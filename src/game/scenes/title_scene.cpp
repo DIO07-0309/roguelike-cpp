@@ -109,11 +109,11 @@ void TitleScene::_render() {
         float w = MeasureTextEx(g_font_small, "重庆大学大数据与软件学院 · 程序设计实训", 12, 1).x;
         DrawTextEx(g_font_small, "重庆大学大数据与软件学院 · 程序设计实训",
                    {sw/2.0f - w/2, (float)(sh - 50)}, 12, 1, {80, 80, 80, 255});
-        w = MeasureTextEx(g_font_small, "开发者：周禹同  20252450  C++版", 14, 1).x;
-        DrawTextEx(g_font_small, "开发者：周禹同  20252450  C++版",
+        w = MeasureTextEx(g_font_small, "开发者：ruozhiDIO  C++版", 14, 1).x;
+        DrawTextEx(g_font_small, "开发者：ruozhiDIO  C++版",
                    {sw/2.0f - w/2, (float)(sh - 30)}, 14, 1, {140, 140, 160, 255});
     } else {
-        DrawText("CQU PT | 20252450 | C++ Edition", sw/2 - 100, sh - 30, 14, {140, 140, 160, 255});
+        DrawText("CQU PT | ruozhiDIO | C++ Edition", sw/2 - 100, sh - 30, 14, {140, 140, 160, 255});
     }
 }
 

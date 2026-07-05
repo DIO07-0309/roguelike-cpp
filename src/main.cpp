@@ -1,7 +1,7 @@
 // ============================================================
 // Roguelike C++ Edition
 // 重庆大学大数据与软件学院 · 程序设计实训
-// 开发者：周禹同 20252450
+// 开发者：ruozhiDIO
 // ============================================================
 #include "raylib.h"
 #include "core/scene_tree.h"
@@ -106,7 +106,7 @@ static void _terminate_handler() {
         time_t now = time(nullptr); struct tm tm_buf;
         localtime_s(&tm_buf, &now); char ts[32];
         strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_buf);
-        fprintf(cf, "[%s] CRASH\nC++ std::terminate\n开发者：周禹同 20252450\n", ts);
+        fprintf(cf, "[%s] CRASH\nC++ std::terminate\n开发者：ruozhiDIO\n", ts);
         fclose(cf);
     }
     fprintf(stderr, "\n致命错误! 详见 crash.log\n按 Enter 退出...");

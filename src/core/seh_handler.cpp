@@ -31,7 +31,7 @@ extern "C" long __stdcall _seh_handler(void* pinfo) {
     char buf[256];
     snprintf(buf, sizeof(buf),
         "SEH Exception 0x%08X at 0x%p\n"
-        "开发者：周禹同 20252450",
+        "开发者：ruozhiDIO",
         (unsigned)code, addr);
     _write_crash(buf);
 
