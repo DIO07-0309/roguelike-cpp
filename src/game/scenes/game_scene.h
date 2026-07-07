@@ -75,7 +75,9 @@ private:
     void _update_monsters(float dt);
     void _on_monster_killed(Monster* m);
     void _check_floor_clear();
+    void _cleanup_dead_monsters();   // poison tick 后统一收尾
     void _apply_pending_damage();
+    void _handle_debug_buff_test_input();  // F1-F6 Debug Buff 测试 (仅 _DEBUG)
 
     // 楼层
     void _activate_stairs();
@@ -96,6 +98,8 @@ private:
     void _draw_hud();
     void _draw_inventory_panel();
     void _draw_skill_bar();
+    void _draw_player_buffs();     // 玩家 Buff HUD（技能栏下方，全名+层数+时间）
+    void _draw_monster_buffs(const Monster& m, float draw_x, float draw_y);  // 怪物 Buff 简写标签
     void _draw_effects();
     void _draw_time_stop_overlay();
     void _draw_boss_cinematic_overlay();

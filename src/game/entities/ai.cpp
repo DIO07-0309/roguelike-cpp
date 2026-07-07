@@ -2,6 +2,7 @@
 #include "monster.h"
 #include "player.h"
 #include "game_map.h"
+#include "combat_system.h"
 #include "vfx_server.h"
 
 MonsterAI::MonsterAI(float sight, float speed, float patrol, float attack)
@@ -72,7 +73,7 @@ void MonsterAI::_execute_attack(Monster* self, Player* player, double gt,
 
 void MonsterAI::_apply_movement(Monster* self, GameMap* map, float mx, float my, double dt) {
     auto& e = self->entity;
-    float s = move_speed * (float)dt;
+    float s = get_effective_speed(self, move_speed) * (float)dt;
 
     // X 轴
     e.position.x += mx * s;

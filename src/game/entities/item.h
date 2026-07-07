@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include "raylib.h"
+#include "combat_system.h"
 
 // ============================================================
 // Item — 道具系统 (4稀有度 / 装备 / 消耗 / 护符)
@@ -96,14 +97,21 @@ struct CharmItem : EquipmentItem {
 struct ConsumableItem : Item {
     std::string effect_type;
     int effect_value;
+    std::string buff_id;                 // 兼容旧存档，新代码优先读 triggers
+    std::vector<BuffTrigger> triggers;   // 使用后触发的 Buff 规则
 
     ConsumableItem(const std::string& name, Rarity r,
-                   const std::string& type, int val)
+                   const std::string& type, int val,
+                   const std::string& buf = "")
         : Item(name, r, "P"), effect_type(type),
-          effect_value(std::max(1, (int)(val * rarity_mult(r)))) {}
+          effect_value(std::max(1, (int)(val * rarity_mult(r)))),
+          buff_id(buf) {
+        if (!buf.empty()) triggers = {{buf, 1, 1.0f, BuffTarget::SELF}};
+    }
 
     std::string use(Player* player);
     std::string get_description() const override {
+        if (!triggers.empty()) return rarity_label(rarity) + " " + base_name + " (" + get_buff_display_name(triggers[0].buff_id) + " 6s)";
         if (effect_type == "heal") return rarity_label(rarity) + " " + base_name + " (恢复" + std::to_string(effect_value) + " HP)";
         return Item::get_description();
     }

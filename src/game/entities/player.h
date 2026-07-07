@@ -20,6 +20,7 @@ public:
     Direction direction = Direction::DOWN;
     bool is_moving = false;
     CombatStats combat;
+    std::vector<BuffInstance> active_buffs;   // 当前施加的 buff
     Inventory inventory;
     SkillManager skills;
     AttackType attack_type = AttackType::PHYSICAL;

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include "raylib.h"
 #include "entity.h"
+#include "combat_system.h"
 
 // 前向声明
 class Player;
@@ -51,6 +52,8 @@ protected:
 // 主动技能
 class ActiveSkill : public Skill {
 public:
+    std::vector<struct BuffTrigger> triggers;   // 命中后触发的 Buff 规则
+
     ActiveSkill(const std::string& n, float cd, int ml = 5)
         : Skill(n, cd, ml) {}
 

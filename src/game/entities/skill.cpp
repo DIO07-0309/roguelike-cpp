@@ -67,7 +67,10 @@ void PassiveSkill::remove(Player* player) {
 }
 
 // ---- SlashSkill ----
-SlashSkill::SlashSkill() : ActiveSkill("斩击", 2.0f, 3) { _cone_range = 1; }
+SlashSkill::SlashSkill() : ActiveSkill("斩击", 2.0f, 3) {
+    _cone_range = 1;
+    triggers = {{"poison", 1, 0.30f, BuffTarget::ENEMY}};
+}
 
 void SlashSkill::_on_level_up() {
     if (level == 2) { base_cooldown = 1.6f; _cone_range = 2; }
@@ -78,8 +81,21 @@ void SlashSkill::_on_level_up() {
 std::string SlashSkill::execute(Player* caster, std::vector<Monster*>& targets, GameMap*) {
     auto hit = get_targets_in_cone(caster, targets, _cone_range);
     if (hit.empty()) return "斩击挥空了（无目标）";
+
+    // Buff 触发规则 (统一到 triggers)
+    std::string extra;
+    for (auto* t : hit) {
+        for (auto& tr : triggers) {
+            if (tr.target == BuffTarget::ENEMY
+                && (tr.chance >= 1.0f || (float)(rng() % 1000) / 1000.0f < tr.chance)) {
+                apply_buff(t, tr.buff_id, tr.stacks);
+                extra += " " + t->name + get_buff_display_name(tr.buff_id) + "!";
+            }
+        }
+    }
+
     int total = 0;
-    float base = caster->combat.get_effective_attack() * 1.5f;
+    float base = get_effective_attack(caster) * 1.5f;
     float power = get_power_multiplier();
     int hits_per = (level >= 3) ? 2 : 1;
     for (auto* t : hit) {
@@ -92,6 +108,7 @@ std::string SlashSkill::execute(Player* caster, std::vector<Monster*>& targets, 
     }
     std::string d = "斩击Lv" + std::to_string(level) + " 命中 " + std::to_string(hit.size()) + " 目标";
     if (hits_per > 1) d += "（二连击）";
+    if (!extra.empty()) d += extra;
     return d + "，造成 " + std::to_string(total) + " 伤害";
 }
 
@@ -100,7 +117,9 @@ std::string SlashSkill::get_level_text() const {
 }
 
 // ---- FireballSkill ----
-FireballSkill::FireballSkill() : ActiveSkill("神罚", 5.0f, 3) {}
+FireballSkill::FireballSkill() : ActiveSkill("神罚", 5.0f, 3) {
+    triggers = {{"slow", 1, 0.25f, BuffTarget::ENEMY}};
+}
 
 void FireballSkill::_on_level_up() {
     if (level == 2) { base_cooldown = 4.0f; _target_count = 2; _range = 7.0f; }
@@ -133,7 +152,7 @@ std::string FireballSkill::execute(Player* caster, std::vector<Monster*>& target
     if (chosen.empty()) return "神罚没有击中任何目标";
 
     int total = 0;
-    float base = caster->combat.get_effective_attack() * 2.5f;
+    float base = get_effective_attack(caster) * 2.5f;
     float power = get_power_multiplier();
     for (auto* t : chosen) {
         int dmg = calculate_damage((int)(base * power),
@@ -141,8 +160,19 @@ std::string FireballSkill::execute(Player* caster, std::vector<Monster*>& target
         t->combat.take_damage(dmg);
         total += dmg;
     }
+    // Buff 触发规则 (统一到 triggers)
+    std::string extra;
+    if (!chosen.empty()) {
+        for (auto& tr : triggers) {
+            if (tr.target == BuffTarget::ENEMY
+                && (tr.chance >= 1.0f || (float)(rng() % 1000) / 1000.0f < tr.chance)) {
+                apply_buff(chosen[0], tr.buff_id, tr.stacks);
+                extra += " " + chosen[0]->name + get_buff_display_name(tr.buff_id) + "!";
+            }
+        }
+    }
     return "神罚Lv" + std::to_string(level) + " 命中 " + std::to_string(chosen.size())
-           + " 目标，造成 " + std::to_string(total) + " 伤害";
+           + " 目标，造成 " + std::to_string(total) + " 伤害" + extra;
 }
 
 std::string FireballSkill::get_level_text() const {
@@ -150,7 +180,9 @@ std::string FireballSkill::get_level_text() const {
 }
 
 // ---- SelfHealSkill ----
-SelfHealSkill::SelfHealSkill() : ActiveSkill("自愈", 8.0f, 3) {}
+SelfHealSkill::SelfHealSkill() : ActiveSkill("自愈", 8.0f, 3) {
+    triggers = {{"attack_up", 1, 1.0f, BuffTarget::SELF}};
+}
 
 void SelfHealSkill::_on_level_up() {
     if (level == 2) base_cooldown = 6.5f;
@@ -166,6 +198,9 @@ std::string SelfHealSkill::execute(Player* caster, std::vector<Monster*>&, GameM
     int recovered = caster->combat.heal(instant);
     std::string d = "自愈Lv" + std::to_string(level) + " 瞬回 " + std::to_string(recovered) + " HP";
     if (level >= 3) { _regen_left = 4.0f; d += "（+4秒持续再生）"; }
+    // Buff 触发规则 (统一到 triggers)
+    apply_triggers_self(triggers, caster);
+    if (!triggers.empty()) d += " " + get_buff_display_name(triggers[0].buff_id) + "!";
     return d;
 }
 

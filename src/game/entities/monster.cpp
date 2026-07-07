@@ -17,11 +17,16 @@ bool Monster::can_attack(double gt) const {
 }
 
 int Monster::attack_target(Player* target, double gt) {
-    int dmg = calculate_damage(combat.get_effective_attack(),
+    int dmg = calculate_damage(get_effective_attack(this),
                                 target->combat.get_effective_defense(attack_type),
                                 attack_type);
     target->combat.take_damage(dmg);
     last_attack_time = (float)gt;
+    // 怪物命中附带 Buff (统一触发规则)
+    for (auto& tr : on_hit_triggers) {
+        if (tr.chance >= 1.0f || (float)(rng() % 1000) / 1000.0f < tr.chance)
+            apply_buff(target, tr.buff_id, tr.stacks);
+    }
     return dmg;
 }
 
@@ -86,9 +91,15 @@ void Monster::draw(float cam_x, float cam_y) {
 
 Monster* spawn_monster(float px, float py, const std::string& type) {
     if (type == "slime") {
-        return new Monster(px, py, "史莱姆", 15, 3, 0, 1, {100, 180, 100, 255});
+        auto* m = new Monster(px, py, "史莱姆", 15, 3, 0, 1, {100, 180, 100, 255});
+        m->on_hit_triggers = {{"slow", 1, 0.25f, BuffTarget::ENEMY}};
+        return m;
     } else if (type == "orc") {
-        return new Monster(px, py, "兽人", 30, 7, 3, 1, {200, 80, 80, 255});
+        auto* m = new Monster(px, py, "兽人", 30, 7, 3, 1, {200, 80, 80, 255});
+        m->on_hit_triggers = {{"poison", 1, 0.25f, BuffTarget::ENEMY}};
+        return m;
     }
-    return new Monster(px, py, "史莱姆", 15, 3, 0, 1, {100, 180, 100, 255});
+    auto* m = new Monster(px, py, "史莱姆", 15, 3, 0, 1, {100, 180, 100, 255});
+    m->on_hit_triggers = {{"slow", 1, 0.25f, BuffTarget::ENEMY}};
+    return m;
 }

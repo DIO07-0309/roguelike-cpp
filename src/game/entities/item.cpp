@@ -1,8 +1,7 @@
 #include "item.h"
 #include "player.h"
 #include "skill.h"
-
-std::mt19937 rng((unsigned)time(nullptr));
+#include "combat_system.h"
 
 Rarity random_rarity() {
     int w[] = {60, 25, 12, 3};
@@ -64,6 +63,10 @@ std::string CharmItem::get_description() const {
 }
 
 std::string ConsumableItem::use(Player* player) {
+    if (!triggers.empty()) {
+        apply_triggers_self(triggers, player);
+        return "使用 " + get_description() + "，属性提升！";
+    }
     if (effect_type == "heal") {
         int recovered = player->combat.heal(effect_value);
         return "使用 " + get_description() + "，恢复了 " + std::to_string(recovered) + " HP";
@@ -91,6 +94,10 @@ std::shared_ptr<Item> generate_random_item() {
         int pd = 3 + (int)(rng() % 6);
         return std::make_shared<EquipmentItem>(n, r, "armor", 0, pd, (int)(rng() % 4));
     } else {
+        // 80% 回血药, 20% 力量药剂
+        if (rng() % 5 == 0) {
+            return std::make_shared<ConsumableItem>("力量药剂", r, "buff", 1, "attack_up");
+        }
         const char* n = potions[rng() % 3];
         int heal = 15 + (int)(rng() % 26);
         return std::make_shared<ConsumableItem>(n, r, "heal", heal);

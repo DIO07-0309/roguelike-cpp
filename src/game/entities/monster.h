@@ -7,6 +7,7 @@
 #include "raylib.h"
 #include "entity.h"
 #include "combat_stats.h"
+#include "combat_system.h"
 
 // 前向声明
 class Player;
@@ -20,9 +21,11 @@ class Monster {
 public:
     Entity entity;
     CombatStats combat;
+    std::vector<BuffInstance> active_buffs;   // 当前施加的 buff
     std::string name;
     Color color{200, 80, 80, 255};
     bool is_boss = false;
+    std::vector<BuffTrigger> on_hit_triggers;  // 命中玩家时触发的 Buff 规则
     AttackType attack_type = AttackType::PHYSICAL;
     float attack_cooldown = 1.5f;
     float last_attack_time = 0.0f;

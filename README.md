@@ -167,7 +167,41 @@ build/roguelike_cpp.exe
 - **追击**：直线向玩家移动，速度 80 px/s
 - **攻击**：1.5 秒冷却，站定攻击
 
-### 5.5 Boss
+### 5.5 Buff 状态系统（B1~B7 完整实现）
+
+**Buff 类型**（3 种，配置化 JSON 驱动）：
+
+| Buff | 类型 | 效果 | 持续 | 最大层数 | 来源 |
+|------|------|------|------|----------|------|
+| **中毒** (poison) | DOT | 每层每 0.5s 跳 3 点物理伤害 | 4s | 5 | 斩击、兽人攻击 |
+| **减速** (slow) | STAT_MOD | 每层移速 ×0.7 | 3s | 3 | 神罚、史莱姆攻击 |
+| **攻击提升** (attack_up) | STAT_MOD | 每层攻击力 +30% | 6s | 3 | 自愈、力量药剂 |
+
+**玩法接入**（B6）：
+- **技能**：斩击 30% 上毒、神罚 25% 减速、自愈必定攻击提升
+- **怪物**：史莱姆 25% 减速、兽人 25% 上毒
+- **道具**：力量药剂（20% 掉落概率）使用后攻击提升 6s
+
+**触发规则统一化**（B7）：
+- 所有 Buff 触发规则统一为 `std::vector<BuffTrigger>`（buff_id + stacks + chance + target）
+- 挂载在 `ActiveSkill.triggers` / `Monster.on_hit_triggers` / `ConsumableItem.triggers`
+- 提供 `apply_triggers()` / `apply_triggers_self()` 两个统一 helper
+
+**Buff HUD**（B3）：
+- 玩家 HUD：技能栏下方显示"显示名 ×层数 剩余时间"
+- 怪物标签：头顶简写标签（毒×2 / 慢×1 / 攻×2）
+
+**配置化**（B4）：`resources/buffs.json` — 加载到 `g_buff_defs` map，display_name/short_name/hud_color 均来自 JSON。自定义精简 JSON 解析器（零第三方依赖）。
+
+**存档恢复**（B5）：`buf:` 行完整存储 id/stacks/remaining/tick_timer，老存档无 `buf:` 字段自动兼容。
+
+**生命周期**（B2）：
+- 死亡对象不再 tick buff
+- poison 毒死怪物 → 复用 `_on_monster_killed()` → XP/掉落/楼梯清怪
+- DOT 用 `while` 处理大 dt 跨多个 tick_interval，不丢 tick
+- 同 id buff 叠层刷新持续时间，POISON 叠层不重置 tick_timer
+
+### 5.6 Boss
 
 三场 Boss 战（第 5 / 10 / 15 层）：
 
@@ -469,3 +503,4 @@ eqa:铁铠,RARE,armor,0,5,1
 | M10 | 音频（8SFX + 4BGM 程序化合成） | ✅ |
 | M11 | 存档系统（JSON 完整序列化） | ✅ |
 | M12 | 日志系统（game.log + crash.log） | ✅ |
+| M13 | Buff 系统（配置化/存档/HUD/玩法接入/触发统一） | ✅ |

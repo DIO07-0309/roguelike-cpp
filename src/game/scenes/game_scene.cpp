@@ -173,6 +173,24 @@ void GameScene::_process(double delta) {
     if (state != GameState::PLAYING) return;
     game_time += dt;
 
+    // ── Buff 逐帧结算 ──
+    std::vector<BuffEvent> buf_events;
+    tick_buffs(player.get(), dt, &buf_events);
+    for (auto& m : monsters) tick_buffs(m.get(), dt, &buf_events);
+
+    // Buff 事件日志
+    for (auto& ev : buf_events) {
+        if (ev.type == BuffEventType::APPLIED)
+            LOG_INFO("[BUF] %s applied to %s (stacks=%d)", ev.buff_id.c_str(), ev.target.c_str(), ev.stacks);
+        else if (ev.type == BuffEventType::TICK_DAMAGE)
+            LOG_INFO("[BUF] %s tick on %s: %d dmg (stacks=%d)", ev.buff_id.c_str(), ev.target.c_str(), ev.value, ev.stacks);
+        else if (ev.type == BuffEventType::EXPIRED)
+            LOG_INFO("[BUF] %s expired from %s", ev.buff_id.c_str(), ev.target.c_str());
+    }
+
+    // 清理被毒死的怪物
+    _cleanup_dead_monsters();
+
     // 延迟播放 BGM（此时 get_tree() 已可用）
     if (!_pending_bgm.empty() && get_tree()) {
         LOG_DEBUG("BGM延迟播放: %s", _pending_bgm.c_str());
@@ -203,7 +221,7 @@ void GameScene::_process(double delta) {
         // 玩家移动
         Vector2 move = player->handle_input(get_tree()->get_input());
         auto& e = player->entity;
-        float s = player->speed * dt;
+        float s = get_effective_speed(player.get()) * dt;
         e.position.x += move.x * s; e.sync_rect();
         if (!game_map->is_rect_walkable(e.rect)) { e.position.x -= move.x * s; e.sync_rect(); }
         e.position.y += move.y * s; e.sync_rect();
@@ -262,6 +280,10 @@ void GameScene::_input(const InputMap& input) {
 
     if (state != GameState::PLAYING) return;
 
+#ifdef _DEBUG
+    _handle_debug_buff_test_input();   // F1-F6 Buff 调试
+#endif
+
     if (inventory_open) {
         if (input.is_action_just_pressed("inventory") || input.is_action_just_pressed("cancel"))
             inventory_open = false;
@@ -288,6 +310,33 @@ void GameScene::_input(const InputMap& input) {
 }
 
 // ============================================================
+// Debug Buff 测试入口 (仅 _DEBUG 构建)
+// ============================================================
+void GameScene::_handle_debug_buff_test_input() {
+    if (!player) return;
+    if (IsKeyPressed(KEY_F1))
+        apply_buff(player.get(), "attack_up", 1);
+    if (IsKeyPressed(KEY_F2))
+        apply_buff(player.get(), "slow", 1);
+    if (IsKeyPressed(KEY_F3) && !monsters.empty())
+        apply_buff(monsters[0].get(), "poison", 2);
+    if (IsKeyPressed(KEY_F4)) {
+        auto dump = [](const std::vector<BuffInstance>& buffs, const char* who) {
+            if (buffs.empty()) { LOG_INFO("[F4] %s buffs: (none)", who); return; }
+            for (auto& b : buffs)
+                LOG_INFO("[F4] %s buff: %s stacks=%d rem=%.2f tick=%.2f",
+                    who, b.id.c_str(), b.stacks, b.remaining, b.tick_timer);
+        };
+        dump(player->active_buffs, "Player");
+        if (!monsters.empty()) dump(monsters[0]->active_buffs, "Monster[0]");
+    }
+    if (IsKeyPressed(KEY_F5) && !monsters.empty())
+        apply_buff(monsters[0].get(), "slow", 2);
+    if (IsKeyPressed(KEY_F6) && !monsters.empty())
+        apply_buff(monsters[0].get(), "attack_up", 2);
+}
+
+// ============================================================
 // 战斗
 // ============================================================
 void GameScene::_player_attack() {
@@ -298,7 +347,7 @@ void GameScene::_player_attack() {
         reinterpret_cast<const std::vector<Monster*>&>(monsters), PLAYER_ATTACK_RANGE);
     if (!target) return;
 
-    int dmg = calculate_damage(player->combat.get_effective_attack(),
+    int dmg = calculate_damage(get_effective_attack(player.get()),
         target->combat.get_effective_defense(player->attack_type));
     player->_last_attack_time = game_time;
 
@@ -472,6 +521,17 @@ void GameScene::_on_monster_killed(Monster* m) {
     _check_floor_clear();
 }
 
+void GameScene::_cleanup_dead_monsters() {
+    auto it = monsters.begin();
+    while (it != monsters.end()) {
+        if (!(*it)->combat.is_alive) {
+            _on_monster_killed(it->get());
+            it = monsters.erase(it);
+        } else ++it;
+    }
+    _check_floor_clear();
+}
+
 void GameScene::_check_floor_clear() {
     bool all_dead = true;
     for (auto& m : monsters) if (m->combat.is_alive) { all_dead = false; break; }
@@ -597,7 +657,12 @@ void GameScene::_draw_map() {
 }
 
 void GameScene::_draw_entities() {
-    for (auto& m : monsters) m->draw(_cam_x, _cam_y);
+    for (auto& m : monsters) {
+        m->draw(_cam_x, _cam_y);
+        _draw_monster_buffs(*m,
+            m->entity.position.x - _cam_x,
+            m->entity.position.y - _cam_y);
+    }
     if (player) player->draw_no_cam(_cam_x, _cam_y);
 }
 
@@ -673,6 +738,8 @@ void GameScene::_draw_hud() {
 
     // 技能栏
     _draw_skill_bar();
+    // 玩家 Buff (技能栏下方)
+    _draw_player_buffs();
 }
 
 void GameScene::_draw_skill_bar() {
@@ -694,6 +761,41 @@ void GameScene::_draw_skill_bar() {
         draw_progress_bar({x + 26, ry + 16, 90, 8}, cd_r,
                           ready ? Color{60, 180, 255, 255} : Color{70, 70, 70, 255});
     }
+}
+
+// ============================================================
+// 玩家 Buff HUD — 技能栏下方，全名 + 层数 + 剩余时间
+// ============================================================
+void GameScene::_draw_player_buffs() {
+    if (!player || player->active_buffs.empty() || !g_font_loaded) return;
+    auto& buffs = player->active_buffs;
+    float x = 10;
+    float y = 56.0f + player->skills.active_skills.size() * 28.0f + 4.0f;
+    for (auto& b : buffs) {
+        std::string line = get_buff_display_name(b.id)
+            + " x" + std::to_string(b.stacks)
+            + "  " + format_buff_time(b.remaining);
+        DrawTextEx(g_font_small, line.c_str(), {x, y}, 14, 1, get_buff_hud_color(b.id));
+        y += 18;
+    }
+}
+
+// ============================================================
+// 怪物 Buff 标签 — 怪物头顶简写
+// ============================================================
+void GameScene::_draw_monster_buffs(const Monster& m, float draw_x, float draw_y) {
+    if (m.active_buffs.empty() || !g_font_loaded) return;
+    std::string label;
+    for (auto& b : m.active_buffs) {
+        if (!label.empty()) label += " ";
+        label += get_buff_short_name(b.id) + "x" + std::to_string(b.stacks);
+    }
+    float tw = MeasureTextEx(g_font_small, label.c_str(), 12, 1).x;
+    float px = draw_x + (m.entity.size.x - tw) / 2;
+    float py = draw_y - 16;
+    Color c = get_buff_hud_color(m.active_buffs[0].id);
+    DrawTextEx(g_font_small, label.c_str(), {px + 1, py + 1}, 12, 1, {0, 0, 0, 180});
+    DrawTextEx(g_font_small, label.c_str(), {px, py}, 12, 1, c);
 }
 
 void GameScene::_draw_inventory_panel() {

@@ -2,11 +2,23 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include <algorithm>
 
 // ============================================================
 // CombatStats — 战斗属性组件 (组合模式)
 // ============================================================
 enum class AttackType { PHYSICAL, MAGICAL, TRUE };
+
+// ============================================================
+// BuffInstance — 单个 buff 实例 (挂在 Player / Monster 上)
+// ============================================================
+struct BuffInstance {
+    std::string id;          // "poison" | "slow" | "attack_up"
+    int stacks = 1;          // 当前层数 (1 ~ max_stacks)
+    float remaining = 0.0f;  // 剩余时间 (秒)
+    float tick_timer = 0.0f; // 距下一次 DOT 触发 (仅 poison 等周期 buff 使用)
+};
 
 struct CombatStats {
     int max_hp;
