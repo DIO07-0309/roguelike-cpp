@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Demo/roguelike_cpp/build_mingw/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
