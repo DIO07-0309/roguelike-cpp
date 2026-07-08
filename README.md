@@ -49,7 +49,7 @@ build/roguelike_cpp.exe
 | **W A S D** | 上下左右移动 |
 | **↑ ↓ ← →** | 切换朝向（不移动） |
 | **空格** | 普攻攻击最近的怪物 |
-| **E** | 拾取地面上的物品 |
+| **E** | 拾取地面物品 / 触发特殊房间 |
 | **I** | 打开 / 关闭背包 |
 | **>** | 下楼（需楼梯激活） |
 
@@ -233,7 +233,36 @@ build/roguelike_cpp.exe
 - 清空楼层时自动存档
 - **难度递增**：怪物 HP×1.0→3.3，ATK×1.0→2.9
 
-### 5.7 地图生成
+### 5.7 特殊房间系统（B8/B9/B10 完整实现）
+
+每层地牢中随机分布 2~3 个特殊房间，房间类型通过 `SpecialRoomType` 强类型枚举管理。
+
+**三种特殊房间**：
+
+| 房间 | 图标 | 效果 | 复用系统 |
+|------|------|------|----------|
+| **祭坛** (ALTAR) | `+` 琥珀色地板 | 4 结果池随机（25%）：攻击赐福 / 治愈赐福 / 代价换力量 / 净化负面 | Buff / Heal |
+| **宝箱** (TREASURE) | `$` 深蓝色地板 | 品质分层（60% 普通 / 30% 丰厚 2 件 / 10% 祝福 +attack_up） | 物品生成 / Inventory |
+| **泉水** (FOUNTAIN) | `~` 深绿色地板 | 回满 HP + 净化 poison/slow | Heal / Buff |
+
+**交互规则**：
+- 首次走入房间 → 弹出发现提示（2.5 秒淡出，如"你发现了一座古老祭坛。"）
+- 站在房间内按 **E** → 触发奖励（优先于拾取）
+- 每个房间每层只能触发一次，触发后地板灰化
+- 发现状态（`discovered`）和触发状态（`triggered`）独立存档
+
+**Seed 驱动地图恢复**：
+- 每层生成时记录 `dungeon_seed`
+- 存档保存 `seed` + `spr`（已触发）+ `spd`（已发现）
+- 读档用同 seed 确定性重建地图 → 恢复所有房间状态
+
+**结构**（`src/game/world/special_room.h/.cpp`）：
+- `SpecialRoomType` enum + `SpecialRoom` struct（cx/cy/rx/ry/rw/rh/type/discovered/triggered）
+- `GameMap::special_rooms` + `get_special_room_at(tx, ty)` 查询
+- `DungeonGenerator` 排除玩家/楼梯房间后 Fisher-Yates 分配
+- `execute_special_room(type, player)` 统一交互入口（GameScene 只调此函数）
+
+### 5.8 地图生成
 
 **BSP（二分空间划分）** 算法随机生成：
 
@@ -283,7 +312,8 @@ roguelike_cpp/
 │       │   └── vfx_server.h / .cpp    # 攻击特效 (pulse/spark/bolt/flash/slash_arc)
 │       ├── world/          #  世界模块
 │       │   ├── game_map.h / .cpp            # GameMap: 2D瓦片网格+碰撞
-│       │   └── dungeon_generator.h / .cpp   # BSPNode + BSP生成器
+│       │   ├── dungeon_generator.h / .cpp   # BSPNode + BSP生成器 + seed驱动
+│       │   ├── special_room.h / .cpp          # 特殊房间: 3类型/交互/发现提示
 │       ├── audio/          #  音频模块（程序化合成）
 │       │   ├── wave_synth.h / .cpp   # 波形合成 (方波/正弦/噪声/ADSR)
 │       │   ├── bgm_engine.h / .cpp   # 4支BGM (和弦+旋律+低音+鼓轨)
@@ -452,7 +482,7 @@ modifiers 叠加:
 | 模块通信 | 直接 import + 方法调用 | Signal 信号槽 |
 | 内存管理 | GC | shared_ptr / unique_ptr (RAII) |
 | 渲染 | pygame.draw.rect/circle | raylib DrawRectangle/DrawCircle |
-| 字体 | TTF 自动（pygame 内置） | LoadFontEx + 逐字码位加载（716字） |
+| 字体 | TTF 自动（pygame 内置） | LoadFontEx + 逐字码位加载（816字） |
 | 音频 | pygame.mixer.Sound | Wave 合成 → LoadSoundFromWave |
 | 输入 | pygame.key.get_pressed() | InputMap 动作→按键抽象 |
 | 打包 | PyInstaller (37MB) | 原生 EXE + raylib.dll (2MB) |
@@ -481,9 +511,13 @@ pas:IronSkin,2;Berserk,1;
 inv:长剑,RARE,weapon,8,1,0;生命药水,COMMON,heal,20;
 eqw:魔渊之刃,LEGENDARY,weapon,18,3,0
 eqa:铁铠,RARE,armor,0,5,1
+buf:poison,2,3.50,0.20;attack_up,1,5.80,0.00;
+seed:2873910246
+spr:1,0,1
+spd:1,1,0
 ```
 
-保存内容：楼层/等级/属性/主动技能(名+等级)/被动技能/背包物品(名+稀有度+属性)/装备武器/装备护甲。
+保存内容：楼层/等级/属性/主动技能(名+等级)/被动技能/背包物品/装备/Buff/地牢种子/特殊房间触发+发现状态。
 
 ---
 
@@ -504,3 +538,6 @@ eqa:铁铠,RARE,armor,0,5,1
 | M11 | 存档系统（JSON 完整序列化） | ✅ |
 | M12 | 日志系统（game.log + crash.log） | ✅ |
 | M13 | Buff 系统（配置化/存档/HUD/玩法接入/触发统一） | ✅ |
+| M14 | 特殊房间系统（祭坛/宝箱/泉水 + 发现提示 + 消息条 + Seed驱动存档恢复） | ✅ |
+| M15 | 特殊房间内容深化（祭坛4结果池 / 宝箱品质分层 / 泉水净化） | ✅ |
+| M16 | 特殊房间体验增强（discovered/triggered 分离 + spd存档 + 屏幕消息显示） | ✅ |

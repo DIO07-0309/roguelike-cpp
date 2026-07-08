@@ -1,31 +1,12 @@
-# Build output
-build/
+﻿build/
+build_mingw/
+dist/
+vendor/
 *.exe
 *.dll
-*.obj
-*.o
-*.a
-*.lib
-*.pdb
-*.ilk
-*.exp
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Vendor (下载的外部依赖，不纳入版本控制)
-vendor/
-
-# Logs
-*.log
+*.pyd
+*.pyc
+__pycache__/
 crash.log
-
-# Saves（本地存档，不上传）
-saves/
+game.log
+saves/save.json

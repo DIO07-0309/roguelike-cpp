@@ -5,8 +5,11 @@
 DungeonGenerator::DungeonGenerator(int w, int h, int ts, int mp, int mr, int mg)
     : _w(w), _h(h), _ts(ts), _min_part(mp), _min_room(mr), _margin(mg) {}
 
-std::shared_ptr<GameMap> DungeonGenerator::generate() {
-    _rooms.clear(); _corridors.clear();
+std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed) {
+    _seed = seed;
+    if (seed != 0) _local_rng.seed(seed);
+
+    _rooms.clear(); _corridors.clear(); _special_rooms.clear();
     delete _root;
     _root = new BSPNode(0, 0, _w, _h);
 
@@ -17,6 +20,11 @@ std::shared_ptr<GameMap> DungeonGenerator::generate() {
     auto gm = std::make_shared<GameMap>(_w, _h, _ts);
     auto tmpl = _build_template();
     gm->load_from_template(tmpl);
+
+    // B8: 分配特殊房间并传至 GameMap
+    _assign_special_rooms();
+    gm->special_rooms = _special_rooms;
+
     return gm;
 }
 
@@ -27,15 +35,51 @@ std::vector<std::pair<int,int>> DungeonGenerator::get_room_centers() const {
     return centers;
 }
 
+// B8: 统一的随机入口 — seed≠0 时走本地 rng，否则走全局 rng
+int DungeonGenerator::_rand_int(int max_exclusive) {
+    if (max_exclusive <= 0) return 0;
+    if (_seed != 0) return (int)(_local_rng() % (uint32_t)max_exclusive);
+    return (int)(rng() % max_exclusive);
+}
+
+// B8: 从 _rooms 中挑选 2~3 个作为特殊房间
+void DungeonGenerator::_assign_special_rooms() {
+    // 需要至少 4 个房间: 玩家 + 楼梯 + 2 特殊
+    if (_rooms.size() < 4) return;
+
+    // 排除 rooms[0] (玩家) 和 rooms.back() (楼梯)
+    std::vector<int> candidates;
+    for (int i = 1; i < (int)_rooms.size() - 1; i++)
+        candidates.push_back(i);
+
+    // Fisher-Yates shuffle (用本地随机保证同 seed 同结果)
+    for (int i = (int)candidates.size() - 1; i > 0; i--) {
+        int j = _rand_int(i + 1);
+        std::swap(candidates[i], candidates[j]);
+    }
+
+    int count = std::min(3, (int)candidates.size());
+    for (int i = 0; i < count; i++) {
+        auto [rx, ry, rw, rh] = _rooms[candidates[i]];
+        SpecialRoom sr;
+        sr.cx = rx + rw / 2;
+        sr.cy = ry + rh / 2;
+        sr.rx = rx; sr.ry = ry; sr.rw = rw; sr.rh = rh;
+        sr.type = special_room_from_index(i); // 0→ALTAR, 1→TREASURE, 2→FOUNTAIN
+        sr.triggered = false;
+        _special_rooms.push_back(sr);
+    }
+}
+
 void DungeonGenerator::_partition(BSPNode* node) {
     bool vertical = (node->w > node->h) ? true
                   : (node->h > node->w) ? false
-                  : ((rng() % 2) == 0);
+                  : (_rand_int(2) == 0);
 
     int region = vertical ? node->w : node->h;
     if (region < _min_part * 2) return;
 
-    int split = _min_part + (int)(rng() % (region - _min_part * 2 + 1));
+    int split = _min_part + _rand_int(region - _min_part * 2 + 1);
     _create_child_nodes(node, vertical, split);
     _partition(node->left);
     _partition(node->right);
@@ -57,10 +101,10 @@ void DungeonGenerator::_create_rooms(BSPNode* node) {
         if (node->right) _create_rooms(node->right);
         return;
     }
-    int rw = _min_room + (int)(rng() % std::max(1, node->w - 2 * _margin - _min_room + 1));
-    int rh = _min_room + (int)(rng() % std::max(1, node->h - 2 * _margin - _min_room + 1));
-    int rx = node->x + _margin + (int)(rng() % std::max(1, node->w - rw - 2 * _margin + 1));
-    int ry = node->y + _margin + (int)(rng() % std::max(1, node->h - rh - 2 * _margin + 1));
+    int rw = _min_room + _rand_int(std::max(1, node->w - 2 * _margin - _min_room + 1));
+    int rh = _min_room + _rand_int(std::max(1, node->h - 2 * _margin - _min_room + 1));
+    int rx = node->x + _margin + _rand_int(std::max(1, node->w - rw - 2 * _margin + 1));
+    int ry = node->y + _margin + _rand_int(std::max(1, node->h - rh - 2 * _margin + 1));
 
     node->rx = rx; node->ry = ry; node->rw = rw; node->rh = rh;
     node->has_room = true;
@@ -88,7 +132,7 @@ std::pair<int,int> DungeonGenerator::_pick_room(BSPNode* node) {
     std::vector<BSPNode*> valid;
     for (auto* c : children) if (c) valid.push_back(c);
     if (valid.empty()) return {-1, -1};
-    return _pick_room(valid[rng() % valid.size()]);
+    return _pick_room(valid[_rand_int((int)valid.size())]);
 }
 
 std::vector<std::string> DungeonGenerator::_build_template() {
@@ -107,8 +151,8 @@ void DungeonGenerator::_carve_rect(std::vector<std::string>& g, int x, int y, in
 }
 
 void DungeonGenerator::_carve_corridor(std::vector<std::string>& g, int x1, int y1, int x2, int y2) {
-    int width = DUNGEON_CORRIDOR_MIN + (int)(rng() % (DUNGEON_CORRIDOR_MAX - DUNGEON_CORRIDOR_MIN + 1));
-    if ((rng() % 2) == 0) {
+    int width = DUNGEON_CORRIDOR_MIN + _rand_int(DUNGEON_CORRIDOR_MAX - DUNGEON_CORRIDOR_MIN + 1);
+    if (_rand_int(2) == 0) {
         _carve_line(g, x1, y1, x2, y1, width);
         _carve_line(g, x2, y1, x2, y2, width);
     } else {

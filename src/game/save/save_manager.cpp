@@ -33,7 +33,10 @@ static std::string trim(const std::string& s) {
 }
 
 // ---- 序列化 ----
-bool SaveManager::save_game(Player* player, int floor, int max_f) {
+bool SaveManager::save_game(Player* player, int floor, int max_f,
+                              uint32_t dungeon_seed,
+                              const std::vector<bool>& special_triggered,
+                              const std::vector<bool>& special_discovered) {
     mkdir_impl(_save_dir().c_str());
     FILE* f = fopen(_save_path().c_str(), "w");
     if (!f) { LOG_ERROR("存档无法写入"); return false; }
@@ -118,11 +121,16 @@ bool SaveManager::save_game(Player* player, int floor, int max_f) {
     }
     fprintf(f, "\n");
 
+    // B8: 特殊房间状态
+    fprintf(f, "seed:%u\n", dungeon_seed);
+    fprintf(f, "spr:%s\n", _encode_spr(special_triggered).c_str());
+    fprintf(f, "spd:%s\n", _encode_spr(special_discovered).c_str());
+
     fclose(f);
-    LOG_INFO("存档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff",
+    LOG_INFO("存档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff seed:%u spr:%zu",
         floor, player->level, c.current_hp, c.max_hp,
         player->skills.active_skills.size(), inv.items.size(),
-        player->active_buffs.size());
+        player->active_buffs.size(), dungeon_seed, special_triggered.size());
     return true;
 }
 
@@ -166,6 +174,9 @@ SaveData* SaveManager::load_save() {
     int lv    = getV("lv", 1);
     int xp    = getV("xp", 0);
     int xpt   = getV("xpt", Player::calc_xp_for_level(lv + 1));
+    uint32_t seed = (uint32_t)getV("seed", 0);
+    std::vector<bool> spr = _decode_spr(getS("spr"));
+    std::vector<bool> spd = _decode_spr(getS("spd"));
     int mhp   = getV("mhp", PLAYER_MAX_HP);
     int chp   = getV("chp", mhp);
     int atk   = getV("atk", PLAYER_ATTACK);
@@ -326,6 +337,9 @@ SaveData* SaveManager::load_save() {
     auto* d = new SaveData;
     d->current_floor = floor;
     d->max_unlocked_floor = maxf;
+    d->dungeon_seed = seed;
+    d->special_triggered = spr;
+    d->special_discovered = spd;
     d->player = std::move(p);
 
     LOG_INFO("读档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff",
@@ -338,4 +352,28 @@ SaveData* SaveManager::load_save() {
 void SaveManager::delete_save() {
     remove(_save_path().c_str());
     LOG_INFO("存档已删除");
+}
+
+// B8: spr 序列化 — vector<bool> → "1,0,1"
+std::string SaveManager::_encode_spr(const std::vector<bool>& v) {
+    std::string out;
+    for (size_t i = 0; i < v.size(); i++) {
+        if (i > 0) out += ",";
+        out += v[i] ? "1" : "0";
+    }
+    return out;
+}
+
+// B8: spr 反序列化 — "1,0,1" → vector<bool>
+std::vector<bool> SaveManager::_decode_spr(const std::string& s) {
+    std::vector<bool> out;
+    if (s.empty()) return out;
+    for (size_t pos = 0; pos < s.size(); ) {
+        size_t comma = s.find(',', pos);
+        std::string tok = s.substr(pos, (comma == std::string::npos) ? std::string::npos : (comma - pos));
+        out.push_back(tok == "1");  // 宽容: 非"1"一律当 false
+        if (comma == std::string::npos) break;
+        pos = comma + 1;
+    }
+    return out;
 }

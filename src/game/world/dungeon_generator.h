@@ -5,6 +5,7 @@
 #include <memory>
 #include "game_map.h"
 #include "config.h"
+#include "special_room.h"
 
 // ============================================================
 // BSPNode — 二分空间划分节点
@@ -32,14 +33,23 @@ public:
     DungeonGenerator(int w, int h, int ts,
                      int min_part = 8, int min_room = 5, int margin = 1);
 
-    std::shared_ptr<GameMap> generate();
+    std::shared_ptr<GameMap> generate(uint32_t seed = 0);
     std::vector<std::pair<int,int>> get_room_centers() const;
+    std::vector<SpecialRoom> get_special_rooms() const { return _special_rooms; }
 
 private:
     int _w, _h, _ts, _min_part, _min_room, _margin;
     BSPNode* _root = nullptr;
     std::vector<std::tuple<int,int,int,int>> _rooms;
     std::vector<std::tuple<int,int,int,int>> _corridors;
+    std::vector<SpecialRoom> _special_rooms;
+
+    // Seed 驱动 (B8)
+    uint32_t _seed = 0;
+    std::mt19937 _local_rng;
+
+    int _rand_int(int max_exclusive);
+    void _assign_special_rooms();
 
     void _partition(BSPNode* node);
     void _create_child_nodes(BSPNode* node, bool vertical, int split);

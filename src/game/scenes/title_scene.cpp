@@ -140,11 +140,15 @@ void TitleScene::_input(const InputMap& input) {
             int maxf = data->max_unlocked_floor;
             // 传递存档中的 player (如果有的话)
             if (data->player) {
-                gs->load_saved_game(floor, maxf, std::move(data->player));
+                gs->load_saved_game(floor, maxf, std::move(data->player),
+                                    data->dungeon_seed, data->special_triggered,
+                                    data->special_discovered);
             } else {
                 auto p = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
                     PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
-                gs->load_saved_game(floor, maxf, std::move(p));
+                gs->load_saved_game(floor, maxf, std::move(p),
+                                    data->dungeon_seed, data->special_triggered,
+                                    data->special_discovered);
             }
             delete data;
             tree->change_scene(gs);

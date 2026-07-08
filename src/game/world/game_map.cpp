@@ -57,6 +57,24 @@ bool GameMap::_in_bounds(int tx, int ty) const {
     return tx >= 0 && tx < width && ty >= 0 && ty < height;
 }
 
+SpecialRoom* GameMap::get_special_room_at(int tile_x, int tile_y) {
+    for (auto& sr : special_rooms) {
+        if (tile_x >= sr.rx && tile_x < sr.rx + sr.rw &&
+            tile_y >= sr.ry && tile_y < sr.ry + sr.rh)
+            return &sr;
+    }
+    return nullptr;
+}
+
+const SpecialRoom* GameMap::get_special_room_at(int tile_x, int tile_y) const {
+    for (auto& sr : special_rooms) {
+        if (tile_x >= sr.rx && tile_x < sr.rx + sr.rw &&
+            tile_y >= sr.ry && tile_y < sr.ry + sr.rh)
+            return &sr;
+    }
+    return nullptr;
+}
+
 void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
     int sc = std::max(0, (int)(cam_x / tile_size));
     int sr = std::max(0, (int)(cam_y / tile_size));
@@ -73,9 +91,40 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                 DrawRectangle(dx, dy, tile_size, tile_size, {60, 60, 80, 255});
                 DrawRectangleLines(dx, dy, tile_size, tile_size, {40, 40, 55, 255});
             } else if (t.type == TileType::FLOOR) {
-                DrawRectangle(dx, dy, tile_size, tile_size, {25, 25, 35, 255});
-                // 细微网格线
-                DrawRectangleLines(dx, dy, tile_size, tile_size, {35, 35, 45, 255});
+                const SpecialRoom* sr = get_special_room_at(x, y);
+                if (sr) {
+                    // 特殊房间地板颜色区分
+                    Color base;
+                    switch (sr->type) {
+                        case SpecialRoomType::ALTAR:    base = {50, 35, 15, 255}; break;
+                        case SpecialRoomType::TREASURE: base = {25, 35, 60, 255}; break;
+                        case SpecialRoomType::FOUNTAIN: base = {20, 45, 25, 255}; break;
+                        default: base = {25, 25, 35, 255}; break;
+                    }
+                    if (sr->triggered) {
+                        base.r = (unsigned char)(base.r * 0.55f);
+                        base.g = (unsigned char)(base.g * 0.55f);
+                        base.b = (unsigned char)(base.b * 0.55f);
+                    }
+                    DrawRectangle(dx, dy, tile_size, tile_size, base);
+                    DrawRectangleLines(dx, dy, tile_size, tile_size, {35, 35, 45, 255});
+                    // 房间中心绘制图标
+                    if (x == sr->cx && y == sr->cy) {
+                        const char* icon = "?";
+                        switch (sr->type) {
+                            case SpecialRoomType::ALTAR:    icon = "+"; break;
+                            case SpecialRoomType::TREASURE: icon = "$"; break;
+                            case SpecialRoomType::FOUNTAIN: icon = "~"; break;
+                        }
+                        Color ic = sr->triggered ? Color{100, 100, 100, 255}
+                                                 : Color{255, 255, 200, 255};
+                        DrawText(icon, (int)dx + 10, (int)dy + 5, 20, ic);
+                    }
+                } else {
+                    DrawRectangle(dx, dy, tile_size, tile_size, {25, 25, 35, 255});
+                    // 细微网格线
+                    DrawRectangleLines(dx, dy, tile_size, tile_size, {35, 35, 45, 255});
+                }
             } else if (t.type == TileType::STAIRS_DOWN) {
                 DrawRectangle(dx, dy, tile_size, tile_size, {50, 40, 20, 255});
                 DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4, {255, 200, 50, 255});

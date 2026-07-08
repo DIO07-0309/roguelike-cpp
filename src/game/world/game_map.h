@@ -3,6 +3,7 @@
 #include <string>
 #include "entity.h"
 #include "raylib.h"
+#include "special_room.h"
 
 // ============================================================
 // Tile / GameMap — 地图数据结构
@@ -30,6 +31,11 @@ public:
 
     bool is_walkable(int tx, int ty) const;
     bool is_rect_walkable(Rectangle rect) const;
+
+    // 特殊房间 (B8)
+    std::vector<SpecialRoom> special_rooms;
+    SpecialRoom* get_special_room_at(int tile_x, int tile_y);
+    const SpecialRoom* get_special_room_at(int tile_x, int tile_y) const;
 
     Vector2 tile_to_pixel(int tx, int ty) const {
         return {(float)tx * tile_size, (float)ty * tile_size};

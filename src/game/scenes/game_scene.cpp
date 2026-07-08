@@ -61,14 +61,34 @@ void GameScene::new_game() {
     enter_floor(1);
 }
 
-void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p) {
+void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
+                                 uint32_t seed,
+                                 const std::vector<bool>& special_triggered,
+                                 const std::vector<bool>& special_discovered) {
     player = std::move(p);
     current_floor = floor;
     max_unlocked_floor = max_f;
-    enter_floor(floor);
+    enter_floor(floor, seed);
+
+    // B8: 地图生成完成后恢复特殊房间触发状态
+    if (game_map && !special_triggered.empty()) {
+        auto& rooms = game_map->special_rooms;
+        size_t n = std::min(rooms.size(), special_triggered.size());
+        for (size_t i = 0; i < n; i++)
+            rooms[i].triggered = special_triggered[i];
+        LOG_INFO("[ROOM] 恢复触发状态: %zu/%zu", n, special_triggered.size());
+    }
+    // B10: 恢复发现状态
+    if (game_map && !special_discovered.empty()) {
+        auto& rooms = game_map->special_rooms;
+        size_t n = std::min(rooms.size(), special_discovered.size());
+        for (size_t i = 0; i < n; i++)
+            rooms[i].discovered = special_discovered[i];
+        LOG_INFO("[ROOM] 恢复发现状态: %zu/%zu", n, special_discovered.size());
+    }
 }
 
-void GameScene::enter_floor(int floor) {
+void GameScene::enter_floor(int floor, uint32_t seed) {
     current_floor = floor;
     game_time = 0;
     ground_items.clear();
@@ -79,10 +99,19 @@ void GameScene::enter_floor(int floor) {
     time_stop_remaining = 0;
     pending_damage.clear();
     monsters.clear();
+    _room_message.clear();
+    _room_message_timer = 0.0f;
 
-    // 生成地牢
+    // B8: seed=0 → 新楼层随机生成; seed!=0 → 读档恢复
+    if (seed != 0) {
+        _dungeon_seed = seed;
+    } else {
+        _dungeon_seed = static_cast<uint32_t>(rng());
+    }
+
+    // 生成地牢 (B8: 统一走 seed 驱动)
     DungeonGenerator gen(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
-    game_map = gen.generate();
+    game_map = gen.generate(_dungeon_seed);
     auto rooms = gen.get_room_centers();
 
     // 放置玩家
@@ -227,6 +256,9 @@ void GameScene::_process(double delta) {
         e.position.y += move.y * s; e.sync_rect();
         if (!game_map->is_rect_walkable(e.rect)) { e.position.y -= move.y * s; e.sync_rect(); }
 
+        // B10: 检测是否步入特殊房间
+        _check_special_room_discovery();
+
         // 怪物 AI（时停期间冻结）
         if (time_stop_remaining <= 0) {
             _update_monsters(dt);
@@ -244,6 +276,9 @@ void GameScene::_process(double delta) {
     for (auto& fx : active_effects) fx.elapsed += dt;
     active_effects.erase(std::remove_if(active_effects.begin(), active_effects.end(),
         [](auto& fx) { return fx.elapsed >= fx.duration; }), active_effects.end());
+
+    // B10: 房间消息计时器
+    if (_room_message_timer > 0) _room_message_timer -= dt;
 }
 
 // ============================================================
@@ -257,7 +292,13 @@ void GameScene::_input(const InputMap& input) {
     if (input.is_action_just_pressed("cancel")) {
         if (state == GameState::PLAYING && player->combat.is_alive) {
             max_unlocked_floor = std::max(max_unlocked_floor, current_floor);
-            SaveManager::save_game(player.get(), current_floor, max_unlocked_floor);
+            std::vector<bool> spr, spd;
+            if (game_map) for (auto& sr : game_map->special_rooms) {
+                spr.push_back(sr.triggered);
+                spd.push_back(sr.discovered);
+            }
+            SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
+                                   _dungeon_seed, spr, spd);
             LOG_INFO("中途退出→存档 (第%d层)", current_floor);
         }
         // 切换到标题场景
@@ -301,7 +342,22 @@ void GameScene::_input(const InputMap& input) {
     }
 
     if (input.is_action_just_pressed("attack")) _player_attack();
-    else if (input.is_action_just_pressed("pickup")) _pickup();
+    else if (input.is_action_just_pressed("pickup")) {
+        // B8: 优先特殊房间交互, 否则走拾取
+        if (player && game_map) {
+            auto [tx, ty] = game_map->pixel_to_tile(
+                player->entity.rect.x + player->entity.rect.width / 2,
+                player->entity.rect.y + player->entity.rect.height / 2);
+            SpecialRoom* room = game_map->get_special_room_at(tx, ty);
+            if (room && !room->triggered) {
+                _interact_special();
+            } else {
+                _pickup();
+            }
+        } else {
+            _pickup();
+        }
+    }
     else if (input.is_action_just_pressed("inventory")) { inventory_open = true; inventory_cursor = 0; }
     else if (input.is_action_just_pressed("skill_1")) _use_skill(0);
     else if (input.is_action_just_pressed("skill_2")) _use_skill(1);
@@ -546,7 +602,13 @@ void GameScene::_activate_stairs() {
     stairs_active = true;
     max_unlocked_floor = std::max(max_unlocked_floor, current_floor);
     LOG_INFO("第%d层清空! 楼梯已激活, 自动存档", current_floor);
-    SaveManager::save_game(player.get(), current_floor, max_unlocked_floor);
+    std::vector<bool> spr, spd;
+    if (game_map) for (auto& sr : game_map->special_rooms) {
+        spr.push_back(sr.triggered);
+        spd.push_back(sr.discovered);
+    }
+    SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
+                           _dungeon_seed, spr, spd);
     on_floor_cleared.emit();
 }
 
@@ -606,6 +668,70 @@ void GameScene::_pickup() {
             [&](auto& d) { return &d == best; });
         if (it != ground_items.end()) ground_items.erase(it);
     }
+}
+
+// B8: 特殊房间交互 — E键优先触发, 每个房间仅一次
+void GameScene::_interact_special() {
+    if (!player || !game_map) return;
+
+    auto [tx, ty] = game_map->pixel_to_tile(
+        player->entity.rect.x + player->entity.rect.width / 2,
+        player->entity.rect.y + player->entity.rect.height / 2);
+
+    SpecialRoom* room = game_map->get_special_room_at(tx, ty);
+    if (!room || room->triggered) return;
+
+    std::string msg = execute_special_room(room->type, player.get());
+    room->triggered = true;
+
+    _show_room_message(msg);
+}
+
+// B10: 每帧检测玩家是否首次步入特殊房间
+void GameScene::_check_special_room_discovery() {
+    if (!game_map || !player) return;
+
+    auto [tx, ty] = game_map->pixel_to_tile(
+        player->entity.rect.x + player->entity.rect.width / 2,
+        player->entity.rect.y + player->entity.rect.height / 2);
+
+    SpecialRoom* room = game_map->get_special_room_at(tx, ty);
+    if (!room || room->discovered) return;
+
+    room->discovered = true;
+    switch (room->type) {
+        case SpecialRoomType::ALTAR:
+            _show_room_message("你发现了一座古老祭坛。"); break;
+        case SpecialRoomType::TREASURE:
+            _show_room_message("你发现了一个隐藏宝箱房。"); break;
+        case SpecialRoomType::FOUNTAIN:
+            _show_room_message("你发现了一处治愈泉水。"); break;
+    }
+}
+
+// B10: 设置临时消息并写日志
+void GameScene::_show_room_message(const std::string& msg) {
+    _room_message = msg;
+    _room_message_timer = 2.5f;
+    LOG_INFO("[ROOM] %s", msg.c_str());
+}
+
+// B10: 渲染房间消息条 (屏幕底部中央)
+void GameScene::_draw_room_message() {
+    if (_room_message_timer <= 0 || _room_message.empty() || !g_font_loaded) return;
+
+    int sw = get_tree()->get_width(), sh = get_tree()->get_height();
+    float alpha = std::min(1.0f, _room_message_timer / 0.6f); // 淡出
+    float tw = MeasureTextEx(g_font_small, _room_message.c_str(), 18, 1).x;
+    float px = sw / 2.0f - tw / 2;
+    float py = (float)(sh - 70);
+
+    Color bg = {10, 10, 20, (unsigned char)(180 * alpha)};
+    DrawRectangleRounded({px - 16, py - 4, tw + 32, 28}, 0.15f, 6, bg);
+    DrawRectangleRoundedLines({px - 16, py - 4, tw + 32, 28}, 0.15f, 6, 1,
+                              Color{80, 80, 120, (unsigned char)(160 * alpha)});
+    DrawTextEx(g_font_small, _room_message.c_str(), {px, py},
+               18, 1, Color{255, 255, 200, (unsigned char)(255 * alpha)});
 }
 
 Monster* GameScene::_get_boss() const {
@@ -740,6 +866,8 @@ void GameScene::_draw_hud() {
     _draw_skill_bar();
     // 玩家 Buff (技能栏下方)
     _draw_player_buffs();
+    // B10: 房间消息条
+    _draw_room_message();
 }
 
 void GameScene::_draw_skill_bar() {

@@ -27,6 +27,7 @@ public:
 
     int current_floor = 1;
     int max_unlocked_floor = 1;
+    uint32_t _dungeon_seed = 0;   // B8: 当前楼层地牢种子
 
     // 游戏状态
     bool inventory_open = false;
@@ -61,9 +62,12 @@ public:
     void _render() override;
 
     // 场景间通信
-    void enter_floor(int floor);
+    void enter_floor(int floor, uint32_t seed = 0);
     void new_game();
-    void load_saved_game(int floor, int max_floor, std::unique_ptr<Player> p);
+    void load_saved_game(int floor, int max_floor, std::unique_ptr<Player> p,
+                         uint32_t seed = 0,
+                         const std::vector<bool>& special_triggered = {},
+                         const std::vector<bool>& special_discovered = {});
 
     // 输入 (override Node::_input)
     void _input(const InputMap& input) override;
@@ -85,7 +89,15 @@ private:
 
     // 道具
     void _pickup();
+    void _interact_special();   // B8: 特殊房间交互 (E键优先)
     void _spawn_floor_monsters(const std::vector<std::pair<int,int>>& rooms);
+
+    // B10: 特殊房间体验层
+    void _check_special_room_discovery();
+    void _show_room_message(const std::string& msg);
+    void _draw_room_message();
+    std::string _room_message;
+    float _room_message_timer = 0.0f;
 
     // Boss
     Monster* _get_boss() const;
