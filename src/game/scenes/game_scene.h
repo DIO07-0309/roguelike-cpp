@@ -67,7 +67,8 @@ public:
     void load_saved_game(int floor, int max_floor, std::unique_ptr<Player> p,
                          uint32_t seed = 0,
                          const std::vector<bool>& special_triggered = {},
-                         const std::vector<bool>& special_discovered = {});
+                         const std::vector<bool>& special_discovered = {},
+                         const std::vector<std::string>& relics = {});
 
     // 输入 (override Node::_input)
     void _input(const InputMap& input) override;
@@ -99,6 +100,11 @@ private:
     std::string _room_message;
     float _room_message_timer = 0.0f;
 
+    // B12: Relic 面板
+    bool _show_relic_panel = false;
+    void _draw_relic_panel();
+    bool _shown_relic_hint = false;   // B12.5: 首次获得 relic 时提示按 R
+
     // Boss
     Monster* _get_boss() const;
     void _drop_boss_reward(Monster* boss);
@@ -111,6 +117,7 @@ private:
     void _draw_inventory_panel();
     void _draw_skill_bar();
     void _draw_player_buffs();     // 玩家 Buff HUD（技能栏下方，全名+层数+时间）
+    void _draw_player_relics();    // B11: 玩家 Relic HUD（buff 下方）
     void _draw_monster_buffs(const Monster& m, float draw_x, float draw_y);  // 怪物 Buff 简写标签
     void _draw_effects();
     void _draw_time_stop_overlay();

@@ -64,7 +64,8 @@ void GameScene::new_game() {
 void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
                                  uint32_t seed,
                                  const std::vector<bool>& special_triggered,
-                                 const std::vector<bool>& special_discovered) {
+                                 const std::vector<bool>& special_discovered,
+                                 const std::vector<std::string>& relics) {
     player = std::move(p);
     current_floor = floor;
     max_unlocked_floor = max_f;
@@ -86,6 +87,16 @@ void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
             rooms[i].discovered = special_discovered[i];
         LOG_INFO("[ROOM] 恢复发现状态: %zu/%zu", n, special_discovered.size());
     }
+    // B11: 恢复 relic (跳过未知 id)
+    player->relics.clear();
+    for (auto& id : relics) {
+        if (get_relic_def(id))
+            player->relics.push_back({id});
+        else
+            LOG_WARN("[RELIC] 读档跳过未知 relic: %s", id.c_str());
+    }
+    if (!relics.empty())
+        LOG_INFO("[RELIC] 恢复圣物: %zu/%zu", player->relics.size(), relics.size());
 }
 
 void GameScene::enter_floor(int floor, uint32_t seed) {
@@ -138,7 +149,8 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     }
 
     stairs_pos = rooms.back();
-    player->combat.current_hp = player->combat.max_hp;
+    // B11: blood_charm — 进入新楼层时使用有效最大生命
+    player->combat.current_hp = get_effective_max_hp(player.get());
     player->reset_attack_timers();
 
     // BGM: Boss层→boss, 普通层→dungeon (延迟到 _process 中播放, 避免 get_tree() 为空)
@@ -205,7 +217,7 @@ void GameScene::_process(double delta) {
     // ── Buff 逐帧结算 ──
     std::vector<BuffEvent> buf_events;
     tick_buffs(player.get(), dt, &buf_events);
-    for (auto& m : monsters) tick_buffs(m.get(), dt, &buf_events);
+    for (auto& m : monsters) tick_buffs(m.get(), dt, &buf_events, player.get()); // B11: venom_fang
 
     // Buff 事件日志
     for (auto& ev : buf_events) {
@@ -293,12 +305,14 @@ void GameScene::_input(const InputMap& input) {
         if (state == GameState::PLAYING && player->combat.is_alive) {
             max_unlocked_floor = std::max(max_unlocked_floor, current_floor);
             std::vector<bool> spr, spd;
+            std::vector<std::string> rlc;
             if (game_map) for (auto& sr : game_map->special_rooms) {
                 spr.push_back(sr.triggered);
                 spd.push_back(sr.discovered);
             }
+            for (auto& r : player->relics) rlc.push_back(r.id);
             SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
-                                   _dungeon_seed, spr, spd);
+                                   _dungeon_seed, spr, spd, rlc);
             LOG_INFO("中途退出→存档 (第%d层)", current_floor);
         }
         // 切换到标题场景
@@ -320,6 +334,9 @@ void GameScene::_input(const InputMap& input) {
     }
 
     if (state != GameState::PLAYING) return;
+
+    // B12: R 键开关 relic 面板
+    if (IsKeyPressed(KEY_R)) _show_relic_panel = !_show_relic_panel;
 
 #ifdef _DEBUG
     _handle_debug_buff_test_input();   // F1-F6 Buff 调试
@@ -540,7 +557,7 @@ void GameScene::_on_monster_killed(Monster* m) {
         player->combat.physical_defense += 1;
         player->combat.magical_defense += 1;
         player->combat.max_hp += 10;
-        player->combat.current_hp = player->combat.max_hp;
+        player->combat.current_hp = get_effective_max_hp(player.get()); // B11: blood_charm
         get_tree()->get_audio()->play_sfx("levelup");
 
         LOG_INFO("玩家升级! Lv%d HP:%d ATK:%d PD:%d MD:%d XP:%d/%d",
@@ -575,6 +592,26 @@ void GameScene::_on_monster_killed(Monster* m) {
     }
 
     _check_floor_clear();
+
+    // B11: leech_blade — 击杀怪物时 20% 概率回 5 HP
+    if (player && player_has_relic(player.get(), "leech_blade")) {
+        const RelicDef* def = get_relic_def("leech_blade");
+        float chance = def ? def->param : 0.20f;
+        int heal = def ? def->param2 : 5;
+        if ((rng() % 1000) < (int)(chance * 1000.0f)) {
+            heal_player(player.get(), heal);  // B11: 使用 effective max clamp
+            LOG_INFO("[RELIC] 吸血之刃触发：回复 %d HP", heal);
+        }
+    }
+    // B12: battle_totem — 击杀怪物 15% 概率获得 attack_up
+    if (player && player_has_relic(player.get(), "battle_totem")) {
+        const RelicDef* def = get_relic_def("battle_totem");
+        float chance = def ? def->param : 0.15f;
+        if ((rng() % 1000) < (int)(chance * 1000.0f)) {
+            apply_buff(player.get(), "attack_up", 1);
+            LOG_INFO("[RELIC] 战斗图腾触发：获得 attack_up");
+        }
+    }
 }
 
 void GameScene::_cleanup_dead_monsters() {
@@ -603,12 +640,14 @@ void GameScene::_activate_stairs() {
     max_unlocked_floor = std::max(max_unlocked_floor, current_floor);
     LOG_INFO("第%d层清空! 楼梯已激活, 自动存档", current_floor);
     std::vector<bool> spr, spd;
+    std::vector<std::string> rlc;
     if (game_map) for (auto& sr : game_map->special_rooms) {
         spr.push_back(sr.triggered);
         spd.push_back(sr.discovered);
     }
+    for (auto& r : player->relics) rlc.push_back(r.id);
     SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
-                           _dungeon_seed, spr, spd);
+                           _dungeon_seed, spr, spd, rlc);
     on_floor_cleared.emit();
 }
 
@@ -685,6 +724,12 @@ void GameScene::_interact_special() {
     room->triggered = true;
 
     _show_room_message(msg);
+
+    // B12.5: 首次获得 relic 时提示按 R 查看面板
+    if (!_shown_relic_hint && !player->relics.empty()) {
+        _shown_relic_hint = true;
+        _show_room_message("按 R 可查看圣物面板");
+    }
 }
 
 // B10: 每帧检测玩家是否首次步入特殊房间
@@ -813,8 +858,10 @@ void GameScene::_draw_hud() {
     int sw = get_tree()->get_width();
     auto& c = player->combat;
 
-    // 玩家血条
-    float hp_r = (float)c.current_hp / c.max_hp;
+    // 玩家血条 (B11: 使用有效最大生命)
+    int eff_max_hp = get_effective_max_hp(player.get());
+    float hp_r = eff_max_hp > 0 ? (float)c.current_hp / eff_max_hp : 0.0f;
+    if (hp_r > 1.0f) hp_r = 1.0f;
     Color hp_c = hp_r > 0.5f ? Color{50, 200, 50, 255}
                : hp_r > 0.25f ? Color{200, 200, 50, 255} : Color{200, 50, 50, 255};
     draw_progress_bar({10, 10, 200, 16}, hp_r, hp_c, {40, 20, 20, 255});
@@ -822,7 +869,7 @@ void GameScene::_draw_hud() {
     if (g_font_loaded) {
         char buf[128];
         snprintf(buf, sizeof(buf), "HP:%d/%d ATK:%d PD:%d MD:%d",
-            c.current_hp, c.max_hp, c.get_effective_attack(),
+            c.current_hp, eff_max_hp, c.get_effective_attack(),
             c.get_effective_defense(AttackType::PHYSICAL),
             c.get_effective_defense(AttackType::MAGICAL));
         DrawTextEx(g_font_small, buf, {215, 10}, 16, 1, {220, 220, 220, 255});
@@ -866,6 +913,18 @@ void GameScene::_draw_hud() {
     _draw_skill_bar();
     // 玩家 Buff (技能栏下方)
     _draw_player_buffs();
+    // B11: 玩家 Relic (Buff 下方)
+    _draw_player_relics();
+    // B12: Relic 面板
+    if (_show_relic_panel) _draw_relic_panel();
+    // B12.5: 战斗 HUD 快捷键提示 (右下角, 常驻)
+    if (g_font_loaded) {
+        const char* hint = "[R]圣物  [I]背包  [ESC]保存";
+        float hw = MeasureTextEx(g_font_small, hint, 12, 1).x;
+        DrawTextEx(g_font_small, hint,
+                   {sw - hw - 14.0f, (float)get_tree()->get_height() - 26.0f},
+                   12, 1, Color{140, 140, 160, 220});
+    }
     // B10: 房间消息条
     _draw_room_message();
 }
@@ -905,6 +964,88 @@ void GameScene::_draw_player_buffs() {
             + "  " + format_buff_time(b.remaining);
         DrawTextEx(g_font_small, line.c_str(), {x, y}, 14, 1, get_buff_hud_color(b.id));
         y += 18;
+    }
+}
+
+// ============================================================
+// B12: 玩家 Relic HUD — Buff 下方, 简写列表 (按 rarity 着色)
+// ============================================================
+// B12: rarity → 颜色映射
+static Color _relic_rarity_color(const std::string& rarity) {
+    if (rarity == "rare")  return Color{100, 170, 255, 255};
+    if (rarity == "epic") return Color{190, 100, 255, 255};
+    return Color{255, 220, 100, 255}; // common
+}
+static std::string _rarity_label_cn(const std::string& rarity) {
+    if (rarity == "rare")  return "稀有";
+    if (rarity == "epic") return "史诗";
+    return "普通";
+}
+
+void GameScene::_draw_player_relics() {
+    if (!player || player->relics.empty() || !g_font_loaded) return;
+
+    // 放在 Buff HUD 下方
+    float x = 10;
+    float base_y = 56.0f + player->skills.active_skills.size() * 28.0f + 4.0f;
+    if (!player->active_buffs.empty())
+        base_y += player->active_buffs.size() * 18.0f + 4.0f;
+
+    DrawTextEx(g_font_small, "圣物:", {x, base_y}, 13, 1, Color{255, 220, 100, 255});
+    float cx = x + MeasureTextEx(g_font_small, "圣物:", 13, 1).x + 4.0f;
+
+    for (auto& r : player->relics) {
+        const RelicDef* def = get_relic_def(r.id);
+        if (!def) continue;
+        Color rc = _relic_rarity_color(def->rarity);
+        std::string token = def->short_name + std::string(" ");
+        DrawTextEx(g_font_small, token.c_str(), {cx, base_y}, 13, 1, rc);
+        cx += MeasureTextEx(g_font_small, token.c_str(), 13, 1).x;
+    }
+}
+
+// ============================================================
+// B12: Relic 面板 — R 键切换, 显示 name / rarity / desc
+// ============================================================
+void GameScene::_draw_relic_panel() {
+    if (!player || !g_font_loaded) return;
+    int sw = get_tree()->get_width();
+
+    int count = (int)player->relics.size();
+    float line_h = 24.0f;
+    float panel_w = 370.0f;
+    float panel_x = (float)sw - panel_w - 20.0f;
+    float panel_y = 70.0f;
+    float panel_h = 56.0f + (count > 0 ? count * line_h : line_h);
+
+    // 背景 + 边框
+    DrawRectangleRounded({panel_x, panel_y, panel_w, panel_h}, 0.08f, 8, Color{15, 15, 35, 220});
+    DrawRectangleRoundedLines({panel_x, panel_y, panel_w, panel_h}, 0.08f, 8, 1.5f, Color{100, 100, 160, 200});
+
+    // 标题
+    DrawTextEx(g_font_small, "圣物图鉴", {panel_x + 14, panel_y + 10}, 18, 1, Color{255, 255, 200, 255});
+
+    // 无 relic
+    if (count == 0) {
+        DrawTextEx(g_font_small, "尚未获得任何圣物。",
+                   {panel_x + 14, panel_y + 38}, 14, 1, Color{160, 160, 180, 255});
+        return;
+    }
+
+    // 逐行 relic
+    float ly = panel_y + 40.0f;
+    for (auto& r : player->relics) {
+        const RelicDef* def = get_relic_def(r.id);
+        if (!def) continue;
+
+        Color rc = _relic_rarity_color(def->rarity);
+        std::string label = "[" + _rarity_label_cn(def->rarity) + "]";
+
+        char line[256];
+        snprintf(line, sizeof(line), "%s %s - %s", label.c_str(), def->name.c_str(), def->desc.c_str());
+
+        DrawTextEx(g_font_small, line, {panel_x + 14, ly}, 14, 1, rc);
+        ly += line_h;
     }
 }
 

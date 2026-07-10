@@ -20,6 +20,13 @@ struct BuffInstance {
     float tick_timer = 0.0f; // 距下一次 DOT 触发 (仅 poison 等周期 buff 使用)
 };
 
+// ============================================================
+// B11: RelicInstance — 局内圣物 (挂在 Player 上, 跨楼层持续)
+// ============================================================
+struct RelicInstance {
+    std::string id;   // "blood_charm" | "venom_fang" | ...
+};
+
 struct CombatStats {
     int max_hp;
     int current_hp;

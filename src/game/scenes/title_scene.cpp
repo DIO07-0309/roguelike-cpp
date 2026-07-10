@@ -104,6 +104,28 @@ void TitleScene::_render() {
         y += 36;
     }
 
+    // B12.5: 操作说明 (右侧, 半透明方块)
+    if (g_font_loaded) {
+        const char* lines[] = {
+            "操作说明",
+            "WASD/方向键 - 移动",
+            "J - 攻击   K - 技能",
+            "E - 交互   I - 背包",
+            "R - 查看圣物",
+            "ESC - 保存并返回",
+        };
+        float guide_x = sw - 240.0f;
+        float guide_y = 180.0f;
+        float guide_w = 220.0f;
+        float guide_h = 158.0f;
+        DrawRectangleRounded({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, Color{15, 15, 30, 200});
+        DrawRectangleRoundedLines({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, 1, Color{70, 70, 100, 180});
+        for (int i = 0; i < 6; i++) {
+            Color lc = (i == 0) ? Color{255, 210, 80, 255} : Color{180, 180, 200, 255};
+            DrawTextEx(g_font_small, lines[i], {guide_x + 12, guide_y + 8 + i * 23.0f}, 14, 1, lc);
+        }
+    }
+
     // 底部版权
     if (g_font_loaded) {
         float w = MeasureTextEx(g_font_small, "重庆大学大数据与软件学院 · 程序设计实训", 12, 1).x;
@@ -142,13 +164,13 @@ void TitleScene::_input(const InputMap& input) {
             if (data->player) {
                 gs->load_saved_game(floor, maxf, std::move(data->player),
                                     data->dungeon_seed, data->special_triggered,
-                                    data->special_discovered);
+                                    data->special_discovered, data->relics);
             } else {
                 auto p = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
                     PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
                 gs->load_saved_game(floor, maxf, std::move(p),
                                     data->dungeon_seed, data->special_triggered,
-                                    data->special_discovered);
+                                    data->special_discovered, data->relics);
             }
             delete data;
             tree->change_scene(gs);

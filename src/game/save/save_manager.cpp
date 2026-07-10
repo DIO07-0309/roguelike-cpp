@@ -36,7 +36,8 @@ static std::string trim(const std::string& s) {
 bool SaveManager::save_game(Player* player, int floor, int max_f,
                               uint32_t dungeon_seed,
                               const std::vector<bool>& special_triggered,
-                              const std::vector<bool>& special_discovered) {
+                              const std::vector<bool>& special_discovered,
+                              const std::vector<std::string>& relics) {
     mkdir_impl(_save_dir().c_str());
     FILE* f = fopen(_save_path().c_str(), "w");
     if (!f) { LOG_ERROR("存档无法写入"); return false; }
@@ -125,12 +126,19 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     fprintf(f, "seed:%u\n", dungeon_seed);
     fprintf(f, "spr:%s\n", _encode_spr(special_triggered).c_str());
     fprintf(f, "spd:%s\n", _encode_spr(special_discovered).c_str());
+    // B11: relic 列表
+    std::string rlc_enc;
+    for (size_t i = 0; i < relics.size(); i++) {
+        if (i > 0) rlc_enc += ",";
+        rlc_enc += relics[i];
+    }
+    fprintf(f, "rlc:%s\n", rlc_enc.c_str());
 
     fclose(f);
-    LOG_INFO("存档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff seed:%u spr:%zu",
+    LOG_INFO("存档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff %zurelic seed:%u",
         floor, player->level, c.current_hp, c.max_hp,
         player->skills.active_skills.size(), inv.items.size(),
-        player->active_buffs.size(), dungeon_seed, special_triggered.size());
+        player->active_buffs.size(), relics.size(), dungeon_seed);
     return true;
 }
 
@@ -177,6 +185,21 @@ SaveData* SaveManager::load_save() {
     uint32_t seed = (uint32_t)getV("seed", 0);
     std::vector<bool> spr = _decode_spr(getS("spr"));
     std::vector<bool> spd = _decode_spr(getS("spd"));
+    // B11: 解析 rlc: 逗号分隔 relic id
+    std::vector<std::string> rlc;
+    {
+        std::string raw = getS("rlc");
+        if (!raw.empty()) {
+            for (size_t pos = 0; pos < raw.size(); ) {
+                size_t comma = raw.find(',', pos);
+                std::string tok = raw.substr(pos, (comma == std::string::npos)
+                    ? std::string::npos : (comma - pos));
+                if (!tok.empty()) rlc.push_back(tok);
+                if (comma == std::string::npos) break;
+                pos = comma + 1;
+            }
+        }
+    }
     int mhp   = getV("mhp", PLAYER_MAX_HP);
     int chp   = getV("chp", mhp);
     int atk   = getV("atk", PLAYER_ATTACK);
@@ -340,6 +363,7 @@ SaveData* SaveManager::load_save() {
     d->dungeon_seed = seed;
     d->special_triggered = spr;
     d->special_discovered = spd;
+    d->relics = rlc;
     d->player = std::move(p);
 
     LOG_INFO("读档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff",

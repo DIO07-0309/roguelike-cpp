@@ -2,6 +2,7 @@
 #include "player.h"
 #include "combat_system.h"
 #include "item.h"
+#include "core/logger.h"
 #include <algorithm>
 
 SpecialRoomType special_room_from_index(int idx) {
@@ -48,8 +49,11 @@ static std::string _altar_attack_up(Player* player) {
 }
 
 static std::string _altar_heal(Player* player) {
-    int amount = std::max(1, player->combat.max_hp * 3 / 10);
-    player->combat.heal(amount);
+    int eff_max = get_effective_max_hp(player);  // B11: blood_charm
+    int amount = std::max(1, eff_max * 3 / 10);
+    // B12: sage_leaf — 祭坛治疗 +10
+    if (player_has_relic(player, "sage_leaf")) amount += 10;
+    heal_player(player, amount);  // B11: 使用 effective max clamp
     return "祭坛赐福：你的伤势恢复了。";
 }
 
@@ -80,39 +84,134 @@ static std::string _exec_altar(Player* player) {
 }
 
 // ============================================================
+// B12: rarity 权重 relic 抽取 (common:100, rare:40, epic:10)
+static int _rarity_weight(const std::string& rarity) {
+    if (rarity == "common") return 100;
+    if (rarity == "rare")   return 40;
+    if (rarity == "epic")   return 10;
+    return 100; // fallback
+}
+
+// B12: 宝箱房 relic 掉落 — 按 rarity 权重抽取, 支持 drop_chance 参数
+static std::string _try_grant_random_relic(Player* player, float drop_chance) {
+    if (!player) return "";
+
+    if ((int)(rng() % 1000) >= (int)(drop_chance * 1000.0f)) return "";
+
+    auto all_ids = get_all_relic_ids();
+    // 先按 rarity 权重选 rarity 档
+    struct RaritySlot { std::string rarity; int weight; std::vector<std::string> ids; };
+    RaritySlot slots[] = {{"common", 100, {}}, {"rare", 40, {}}, {"epic", 10, {}}};
+    int total_w = 0;
+    for (auto& slot : slots) {
+        for (auto& id : all_ids) {
+            if (!player_has_relic(player, id)) {
+                const RelicDef* def = get_relic_def(id);
+                if (def && def->rarity == slot.rarity)
+                    slot.ids.push_back(id);
+            }
+        }
+        if (!slot.ids.empty()) total_w += slot.weight;
+    }
+
+    // 没有可用 relic
+    if (total_w == 0) return "";
+
+    // 按权重选 rarity 档
+    int roll = (int)(rng() % (uint32_t)total_w);
+    std::string chosen;
+    for (auto& slot : slots) {
+        if (slot.ids.empty()) continue;
+        if (roll < slot.weight) {
+            chosen = slot.ids[(int)(rng() % (uint32_t)slot.ids.size())];
+            break;
+        }
+        roll -= slot.weight;
+    }
+    // fallback: 如果因某种原因没选中, 从所有候选中随机
+    if (chosen.empty()) {
+        std::vector<std::string> all_candidates;
+        for (auto& id : all_ids)
+            if (!player_has_relic(player, id))
+                all_candidates.push_back(id);
+        if (all_candidates.empty()) return "";
+        chosen = all_candidates[(int)(rng() % (uint32_t)all_candidates.size())];
+    }
+
+    player->relics.push_back({chosen});
+    const RelicDef* def = get_relic_def(chosen);
+    std::string name = def ? def->name : chosen;
+    LOG_INFO("[RELIC] 获得圣物: %s (%s)", name.c_str(), def ? def->rarity.c_str() : "?");
+    return "你获得了圣物：" + name + "。";
+}
+
+// ============================================================
 // B9.2 宝箱: 品质分层 (60% 普通 / 30% 丰厚 / 10% 祝福)
 // ============================================================
 static std::string _exec_treasure(Player* player) {
     int roll = rng() % 100; // 0-99
+    std::string msg;
 
     if (roll < 10) {
         // 祝福宝箱 (10%)
         auto item = generate_random_item();
         if (item) player->inventory.add(item, player);
         apply_buff(player, "attack_up", 1);
-        return "宝箱中的力量流入了你的身体。";
+        msg = "宝箱中的力量流入了你的身体。";
     } else if (roll < 40) {
         // 丰厚宝箱 (30%: roll ∈ [10, 39])
         auto a = generate_random_item();
         auto b = generate_random_item();
         if (a) player->inventory.add(a, player);
         if (b) player->inventory.add(b, player);
-        return "你打开了宝箱，里面装着两件战利品！";
+        msg = "你打开了宝箱，里面装着两件战利品！";
     } else {
         // 普通宝箱 (60%: roll ∈ [40, 99])
         auto item = generate_random_item();
-        if (!item) return "宝箱里空空如也。";
-        player->inventory.add(item, player);
-        return "你打开了宝箱，获得了战利品。";
+        if (!item) {
+            msg = "宝箱里空空如也。";
+        } else {
+            player->inventory.add(item, player);
+            msg = "你打开了宝箱，获得了战利品。";
+        }
     }
+
+    // B12: 宝箱品质分级 relic 掉率 (普通10% / 丰厚20% / 祝福35%)
+    float relic_chance = (roll < 10) ? 0.35f : (roll < 40) ? 0.20f : 0.10f;
+    // B12: merchant_coin — relic 掉率 +15%
+    if (player_has_relic(player, "merchant_coin")) {
+        relic_chance += 0.15f;
+        if (relic_chance > 0.95f) relic_chance = 0.95f;
+    }
+    {
+        std::string relic_msg = _try_grant_random_relic(player, relic_chance);
+        if (!relic_msg.empty()) msg += " " + relic_msg;
+    }
+    // B11: golden_dice — 宝箱额外多给 1 件物品
+    if (player_has_relic(player, "golden_dice")) {
+        auto extra = generate_random_item();
+        if (extra && player->inventory.add(extra, player))
+            msg += " 金色骰子额外赐予了一件物品。";
+    }
+    // B12: merchant_coin — 宝箱额外多给 1 件物品 (与 golden_dice 叠加)
+    if (player_has_relic(player, "merchant_coin")) {
+        auto extra = generate_random_item();
+        if (extra && player->inventory.add(extra, player))
+            msg += " 商人硬币额外带来了一件物品。";
+    }
+    return msg;
 }
 
 // ============================================================
 // B9.3 泉水: 回满 HP + 净化负面状态
 // ============================================================
 static std::string _exec_fountain(Player* player) {
-    int missing = player->combat.max_hp - player->combat.current_hp;
-    if (missing > 0) player->combat.heal(missing);
+    int eff_max = get_effective_max_hp(player);  // B11: blood_charm
+    int missing = eff_max - player->combat.current_hp;
+    if (missing < 0) missing = 0;
+    // B12: sage_leaf — 泉水治疗 +10
+    if (player_has_relic(player, "sage_leaf")) missing += 10;
+    if (missing > 0) heal_player(player, missing);  // B11: 使用 effective max clamp
     _cleanse_debuffs(player);
     return "泉水治愈并净化了你的身体。";
 }

@@ -71,7 +71,8 @@ struct BuffEvent {
 // 逐帧结算 (使用 while 处理大 dt 跨多个 tick_interval)
 // events 可选 — 非 nullptr 时写入事件
 void tick_buffs(Player* p, float dt, std::vector<BuffEvent>* events = nullptr);
-void tick_buffs(Monster* m, float dt, std::vector<BuffEvent>* events = nullptr);
+void tick_buffs(Monster* m, float dt, std::vector<BuffEvent>* events = nullptr,
+                const Player* relic_owner = nullptr);  // B11: venom_fang
 
 // 施加 (events 可选)
 void apply_buff(Player* p, const std::string& id, int stacks = 1,
@@ -84,6 +85,8 @@ int  get_effective_attack(const Player* p);
 int  get_effective_attack(const Monster* m);
 float get_effective_speed(const Player* p);
 float get_effective_speed(const Monster* m, float base_speed);
+int  get_effective_max_hp(const Player* p);  // B11: blood_charm
+void heal_player(Player* p, int amount);     // B11: 治疗 (按 effective max_hp clamp)
 
 // Buff 显示 helper (集中管理，避免 if-else 散落)
 std::string get_buff_display_name(const std::string& id);   // "poison" → "中毒"
@@ -108,3 +111,27 @@ void apply_triggers(const std::vector<BuffTrigger>& triggers,
 
 // 对自身应用 triggers (道具使用 / 自身技能)
 void apply_triggers_self(const std::vector<BuffTrigger>& triggers, Player* self);
+
+// ============================================================
+// B11: Relic 系统 — 局内圣物配置与查询
+// ============================================================
+struct RelicDef {
+    std::string id;
+    std::string name;        // "血纹护符"
+    std::string short_name;  // "血"
+    std::string desc;        // "进入新楼层时恢复20%生命"
+    std::string rarity = "common"; // B12: "common" | "rare" | "epic"
+    float param = 0.0f;
+    int   param2 = 0;
+    int hud_color_r = 200;
+    int hud_color_g = 200;
+    int hud_color_b = 200;
+};
+
+bool load_relic_defs(const std::string& json_path);
+const RelicDef* get_relic_def(const std::string& id);
+bool player_has_relic(const Player* p, const std::string& id);
+std::vector<std::string> get_all_relic_ids();
+std::string get_relic_display_name(const std::string& id);
+std::string get_relic_short_name(const std::string& id);
+Color get_relic_hud_color(const std::string& id);

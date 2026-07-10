@@ -21,6 +21,7 @@ public:
     bool is_moving = false;
     CombatStats combat;
     std::vector<BuffInstance> active_buffs;   // 当前施加的 buff
+    std::vector<RelicInstance> relics;        // B11: 局内圣物 (跨楼层持续)
     Inventory inventory;
     SkillManager skills;
     AttackType attack_type = AttackType::PHYSICAL;

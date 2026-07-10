@@ -259,17 +259,82 @@ void apply_buff(Monster* m, const std::string& id, int stacks, std::vector<BuffE
     if (m && m->combat.is_alive) _apply_impl(m->active_buffs, id, stacks, m->name.c_str(), events);
 }
 
+// B12: plague_mask — 玩家中毒 tick -1 (需 inline loop)
 void tick_buffs(Player* p, float dt, std::vector<BuffEvent>* events) {
-    if (p && p->combat.is_alive) _tick_impl(p->active_buffs, &p->combat, dt, "Player", events);
+    if (!p || !p->combat.is_alive) return;
+    bool has_plague = player_has_relic(p, "plague_mask");
+    if (!has_plague) { _tick_impl(p->active_buffs, &p->combat, dt, "Player", events); return; }
+
+    // Inline tick loop for plague_mask damage reduction
+    size_t i = 0;
+    auto& buffs = p->active_buffs;
+    auto* combat = &p->combat;
+    while (i < buffs.size()) {
+        auto& b = buffs[i];
+        const BuffDef* def = get_buff_def(b.id);
+        bool removed = false;
+        b.remaining -= dt;
+        if (def && def->tick_interval > 0 && combat && combat->is_alive) {
+            b.tick_timer -= dt;
+            while (b.tick_timer <= 0 && b.remaining > 0 && combat->is_alive) {
+                int dmg = def->tick_damage * b.stacks;
+                if (b.id == "poison") { dmg -= 1; if (dmg < 0) dmg = 0; } // B12: plague_mask
+                combat->take_damage(dmg);
+                if (events) events->push_back({BuffEventType::TICK_DAMAGE, b.id, "Player", b.stacks, dmg});
+                b.tick_timer += def->tick_interval;
+                if (!combat->is_alive) break;
+            }
+        }
+        if (b.remaining <= 0) removed = true;
+        if (removed) {
+            if (events) events->push_back({BuffEventType::EXPIRED, b.id, "Player", b.stacks, 0});
+            buffs[i] = buffs.back(); buffs.pop_back();
+        } else { i++; }
+    }
 }
-void tick_buffs(Monster* m, float dt, std::vector<BuffEvent>* events) {
-    if (m && m->combat.is_alive) _tick_impl(m->active_buffs, &m->combat, dt, m->name.c_str(), events);
+void tick_buffs(Monster* m, float dt, std::vector<BuffEvent>* events,
+                const Player* relic_owner) {
+    if (!m || !m->combat.is_alive) return;
+    // B11: venom_fang — 玩家持有的 relic 增强怪物身上的 poison 每跳伤害
+    if (relic_owner && player_has_relic(relic_owner, "venom_fang")) {
+        // 手动结算 (不能直接调用 _tick_impl，需要在伤害计算处插入 venom_fang 加成)
+        size_t i = 0;
+        auto& buffs = m->active_buffs;
+        auto* combat = &m->combat;
+        while (i < buffs.size()) {
+            auto& b = buffs[i];
+            const BuffDef* def = get_buff_def(b.id);
+            bool removed = false;
+            b.remaining -= dt;
+            if (def && def->tick_interval > 0 && combat && combat->is_alive) {
+                b.tick_timer -= dt;
+                while (b.tick_timer <= 0 && b.remaining > 0 && combat->is_alive) {
+                    int dmg = def->tick_damage * b.stacks;
+                    if (b.id == "poison") dmg += 1; // B11: venom_fang +1
+                    combat->take_damage(dmg);
+                    if (events) events->push_back({BuffEventType::TICK_DAMAGE, b.id, m->name.c_str(), b.stacks, dmg});
+                    b.tick_timer += def->tick_interval;
+                    if (!combat->is_alive) break;
+                }
+            }
+            if (b.remaining <= 0) removed = true;
+            if (removed) {
+                if (events) events->push_back({BuffEventType::EXPIRED, b.id, m->name.c_str(), b.stacks, 0});
+                buffs[i] = buffs.back(); buffs.pop_back();
+            } else { i++; }
+        }
+    } else {
+        _tick_impl(m->active_buffs, &m->combat, dt, m->name.c_str(), events);
+    }
 }
 
 int get_effective_attack(const Player* p) {
     if (!p) return 1;
     int base = p->combat.get_effective_attack();
-    return std::max(1, (int)(base * (1.0f + 0.3f * _count_stacks(p->active_buffs, "attack_up"))));
+    float atk = (float)base * (1.0f + 0.3f * _count_stacks(p->active_buffs, "attack_up"));
+    // B12: war_drum — 攻击力 +15%
+    if (player_has_relic(p, "war_drum")) atk *= 1.15f;
+    return std::max(1, (int)atk);
 }
 int get_effective_attack(const Monster* m) {
     if (!m) return 1;
@@ -279,11 +344,35 @@ int get_effective_attack(const Monster* m) {
 
 float get_effective_speed(const Player* p) {
     if (!p) return 200.0f;
-    return p->speed * std::pow(0.7f, _count_stacks(p->active_buffs, "slow"));
+    float mult = 1.0f;
+    // B11: hunters_eye — 移速 +10%
+    if (player_has_relic(p, "hunters_eye")) {
+        const RelicDef* def = get_relic_def("hunters_eye");
+        mult += (def ? def->param : 0.10f);
+    }
+    return p->speed * std::pow(0.7f, _count_stacks(p->active_buffs, "slow")) * mult;
 }
 float get_effective_speed(const Monster* m, float base_speed) {
     if (!m) return base_speed;
     return base_speed * std::pow(0.7f, _count_stacks(m->active_buffs, "slow"));
+}
+
+// B11: blood_charm — 玩家有效最大生命 = 基础值 + 20
+// B12: iron_heart — +10
+int get_effective_max_hp(const Player* p) {
+    if (!p) return 0;
+    int hp = p->combat.max_hp;
+    if (player_has_relic(p, "blood_charm")) hp += 20;
+    if (player_has_relic(p, "iron_heart"))  hp += 10;
+    return hp;
+}
+
+// B11: 玩家侧治疗 helper — 按 effective max_hp clamp, 防止 blood_charm 时被 base max_hp 截断
+void heal_player(Player* p, int amount) {
+    if (!p || amount <= 0) return;
+    p->combat.current_hp += amount;
+    int cap = get_effective_max_hp(p);
+    if (p->combat.current_hp > cap) p->combat.current_hp = cap;
 }
 
 std::string get_buff_display_name(const std::string& id) {
@@ -297,6 +386,150 @@ std::string get_buff_short_name(const std::string& id) {
 std::string format_buff_time(float sec) {
     char buf[16]; snprintf(buf, sizeof(buf), "%.1fs", sec);
     return buf;
+}
+
+// ============================================================
+// B11: Relic 配置表
+// ============================================================
+static std::unordered_map<std::string, RelicDef> g_relic_defs;
+static bool g_relic_defs_loaded = false;
+
+// 复用 combat_system.cpp 现有的 _skip_ws / _read_string / _read_float / _read_int
+static std::string _parse_relic_obj(const char*& p, RelicDef& out) {
+    p = _skip_ws(p);
+    if (*p != '{') return "expected '{'";
+    p++;
+    while (*p) {
+        p = _skip_ws(p);
+        if (*p == '}') { p++; return ""; }
+        if (*p == ',') { p++; continue; }
+
+        std::string key = _read_string(p);
+        p = _skip_ws(p);
+        if (*p != ':') return "expected ':' after " + key;
+        p++;
+
+        if (key == "id")              out.id = _read_string(p);
+        else if (key == "name")        out.name = _read_string(p);
+        else if (key == "short_name")  out.short_name = _read_string(p);
+        else if (key == "desc")        out.desc = _read_string(p);
+        else if (key == "rarity")       out.rarity = _read_string(p);
+        else if (key == "param")       out.param = _read_float(p);
+        else if (key == "param2")      out.param2 = _read_int(p);
+        else if (key == "hud_color") {
+            p = _skip_ws(p); if (*p != '[') return "expected '['"; p++;
+            out.hud_color_r = _read_int(p);
+            p = _skip_ws(p); if (*p == ',') p++;
+            out.hud_color_g = _read_int(p);
+            p = _skip_ws(p); if (*p == ',') p++;
+            out.hud_color_b = _read_int(p);
+            p = _skip_ws(p); if (*p == ']') p++;
+        } else {
+            p = _skip_ws(p);
+            if (*p == '"') { _read_string(p); }
+            else if (*p == '[') { while (*p && *p != ']') p++; if (*p == ']') p++; }
+            else if (*p == '{') { int d = 1; p++; while (*p && d) { if (*p=='{') d++; if (*p=='}') d--; p++; } }
+            else { while (*p && *p != ',' && *p != '}' && *p != '\n') p++; }
+        }
+    }
+    return "unterminated";
+}
+
+static void _apply_relic_defaults(RelicDef& d) {
+    if (d.name.empty())       d.name = d.id;
+    if (d.short_name.empty()) d.short_name = d.name;
+    if (d.rarity.empty())     d.rarity = "common";  // B12
+}
+
+bool load_relic_defs(const std::string& path) {
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) {
+        LOG_ERROR("[RELIC] Cannot open %s", path.c_str());
+        return false;
+    }
+    fseek(f, 0, SEEK_END);
+    size_t sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    std::string buf(sz + 1, '\0');
+    fread(&buf[0], 1, sz, f);
+    fclose(f);
+
+    const char* p = buf.c_str();
+    p = _skip_ws(p);
+    if (*p != '[') {
+        LOG_ERROR("[RELIC] JSON root must be array");
+        return false;
+    }
+    p++;
+
+    int loaded = 0, skipped = 0;
+    while (*p) {
+        p = _skip_ws(p);
+        if (*p == ']') { p++; break; }
+        if (*p == ',') { p++; continue; }
+
+        RelicDef def;
+        std::string err = _parse_relic_obj(p, def);
+        if (!err.empty()) {
+            LOG_WARN("[RELIC] Parse error #%d: %s -- skip", loaded + skipped, err.c_str());
+            int depth = 0;
+            while (*p) {
+                if (*p == '{' && !depth) depth = 1;
+                else if (*p == '{') depth++;
+                else if (*p == '}') { depth--; if (!depth) { p++; break; } }
+                p++;
+            }
+            skipped++; continue;
+        }
+        if (def.id.empty()) {
+            LOG_WARN("[RELIC] Missing id -- skip");
+            skipped++; continue;
+        }
+        _apply_relic_defaults(def);
+
+        LOG_INFO("[RELIC] Loaded '%s': %s param=%.2f param2=%d",
+            def.id.c_str(), def.name.c_str(), def.param, def.param2);
+        g_relic_defs[def.id] = def;
+        loaded++;
+    }
+
+    g_relic_defs_loaded = true;
+    LOG_INFO("[RELIC] Loaded %d relics, skipped %d", loaded, skipped);
+    return loaded > 0;
+}
+
+const RelicDef* get_relic_def(const std::string& id) {
+    auto it = g_relic_defs.find(id);
+    return it != g_relic_defs.end() ? &it->second : nullptr;
+}
+
+bool player_has_relic(const Player* p, const std::string& id) {
+    if (!p) return false;
+    for (auto& r : p->relics)
+        if (r.id == id) return true;
+    return false;
+}
+
+std::vector<std::string> get_all_relic_ids() {
+    std::vector<std::string> ids;
+    for (auto& kv : g_relic_defs) ids.push_back(kv.first);
+    return ids;
+}
+
+std::string get_relic_display_name(const std::string& id) {
+    const RelicDef* def = get_relic_def(id);
+    return def ? def->name : id;
+}
+
+std::string get_relic_short_name(const std::string& id) {
+    const RelicDef* def = get_relic_def(id);
+    return def ? def->short_name : id;
+}
+
+Color get_relic_hud_color(const std::string& id) {
+    const RelicDef* def = get_relic_def(id);
+    if (def) return {(unsigned char)def->hud_color_r, (unsigned char)def->hud_color_g, (unsigned char)def->hud_color_b, 255};
+    return {200, 200, 200, 255};
 }
 
 // ---- BuffTrigger helpers ----
