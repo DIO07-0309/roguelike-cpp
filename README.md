@@ -51,6 +51,7 @@ build/roguelike_cpp.exe
 | **空格** | 普攻攻击最近的怪物 |
 | **E** | 拾取地面物品 / 触发特殊房间 |
 | **I** | 打开 / 关闭背包 |
+| **R** | 打开 / 关闭圣物面板 |
 | **>** | 下楼（需楼梯激活） |
 
 ### 技能释放
@@ -262,7 +263,47 @@ build/roguelike_cpp.exe
 - `DungeonGenerator` 排除玩家/楼梯房间后 Fisher-Yates 分配
 - `execute_special_room(type, player)` 统一交互入口（GameScene 只调此函数）
 
-### 5.8 地图生成
+### 5.8 圣物系统（B11/B12 完整实现）
+
+Relic 是挂在 Player 身上的局内常驻被动构筑物，不占技能栏、非消耗品，一旦获得就在本局后续楼层持续生效。
+
+**11 个圣物**（含 B11 基础 5 个 + B12 扩充 6 个）：
+
+| 圣物 | 稀有度 | 效果 | Hook |
+|------|--------|------|------|
+| **血纹护符** | common | 最大生命 +20 | `get_effective_max_hp` |
+| **毒牙** | common | 怪物身上 poison 每跳 +1 | `tick_buffs(Monster*)` |
+| **金色骰子** | rare | 宝箱额外多给 1 件物品 | `_exec_treasure` |
+| **猎人之眼** | common | 移速 +10% | `get_effective_speed` |
+| **吸血之刃** | common | 击杀怪物 20% 回 5 HP | `_on_monster_killed` |
+| **战鼓** | common | 攻击力 +15% | `get_effective_attack` |
+| **战斗图腾** | common | 击杀 15% 获 attack_up | `_on_monster_killed` |
+| **铁之心** | common | 最大生命 +10 | `get_effective_max_hp` |
+| **贤者之叶** | rare | 祭坛/泉水治疗 +10 | `_altar_heal/_exec_fountain` |
+| **商人硬币** | rare | 宝箱 relic 掉率 +15% + 额外 1 件物品 | `_exec_treasure` |
+| **瘟疫面具** | epic | 玩家中毒每跳 -1 | `tick_buffs(Player*)` |
+
+**稀有度与掉落**：
+
+| 稀有度 | 颜色 | 权重 | 宝箱掉落 |
+|--------|------|------|----------|
+| **普通** | 金色 | 100 | 普通10% / 丰厚20% / 祝福35% |
+| **稀有** | 蓝色 | 40 | 同上（按权重分档） |
+| **史诗** | 紫色 | 10 | 同上 |
+
+- 宝箱品质越高，relic 掉率越高
+- 已持有 relic 不重复发
+- 某稀有度池空时自动回退到其他可用 relic
+
+**获取来源**：仅从宝箱房获得（与物品掉落叠加，不替换）。
+
+**R 面板**：按 **R** 键打开圣物图鉴，显示已持有 relic 的名字 / 稀有度 / 描述。右上角半透明面板，不暂停游戏。
+
+**首次 relic 提示**：初次获得任意 relic 时会弹出 "按 R 可查看圣物面板"。
+
+**存档**：`rlc:id1,id2,...` 行保存持有 relic 列表，旧存档兼容。
+
+### 5.9 地图生成
 
 **BSP（二分空间划分）** 算法随机生成：
 
@@ -330,6 +371,8 @@ roguelike_cpp/
 │       └── tutorial/       #  教程逻辑
 │           └── tutorial_guide.h / .cpp  # 7阶段教程引导
 └── resources/              #  JSON 资源配置（外部数据）
+    ├── buffs.json         # Buff 配置 (3种)
+    └── relics.json        # Relic 配置 (11种 + rarity)
 ```
 
 ---
@@ -482,7 +525,7 @@ modifiers 叠加:
 | 模块通信 | 直接 import + 方法调用 | Signal 信号槽 |
 | 内存管理 | GC | shared_ptr / unique_ptr (RAII) |
 | 渲染 | pygame.draw.rect/circle | raylib DrawRectangle/DrawCircle |
-| 字体 | TTF 自动（pygame 内置） | LoadFontEx + 逐字码位加载（816字） |
+| 字体 | TTF 自动（pygame 内置） | LoadFontEx + 混合码位（基线829 + relic 动态） |
 | 音频 | pygame.mixer.Sound | Wave 合成 → LoadSoundFromWave |
 | 输入 | pygame.key.get_pressed() | InputMap 动作→按键抽象 |
 | 打包 | PyInstaller (37MB) | 原生 EXE + raylib.dll (2MB) |
@@ -515,9 +558,10 @@ buf:poison,2,3.50,0.20;attack_up,1,5.80,0.00;
 seed:2873910246
 spr:1,0,1
 spd:1,1,0
+rlc:blood_charm,war_drum,plague_mask
 ```
 
-保存内容：楼层/等级/属性/主动技能(名+等级)/被动技能/背包物品/装备/Buff/地牢种子/特殊房间触发+发现状态。
+保存内容：楼层/等级/属性/主动技能(名+等级)/被动技能/背包物品/装备/Buff/地牢种子/特殊房间触发+发现状态/持有圣物列表。
 
 ---
 
@@ -541,3 +585,6 @@ spd:1,1,0
 | M14 | 特殊房间系统（祭坛/宝箱/泉水 + 发现提示 + 消息条 + Seed驱动存档恢复） | ✅ |
 | M15 | 特殊房间内容深化（祭坛4结果池 / 宝箱品质分层 / 泉水净化） | ✅ |
 | M16 | 特殊房间体验增强（discovered/triggered 分离 + spd存档 + 屏幕消息显示） | ✅ |
+| M17 | 圣物系统 MVP（5 relic / 宝箱掉落 / 局内效果 / HUD / rlc 存档） | ✅ |
+| M18 | 圣物内容扩展（11 relic + rarity + 宝箱权重掉落 + R 面板） | ✅ |
+| M19 | UI 引导 + 字体覆盖稳定化（操作说明 / 快捷键提示 / 首次 relic 提示 / 混合码位） | ✅ |
