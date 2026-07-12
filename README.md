@@ -525,7 +525,7 @@ modifiers 叠加:
 | 模块通信 | 直接 import + 方法调用 | Signal 信号槽 |
 | 内存管理 | GC | shared_ptr / unique_ptr (RAII) |
 | 渲染 | pygame.draw.rect/circle | raylib DrawRectangle/DrawCircle |
-| 字体 | TTF 自动（pygame 内置） | LoadFontEx + 混合码位（基线829 + relic 动态） |
+| 字体 | TTF 自动（pygame 内置） | LoadFontEx + 精确码位（1446个，工具扫描） |
 | 音频 | pygame.mixer.Sound | Wave 合成 → LoadSoundFromWave |
 | 输入 | pygame.key.get_pressed() | InputMap 动作→按键抽象 |
 | 打包 | PyInstaller (37MB) | 原生 EXE + raylib.dll (2MB) |
@@ -588,3 +588,4 @@ rlc:blood_charm,war_drum,plague_mask
 | M17 | 圣物系统 MVP（5 relic / 宝箱掉落 / 局内效果 / HUD / rlc 存档） | ✅ |
 | M18 | 圣物内容扩展（11 relic + rarity + 宝箱权重掉落 + R 面板） | ✅ |
 | M19 | UI 引导 + 字体覆盖稳定化（操作说明 / 快捷键提示 / 首次 relic 提示 / 混合码位） | ✅ |
+| M20 | 中文显示修复：精确码位扫描替代全量CJK，字体图集从溢出变为1446码点 | ✅ |
