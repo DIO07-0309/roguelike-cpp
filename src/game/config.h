@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "raylib.h"
 
 // ============================================================
 // 全局游戏常量 (迁移自 config.py)
@@ -74,6 +75,4 @@ inline constexpr Color COLOR_GOLD     {255, 200, 50, 255};
 inline constexpr Color COLOR_DARK_RED {140, 20, 20, 255};
 inline constexpr Color COLOR_CYBER_BLUE{80, 120, 255, 255};
 
-inline bool is_boss_floor(int floor) {
-    return floor == 5 || floor == 10 || floor == 15;
-}
+bool is_boss_floor(int floor);

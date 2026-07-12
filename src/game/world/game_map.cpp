@@ -1,5 +1,6 @@
 #include "game_map.h"
 #include "config.h"
+#include <cmath>
 
 GameMap::GameMap(int w, int h, int ts)
     : width(w), height(h), tile_size(ts),
@@ -15,6 +16,13 @@ void GameMap::_init_walls() {
             _tiles[y][x] = Tile::wall();
         }
     }
+}
+
+Vector2 GameMap::tile_to_pixel(int tx, int ty) const {
+    return {(float)tx * tile_size, (float)ty * tile_size};
+}
+std::pair<int,int> GameMap::pixel_to_tile(float px, float py) const {
+    return {(int)(px / tile_size), (int)(py / tile_size)};
 }
 
 void GameMap::load_from_template(const std::vector<std::string>& tmpl) {
@@ -130,6 +138,52 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                 DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4, {255, 200, 50, 255});
                 DrawText(">", dx + 10, dy + 6, 20, {255, 220, 100, 255});
             }
+
+            // D4 Step1: 事件房间中心绘制标记
+            if (event_room_index >= 0 && x == event_tile_x && y == event_tile_y) {
+                float pulse = 2 + sinf((float)GetTime() * 5) * 2;
+                Color ec = event_triggered ? Color{80, 80, 80, 120} : Color{255, 200, 100, 200};
+                DrawRectangleLinesEx({dx - pulse, dy - pulse, tile_size + pulse*2, tile_size + pulse*2}, float(1.5), ec);
+                DrawText("?", dx + 10, dy + 5, 18, event_triggered ? Color{100, 100, 100, 200} : Color{255, 220, 100, 255});
+            }
+
+            // D2 Step5: Arena 元素绘制
+            auto* arena = get_special_room_at(x, y) ? nullptr : get_arena_at(x, y);
+            if (arena) {
+                switch (arena->type) {
+                case ArenaObjectType::EXPLOSIVE_BARREL:
+                    DrawRectangle(dx+6, dy+6, tile_size-12, tile_size-12, {180, 100, 30, 255});
+                    DrawText("!", dx+12, dy+5, 18, {255, 200, 50, 255}); break;
+                case ArenaObjectType::HEALING_TOTEM:
+                    DrawRectangle(dx+4, dy+4, tile_size-8, tile_size-8, {30, 140, 60, 255});
+                    DrawText("+", dx+11, dy+5, 18, {100, 255, 120, 255}); break;
+                case ArenaObjectType::POISON_POOL:
+                    DrawRectangle(dx+2, dy+2, tile_size-4, tile_size-4, {20, 80, 30, 200});
+                    DrawText("~", dx+10, dy+5, 16, {80, 220, 80, 200}); break;
+                case ArenaObjectType::ROCK: {
+                    DrawRectangle(dx+2, dy+8, tile_size-4, tile_size-10, {100, 95, 100, 255});
+                    DrawRectangleLines(dx+2, dy+8, tile_size-4, tile_size-10, {130, 125, 130, 255});
+                } break;
+                case ArenaObjectType::SPIKE:
+                    DrawTriangle({dx+tile_size/2, dy+2}, {dx+2, dy+tile_size-4},
+                                {dx+tile_size-2, dy+tile_size-4}, {180, 50, 50, 255});
+                    break;
+                }
+            }
         }
     }
+}
+
+ArenaObject* GameMap::get_arena_at(int tile_x, int tile_y) {
+    for (auto& ao : arena_objects)
+        if (ao.tile_x == tile_x && ao.tile_y == tile_y && ao.active)
+            return &ao;
+    return nullptr;
+}
+
+const ArenaObject* GameMap::get_arena_at(int tile_x, int tile_y) const {
+    for (auto& ao : arena_objects)
+        if (ao.tile_x == tile_x && ao.tile_y == tile_y && ao.active)
+            return &ao;
+    return nullptr;
 }

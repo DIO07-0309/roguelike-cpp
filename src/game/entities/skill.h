@@ -6,11 +6,23 @@
 #include "raylib.h"
 #include "entity.h"
 #include "combat_system.h"
+#include "build_tag.h"
 
 // 前向声明
 class Player;
 class Monster;
 class GameMap;
+
+// ============================================================
+// D3 Step2: SkillEvolution — 技能进化数据
+// 每级不提升数值，而是改变技能行为
+// ============================================================
+struct SkillEvolution {
+    int level = 1;                         // 1-3 级
+    std::string name;                       // 进化名称 e.g. "广域斩"
+    std::string desc;                       // 效果描述
+    std::vector<BuildTag> required_tags;    // 需要的构筑标签 (用于 Relic 联动)
+};
 
 // ============================================================
 // Skill — 技能系统 (4主动 + 2被动 + 3级升级 + 冷却)
@@ -28,14 +40,30 @@ public:
     float charm_cd_bonus = 0.0f;
     float charm_power_bonus = 0.0f;
 
-    Skill(const std::string& n, float cd, int ml = 5)
-        : name(n), base_cooldown(cd), cooldown(cd), max_level(ml) {}
+    Skill(const std::string& n, float cd, int ml = 5);
     virtual ~Skill() = default;
+
+    // D3 Step1: 构筑标签查询 (替代 dynamic_cast / 硬编码类型判断)
+    bool has_tag(BuildTag t) const     { return ::has_tag(tags, t); }
+    bool has_any_tag(std::initializer_list<BuildTag> list) const { return ::has_any_tag(tags, list); }
+    bool has_all_tags(std::initializer_list<BuildTag> list) const { return ::has_all_tags(tags, list); }
+
+    std::vector<BuildTag> tags;   // D3 Step1: 构筑标签
+
+    // D3 Step2: 技能进化 (Evolution 系统)
+    std::vector<SkillEvolution> evolutions;    // 进化路径 (在构造器中填充)
+    int evolution_level = 0;                    // 当前进化等级 0-3 (0=未进化)
+    void add_evolution(int lv, const char* name, const char* desc,
+                       std::initializer_list<BuildTag> req);
+    bool can_evolve() const;
+    std::string evolve();                        // 执行进化, 返回名称
+    const SkillEvolution* current_evolution() const; // 当前进化等级的数据 (nullptr=无)
+    std::string get_evolution_text() const;      // "广域斩 Lv2" 风格显示
 
     bool can_use(double game_time) const;
     float remaining_cooldown(double game_time) const;
     void mark_used(double game_time);
-    bool can_upgrade() const { return level < max_level; }
+    bool can_upgrade() const;
     bool upgrade();
 
     float get_power_multiplier() const;
@@ -57,8 +85,9 @@ public:
     ActiveSkill(const std::string& n, float cd, int ml = 5)
         : Skill(n, cd, ml) {}
 
+    // D2 Step2: is_heavy — 重击强化 (仅 combo.is_heavy() 时为 true)
     virtual std::string execute(Player* caster, std::vector<Monster*>& targets,
-                                GameMap* map) = 0;
+                                GameMap* map, bool is_heavy = false) = 0;
 };
 
 // 被动技能
@@ -80,7 +109,7 @@ class SlashSkill : public ActiveSkill {
 public:
     SlashSkill();
     std::string execute(Player* caster, std::vector<Monster*>& targets,
-                        GameMap* map) override;
+                        GameMap* map, bool is_heavy = false) override;
     std::string get_level_text() const override;
 protected:
     void _on_level_up() override;
@@ -91,7 +120,7 @@ class FireballSkill : public ActiveSkill {
 public:
     FireballSkill();
     std::string execute(Player* caster, std::vector<Monster*>& targets,
-                        GameMap* map) override;
+                        GameMap* map, bool is_heavy = false) override;
     std::string get_level_text() const override;
 protected:
     void _on_level_up() override;
@@ -103,7 +132,7 @@ class SelfHealSkill : public ActiveSkill {
 public:
     SelfHealSkill();
     std::string execute(Player* caster, std::vector<Monster*>& targets,
-                        GameMap* map) override;
+                        GameMap* map, bool is_heavy = false) override;
     std::string get_level_text() const override;
     void tick_regen(Player* caster, float delta);
 protected:
@@ -115,7 +144,7 @@ class TheWorldSkill : public ActiveSkill {
 public:
     TheWorldSkill();
     std::string execute(Player* caster, std::vector<Monster*>& targets,
-                        GameMap* map) override;
+                        GameMap* map, bool is_heavy = false) override;
     std::string get_level_text() const override;
     float get_stop_duration() const;
 protected:
@@ -126,26 +155,16 @@ protected:
 // ---- 具体被动技能 ----
 class IronSkinSkill : public PassiveSkill {
 public:
-    IronSkinSkill() : PassiveSkill("铁壁", "def_flat", 3, 3) {}
-    int get_value() const override {
-        int v[] = {0, 3, 7, 12};
-        return v[std::min(level, 3)];
-    }
-    std::string get_level_text() const override {
-        return "Lv" + std::to_string(level) + " DEF+" + std::to_string(get_value());
-    }
+    IronSkinSkill() : PassiveSkill("铁壁", "def_flat", 3, 3) { tags = {BuildTag::DEFENSE}; }
+    int get_value() const override;
+    std::string get_level_text() const override;
 };
 
 class BerserkSkill : public PassiveSkill {
 public:
-    BerserkSkill() : PassiveSkill("狂暴", "atk_flat", 3, 3) {}
-    int get_value() const override {
-        int v[] = {0, 3, 7, 12};
-        return v[std::min(level, 3)];
-    }
-    std::string get_level_text() const override {
-        return "Lv" + std::to_string(level) + " ATK+" + std::to_string(get_value());
-    }
+    BerserkSkill() : PassiveSkill("狂暴", "atk_flat", 3, 3) { tags = {BuildTag::MELEE}; }
+    int get_value() const override;
+    std::string get_level_text() const override;
 };
 
 // ---- 技能管理器 ----
@@ -155,7 +174,7 @@ public:
     std::vector<std::unique_ptr<PassiveSkill>> passives;
     int max_active = 4;
 
-    bool can_learn() const { return (int)active_skills.size() < max_active; }
+    bool can_learn() const;
     bool learn(std::unique_ptr<Skill> skill);
     std::string use_active(int index, Player* caster,
                            std::vector<Monster*>& targets,

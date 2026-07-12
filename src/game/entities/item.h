@@ -18,25 +18,9 @@ enum class Rarity {
     LEGENDARY = 3, // 3.0x, 橙
 };
 
-inline float rarity_mult(Rarity r) {
-    float m[] = {1.0f, 1.5f, 2.0f, 3.0f};
-    return m[static_cast<int>(r)];
-}
-
-inline Color rarity_color(Rarity r) {
-    Color c[] = {
-        {180, 180, 180, 255},  // COMMON
-        {80, 160, 255, 255},   // RARE
-        {180, 80, 255, 255},   // EPIC
-        {255, 140, 40, 255},   // LEGENDARY
-    };
-    return c[static_cast<int>(r)];
-}
-
-inline std::string rarity_label(Rarity r) {
-    const char* l[] = {"普通", "稀有", "史诗", "传说"};
-    return l[static_cast<int>(r)];
-}
+float rarity_mult(Rarity r);
+Color rarity_color(Rarity r);
+std::string rarity_label(Rarity r);
 
 // 基类
 struct Item {
@@ -45,13 +29,9 @@ struct Item {
     std::string tile_char;
     Color color;
 
-    Item(const std::string& name, Rarity r, const std::string& tc)
-        : base_name(name), rarity(r), tile_char(tc), color(rarity_color(r)) {}
-
+    Item(const std::string& name, Rarity r, const std::string& tc);
     virtual ~Item() = default;
-    virtual std::string get_description() const {
-        return rarity_label(rarity) + " " + base_name;
-    }
+    virtual std::string get_description() const;
 };
 
 // 装备
@@ -61,14 +41,7 @@ struct EquipmentItem : Item {
     int atk_bonus = 0, pdef_bonus = 0, mdef_bonus = 0;
 
     EquipmentItem(const std::string& name, Rarity r, const std::string& sl,
-                  int atk = 0, int pdef = 0, int mdef = 0)
-        : Item(name, r, (sl == "weapon" ? "W" : sl == "armor" ? "A" : "C")),
-          slot(sl) {
-        float m = rarity_mult(r);
-        atk_bonus = std::max(1, (int)(atk * m));
-        pdef_bonus = std::max(1, (int)(pdef * m));
-        mdef_bonus = std::max(1, (int)(mdef * m));
-    }
+                  int atk = 0, int pdef = 0, int mdef = 0);
 
     void apply(Player* player);
     void remove(Player* player);
@@ -83,11 +56,7 @@ struct CharmItem : EquipmentItem {
     float power_bonus = 0.0f;
 
     CharmItem(const std::string& name, Rarity r, const std::string& sk,
-              float cd, float pw)
-        : EquipmentItem(name, r, "charm", 0, 0, 0),
-          skill_class_name(sk), cd_bonus(cd), power_bonus(pw) {
-        tile_char = "C";
-    }
+              float cd, float pw);
     void apply(Player* player);
     void remove(Player* player);
     std::string get_description() const override;
@@ -102,19 +71,10 @@ struct ConsumableItem : Item {
 
     ConsumableItem(const std::string& name, Rarity r,
                    const std::string& type, int val,
-                   const std::string& buf = "")
-        : Item(name, r, "P"), effect_type(type),
-          effect_value(std::max(1, (int)(val * rarity_mult(r)))),
-          buff_id(buf) {
-        if (!buf.empty()) triggers = {{buf, 1, 1.0f, BuffTarget::SELF}};
-    }
+                   const std::string& buf = "");
 
     std::string use(Player* player);
-    std::string get_description() const override {
-        if (!triggers.empty()) return rarity_label(rarity) + " " + base_name + " (" + get_buff_display_name(triggers[0].buff_id) + " 6s)";
-        if (effect_type == "heal") return rarity_label(rarity) + " " + base_name + " (恢复" + std::to_string(effect_value) + " HP)";
-        return Item::get_description();
-    }
+    std::string get_description() const override;
 };
 
 // 地面掉落物

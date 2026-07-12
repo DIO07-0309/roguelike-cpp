@@ -5,6 +5,21 @@
 #include "raylib.h"
 #include "special_room.h"
 
+// 前向声明 (避免循环依赖)
+enum class EventType : int;
+
+// ============================================================
+// D2 Step5: ArenaObject — 战场环境元素
+// ============================================================
+enum class ArenaObjectType { EXPLOSIVE_BARREL, HEALING_TOTEM, POISON_POOL, ROCK, SPIKE };
+
+struct ArenaObject {
+    ArenaObjectType type;
+    int tile_x, tile_y;
+    bool active = true;
+    float timer = 0.0f;
+};
+
 // ============================================================
 // Tile / GameMap — 地图数据结构
 // ============================================================
@@ -37,12 +52,19 @@ public:
     SpecialRoom* get_special_room_at(int tile_x, int tile_y);
     const SpecialRoom* get_special_room_at(int tile_x, int tile_y) const;
 
-    Vector2 tile_to_pixel(int tx, int ty) const {
-        return {(float)tx * tile_size, (float)ty * tile_size};
-    }
-    std::pair<int,int> pixel_to_tile(float px, float py) const {
-        return {(int)(px / tile_size), (int)(py / tile_size)};
-    }
+    // D2 Step5: 战场元素
+    std::vector<ArenaObject> arena_objects;
+    ArenaObject*       get_arena_at(int tile_x, int tile_y);
+    const ArenaObject* get_arena_at(int tile_x, int tile_y) const;
+
+    // D4 Step1: 动态事件
+    int   event_room_index = -1;
+    int   event_tile_x = 0, event_tile_y = 0;
+    bool  event_triggered = false;
+    EventType event_type = (EventType)0;  // EventType::NONE
+
+    Vector2 tile_to_pixel(int tx, int ty) const;
+    std::pair<int,int> pixel_to_tile(float px, float py) const;
 
     void draw(float cam_x, float cam_y, int screen_w, int screen_h) const;
 

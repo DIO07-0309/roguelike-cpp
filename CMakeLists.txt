@@ -49,7 +49,8 @@ if(MSVC)
                 "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
     )
 else()
-    # MinGW / Linux / macOS
+    # MinGW / Linux / macOS — 强制 UTF-8 源文件 + 运行期字面量
+    add_compile_options(-finput-charset=UTF-8 -fexec-charset=UTF-8)
     set(RAYLIB_LIB "${RAYLIB_DIR}/lib/libraylibdll.a")
     set(RAYLIB_DLL "${RAYLIB_DIR}/lib/raylib.dll")
     target_link_libraries(${PROJECT_NAME} PRIVATE

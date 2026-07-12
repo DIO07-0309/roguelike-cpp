@@ -12,42 +12,274 @@
 #include "core/logger.h"
 #include "save/save_manager.h"
 #include "audio_server.h"
+#include "floor_config.h"
+#include "event_system.h"
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 
 // 字体指针 (在 main.cpp 中初始化)
 extern Font g_font;
 extern Font g_font_small;
 extern bool g_font_loaded;
 
-// ---- 内部辅助：绘制工具 ----
-static void draw_panel(Rectangle r, const char* title, Color bg = {20, 20, 40, 230}) {
-    DrawRectangleRounded(r, 0.08f, 8, bg);
-    DrawRectangleRoundedLines(r, 0.08f, 8, 2, {100, 100, 180, 255});
-    if (title && g_font_loaded)
-        DrawTextEx(g_font_small, title, {r.x + 12, r.y + 8}, 18, 1, {200, 200, 255, 255});
+// ============================================================
+// C1: 体验打磨 — 伤害数字/震动/冻结 辅助函数
+// ============================================================
+// _dmg_color_for moved to PresentationSystemDirector (dmg_color_for)
+static Color _olddmg_color_for(int dmg, bool is_magic, bool is_poison) {
+    if (is_poison) return {40, 220, 80, 255};
+    if (is_magic)  return {160, 120, 255, 255};
+    if (dmg >= 50) return {255, 220, 50, 255};  // 大数字偏黄
+    return {255, 255, 255, 255};
 }
 
-static void draw_glow_text(const char* text, float x, float y, int size, Color c, bool center = true) {
-    if (!g_font_loaded) return;
-    float w = MeasureTextEx(g_font, text, (float)size, 1).x;
-    if (center) x -= w / 2;
-    DrawTextEx(g_font, text, {x + 1, y + 1}, size, 1, {0, 0, 0, 100});
-    DrawTextEx(g_font, text, {x, y}, size, 1, c);
+// _trigger_shake / _trigger_freeze moved to PresentationSystemDirector
+
+// ============================================================
+// D4 Step2: Event Presentation impl
+// ============================================================
+static int _event_option_count(EventType et) {
+    switch (et) {
+        case EventType::BLOOD_RITUAL: return 2; // YES/NO
+        case EventType::PRISONER:     return 2;
+        case EventType::CURSED_ROOM:  return 2;
+        case EventType::ALTAR_CHOICE: return 3;
+        case EventType::MERCHANT:     return 3;
+        default: return 0; // confirm-only
+    }
 }
 
-static void draw_progress_bar(Rectangle r, float ratio, Color fill, Color bg = {30, 30, 60, 255}) {
-    DrawRectangleRec(r, bg);
-    DrawRectangleRec({r.x, r.y, r.width * ratio, r.height}, fill);
-    DrawRectangleLinesEx(r, 1, {60, 60, 90, 255});
+static Color _event_anim_color(EventType et) {
+    switch (et) {
+        case EventType::AMBUSH:         return {255, 40, 30, 255};
+        case EventType::CURSED_ROOM:    return {140, 40, 200, 255};
+        case EventType::BLOOD_RITUAL:   return {200, 30, 30, 255};
+        case EventType::LOST_CAMP:      return {255, 200, 60, 255};
+        case EventType::TREASURE_GUARD: return {255, 200, 30, 255};
+        case EventType::MERCHANT:       return {255, 220, 100, 255};
+        case EventType::ALTAR_CHOICE:   return {200, 200, 255, 255};
+        case EventType::STATUE:         return {180, 160, 220, 255};
+        default: return {255, 200, 50, 255};
+    }
+}
+
+void GameScene::_start_event_presentation(EventType et) {
+    _event_ui.active = true;
+    _event_ui.phase = EventPhase::ENTER;
+    _event_ui.current = et;
+    _event_ui.timer = 1.2f;
+    _event_ui.fade = 0.0f;
+    _event_ui.selected = 0;
+    _event_ui.option_count = _event_option_count(et);
+    _event_ui.desc_text = "";  // filled in DESC phase
+    _event_ui.reward_text = "";
+    _event_ui.complete_text = "";
+    _event_ui.anim_color = _event_anim_color(et);
+}
+
+void GameScene::_tick_event_ui(float dt) {
+    auto& ui = _event_ui;
+    if (!ui.active) return;
+
+    // fade in/out
+    if (ui.fade < 1.0f) ui.fade = std::min(1.0f, ui.fade + dt * 3.0f);
+    ui.timer -= dt;
+
+    switch (ui.phase) {
+    case EventPhase::ENTER:
+        if (ui.timer <= 0) {
+            ui.phase = EventPhase::DESC;
+            ui.timer = 0;
+            // Pick desc text from pool
+            auto pool = event_text_pool((int)ui.current - 1);
+            if (!pool.empty()) ui.desc_text = pool[rng() % pool.size()];
+        }
+        break;
+    case EventPhase::ANIM:
+        if (ui.timer <= 0) {
+            ui.phase = EventPhase::REWARD;
+            ui.timer = 1.5f;
+            // Execute event here
+            DungeonEvent ev; ev.type = ui.current; ev.triggered = false;
+            ui.reward_text = execute_event(ev, player.get(), current_floor);
+            // D4 Step5: 事件WorldFlag
+            if (ev.type == EventType::CURSED_ROOM && ui.selected == 0) {
+                _gameplay.world_state.set(WorldFlag::Accepted_Curse);
+                // D4 Step5.3: 诅咒→祭司信任-1, 所有NPC恐惧+1
+                _gameplay.rels.add_trust(70, -1); _gameplay.rels.add_fear(70, 1);
+            }
+            else if (ev.type == EventType::BLOOD_RITUAL && ui.selected == 0) {
+                _gameplay.world_state.set(WorldFlag::Blood_Ritual);
+                // D4 Step5.3: 血祭→祭司恐惧+2腐化+1
+                _gameplay.rels.apply_reward(RR_BLOOD_RITUAL);
+            }
+            if (ui.reward_text.size() > 6 && ui.reward_text.substr(0, 6) == "RELIC:") {
+                ui.complete_text = "获得圣物:" + ui.reward_text.substr(6);
+            } else if (ui.reward_text.size() > 4 && ui.reward_text.substr(0, 4) == "MSG:") {
+                ui.complete_text = ui.reward_text.substr(4);
+            } else {
+                ui.complete_text = ui.reward_text;
+            }
+        }
+        break;
+    case EventPhase::REWARD:
+        if (ui.timer <= 0) {
+            ui.phase = EventPhase::COMPLETE;
+            ui.timer = 2.0f;
+            ui.fade = 0.0f; // restart fade for complete
+        }
+        break;
+    case EventPhase::COMPLETE:
+        if (ui.timer <= 0) {
+            ui.active = false;
+            ui.phase = EventPhase::INACTIVE;
+            game_map->event_triggered = true;
+        }
+        break;
+    default: break;
+    }
+}
+
+void GameScene::_handle_event_input(const InputMap& input) {
+    auto& ui = _event_ui;
+    if (!ui.active) return;
+
+    if (input.is_action_just_pressed("cancel")) {
+        if (ui.phase == EventPhase::DESC || ui.phase == EventPhase::CHOICE) {
+            // 退出事件 (不触发)
+            ui.active = false;
+            ui.phase = EventPhase::INACTIVE;
+            _presentation.room_msg = "你离开了这里。";
+            _presentation.room_msg_timer = 1.5f;
+        }
+        return;
+    }
+
+    if (ui.phase == EventPhase::DESC) {
+        if (input.is_action_just_pressed("confirm")) {
+            if (ui.option_count > 0) {
+                ui.phase = EventPhase::CHOICE;
+                ui.selected = 0;
+            } else {
+                // No options, start anim
+                ui.phase = EventPhase::ANIM;
+                ui.timer = 0.8f;
+                _presentation.trigger_shake(3.0f);
+            }
+        }
+    } else if (ui.phase == EventPhase::CHOICE) {
+        if (input.is_action_just_pressed("move_left"))
+            ui.selected = (ui.selected - 1 + ui.option_count) % ui.option_count;
+        if (input.is_action_just_pressed("move_right"))
+            ui.selected = (ui.selected + 1) % ui.option_count;
+        if (input.is_action_just_pressed("confirm")) {
+            ui.phase = EventPhase::ANIM;
+            ui.timer = 0.8f;
+            _presentation.trigger_shake(4.0f);
+        }
+    }
+}
+
+void GameScene::_draw_event_ui(int sw, int sh) {
+    auto& ui = _event_ui;
+    if (!ui.active) return;
+
+    float alpha = ui.fade;
+    auto ename = event_type_name(ui.current);
+    Color gold = {255, 210, 50, (unsigned char)(255 * alpha)};
+    Color white = {240, 240, 240, (unsigned char)(230 * alpha)};
+    Color bg = {0, 0, 0, (unsigned char)(140 * alpha)};
+
+    switch (ui.phase) {
+    case EventPhase::ENTER: {
+        // 中央大标题
+        DrawRectangle(0, 0, sw, sh, bg);
+        GameRenderer::draw_glow_text("══════════════", sw/2.0f, sh/2.0f - 40, 22, gold, true);
+        char title_buf[64]; snprintf(title_buf, sizeof(title_buf), "EVENT");
+        GameRenderer::draw_glow_text(title_buf, sw/2.0f, sh/2.0f - 12, 36, gold, true);
+        GameRenderer::draw_glow_text(ename, sw/2.0f, sh/2.0f + 28, 22, white, true);
+        GameRenderer::draw_glow_text("══════════════", sw/2.0f, sh/2.0f + 52, 22, gold, true);
+        break;
+    }
+    case EventPhase::DESC:
+    case EventPhase::CHOICE: {
+        // 事件窗口
+        float pw = 500, ph = 260;
+        Rectangle pr = {sw/2.0f - pw/2, sh/2.0f - ph/2, pw, ph};
+        GameRenderer::draw_panel(pr, ename, {15,15,35,(unsigned char)(220*alpha)});
+
+        // 描述文字
+        if (g_font_loaded && !ui.desc_text.empty())
+            DrawTextEx(g_font_small, ui.desc_text.c_str(), {pr.x+30, pr.y+50}, 16, 1, white);
+
+        // 选项 (CHOICE phase)
+        if (ui.phase == EventPhase::CHOICE) {
+            float oy = pr.y + 130;
+            for (int i = 0; i < ui.option_count; i++) {
+                const char* choice_text = "?";
+                if (ui.current == EventType::BLOOD_RITUAL || ui.current == EventType::PRISONER
+                    || ui.current == EventType::CURSED_ROOM) {
+                    choice_text = (i == 0) ? "▶ YES" : "  NO";
+                } else if (ui.current == EventType::ALTAR_CHOICE) {
+                    const char* opts[] = {"▶ 攻击强化", "  生命恢复", "  技能进化"};
+                    choice_text = (i < 3) ? opts[i] : "?";
+                } else if (ui.current == EventType::MERCHANT) {
+                    const char* opts[] = {"▶ 购买药水", "  攻击祝福", "  随机圣物"};
+                    choice_text = (i < 3) ? opts[i] : "?";
+                }
+                Color cc = (i == ui.selected) ? gold : Color{180,180,180,(unsigned char)(200*alpha)};
+                DrawTextEx(g_font_small, choice_text, {pr.x+40, oy + i*28}, 16, 1, cc);
+            }
+        }
+        // 提示
+        const char* hint = (ui.phase == EventPhase::DESC)
+            ? "[ENTER]继续  [ESC]离开"
+            : "[←→]选择  [ENTER]确认  [ESC]取消";
+        DrawTextEx(g_font_small, hint,
+                   {pr.x + (pw - MeasureTextEx(g_font_small,hint,14,1).x)/2, pr.y+ph-28},
+                   14, 1, Color{140,140,160,(unsigned char)(180*alpha)});
+        break;
+    }
+    case EventPhase::ANIM: {
+        // 简单动画: 彩色脉冲环
+        DrawRectangle(0, 0, sw, sh, bg);
+        float pulse = sinf(ui.timer * 8) * 30;
+        float r = 80 + pulse;
+        DrawRing({sw/2.0f, sh/2.0f}, r*0.7f, r, 0, 360, 24,
+                 Color{ui.anim_color.r, ui.anim_color.g, ui.anim_color.b, (unsigned char)(180*alpha)});
+        DrawRing({sw/2.0f, sh/2.0f}, r*0.4f, r*0.5f, 0, 360, 16,
+                 Color{ui.anim_color.r, ui.anim_color.g, ui.anim_color.b, (unsigned char)(120*alpha)});
+        break;
+    }
+    case EventPhase::REWARD: {
+        DrawRectangle(0, 0, sw, sh, bg);
+        GameRenderer::draw_glow_text("EVENT COMPLETE", sw/2.0f, sh/2.0f - 30, 28, gold, true);
+        if (!ui.complete_text.empty())
+            GameRenderer::draw_glow_text(ui.complete_text.c_str(), sw/2.0f, sh/2.0f + 20, 20, white, true);
+        break;
+    }
+    case EventPhase::COMPLETE: {
+        DrawRectangle(0, 0, sw, sh, {0,0,0,(unsigned char)(120*alpha)});
+        GameRenderer::draw_glow_text("EVENT COMPLETE", sw/2.0f, sh/2.0f - 20, 24,
+                                      {255,210,50,(unsigned char)(200*alpha)}, true);
+        if (!ui.complete_text.empty())
+            GameRenderer::draw_glow_text(ui.complete_text.c_str(), sw/2.0f, sh/2.0f + 18, 18,
+                                          {240,240,240,(unsigned char)(180*alpha)}, true);
+        break;
+    }
+    default: break;
+    }
 }
 
 // ============================================================
 // GameScene 实现
 // ============================================================
 void GameScene::_ready() {
-    // 由外部调用 new_game() / enter_floor() 初始化
+    // D6: 场景入树时绑定Director (new_game/load_saved_game都会走这里)
+    _flow.bind(this);
+    _player_ctrl.bind(this);
 }
 
 void GameScene::new_game() {
@@ -55,6 +287,10 @@ void GameScene::new_game() {
         PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
     auto sk = random_active_skill();
     player->skills.learn(std::move(sk));
+
+    // D4.6 Step5: 加载Meta存档 + 重置本局统计
+    g_meta.load();
+    _gameplay.run_stats = RunSummary{};
     player->skills.apply_all_passives(player.get());
     current_floor = 1;
     max_unlocked_floor = 1;
@@ -64,8 +300,7 @@ void GameScene::new_game() {
 void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
                                  uint32_t seed,
                                  const std::vector<bool>& special_triggered,
-                                 const std::vector<bool>& special_discovered,
-                                 const std::vector<std::string>& relics) {
+                                 const std::vector<bool>& special_discovered) {
     player = std::move(p);
     current_floor = floor;
     max_unlocked_floor = max_f;
@@ -87,16 +322,7 @@ void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
             rooms[i].discovered = special_discovered[i];
         LOG_INFO("[ROOM] 恢复发现状态: %zu/%zu", n, special_discovered.size());
     }
-    // B11: 恢复 relic (跳过未知 id)
-    player->relics.clear();
-    for (auto& id : relics) {
-        if (get_relic_def(id))
-            player->relics.push_back({id});
-        else
-            LOG_WARN("[RELIC] 读档跳过未知 relic: %s", id.c_str());
-    }
-    if (!relics.empty())
-        LOG_INFO("[RELIC] 恢复圣物: %zu/%zu", player->relics.size(), relics.size());
+    // B13: Relic 不再跨层 — 读档不恢复圣物 (每层重新Build)
 }
 
 void GameScene::enter_floor(int floor, uint32_t seed) {
@@ -110,8 +336,20 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     time_stop_remaining = 0;
     pending_damage.clear();
     monsters.clear();
-    _room_message.clear();
-    _room_message_timer = 0.0f;
+    _presentation.room_msg.clear();
+    _presentation.room_msg_timer = 0.0f;
+
+    // B13: Relic 每层重建 — 新楼层清空旧圣物
+    player->relics.clear();
+
+    // D4 Step1: 重置事件状态
+    if (game_map) {
+        game_map->event_room_index = -1;
+        game_map->event_triggered = false;
+    }
+    _presentation.boss_intro_text.clear();
+    _presentation.boss_modifier_text.clear();
+    _boss.arena.clear();  // D5 Step4: 新楼层清除Arena
 
     // B8: seed=0 → 新楼层随机生成; seed!=0 → 读档恢复
     if (seed != 0) {
@@ -120,9 +358,12 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
         _dungeon_seed = static_cast<uint32_t>(rng());
     }
 
-    // 生成地牢 (B8: 统一走 seed 驱动)
+    // D1: FloorConfig — 统一难度/敌人池/特殊房间/BGM/剧情
+    const FloorConfig* fcfg = get_floor_config(floor);
+
+    // 生成地牢 (B8: seed 驱动; D1: special_room_count 从配置读)
     DungeonGenerator gen(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
-    game_map = gen.generate(_dungeon_seed);
+    game_map = gen.generate(_dungeon_seed, fcfg->special_room_count, fcfg->arena_density);
     auto rooms = gen.get_room_centers();
 
     // 放置玩家
@@ -143,56 +384,84 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
         boss_intro_skills = info.skills_text;
         boss_intro_color = info.color;
         state = GameState::BOSS_INTRO;
+
+        // D4 Step5.5: BossNarrative覆盖intro对话
+        BuildType bt = calculate_build(player.get()).identify();
+        const BossDialogue* bd = _boss.narrative.find_intro(
+            floor, _gameplay.world_state, bt, _gameplay.rels, _gameplay.story);
+        if (bd && bd->intro) {
+            _presentation.boss_intro_text = bd->intro;
+        }
     } else {
-        _spawn_floor_monsters(rooms);
+        FloorManager::spawn_floor_monsters(floor, game_map.get(), monsters, rooms);
         state = GameState::PLAYING;
     }
 
     stairs_pos = rooms.back();
+
+    // D4 Step1: 非Boss层生成动态事件 (25%概率, 休息层50%)
+    if (!fcfg->is_boss && rooms.size() > 3) {
+        float ev_chance = fcfg->is_rest_floor ? 0.50f : 0.25f;
+        ChapterConfig ch = *get_chapter_config(fcfg->chapter);
+        if ((float)(rng() % 1000) / 1000.0f < ev_chance) {
+            DungeonEvent ev = generate_event(floor, ch, rng);
+            int ev_room = 1 + (int)(rng() % ((uint32_t)rooms.size() - 2));
+            auto [etx, ety] = rooms[ev_room];
+            game_map->event_room_index = ev_room;
+            game_map->event_tile_x = etx;
+            game_map->event_tile_y = ety;
+            game_map->event_triggered = false;
+            game_map->event_type = ev.type;  // 存储事件类型
+        }
+    }
+
+    // D4 Step4: NPC 生成 (配置中有NPC的楼层)
+    if (!fcfg->is_boss) _spawn_floor_npcs(floor, rooms);
+
+    // D4 Step5.1: StoryDirector 楼层推进
+    _gameplay.story.enter_floor(floor);
+    // D4 Step5.2: QuestManager 楼层推进
+    _gameplay.quest_mgr.set_relationship_system(&_gameplay.rels);
+    _gameplay.quest_mgr.update(_gameplay.world_state, _gameplay.story);
+
     // B11: blood_charm — 进入新楼层时使用有效最大生命
     player->combat.current_hp = get_effective_max_hp(player.get());
     player->reset_attack_timers();
 
-    // BGM: Boss层→boss, 普通层→dungeon (延迟到 _process 中播放, 避免 get_tree() 为空)
-    _pending_bgm = is_boss_floor(floor) ? "boss" : "dungeon";
+    // D4 Step3: 楼层入场演出 (非Boss层, 首次进入, new_game)
+    if (!fcfg->is_boss && !_gameplay.narr_state.floor_intro_played[floor - 1]) {
+        _gameplay.narr_state.floor_intro_played[floor - 1] = true;
+        _presentation.floor_intro_active = true;
+        _presentation.floor_intro_timer = 2.0f;
+        _presentation.floor_intro_fade = 0.0f;
+        _presentation.floor_intro_floor = floor;
+        _gameplay.narr_state.narration_timer = 25.0f + (float)(rng() % 15);
+    }
+    // D4 Step3: 章节入场 (每新章节开始)
+    if (!fcfg->is_boss && fcfg->chapter != _presentation.chapter_intro_ch) {
+        _presentation.chapter_intro_active = true;
+        _presentation.chapter_intro_timer = 3.0f;
+        _presentation.chapter_intro_ch = fcfg->chapter;
+        _presentation.floor_intro_active = false;  // chapter intro overrides floor intro
+    }
 
-    if (is_boss_floor(floor)) {
+    // D1: BGM + 剧情从 FloorConfig 读取
+    _pending_bgm = fcfg->bgm;
+
+    if (fcfg->story_msg && !_presentation.floor_intro_active && !_presentation.chapter_intro_active) {
+        _presentation.room_msg = fcfg->story_msg;
+        _presentation.room_msg_timer = 3.0f;
+    }
+
+    if (fcfg->is_boss) {
         LOG_INFO("进入第%d层 (Boss: %s) - HP:%d ATK:%d DEF:%d",
             floor, get_boss_info(floor).name.c_str(),
             get_boss_info(floor).max_hp, get_boss_info(floor).attack,
             get_boss_info(floor).pdef);
     } else {
-        int monster_count = (int)monsters.size();
-        LOG_INFO("进入第%d层 - %d只怪物, 难度倍率: HPx%.2f ATKx%.2f",
-            floor, monster_count,
-            FLOOR_MONSTER_HP_MULT[std::min(floor - 1, 14)],
-            FLOOR_MONSTER_ATK_MULT[std::min(floor - 1, 14)]);
-    }
-}
-
-void GameScene::_spawn_floor_monsters(const std::vector<std::pair<int,int>>& rooms) {
-    int idx = std::min(current_floor - 1, 14);
-    int count = FLOOR_MONSTER_COUNT[idx];
-    float hp_m = FLOOR_MONSTER_HP_MULT[idx];
-    float atk_m = FLOOR_MONSTER_ATK_MULT[idx];
-
-    int ri = 1;
-    while ((int)monsters.size() < count && ri < 500) {
-        auto [tx, ty] = rooms[ri % rooms.size()];
-        int off_x = (int)(rng() % 5) - 2;
-        int off_y = (int)(rng() % 5) - 2;
-        int stx = tx + off_x, sty = ty + off_y;
-        if (game_map->is_walkable(stx, sty)) {
-            auto [px, py] = game_map->tile_to_pixel(stx, sty);
-            const char* type = (rng() % 3 == 0) ? "orc" : "slime";
-            auto* m = spawn_monster(px, py, type);
-            m->combat.max_hp = (int)(m->combat.max_hp * hp_m);
-            m->combat.current_hp = m->combat.max_hp;
-            m->combat.attack = (int)(m->combat.attack * atk_m);
-            m->entity.sync_rect();
-            monsters.emplace_back(m);
-        }
-        ri++;
+        LOG_INFO("进入第%d层 [%s] - %d只怪物, HPx%.2f ATKx%.2f",
+            floor, fcfg->chapter_label, (int)monsters.size(),
+            fcfg->hp_mult, fcfg->atk_mult);
     }
 }
 
@@ -204,33 +473,211 @@ void GameScene::_process(double delta) {
     float dt = (float)delta;
 
     if (state == GameState::BOSS_CINEMATIC) {
-        boss_cinematic_timer -= dt;
-        if (boss_cinematic_timer <= 0) {
-            boss_cinematic_timer = 0;
-            state = GameState::PLAYING;
+        // B15: Boss登场 — 玩家冻结, Boss暂停, 2秒后启动
+        if (_boss_entrance_timer > 0) {
+            _boss_entrance_timer -= dt;
+            if (_boss_entrance_timer <= 0) {
+                _boss_entered = true;
+                state = GameState::PLAYING;
+            }
+        } else {
+            boss_cinematic_timer -= dt;
+            if (boss_cinematic_timer <= 0) {
+                boss_cinematic_timer = 0;
+                _boss_entered = true;
+                state = GameState::PLAYING;
+            }
         }
     }
 
     if (state != GameState::PLAYING) return;
     game_time += dt;
 
+    // B15: Boss Phase2 提示
+    if (!_boss_phase2_shown) {
+        auto* boss = _get_boss();
+        if (boss) {
+            auto* bai = dynamic_cast<BossAI*>(boss->ai);
+            if (bai && bai->phase2) {
+                // D4 Step5.5: Boss Phase2对话
+                BuildType bt = calculate_build(player.get()).identify();
+                const BossDialogue* pd = _boss.narrative.find_phase2(
+                    current_floor, _gameplay.world_state, bt);
+                _presentation.room_msg = pd && pd->phase2 ? pd->phase2 : "BOSS 狂暴！";
+                _presentation.room_msg_timer = 2.5f;
+                _boss_phase2_shown = true;
+                _presentation.trigger_shake(10.0f);
+                _boss.cinematic.trigger_phase2();   // D5 Step6
+                _boss.timeline.record(_boss.encounter.total_time(), "PHASE2");
+            }
+        }
+    }
+
+    // D5 Step2: LastStand 检测  D5 Step3: BossBehavior 评估
+    if (!_boss.evolution.last_stand_triggered) {
+        auto* boss = _get_boss();
+        if (boss && boss->is_boss && (float)boss->combat.current_hp / boss->combat.max_hp < 0.15f) {
+            _boss.evolution.last_stand_triggered = true;
+            // Boss 最终阶段: 所有技能CD减半 + 超大范围
+            if (auto* bai = dynamic_cast<BossAI*>(boss->ai)) {
+                bai->_charge->cooldown *= 0.5f;
+                bai->_shockwave->cooldown *= 0.5f;
+                bai->_summon->cooldown *= 0.5f;
+                bai->_shockwave->fx_radius *= 1.5f;
+                bai->_charge->fx_radius *= 1.3f;
+            }
+            _boss.cinematic.trigger_last_stand();  // D5 Step6
+            _boss.timeline.record(_boss.encounter.total_time(), "LAST_STAND");
+            _presentation.room_msg = _boss.evolution.evolution_name
+                ? std::string(_boss.evolution.evolution_name) + std::string("!")
+                : std::string("LAST STAND!");
+            _presentation.room_msg_timer = 2.5f;
+            _presentation.trigger_shake(14.0f);
+        }
+    }
+
+    // D5 Step3: Boss Memory tick + Behavior 评估 (仅Boss存在时)
+    {
+        auto* boss = _get_boss();
+        if (boss && boss->is_boss) {
+            _boss.behavior.memory.tick(dt, false);
+            BossContext ctx;
+            ctx.hp_pct = (float)boss->combat.current_hp / boss->combat.max_hp;
+            ctx.dist_tiles = hypotf(
+                boss->entity.rect.x - player->entity.rect.x,
+                boss->entity.rect.y - player->entity.rect.y) / TILE_SIZE;
+            ctx.player_low_hp = player->combat.current_hp < player->combat.max_hp * 0.3f;
+            ctx.player_combo_high = player->combo.count >= 4;
+            ctx.player_far = ctx.dist_tiles > 7;
+            ctx.player_near = ctx.dist_tiles < 3;
+            ctx.last_stand = _boss.evolution.last_stand_triggered;
+            ctx.build = calculate_build(player.get()).identify();
+            ctx.stage = _gameplay.story.stage();
+            _boss.behavior.personality = boss_personality_for_floor(current_floor);
+            evaluate_boss_decision(current_floor, ctx, _gameplay.world_state, _gameplay.rels,
+                                    _boss.behavior, dt);
+            // D5 Step5: BossEncounter tick
+            _boss.encounter.tick(dt, ctx.hp_pct);
+            _boss.cinematic.tick(dt);  // D5 Step6
+
+            // D5 Step4: Behavior→Command (决策→执行)
+            _boss.current_cmd = boss_decision_to_command(
+                (int)_boss.behavior.current);
+            // Boss战 arena tick
+            _boss.arena.tick(dt, player.get(), monsters);
+            // Phase2: 生成 arena (每8秒随机放置)
+            static float _arena_spawn_timer = 0;
+            _arena_spawn_timer += dt;
+            if (_arena_spawn_timer > 8.0f) {
+                _arena_spawn_timer = 0;
+                float bx = boss->entity.rect.x + boss->entity.rect.width/2
+                         + (float)((int)rng()%200 - 100);
+                float by = boss->entity.rect.y + boss->entity.rect.height/2
+                         + (float)((int)rng()%200 - 100);
+                if (current_floor == 5)
+                    _boss.arena.spawn_shadow_wall(bx, by, 3.0f);
+                else if (current_floor == 10)
+                    _boss.arena.spawn_lava(bx, by, 2.5f);
+                else if (current_floor == 15)
+                    _boss.arena.spawn_void_crack(bx, by, 3.5f);
+            }
+        }
+    }
+
+    // D3 Step4: Build Fusion 检测 — 构筑成型/切换
+    {
+        BuildScore bs = calculate_build(player.get());
+        BuildType bt = bs.identify();
+        if (bt != BuildType::NONE && bt != _gameplay.last_notified_build) {
+            std::string msg;
+            if (_gameplay.last_notified_build == BuildType::NONE)
+                msg = std::string("BUILD COMPLETE! ") + bs.build_name();
+            else
+                msg = std::string("BUILD CHANGED: ") + bs.build_name();
+            _presentation.room_msg = msg;
+            _presentation.room_msg_timer = 2.0f;
+            _gameplay.last_notified_build = bt;
+        }
+    }
+
     // ── Buff 逐帧结算 ──
     std::vector<BuffEvent> buf_events;
     tick_buffs(player.get(), dt, &buf_events);
     for (auto& m : monsters) tick_buffs(m.get(), dt, &buf_events, player.get()); // B11: venom_fang
 
-    // Buff 事件日志
+    // Buff 事件日志 + C1: poison tick 伤害数字
     for (auto& ev : buf_events) {
         if (ev.type == BuffEventType::APPLIED)
             LOG_INFO("[BUF] %s applied to %s (stacks=%d)", ev.buff_id.c_str(), ev.target.c_str(), ev.stacks);
-        else if (ev.type == BuffEventType::TICK_DAMAGE)
+        else if (ev.type == BuffEventType::TICK_DAMAGE) {
             LOG_INFO("[BUF] %s tick on %s: %d dmg (stacks=%d)", ev.buff_id.c_str(), ev.target.c_str(), ev.value, ev.stacks);
+            // C1: Poison 浮动数字 (在怪物头顶上方)
+            for (auto& m : monsters) {
+                if (m->name == ev.target) {
+                    _presentation.damage_floats.push_back({
+                        m->entity.rect.x + m->entity.rect.width/2,
+                        m->entity.rect.y - 8,
+                        0.6f, ev.value,
+                        dmg_color_for(ev.value, false, true)
+                    });
+                    break;
+                }
+            }
+        }
         else if (ev.type == BuffEventType::EXPIRED)
             LOG_INFO("[BUF] %s expired from %s", ev.buff_id.c_str(), ev.target.c_str());
     }
 
     // 清理被毒死的怪物
     _cleanup_dead_monsters();
+
+    // D2 Step5: Arena 环境 tick (D4.6: arena_scale)
+    if (game_map && !game_map->arena_objects.empty()) {
+        float px = player->entity.rect.x + player->entity.rect.width/2;
+        float py = player->entity.rect.y + player->entity.rect.height/2;
+        float ascale = g_growth.arena_scale(current_floor);
+        for (auto& ao : game_map->arena_objects) {
+            if (!ao.active) continue;
+            float ax = ao.tile_x * TILE_SIZE + TILE_SIZE/2;
+            float ay = ao.tile_y * TILE_SIZE + TILE_SIZE/2;
+            float dist = hypotf(px - ax, py - ay);
+            switch (ao.type) {
+            case ArenaObjectType::EXPLOSIVE_BARREL:
+                ao.timer += dt;
+                break;
+            case ArenaObjectType::HEALING_TOTEM:
+                ao.timer += dt;
+                if (ao.timer >= 2.0f) { ao.timer = 0;
+                    if (dist < 2.5f * TILE_SIZE) heal_player(player.get(), (int)(5 * ascale));
+                    for (auto& m : monsters)
+                        if (m->combat.is_alive && hypotf(m->entity.rect.x + m->entity.rect.width/2 - ax,
+                            m->entity.rect.y + m->entity.rect.height/2 - ay) < 2.5f * TILE_SIZE)
+                            m->combat.heal((int)(m->combat.max_hp * 0.08f * ascale));
+                }
+                break;
+            case ArenaObjectType::POISON_POOL:
+                if (dist < 1.2f * TILE_SIZE) apply_buff(player.get(), "poison", 1);
+                for (auto& m : monsters)
+                    if (m->combat.is_alive && hypotf(m->entity.rect.x + m->entity.rect.width/2 - ax,
+                        m->entity.rect.y + m->entity.rect.height/2 - ay) < 1.2f * TILE_SIZE)
+                        apply_buff(m.get(), "poison", 1);
+                break;
+            case ArenaObjectType::SPIKE: {
+                int sd = (int)(3 * ascale), md = (int)(4 * ascale);
+                if (dist < 0.8f * TILE_SIZE) {
+                    player->combat.take_damage(sd);
+                    _presentation.damage_floats.push_back({px, py-8, 0.4f, sd, {255, 60, 40, 255}});
+                }
+                for (auto& m : monsters)
+                    if (m->combat.is_alive && hypotf(m->entity.rect.x + m->entity.rect.width/2 - ax,
+                        m->entity.rect.y + m->entity.rect.height/2 - ay) < 0.8f * TILE_SIZE)
+                        m->combat.take_damage(md);
+                break;
+            }
+            default: break;
+            }
+        }
+    }
 
     // 延迟播放 BGM（此时 get_tree() 已可用）
     if (!_pending_bgm.empty() && get_tree()) {
@@ -245,52 +692,153 @@ void GameScene::_process(double delta) {
         if (time_stop_remaining <= 0) {
             time_stop_remaining = 0;
             _apply_pending_damage();
+            // D3 Step3: The World E2 — 结束时释放 Shockwave
+            if (_tw_evo_level >= 2) {
+                float cx = player->entity.rect.x + player->entity.rect.width/2;
+                float cy = player->entity.rect.y + player->entity.rect.height/2;
+                for (auto& m : monsters) {
+                    if (!m->combat.is_alive) continue;
+                    float d = hypotf(m->entity.rect.x + m->entity.rect.width/2 - cx,
+                                     m->entity.rect.y + m->entity.rect.height/2 - cy);
+                    if (d < 120) {
+                        int sd = calculate_damage(get_effective_attack(player.get()),
+                            m->combat.get_effective_defense(AttackType::PHYSICAL));
+                        m->combat.take_damage(sd);
+                        // 击退
+                        float dx = m->entity.rect.x - cx, dy = m->entity.rect.y - cy;
+                        float len = sqrtf(dx*dx + dy*dy);
+                        if (len > 0) { m->entity.position.x += dx / len * 30; m->entity.position.y += dy / len * 30; m->entity.sync_rect(); }
+                    }
+                }
+                _presentation.trigger_shake(8.0f);
+                _presentation.room_msg = "时停冲击!";
+                _presentation.room_msg_timer = 1.0f;
+            }
+            // D3 Step3: The World E3 — 速度提升 5s
+            if (_tw_evo_level >= 3) {
+                _tw_speed_boost = 5.0f;
+            }
+            _tw_evo_level = 0;
         }
     }
+
+    // D3 Step3: TW E3 speed boost tick
+    if (_tw_speed_boost > 0) _tw_speed_boost -= dt;
 
     if (!player->combat.is_alive) {
         LOG_INFO("玩家死亡! 第%d层 Lv%d - 存档已保留", current_floor, player->level);
-        auto ds = std::make_shared<DeathScene>();
-        ds->name = "DeathScene";
-        ds->final_floor = current_floor;
-        ds->final_level = player->level;
-        get_tree()->change_scene(ds);
+        // D4.6 Step5: 完成本局统计并结算Meta货币
+        // D6 Step6: 死亡 — 委托给 Director 链
+        _gameplay.on_player_dead(current_floor, player->level, player.get());
+        g_meta.end_run(_gameplay.run_stats);
+        _flow.on_player_dead();
         return;
     }
 
-    if (!inventory_open) {
-        // 玩家移动
-        Vector2 move = player->handle_input(get_tree()->get_input());
-        auto& e = player->entity;
-        float s = get_effective_speed(player.get()) * dt;
-        e.position.x += move.x * s; e.sync_rect();
-        if (!game_map->is_rect_walkable(e.rect)) { e.position.x -= move.x * s; e.sync_rect(); }
-        e.position.y += move.y * s; e.sync_rect();
-        if (!game_map->is_rect_walkable(e.rect)) { e.position.y -= move.y * s; e.sync_rect(); }
-
-        // B10: 检测是否步入特殊房间
-        _check_special_room_discovery();
-
-        // 怪物 AI（时停期间冻结）
-        if (time_stop_remaining <= 0) {
-            _update_monsters(dt);
-            _check_floor_transition();
-        }
-
-        // 自愈 Lv3 持续回复
-        for (auto& sk : player->skills.active_skills) {
-            if (auto* h = dynamic_cast<SelfHealSkill*>(sk.get()))
-                h->tick_regen(player.get(), dt);
-        }
-    }
+    // D6 Step7: 玩家移动/交互/怪物AI — 委托给 PlayerController
+    _player_ctrl.tick(dt);
 
     // VFX 更新
     for (auto& fx : active_effects) fx.elapsed += dt;
     active_effects.erase(std::remove_if(active_effects.begin(), active_effects.end(),
         [](auto& fx) { return fx.elapsed >= fx.duration; }), active_effects.end());
 
+    // D4.6 Step3: FlowDirector tick
+    _gameplay.flow.tick(dt);
+
     // B10: 房间消息计时器
-    if (_room_message_timer > 0) _room_message_timer -= dt;
+    if (_presentation.room_msg_timer > 0) _presentation.room_msg_timer -= dt;
+
+    // D4 Step2: 事件演出 tick
+    _tick_event_ui(dt);
+    // D4 Step4: 对话计时器
+    _update_dialogue(dt);
+    // D4 Step5.2: QuestManager 自动推进
+    _gameplay.quest_mgr.update(_gameplay.world_state, _gameplay.story);
+
+    // D4 Step3: 楼层入场计时器
+    if (_presentation.floor_intro_active) {
+        _presentation.floor_intro_timer -= dt;
+        _presentation.floor_intro_fade = std::min(1.0f, _presentation.floor_intro_fade + dt * 2.5f);
+        if (_presentation.floor_intro_timer <= 0) _presentation.floor_intro_active = false;
+    }
+    // D4 Step3: 章节入场计时器
+    if (_presentation.chapter_intro_active) {
+        _presentation.chapter_intro_timer -= dt;
+        if (_presentation.chapter_intro_timer <= 0) _presentation.chapter_intro_active = false;
+    }
+    // D4 Step3: 随机旁白 (25-40秒间隔, 不在事件中)
+    if (!_presentation.floor_intro_active && !_presentation.chapter_intro_active && !_is_event_running()
+        && !inventory_open && state == GameState::PLAYING && !is_boss_floor(current_floor)) {
+        _gameplay.narr_state.narration_timer -= dt;
+        if (_gameplay.narr_state.narration_timer <= 0) {
+            // D4 Step5.4: WorldReaction overlay 优先覆盖随机旁白
+            const char* nar = StoryDirector::world_flag_narration(_gameplay.world_state);
+            if (!nar) nar = pick_random_narration(current_floor, _gameplay.narr_state);
+            if (nar) { _presentation.room_msg = nar; _presentation.room_msg_timer = 3.0f; }
+            _gameplay.narr_state.narration_timer = 25.0f + (float)(rng() % 15);
+        }
+        // D4 Step5.1: StoryDirector update + 世界事件 (~30秒)
+        _gameplay.story.update(dt);
+        if (_gameplay.story.should_trigger_story()) {
+            // D4 Step5.4: WorldReaction 世界事件优先
+            const char* we = g_reactions.current_world_event(_gameplay.world_state, _gameplay.story.stage());
+            if (!we) we = _gameplay.story.tick_world_event(_gameplay.world_state);
+            if (we) { _presentation.room_msg = we; _presentation.room_msg_timer = 3.0f; }
+        }
+
+        // D4.6 Step3: FlowDirector自动补救 (超过阈值触发动态内容)
+        const char* suggest = _gameplay.flow.auto_spawn_suggestion();
+        if (suggest && game_map && !monsters.empty()) {
+            if (strcmp(suggest, "AUTO_STORY") == 0) {
+                const char* we = _gameplay.story.tick_world_event(_gameplay.world_state);
+                if (we) { _presentation.room_msg = we; _presentation.room_msg_timer = 3.0f; _gameplay.flow.mark_story(); }
+            } else if (strcmp(suggest, "AUTO_REWARD") == 0) {
+                // 在玩家附近生成药水
+                auto [tx, ty] = game_map->pixel_to_tile(
+                    player->entity.rect.x + player->entity.rect.width/2,
+                    player->entity.rect.y + player->entity.rect.height/2);
+                auto p = std::make_shared<ConsumableItem>("探索发现", Rarity::RARE, "heal", 25);
+                ground_items.push_back({p, tx + 2, ty + 1});
+                _presentation.room_msg = "你在角落发现了一件物品。";
+                _presentation.room_msg_timer = 2.0f;
+                _gameplay.flow.mark_reward();
+            } else if (strcmp(suggest, "AUTO_PATROL") == 0) {
+                // 在玩家附近生成巡逻怪
+                auto [tx, ty] = game_map->pixel_to_tile(
+                    player->entity.rect.x + (rng()%10-5) * TILE_SIZE,
+                    player->entity.rect.y + (rng()%10-5) * TILE_SIZE);
+                auto [px, py] = game_map->tile_to_pixel(tx, ty);
+                if (game_map->is_walkable(tx, ty)) {
+                    auto* m = spawn_monster(px, py, (rng()%3==0)?"orc":"slime");
+                    m->combat.max_hp = (int)(m->combat.max_hp * g_growth.hp_scale(current_floor));
+                    m->combat.current_hp = m->combat.max_hp;
+                    monsters.emplace_back(m);
+                    _gameplay.flow.mark_combat();
+                }
+            } else if (strcmp(suggest, "AUTO_ELITE") == 0) {
+                auto [tx, ty] = game_map->pixel_to_tile(
+                    player->entity.rect.x + (rng()%8-4) * TILE_SIZE,
+                    player->entity.rect.y + (rng()%8-4) * TILE_SIZE);
+                if (game_map->is_walkable(tx, ty)) {
+                    auto [px, py] = game_map->tile_to_pixel(tx, ty);
+                    auto* m = spawn_monster(px, py, "elite");
+                    m->combat.max_hp = (int)(m->combat.max_hp * g_growth.elite_scale(current_floor));
+                    m->combat.current_hp = m->combat.max_hp;
+                    monsters.emplace_back(m);
+                    _presentation.room_msg = "一支精英巡逻队出现了！";
+                    _presentation.room_msg_timer = 2.0f;
+                    _gameplay.flow.mark_combat();
+                }
+            }
+        }
+    }
+
+    // D2: Combo 窗口衰减 — 超过 WINDOW 未命中则重置
+    player->combo.tick(dt);
+
+    // D6 Step5: Presentation tick (shake/freeze/damage/message/intro)
+    _presentation.tick(dt);
 }
 
 // ============================================================
@@ -301,18 +849,30 @@ void GameScene::_input(const InputMap& input) {
     auto* tree = get_tree();
     if (!tree) return;
 
+    // D4 Step2: 事件UI拦截所有输入
+    if (_is_event_running()) { _handle_event_input(input); return; }
+    // D4 Step4: 对话UI拦截
+    if (_dialogue.active) { _handle_dialogue_input(input); return; }
+    // D4 Step4: Quest log (Q键)
+    if (IsKeyPressed(KEY_Q)) {
+        _quest_log_open = !_quest_log_open;
+        if (_quest_log_open) inventory_open = false;
+        return;
+    }
+    if (_quest_log_open) { if (IsKeyPressed(KEY_Q) || input.is_action_just_pressed("cancel")) _quest_log_open = false; return; }
+
     if (input.is_action_just_pressed("cancel")) {
         if (state == GameState::PLAYING && player->combat.is_alive) {
             max_unlocked_floor = std::max(max_unlocked_floor, current_floor);
             std::vector<bool> spr, spd;
-            std::vector<std::string> rlc;
+            // B13: Relic 不再跨层 (无需保存圣物列表)
             if (game_map) for (auto& sr : game_map->special_rooms) {
                 spr.push_back(sr.triggered);
                 spd.push_back(sr.discovered);
             }
-            for (auto& r : player->relics) rlc.push_back(r.id);
+            // B13: Relic 不再跨层 (无需保存圣物)
             SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
-                                   _dungeon_seed, spr, spd, rlc);
+                                   _dungeon_seed, spr, spd);
             LOG_INFO("中途退出→存档 (第%d层)", current_floor);
         }
         // 切换到标题场景
@@ -327,8 +887,18 @@ void GameScene::_input(const InputMap& input) {
             auto pos = game_map->tile_to_pixel(stairs_pos.first, stairs_pos.second);
             auto* boss = spawn_boss(stairs_pos.first, stairs_pos.second, boss_floor);
             monsters.emplace_back(boss);
+
+            // D6 Step3: BossSystemDirector — 统一初始化所有Boss子系统
+            BuildType bt = calculate_build(player.get()).identify();
+            _boss.init_on_spawn(boss, boss_floor, _gameplay.world_state, bt, _gameplay.rels, game_map.get());
+            _presentation.boss_modifier_text = _boss.modifier_text;
+
             boss_cinematic_timer = 1.0f;
+            _boss_entrance_timer = 2.0f;
+            _boss_entered = false;
+            _boss_phase2_shown = false;
             state = GameState::BOSS_CINEMATIC;
+            _flow.on_boss_intro_confirm();  // D6 Step6
         }
         return;
     }
@@ -342,44 +912,8 @@ void GameScene::_input(const InputMap& input) {
     _handle_debug_buff_test_input();   // F1-F6 Buff 调试
 #endif
 
-    if (inventory_open) {
-        if (input.is_action_just_pressed("inventory") || input.is_action_just_pressed("cancel"))
-            inventory_open = false;
-        else if (input.is_action_just_pressed("move_up"))
-            inventory_cursor = std::max(0, inventory_cursor - 1);
-        else if (input.is_action_just_pressed("move_down"))
-            inventory_cursor = std::min(std::max(0, (int)player->inventory.items.size() - 1), inventory_cursor + 1);
-        else if (IsKeyPressed(KEY_X))
-            { player->inventory.equip(inventory_cursor, player.get()); inventory_cursor = std::min(inventory_cursor, std::max(0, (int)player->inventory.items.size() - 1)); }
-        else if (IsKeyPressed(KEY_U))
-            { player->inventory.use_item(inventory_cursor, player.get()); inventory_cursor = std::min(inventory_cursor, std::max(0, (int)player->inventory.items.size() - 1)); }
-        else if (IsKeyPressed(KEY_D))
-            { player->inventory.remove(inventory_cursor); inventory_cursor = std::min(inventory_cursor, std::max(0, (int)player->inventory.items.size() - 1)); }
-        return;
-    }
-
-    if (input.is_action_just_pressed("attack")) _player_attack();
-    else if (input.is_action_just_pressed("pickup")) {
-        // B8: 优先特殊房间交互, 否则走拾取
-        if (player && game_map) {
-            auto [tx, ty] = game_map->pixel_to_tile(
-                player->entity.rect.x + player->entity.rect.width / 2,
-                player->entity.rect.y + player->entity.rect.height / 2);
-            SpecialRoom* room = game_map->get_special_room_at(tx, ty);
-            if (room && !room->triggered) {
-                _interact_special();
-            } else {
-                _pickup();
-            }
-        } else {
-            _pickup();
-        }
-    }
-    else if (input.is_action_just_pressed("inventory")) { inventory_open = true; inventory_cursor = 0; }
-    else if (input.is_action_just_pressed("skill_1")) _use_skill(0);
-    else if (input.is_action_just_pressed("skill_2")) _use_skill(1);
-    else if (input.is_action_just_pressed("skill_3")) _use_skill(2);
-    else if (input.is_action_just_pressed("skill_4")) _use_skill(3);
+    // D6 Step7: 玩家攻击/技能/拾取/交互/背包 — 委托给 PlayerController
+    _player_ctrl.handle_input(input);
 }
 
 // ============================================================
@@ -407,131 +941,42 @@ void GameScene::_handle_debug_buff_test_input() {
         apply_buff(monsters[0].get(), "slow", 2);
     if (IsKeyPressed(KEY_F6) && !monsters.empty())
         apply_buff(monsters[0].get(), "attack_up", 2);
+    // D4.6: F8 = 显示/隐藏 GrowthCurve debug面板
+    if (IsKeyPressed(KEY_F8))
+        _presentation.show_growth_debug = !_presentation.show_growth_debug;
+    // D4.6: F9 = 开关打击感效果 (除伤害数字外全部)
+    if (IsKeyPressed(KEY_F9))
+        _presentation.combat_juice_on = !_presentation.combat_juice_on;
+    // D4.6: F10 = 显示FlowDirector调试面板
+    if (IsKeyPressed(KEY_F10))
+        _presentation.show_flow_debug = !_presentation.show_flow_debug;
+    // D5 Step3: F11 = 显示BossBehavior调试面板
+    if (IsKeyPressed(KEY_F11))
+        _presentation.show_boss_behavior = !_presentation.show_boss_behavior;
+    // D5 Step4: F12 = 显示BossCombat调试面板
+    if (IsKeyPressed(KEY_F12))
+        _presentation.show_boss_cmd = !_presentation.show_boss_cmd;
+    // D5 Step5: Shift+F12 = toggle BossReport
+    if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_F12))
+        _presentation.show_boss_report = !_presentation.show_boss_report;
+    // D6 Step1: Ctrl+F12 = 循环切换Ending Type预览
+    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_F12)) {
+        static int ending_idx = 0;
+        EndingType all[] = {EndingType::BAD_END, EndingType::NORMAL_END,
+                            EndingType::GOOD_END, EndingType::TRUE_END, EndingType::SECRET_END};
+        ending_idx = (ending_idx + 1) % 5;
+        _gameplay.ending_dir.debug_override(all[ending_idx]);
+        _presentation.room_msg = std::string("[Preview] ") + _gameplay.ending_dir.ending_name();
+        _presentation.room_msg_timer = 2.0f;
+    }
 }
 
 // ============================================================
 // 战斗
 // ============================================================
-void GameScene::_player_attack() {
-    if (!player->combat.is_alive) return;
-    if (!player->can_attack(game_time)) return;
-
-    auto* target = find_attack_target(player->entity.rect,
-        reinterpret_cast<const std::vector<Monster*>&>(monsters), PLAYER_ATTACK_RANGE);
-    if (!target) return;
-
-    int dmg = calculate_damage(get_effective_attack(player.get()),
-        target->combat.get_effective_defense(player->attack_type));
-    player->_last_attack_time = game_time;
-
-    get_tree()->get_audio()->play_sfx("melee");
-
-    if (time_stop_remaining > 0) {
-        pending_damage.emplace_back(target, dmg);
-    } else {
-        target->combat.take_damage(dmg);
-        get_tree()->get_audio()->play_sfx("hit");
-        VFXServer v;
-        v.hit_flash(target->entity.position.x, target->entity.position.y, target->entity.size.x);
-        for (auto& e : v.effects) active_effects.push_back(e);
-        if (!target->combat.is_alive) {
-            _on_monster_killed(target);
-            auto it = std::find_if(monsters.begin(), monsters.end(),
-                [&](auto& m) { return m.get() == target; });
-            if (it != monsters.end()) monsters.erase(it);
-        }
-    }
-
-    // 玩家普攻 VFX
-    VFXServer vfx;
-    vfx.player_attack(player->entity.rect.x + player->entity.rect.width/2,
-                      player->entity.rect.y + player->entity.rect.height/2,
-                      PLAYER_ATTACK_RANGE * TILE_SIZE);
-    for (auto& e : vfx.effects) active_effects.push_back(e);
-}
-
-void GameScene::_use_skill(int index) {
-    if (index >= (int)player->skills.active_skills.size()) return;
-    auto& sk = player->skills.active_skills[index];
-    if (!sk->can_use(game_time)) return;
-
-    // The World 时停
-    if (dynamic_cast<TheWorldSkill*>(sk.get())) {
-        std::vector<Monster*> mlist;
-        for (auto& m : monsters) mlist.push_back(m.get());
-        sk->execute(player.get(), mlist, game_map.get());
-        sk->mark_used(game_time);
-        time_stop_remaining = static_cast<TheWorldSkill*>(sk.get())->get_stop_duration();
-        pending_damage.clear();
-        get_tree()->get_audio()->play_sfx("timestop", 1.0f);
-        VFXServer vfx;
-        vfx.time_stop(player->entity.rect.x + player->entity.rect.width/2,
-                      player->entity.rect.y + player->entity.rect.height/2);
-        for (auto& e : vfx.effects) active_effects.push_back(e);
-        return;
-    }
-
-    // 时停期间的技能：伤害暂存
-    if (time_stop_remaining > 0) {
-        std::unordered_map<Monster*, int> pre_hp;
-        for (auto& m : monsters) pre_hp[m.get()] = m->combat.current_hp;
-
-        std::vector<Monster*> mlist;
-        for (auto& m : monsters) mlist.push_back(m.get());
-        sk->execute(player.get(), mlist, game_map.get());
-        sk->mark_used(game_time);
-
-        for (auto& m : monsters) {
-            int delta = pre_hp[m.get()] - m->combat.current_hp;
-            if (delta > 0) {
-                pending_damage.emplace_back(m.get(), delta);
-                m->combat.current_hp = pre_hp[m.get()];
-                m->combat.is_alive = true;
-            }
-        }
-        return;
-    }
-
-    // 普通技能
-    std::vector<Monster*> mlist;
-    for (auto& m : monsters) mlist.push_back(m.get());
-    sk->execute(player.get(), mlist, game_map.get());
-    sk->mark_used(game_time);
-
-    // 技能 SFX (匹配Python版: slash/bolt/heal)
-    if (dynamic_cast<SlashSkill*>(sk.get()))
-        get_tree()->get_audio()->play_sfx("slash");
-    else if (dynamic_cast<FireballSkill*>(sk.get()))
-        get_tree()->get_audio()->play_sfx("bolt");
-    else if (dynamic_cast<SelfHealSkill*>(sk.get()))
-        get_tree()->get_audio()->play_sfx("heal");
-
-    // 技能 VFX (匹配Python版 fx_engine.py)
-    VFXServer vfx;
-    float cx = player->entity.rect.x + player->entity.rect.width/2;
-    float cy = player->entity.rect.y + player->entity.rect.height/2;
-    if (dynamic_cast<SlashSkill*>(sk.get())) {
-        vfx.slash_skill(cx, cy, player->direction, sk->level);
-    } else if (dynamic_cast<FireballSkill*>(sk.get())) {
-        auto t = find_attack_target(player->entity.rect,
-            reinterpret_cast<const std::vector<Monster*>&>(monsters), 10.0f);
-        float tx = t ? t->entity.rect.x + t->entity.rect.width/2 : cx + 100;
-        float ty = t ? t->entity.rect.y + t->entity.rect.height/2 : cy;
-        vfx.fireball(cx, cy, tx, ty, sk->level);
-    } else if (dynamic_cast<SelfHealSkill*>(sk.get())) {
-        vfx.heal(cx, cy, sk->level);
-    }
-    for (auto& e : vfx.effects) active_effects.push_back(e);
-
-    // 清理死亡怪物
-    auto it = monsters.begin();
-    while (it != monsters.end()) {
-        if (!(*it)->combat.is_alive) {
-            _on_monster_killed((*it).get());
-            it = monsters.erase(it);
-        } else ++it;
-    }
-}
+// _player_attack / _use_skill — delegated to PlayerController (D6 Step7)
+void GameScene::_player_attack() { _player_ctrl.player_attack(); }
+void GameScene::_use_skill(int index) { _player_ctrl.use_skill(index); }
 
 void GameScene::_update_monsters(float dt) {
     int hp_before = player->combat.current_hp;
@@ -544,9 +989,16 @@ void GameScene::_update_monsters(float dt) {
 }
 
 void GameScene::_on_monster_killed(Monster* m) {
-    // XP
-    int xp = m->is_boss ? XP_PER_KILL_BOSS
-                        : XP_PER_KILL_BASE + (int)(m->combat.max_hp * 0.5f);
+    // D4.6 Step5: 追踪统计
+    _gameplay.run_stats.total_kills++;
+    if (m->is_boss) _gameplay.run_stats.bosses_killed++;
+    if (m->is_elite) _gameplay.run_stats.elite_kills++;
+
+    // XP (D4.6: GrowthCurve exp_scale)
+    int xp = m->is_boss ? (int)(XP_PER_KILL_BOSS * g_growth.exp_scale(current_floor))
+                        : (int)((XP_PER_KILL_BASE + (int)(m->combat.max_hp * 0.5f))
+                               * g_growth.exp_scale(current_floor));
+    if (m->is_elite && !m->is_boss) xp = xp * 3 / 2;
     // Level up logic
     player->xp += xp;
     while (player->xp >= player->xp_to_next) {
@@ -578,17 +1030,86 @@ void GameScene::_on_monster_killed(Monster* m) {
         on_player_leveled.emit(player->level);
     }
 
-    // Boss 奖励
+    // Boss 奖励 (B15增强: 回复30%HP + 必掉Relic + 必掉宝箱)
     if (m->is_boss) {
         LOG_INFO("Boss击杀! %s - 第%d层", m->name.c_str(), current_floor);
+        // D5 Step5: BossEncounter结束 + 生成BattleReport
+        _boss.replay_mem.survive_time = _boss.encounter.total_time();
+        _boss.encounter.end(_boss.replay_mem, _boss.dmg_done, _boss.dmg_taken,
+                             (int)_boss.arena.zones().size());
+        _boss.battle_report = _boss.encounter.report();
         get_tree()->get_audio()->play_sfx("victory");
+        _presentation.trigger_shake(CombatFeelSystem::SHAKE_BOSS);   // D4.6: Boss死亡震
+        _boss.cinematic.trigger_death();                    // D5 Step6
+        _boss.timeline.record(_boss.encounter.total_time(), "DEATH");
+        // D4 Step5.5: Boss death对话
+        {
+            BuildType bt = calculate_build(player.get()).identify();
+            const BossDialogue* dd = _boss.narrative.find_death(
+                current_floor, _gameplay.world_state, bt);
+            if (dd && dd->death) {
+                _presentation.room_msg = dd->death;
+                _presentation.room_msg_timer = 3.0f;
+            }
+        }
+        // D4 Step5.1: Boss击杀 WorldFlag + StoryDirector
+        // D4 Step5.3: Boss击杀 → 所有NPC respect+1
+        if (current_floor == 5)  { _gameplay.world_state.set(WorldFlag::Boss1_Defeated); _gameplay.story.boss_dead(5);
+            for (auto& r : _gameplay.rels.all()) _gameplay.rels.add_respect(r.npc_id, 1); }
+        if (current_floor == 10) { _gameplay.world_state.set(WorldFlag::Boss2_Defeated); _gameplay.story.boss_dead(10);
+            for (auto& r : _gameplay.rels.all()) _gameplay.rels.add_respect(r.npc_id, 1); }
+        if (current_floor == 15) {
+            _gameplay.world_state.set(WorldFlag::Boss3_Defeated);
+            if (_gameplay.world_state.has(WorldFlag::Boss1_Defeated) && _gameplay.world_state.has(WorldFlag::Boss2_Defeated))
+                _gameplay.world_state.set(WorldFlag::All_Boss_Defeated);
+            _gameplay.story.boss_dead(15);
+            for (auto& r : _gameplay.rels.all()) _gameplay.rels.add_respect(r.npc_id, 2);
+        }
+        // True Ending: 全Boss + 不诅咒 + 不血祭 + 不杀商人 + 好感
+        if (_gameplay.world_state.has(WorldFlag::All_Boss_Defeated)
+            && !_gameplay.world_state.has(WorldFlag::Accepted_Curse)
+            && !_gameplay.world_state.has(WorldFlag::Blood_Ritual)
+            && !_gameplay.world_state.has(WorldFlag::Merchant_Killed)
+            && _gameplay.world_state.counter("priest_trust") >= 3
+            && _gameplay.world_state.counter("watcher_respect") >= 1)
+            _gameplay.world_state.set(WorldFlag::True_Ending_Ready);
         _drop_boss_reward(m);
+
+        // B15: 回复30%最大生命
+        int heal_amt = (int)(get_effective_max_hp(player.get()) * 0.30f);
+        heal_player(player.get(), heal_amt);
+
+        // B15: 必掉一个Relic (当前Build)
+        auto all_ids = get_all_relic_ids();
+        std::vector<std::string> candidates;
+        for (auto& id : all_ids)
+            if (!player_has_relic(player.get(), id))
+                candidates.push_back(id);
+        if (!candidates.empty()) {
+            std::string chosen = candidates[rng() % candidates.size()];
+            player->relics.push_back({chosen});
+            const RelicDef* def = get_relic_def(chosen);
+            if (def) {
+                _presentation.room_msg = "RELIC:" + def->name;
+                g_relic_archive.mark_obtained(chosen, rarity_level(def->rarity));
+            }
+            _presentation.room_msg_timer = 3.5f;
+        }
+
+        // B15: 必掉一个高品质物品
+        auto [btx, bty] = game_map->pixel_to_tile(m->entity.position.x, m->entity.position.y);
+        auto extra_item = generate_random_item();
+        if (extra_item) ground_items.push_back({extra_item, btx + 3, bty});
     }
 
-    // 普通掉落
-    else if ((float)(rng() % 1000) / 1000.0f < LOOT_DROP_CHANCE) {
-        auto [tx, ty] = game_map->pixel_to_tile(m->entity.position.x, m->entity.position.y);
-        ground_items.push_back({generate_random_item(), tx, ty});
+    // 普通掉落 (D4.6: gold_scale + Elite 掉率+50%)
+    else {
+        float drop_chance = m->is_elite ? LOOT_DROP_CHANCE * 1.5f : LOOT_DROP_CHANCE;
+        drop_chance *= g_growth.gold_scale(current_floor);
+        if ((float)(rng() % 1000) / 1000.0f < drop_chance) {
+            auto [tx, ty] = game_map->pixel_to_tile(m->entity.position.x, m->entity.position.y);
+            ground_items.push_back({generate_random_item(), tx, ty});
+        }
     }
 
     _check_floor_clear();
@@ -626,9 +1147,7 @@ void GameScene::_cleanup_dead_monsters() {
 }
 
 void GameScene::_check_floor_clear() {
-    bool all_dead = true;
-    for (auto& m : monsters) if (m->combat.is_alive) { all_dead = false; break; }
-    if (all_dead && !stairs_active) _activate_stairs();
+    if (FloorManager::is_floor_cleared(monsters) && !stairs_active) _activate_stairs();
 }
 
 void GameScene::_activate_stairs() {
@@ -640,36 +1159,30 @@ void GameScene::_activate_stairs() {
     max_unlocked_floor = std::max(max_unlocked_floor, current_floor);
     LOG_INFO("第%d层清空! 楼梯已激活, 自动存档", current_floor);
     std::vector<bool> spr, spd;
-    std::vector<std::string> rlc;
     if (game_map) for (auto& sr : game_map->special_rooms) {
         spr.push_back(sr.triggered);
         spd.push_back(sr.discovered);
     }
-    for (auto& r : player->relics) rlc.push_back(r.id);
+    // B13: Relic 不再跨层 (无需保存圣物)
     SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
-                           _dungeon_seed, spr, spd, rlc);
+                           _dungeon_seed, spr, spd);
     on_floor_cleared.emit();
 }
 
 void GameScene::_check_floor_transition() {
-    if (!stairs_active || !player) return;
-    auto [tx, ty] = game_map->pixel_to_tile(
-        player->entity.rect.x + player->entity.rect.width/2,
-        player->entity.rect.y + player->entity.rect.height/2);
-    if (std::make_pair(tx, ty) != stairs_pos) return;
+    if (!stairs_active) return;
+    int next = FloorManager::check_floor_transition(get_tree()->get_input(),
+        current_floor, game_map.get(), player.get(), stairs_pos);
+    if (next < 0) return;  // 不下楼
 
-    auto& input = get_tree()->get_input();
-    if (!input.is_action_just_pressed("descend")) return;
-
-    if (current_floor >= MAX_FLOORS) {
+    if (next == MAX_FLOORS) {
         LOG_INFO("通关! 最终第%d层 Lv%d", current_floor, player->level);
-        auto vs = std::make_shared<VictoryScene>();
-        vs->name = "VictoryScene";
-        vs->final_level = player->level;
-        get_tree()->change_scene(vs);
-        return;
+        // D6 Step6: 通关 — 委托给 FlowDirector (ending → VictoryScene → Credits)
+        _gameplay.on_game_clear(current_floor, player->level, player.get(),
+                                 _boss.battle_report, g_relic_archive.collection_pct());
+        _flow.on_game_clear();
     } else {
-        enter_floor(current_floor + 1);
+        enter_floor(next);
     }
 }
 
@@ -687,97 +1200,8 @@ void GameScene::_apply_pending_damage() {
     pending_damage.clear();
 }
 
-// ============================================================
-// 拾取
-// ============================================================
-void GameScene::_pickup() {
-    DroppedItem* best = nullptr;
-    float best_dist = PICKUP_RANGE * TILE_SIZE;
-    Rectangle pr = player->entity.rect;
-    for (auto& d : ground_items) {
-        float px = d.tile_x * TILE_SIZE + TILE_SIZE / 2;
-        float py = d.tile_y * TILE_SIZE + TILE_SIZE / 2;
-        float dist = sqrtf(powf(pr.x + pr.width/2 - px, 2) + powf(pr.y + pr.height/2 - py, 2));
-        if (dist < best_dist) { best_dist = dist; best = &d; }
-    }
-    if (!best) return;
-    if (player->inventory.add(best->item, player.get())) {
-        LOG_DEBUG("拾取: %s", best->item->get_description().c_str());
-        auto it = std::find_if(ground_items.begin(), ground_items.end(),
-            [&](auto& d) { return &d == best; });
-        if (it != ground_items.end()) ground_items.erase(it);
-    }
-}
-
-// B8: 特殊房间交互 — E键优先触发, 每个房间仅一次
-void GameScene::_interact_special() {
-    if (!player || !game_map) return;
-
-    auto [tx, ty] = game_map->pixel_to_tile(
-        player->entity.rect.x + player->entity.rect.width / 2,
-        player->entity.rect.y + player->entity.rect.height / 2);
-
-    SpecialRoom* room = game_map->get_special_room_at(tx, ty);
-    if (!room || room->triggered) return;
-
-    std::string msg = execute_special_room(room->type, player.get());
-    room->triggered = true;
-
-    _show_room_message(msg);
-
-    // B12.5: 首次获得 relic 时提示按 R 查看面板
-    if (!_shown_relic_hint && !player->relics.empty()) {
-        _shown_relic_hint = true;
-        _show_room_message("按 R 可查看圣物面板");
-    }
-}
-
-// B10: 每帧检测玩家是否首次步入特殊房间
-void GameScene::_check_special_room_discovery() {
-    if (!game_map || !player) return;
-
-    auto [tx, ty] = game_map->pixel_to_tile(
-        player->entity.rect.x + player->entity.rect.width / 2,
-        player->entity.rect.y + player->entity.rect.height / 2);
-
-    SpecialRoom* room = game_map->get_special_room_at(tx, ty);
-    if (!room || room->discovered) return;
-
-    room->discovered = true;
-    switch (room->type) {
-        case SpecialRoomType::ALTAR:
-            _show_room_message("你发现了一座古老祭坛。"); break;
-        case SpecialRoomType::TREASURE:
-            _show_room_message("你发现了一个隐藏宝箱房。"); break;
-        case SpecialRoomType::FOUNTAIN:
-            _show_room_message("你发现了一处治愈泉水。"); break;
-    }
-}
-
-// B10: 设置临时消息并写日志
-void GameScene::_show_room_message(const std::string& msg) {
-    _room_message = msg;
-    _room_message_timer = 2.5f;
-    LOG_INFO("[ROOM] %s", msg.c_str());
-}
-
-// B10: 渲染房间消息条 (屏幕底部中央)
-void GameScene::_draw_room_message() {
-    if (_room_message_timer <= 0 || _room_message.empty() || !g_font_loaded) return;
-
-    int sw = get_tree()->get_width(), sh = get_tree()->get_height();
-    float alpha = std::min(1.0f, _room_message_timer / 0.6f); // 淡出
-    float tw = MeasureTextEx(g_font_small, _room_message.c_str(), 18, 1).x;
-    float px = sw / 2.0f - tw / 2;
-    float py = (float)(sh - 70);
-
-    Color bg = {10, 10, 20, (unsigned char)(180 * alpha)};
-    DrawRectangleRounded({px - 16, py - 4, tw + 32, 28}, 0.15f, 6, bg);
-    DrawRectangleRoundedLines({px - 16, py - 4, tw + 32, 28}, 0.15f, 6, 1,
-                              Color{80, 80, 120, (unsigned char)(160 * alpha)});
-    DrawTextEx(g_font_small, _room_message.c_str(), {px, py},
-               18, 1, Color{255, 255, 200, (unsigned char)(255 * alpha)});
-}
+// _pickup, _interact_special, _check_special_room_discovery, _show_room_message
+// 已迁移到 InteractionHandler
 
 Monster* GameScene::_get_boss() const {
     for (auto& m : monsters)
@@ -797,29 +1221,281 @@ void GameScene::_drop_boss_reward(Monster* boss) {
 // 渲染
 // ============================================================
 void GameScene::_render() {
-    if (state == GameState::BOSS_INTRO) { _draw_boss_intro(); return; }
+    int sw = get_tree()->get_width(), sh = get_tree()->get_height();
+    if (state == GameState::BOSS_INTRO) {
+        _renderer.draw_boss_intro(sw, sh, boss_intro_title, boss_intro_lore,
+                                   boss_intro_skills, boss_intro_color, boss_floor);
+        // D4 Step5.5: BossNarrative覆盖对话 (显示在面板下方)
+        if (!_presentation.boss_intro_text.empty() && g_font_loaded) {
+            float tw = MeasureTextEx(g_font_small, _presentation.boss_intro_text.c_str(), 17, 1).x;
+            DrawTextEx(g_font_small, _presentation.boss_intro_text.c_str(),
+                       {sw/2.0f - tw/2, (float)(sh - 100)}, 17, 1, {255, 220, 100, 240});
+        }
+        // D5 Step1: BossModifier文字 (金色Warning风格)
+        if (!_presentation.boss_modifier_text.empty() && g_font_loaded) {
+            float mw = MeasureTextEx(g_font_small, _presentation.boss_modifier_text.c_str(), 15, 1).x;
+            DrawRectangle(sw/2.0f - mw/2 - 12, (float)(sh - 72), mw + 24, 24,
+                          {30, 15, 15, 200});
+            DrawTextEx(g_font_small, _presentation.boss_modifier_text.c_str(),
+                       {sw/2.0f - mw/2, (float)(sh - 68)}, 15, 1, {255, 80, 40, 240});
+        }
+        return;
+    }
 
     ClearBackground(BLACK);
-    _update_camera();
+    _renderer.update_camera(_cam_x, _cam_y, player.get(), game_map.get(), sw, sh);
+
+    // D4 Step5.4: WorldReaction tint (覆盖 CLEAR_BACKGROUND 之上)
+    {
+        unsigned char tr = 0, tg = 0, tb = 0;
+        g_reactions.current_tint(_gameplay.world_state, _gameplay.story.stage(), tr, tg, tb);
+        if (tr > 0 || tg > 0 || tb > 0) {
+            DrawRectangle(0, 0, sw, sh, {tr, tg, tb, 18});  // 18 alpha = 7% overlay
+        }
+    }
+
+    // C1: 屏幕震动 (相机偏移)
+    float shake_ox = 0, shake_oy = 0;
+    if (_presentation.shake_timer > 0) {
+        float s = _presentation.shake_intensity * (_presentation.shake_timer / 0.12f);
+        shake_ox = ((float)(rng() % 100) / 100.0f - 0.5f) * s * 2;
+        shake_oy = ((float)(rng() % 100) / 100.0f - 0.5f) * s * 2;
+    }
+    float saved_cx = _cam_x, saved_cy = _cam_y;
+    _cam_x += shake_ox; _cam_y += shake_oy;
+
     _draw_map();
     _draw_ground_items();
     _draw_entities();
-    _draw_effects();  // 特效在最上层
-    _draw_hud();
+    _renderer.draw_effects(active_effects, _cam_x, _cam_y);
+    // D5 Step4: Boss战场绘制
+    _boss.arena.draw(_cam_x, _cam_y);
 
-    if (inventory_open) _draw_inventory_panel();
-    if (time_stop_remaining > 0) _draw_time_stop_overlay();
-    if (state == GameState::BOSS_CINEMATIC) _draw_boss_cinematic_overlay();
-}
+    // C1: 伤害数字 (世界坐标→屏幕)
+    for (auto& df : _presentation.damage_floats) {
+        float sx = df.x - _cam_x, sy = df.y - _cam_y - (0.6f - df.lifetime) * 30;
+        unsigned char a = (unsigned char)(df.color.a * (df.lifetime / 0.6f));
+        Color c = df.color; c.a = a;
+        char buf[16]; snprintf(buf, sizeof(buf), "%d", df.value);
+        GameRenderer::draw_glow_text(buf, sx, sy, 16 + df.value / 10, c, true);
+    }
 
-void GameScene::_update_camera() {
-    if (!player) return;
-    int sw = get_tree()->get_width(), sh = get_tree()->get_height();
-    _cam_x = player->entity.rect.x + player->entity.rect.width/2 - sw/2;
-    _cam_y = player->entity.rect.y + player->entity.rect.height/2 - sh/2;
-    if (game_map) {
-        _cam_x = std::max(0.0f, std::min(_cam_x, (float)game_map->pixel_width - sw));
-        _cam_y = std::max(0.0f, std::min(_cam_y, (float)game_map->pixel_height - sh));
+    _cam_x = saved_cx; _cam_y = saved_cy;  // 恢复
+
+    // HUD (委托给 GameRenderer)
+    _renderer.draw_hud(player.get(), current_floor, game_time,
+                        _get_boss(), _show_relic_panel,
+                        inventory_open, inventory_cursor,
+                        _presentation.room_msg, _presentation.room_msg_timer, sw, sh);
+
+    if (inventory_open) _renderer.draw_inventory_panel(player.get(), inventory_cursor, sw, sh);
+
+    // D4.6 Step1: F8 Growth Curve debug
+    if (_presentation.show_growth_debug && g_font_loaded) {
+        const GrowthCurve& gc = g_growth.curve(current_floor);
+        float pw = 240, ph = 260;
+        Rectangle pr = {sw - pw - 10.0f, 10.0f, pw, ph};
+        GameRenderer::draw_panel(pr, "Growth Curve", {15,15,30,220});
+        float y = pr.y + 36;
+        auto line = [&](const char* fmt, float val) {
+            char buf[32]; snprintf(buf, sizeof(buf), fmt, val);
+            DrawTextEx(g_font_small, buf, {pr.x+14, y}, 14, 1, {200,220,255,255}); y += 20;
+        };
+        line("Floor %d", (float)current_floor);
+        line("Monster HP  x%.2f",  gc.monster_hp);
+        line("Monster ATK x%.2f",  gc.monster_atk);
+        line("Boss HP     x%.2f",  gc.boss_hp);
+        line("Boss ATK    x%.2f",  gc.boss_atk);
+        line("Elite Scale x%.2f",  gc.elite_scale);
+        line("EXP Scale   x%.2f",  gc.exp_scale);
+        line("Gold Scale  x%.2f",  gc.gold_scale);
+        line("Relic Scale x%.2f",  gc.relic_scale);
+        line("Arena Scale x%.2f",  gc.arena_scale);
+    }
+
+    // D4.6 Step3: F10 FlowDirector debug
+    if (_presentation.show_flow_debug && g_font_loaded) {
+        float pw = 220, ph = 210;
+        Rectangle pr = {sw - pw - 10.0f, 280.0f, pw, ph};
+        GameRenderer::draw_panel(pr, "Flow Director", {15,30,15,220});
+        float y = pr.y + 36;
+        auto line = [&](const char* fmt, float val) {
+            char buf[32]; snprintf(buf, sizeof(buf), fmt, val);
+            DrawTextEx(g_font_small, buf, {pr.x+14, y}, 13, 1, {200,255,200,255}); y += 19;
+        };
+        const FlowTimer& ft = _gameplay.flow.timer();
+        line("Combat  %.1fs", ft.combat);
+        line("Reward  %.1fs", ft.reward);
+        line("Story   %.1fs", ft.story);
+        line("Event   %.1fs", ft.event);
+        line("Explorer %d pts", (int)ft.explorer_score);
+        line("Rooms   %d",     ft.rooms_explored);
+        line("MaxGap  %.1fs",  _gameplay.flow.worst_gap());
+    }
+
+    // D5 Step3: F11 BossBehavior debug
+    if (_presentation.show_boss_behavior && g_font_loaded) {
+        auto* boss = _get_boss();
+        float pw = 240, ph = boss ? 260.0f : 120.0f;
+        Rectangle pr = {sw - pw - 10.0f, 500.0f, pw, ph};
+        GameRenderer::draw_panel(pr, "Boss Behavior", {25,15,25,220});
+        float y = pr.y + 36;
+        auto line = [&](const char* fmt, float val) {
+            char buf[32]; snprintf(buf, sizeof(buf), fmt, val);
+            DrawTextEx(g_font_small, buf, {pr.x+14, y}, 13, 1, {255,200,100,255}); y += 18;
+        };
+        auto& st = _boss.behavior;
+        line("Decision %s",     0); // hack: print string via label
+        DrawTextEx(g_font_small, st.decision_name ? st.decision_name : "IDLE",
+                   {pr.x+100, y-18}, 13, 1, {255,255,100,255});
+        auto* bl = _get_boss();
+        if (bl) {
+            line("Pers   %s", 0);
+            DrawTextEx(g_font_small, st.personality_name ? st.personality_name : "?",
+                       {pr.x+100, y-18}, 13, 1, {150,255,150,255});
+            line("Mem Atk %d",  (float)st.memory.attacks);
+            line("Mem Skl %d",  (float)st.memory.skills);
+            line("Mem Cmb %d",  (float)st.memory.combos_max);
+            line("Mem Dod %d",  (float)st.memory.dodges);
+            for (int i = 0; i < 8; i++) {
+                if (st.weights[i] == 0) continue;
+                const char* dn[] = {"CHS","RET","CRG","SUM","DEF","RNG","MEL","SPC"};
+                char wb[32]; snprintf(wb, sizeof(wb), "%s:%d", dn[i], st.weights[i]);
+                DrawTextEx(g_font_small, wb, {pr.x+14 + (i%4)*56.0f, y + (i/4)*16.0f},
+                           11, 1, Color{(unsigned char)(150+i*12),(unsigned char)(180+i*8),255,255});
+            }
+        }
+    }
+
+    // D5 Step4: F12 BossCombat debug
+    if (_presentation.show_boss_cmd && g_font_loaded) {
+        float pw = 220, ph = 200;
+        Rectangle pr = {sw - pw - 10.0f, 510.0f, pw, ph};
+        GameRenderer::draw_panel(pr, "Boss Cmd+Arena", {25,20,20,220});
+        float y = pr.y + 36;
+        auto line = [&](const char* fmt, float val) {
+            char buf[32]; snprintf(buf, sizeof(buf), fmt, val);
+            DrawTextEx(g_font_small, buf, {pr.x+14, y}, 13, 1, {200,255,200,255}); y += 18;
+        };
+        DrawTextEx(g_font_small, boss_command_name(_boss.current_cmd),
+                   {pr.x+14, y}, 14, 1, {255,255,100,255}); y += 20;
+        line("Arena Zones %d", (float)_boss.arena.zones().size());
+        line("SkillQ active %d", _boss.skill_queue.active ? 1.0f : 0.0f);
+        line("SkillQ size  %d",  (float)_boss.skill_queue.queue.size());
+        y += 10;
+        for (auto& z : _boss.arena.zones()) {
+            char zbuf[64];
+            const char* tn = z.type == DangerType::LAVA ? "LAVA" :
+                             z.type == DangerType::SHADOW_WALL ? "WALL" :
+                             z.type == DangerType::VOID_CRACK ? "VOID" : "?";
+            snprintf(zbuf, sizeof(zbuf), "%s %.1fs r=%.0f",
+                     tn, z.remaining, z.radius);
+            DrawTextEx(g_font_small, zbuf, {pr.x+14, y}, 11, 1,
+                       z.is_warning() ? Color{255,200,100,180} : Color{255,60,40,200});
+            y += 14; if (y > pr.y+ph-20) break;
+        }
+    }
+
+    // D5 Step5: F13 BossReport debug
+    if (_presentation.show_boss_report && g_font_loaded) {
+        auto& r = _boss.battle_report;
+        float pw = 230, ph = 290;
+        Rectangle pr = {sw - pw - 10.0f, 480.0f, pw, ph};
+        GameRenderer::draw_panel(pr, "Boss Report", {20,25,20,220});
+        float y = pr.y + 36;
+        auto line = [&](const char* fmt, float val) {
+            char buf[32]; snprintf(buf, sizeof(buf), fmt, val);
+            DrawTextEx(g_font_small, buf, {pr.x+14, y}, 13, 1, {200,255,200,255}); y += 18;
+        };
+        line("%s %s", 0);
+        DrawTextEx(g_font_small, _boss.encounter.phase_name(), {pr.x+14, y-18}, 13, 1, {255,200,100,255});
+        DrawTextEx(g_font_small, r.rank_name(), {pr.x+120, y-18}, 16, 1, {255,255,60,255});
+        line("Time     %.1fs", r.battle_time);
+        line("Damage   %d", (float)r.total_damage);
+        line("Taken    %d", (float)r.damage_taken);
+        line("ComboMax %d",  (float)r.replay.combo_max);
+        line("Strategy %s", 0);
+        DrawTextEx(g_font_small, r.replay.strategy_name(), {pr.x+100, y-18}, 13, 1, {255,150,100,255});
+        line("Rank    %s", 0);
+        DrawTextEx(g_font_small, r.rank_name(), {pr.x+100, y-18}, 14, 1, {255,200,60,255});
+        line("ArenaZns %d", (float)r.arena_zones_spawned);
+        line("BloodRit %s", (float)r.replay.blood_ritual);
+        line("Curse    %s", (float)r.replay.curse);
+    }
+
+    // D4 Step3: 章节入场 (全屏大标题, 3秒)
+    if (_presentation.chapter_intro_active) {
+        int ch = _presentation.chapter_intro_ch;
+        float a = std::min(1.0f, _presentation.chapter_intro_timer);
+        Color gold = {255, 200, 50, (unsigned char)(220 * a)};
+        Color white = {230, 230, 240, (unsigned char)(200 * a)};
+        DrawRectangle(0, 0, sw, sh, {0, 0, 0, (unsigned char)(150 * a)});
+        GameRenderer::draw_glow_text(get_chapter_subtitle(ch), sw/2.0f, sh/2.0f - 35,
+                                      36, gold, true);
+        GameRenderer::draw_glow_text(get_chapter_title(ch), sw/2.0f, sh/2.0f + 15,
+                                      28, white, true);
+        auto* fn = get_floor_narrative(_presentation.floor_intro_floor > 0 ? _presentation.floor_intro_floor : current_floor);
+        if (fn) GameRenderer::draw_glow_text(fn->subtitle, sw/2.0f, sh/2.0f + 50,
+                                              18, Color{180,180,200,(unsigned char)(160*a)}, true);
+    }
+
+    // D4 Step3: 楼层入场演出 (非章节覆盖时)
+    if (_presentation.floor_intro_active && !_presentation.chapter_intro_active) {
+        auto* fn = get_floor_narrative(_presentation.floor_intro_floor);
+        if (fn) {
+            float a = _presentation.floor_intro_fade;
+            Color gold = {255, 200, 50, (unsigned char)(200 * a)};
+            Color white = {230, 230, 240, (unsigned char)(180 * a)};
+            DrawRectangle(0, 0, sw, sh, {0, 0, 0, (unsigned char)(120 * a)});
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Floor %d", _presentation.floor_intro_floor);
+            GameRenderer::draw_glow_text(buf, sw/2.0f, sh/2.0f - 40, 20, gold, true);
+            GameRenderer::draw_glow_text("══════════════", sw/2.0f, sh/2.0f - 20, 18, gold, true);
+            GameRenderer::draw_glow_text(fn->title, sw/2.0f, sh/2.0f + 10, 28, white, true);
+            GameRenderer::draw_glow_text(fn->subtitle, sw/2.0f, sh/2.0f + 42, 16,
+                                          Color{180,180,200,(unsigned char)(140*a)}, true);
+            GameRenderer::draw_glow_text("══════════════", sw/2.0f, sh/2.0f + 60, 18, gold, true);
+        }
+    }
+
+    // D4 Step4: 对话UI (在HUD之上, 事件之下)
+    _draw_dialogue(sw, sh);
+    // D4 Step4: 任务日志
+    if (_quest_log_open) _draw_quest_log(sw, sh);
+
+    // D4 Step2: 事件演出 UI (在所有 HUD 之上)
+    _draw_event_ui(sw, sh);
+
+    if (time_stop_remaining > 0) _renderer.draw_time_stop_overlay(sw, sh, time_stop_remaining);
+    if (state == GameState::BOSS_CINEMATIC && _boss_entrance_timer > 0) {
+        // B15: Boss登场文字
+        DrawRectangle(0, 0, sw, sh, {0, 0, 0, 160});
+        GameRenderer::draw_glow_text("!!! BOSS 登场 !!!", sw / 2.0f, sh / 2.0f - 20,
+                                      40, {255, 60, 40, 255}, true);
+        auto* boss = _get_boss();
+        if (boss) {
+            GameRenderer::draw_glow_text(boss->name.c_str(), sw / 2.0f, sh / 2.0f + 30,
+                                          28, boss->color, true);
+        }
+    } else if (state == GameState::BOSS_CINEMATIC) {
+        _renderer.draw_boss_cinematic_overlay(sw, sh);
+    }
+
+    // D5 Step6: BossCinematic overlay (Phase2/LastStand vignette)
+    if (_boss.cinematic.is_running()) {
+        float a = std::min(1.0f, _boss.cinematic.timer());
+        Color edge = {0,0,0, (unsigned char)(80 * a)};
+        // simple 3-bar vignette at screen edges (top/bottom)
+        DrawRectangle(0, 0, sw, 40, edge);
+        DrawRectangle(0, sh-40, sw, 40, edge);
+        if (g_font_loaded) {
+            const char* pname = _boss.cinematic.phase_name();
+            if (pname && strcmp(pname, "NONE") != 0) {
+                float tw = MeasureTextEx(g_font_small, pname, 22, 1).x;
+                DrawTextEx(g_font_small, pname, {sw/2.0f - tw/2, sh/2.0f - 12},
+                           22, 1, {255,200,50,(unsigned char)(220*a)});
+            }
+        }
     }
 }
 
@@ -830,11 +1506,31 @@ void GameScene::_draw_map() {
 void GameScene::_draw_entities() {
     for (auto& m : monsters) {
         m->draw(_cam_x, _cam_y);
-        _draw_monster_buffs(*m,
+        _renderer.draw_monster_buffs(*m,
             m->entity.position.x - _cam_x,
             m->entity.position.y - _cam_y);
+        // D2 Step4: Tank守护连线 (淡蓝色)
+        if (m->ai && m->team_role == TeamRole::FRONTLINE && m->ai->_protect_target) {
+            float x1 = m->entity.rect.x + m->entity.rect.width/2 - _cam_x;
+            float y1 = m->entity.rect.y + m->entity.rect.height/2 - _cam_y;
+            auto* t = m->ai->_protect_target;
+            float x2 = t->entity.rect.x + t->entity.rect.width/2 - _cam_x;
+            float y2 = t->entity.rect.y + t->entity.rect.height/2 - _cam_y;
+            DrawLineEx({x1, y1}, {x2, y2}, 1.5f, {60, 140, 255, 100});
+        }
     }
     if (player) player->draw_no_cam(_cam_x, _cam_y);
+
+    // D4 Step4: NPC 标记
+    for (int i = 0; i < _npc_count; i++) {
+        if (_npc_state[i].finished) continue;
+        float nx = _npc_tile_x[i] * TILE_SIZE + TILE_SIZE/2 - _cam_x;
+        float ny = _npc_tile_y[i] * TILE_SIZE + TILE_SIZE/2 - _cam_y;
+        // 绿色圆点标记
+        float pulse = 4 + sinf((float)GetTime() * 4) * 2;
+        DrawCircle(nx, ny - 10, pulse, {100, 220, 140, 180});
+        DrawCircle(nx, ny - 10, 3, {60, 180, 80, 255});
+    }
 }
 
 void GameScene::_draw_ground_items() {
@@ -853,325 +1549,199 @@ void GameScene::_draw_ground_items() {
     }
 }
 
-void GameScene::_draw_hud() {
-    if (!player) return;
-    int sw = get_tree()->get_width();
-    auto& c = player->combat;
+// _draw_hud 已迁移到 GameRenderer
+// _draw_* methods migrated to GameRenderer
 
-    // 玩家血条 (B11: 使用有效最大生命)
-    int eff_max_hp = get_effective_max_hp(player.get());
-    float hp_r = eff_max_hp > 0 ? (float)c.current_hp / eff_max_hp : 0.0f;
-    if (hp_r > 1.0f) hp_r = 1.0f;
-    Color hp_c = hp_r > 0.5f ? Color{50, 200, 50, 255}
-               : hp_r > 0.25f ? Color{200, 200, 50, 255} : Color{200, 50, 50, 255};
-    draw_progress_bar({10, 10, 200, 16}, hp_r, hp_c, {40, 20, 20, 255});
-
-    if (g_font_loaded) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "HP:%d/%d ATK:%d PD:%d MD:%d",
-            c.current_hp, eff_max_hp, c.get_effective_attack(),
-            c.get_effective_defense(AttackType::PHYSICAL),
-            c.get_effective_defense(AttackType::MAGICAL));
-        DrawTextEx(g_font_small, buf, {215, 10}, 16, 1, {220, 220, 220, 255});
+// ============================================================
+// D4 Step4: NPC / Dialogue / Quest 实现
+// ============================================================
+NPCState* GameScene::_find_or_create_npc_state(int npc_id) {
+    for (int i = 0; i < _npc_count; i++)
+        if (_npc_state[i].id == npc_id) return &_npc_state[i];
+    if (_npc_count < 10) {
+        _npc_state[_npc_count].id = npc_id;
+        return &_npc_state[_npc_count++];
     }
+    return nullptr;
+}
 
-    // XP 条
-    float xp_r = (float)player->xp / player->xp_to_next;
-    draw_progress_bar({10, 30, 200, 10}, xp_r, {80, 120, 255, 255});
-
-    if (g_font_loaded) {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Lv%d XP:%d/%d", player->level, player->xp, player->xp_to_next);
-        DrawTextEx(g_font_small, buf, {12, 42}, 13, 1, {180, 200, 255, 255});
+void GameScene::_spawn_floor_npcs(int floor, const std::vector<std::pair<int,int>>& rooms) {
+    for (int slot = 0; slot < 2; slot++) {
+        const NPCData* cfg = get_npc_config(floor, slot);
+        if (!cfg) continue;
+        int npc_id = floor * 10 + slot;
+        NPCState* st = _find_or_create_npc_state(npc_id);
+        if (!st || st->finished) continue; // 已完成对话的不再生
+        // 放在非玩家/非楼梯的房间
+        int r_idx = 2 + slot; if (r_idx >= (int)rooms.size() - 1) r_idx = (int)rooms.size()/2;
+        auto [rx, ry] = rooms[r_idx];
+        _npc_tile_x[_npc_count - 1] = rx;
+        _npc_tile_y[_npc_count - 1] = ry;
     }
+}
 
-    // 楼层
-    if (g_font_loaded) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "第%d/%d层", current_floor, MAX_FLOORS);
-        DrawTextEx(g_font_small, buf, {220, 42}, 16, 1, {200, 200, 50, 255});
+void GameScene::_start_dialogue(int npc_index) {
+    if (npc_index < 0 || npc_index >= _npc_count) return;
+    NPCState* st = &_npc_state[npc_index];
+    const NPCData* cfg = get_npc_config(st->id / 10, st->id % 10);
+    if (!cfg) return;
+
+    _dialogue.active = true;
+    _dialogue.page = 0;
+    _dialogue.timer = 0.0f;
+    _dialogue.pages.clear();
+    _dialogue.target_npc = st;
+
+    // 首次对话 → first_dialogue, 否则 → repeat
+    const char* const* pool = st->met ? cfg->repeat_dialogue : cfg->first_dialogue;
+    for (int i = 0; i < 5; i++) {
+        if (!pool[i]) break;
+        DialoguePage dp;
+        dp.speaker = cfg->name;
+        dp.text = pool[i];
+        _dialogue.pages.push_back(dp);
     }
+    if (!st->met) st->met = true;
 
-    // Boss 血条
-    auto* boss = _get_boss();
-    if (boss) {
-        float bw = 400, bh = 20;
-        float bx = sw / 2 - bw / 2, by = 4;
-        draw_progress_bar({bx, by, bw, bh},
-            (float)boss->combat.current_hp / boss->combat.max_hp,
-            {220, 100, 30, 255}, {30, 5, 5, 255});
-        if (g_font_loaded) {
-            char buf[64];
-            snprintf(buf, sizeof(buf), "%s HP:%d/%d",
-                boss->name.c_str(), boss->combat.current_hp, boss->combat.max_hp);
-            float tw = MeasureTextEx(g_font_small, buf, 18, 1).x;
-            DrawTextEx(g_font_small, buf, {bx + (bw - tw) / 2, by + bh + 3}, 18, 1, {255, 220, 100, 255});
+    // D4 Step5.2: NPC对话自动接取关联任务
+    Quest* npc_quest = _gameplay.quest_mgr.get_npc_quest(st->id / 10);
+    if (npc_quest && npc_quest->state == QuestState::AVAILABLE)
+        _gameplay.quest_mgr.accept(npc_quest->id, _gameplay.world_state);
+
+    // D4 Step5: NPC自适应对话 (根据WorldFlag插入额外页面)
+    int npc_floor = st->id / 10;
+    const char* adaptive = StoryDirector::npc_adaptive_text(npc_floor, _gameplay.world_state);
+    if (adaptive && !st->finished) {
+        DialoguePage ap;
+        ap.speaker = cfg->name;
+        ap.text = adaptive;
+        _dialogue.pages.push_back(ap);
+    }
+}
+
+void GameScene::_update_dialogue(float dt) {
+    if (!_dialogue.active) return;
+    _dialogue.timer += dt;
+}
+
+void GameScene::_handle_dialogue_input(const InputMap& input) {
+    auto& d = _dialogue;
+    if (!d.active) return;
+
+    if (input.is_action_just_pressed("confirm") || input.is_action_just_pressed("attack")) {
+        d.page++;
+        d.timer = 0.0f;
+        if (d.page >= (int)d.pages.size()) {
+            // 对话结束
+            if (d.target_npc) {
+                d.target_npc->finished = true;
+                // D4 Step5: 对话完成WorldFlag
+                int npc_floor = d.target_npc->id / 10;
+                if (npc_floor == 2) { _gameplay.world_state.set(WorldFlag::Saved_Prisoner); _gameplay.rels.apply_reward(RR_SAVE_PRISONER); }
+                else if (npc_floor == 7) { _gameplay.world_state.set(WorldFlag::Saved_Priest); _gameplay.rels.apply_reward(RR_SAVE_PRIEST); }
+                else if (npc_floor == 9) { /* F9 flag set by event flow */ _gameplay.rels.add_respect(90, 1); }
+                else if (npc_floor == 14) { _gameplay.rels.add_trust(140, 1); _gameplay.rels.add_respect(140, 2); }
+                // 告别语
+                const NPCData* cfg = get_npc_config(d.target_npc->id / 10, d.target_npc->id % 10);
+                if (cfg && cfg->farewell) {
+                    _presentation.room_msg = cfg->farewell;
+                    _presentation.room_msg_timer = 2.0f;
+                }
+            }
+            d.active = false;
+            d.target_npc = nullptr;
         }
     }
+    if (input.is_action_just_pressed("cancel")) {
+        d.active = false; d.target_npc = nullptr;
+        _presentation.room_msg = "你转身离开了。";
+        _presentation.room_msg_timer = 1.5f;
+    }
+}
 
-    // 技能栏
-    _draw_skill_bar();
-    // 玩家 Buff (技能栏下方)
-    _draw_player_buffs();
-    // B11: 玩家 Relic (Buff 下方)
-    _draw_player_relics();
-    // B12: Relic 面板
-    if (_show_relic_panel) _draw_relic_panel();
-    // B12.5: 战斗 HUD 快捷键提示 (右下角, 常驻)
+void GameScene::_draw_dialogue(int sw, int sh) {
+    auto& d = _dialogue;
+    if (!d.active || d.page >= (int)d.pages.size()) return;
+
+    float pw = 600, ph = 260;
+    Rectangle pr = {sw/2.0f - pw/2, sh/2.0f - ph/2, pw, ph};
+    GameRenderer::draw_panel(pr, d.pages[d.page].speaker.c_str(), {20,20,45,240});
+
     if (g_font_loaded) {
-        const char* hint = "[R]圣物  [I]背包  [ESC]保存";
-        float hw = MeasureTextEx(g_font_small, hint, 12, 1).x;
-        DrawTextEx(g_font_small, hint,
-                   {sw - hw - 14.0f, (float)get_tree()->get_height() - 26.0f},
-                   12, 1, Color{140, 140, 160, 220});
+        DrawTextEx(g_font_small, d.pages[d.page].text.c_str(), {pr.x+30, pr.y+50}, 16, 1, {230,230,240,255});
     }
-    // B10: 房间消息条
-    _draw_room_message();
+    const char* hint = (d.page + 1 < (int)d.pages.size())
+        ? "[ENTER]下一页  [ESC]跳过" : "[ENTER]告别  [ESC]离开";
+    DrawTextEx(g_font_small, hint,
+               {pr.x + (pw - MeasureTextEx(g_font_small,hint,14,1).x)/2, pr.y+ph-28},
+               14, 1, {140,140,160,200});
+    // 页数指示器
+    char pg[16]; snprintf(pg, sizeof(pg), "%d/%d", d.page+1, (int)d.pages.size());
+    DrawTextEx(g_font_small, pg, {pr.x+pw-40, pr.y+12}, 13, 1, {180,180,200,200});
 }
 
-void GameScene::_draw_skill_bar() {
-    auto& active = player->skills.active_skills;
-    if (active.empty() || !g_font_loaded) return;
-    float x = 10, y = 56;
-    for (int i = 0; i < (int)active.size(); i++) {
-        float ry = y + i * 28;
-        bool ready = active[i]->can_use(game_time);
-        Color bg = ready ? Color{50, 160, 50, 255} : Color{60, 60, 60, 255};
-        DrawRectangleRounded({x, ry, 22, 18}, 0.2f, 3, bg);
-        DrawTextEx(g_font_small, std::to_string(i + 1).c_str(), {x + 7, ry + 1}, 14, 1, WHITE);
+void GameScene::_draw_quest_log(int sw, int sh) {
+    float pw = 380, ph = 420;
+    Rectangle pr = {sw/2.0f - pw/2, sh/2.0f - ph/2, pw, ph};
+    auto& quests = _gameplay.quest_mgr.all_quests();
+    int done = _gameplay.quest_mgr.completed_count(), total = (int)quests.size();
+    GameRenderer::draw_panel(pr, "任务日志  Q关闭", {20,20,40,230});
 
-        std::string label = active[i]->name + " " + active[i]->get_level_text();
-        DrawTextEx(g_font_small, label.c_str(), {x + 26, ry + 2}, 14, 1,
-                   ready ? Color{180, 220, 255, 255} : Color{100, 100, 100, 255});
+    if (quests.empty()) {
+        DrawTextEx(g_font_small, "暂无任务。", {pr.x+30, pr.y+60}, 16, 1, {160,160,180,200});
+    } else {
+        char progress[32];
+        snprintf(progress, sizeof(progress), "%d/%d 完成", done, total);
+        DrawTextEx(g_font_small, progress, {pr.x+pw-100, pr.y+14}, 12, 1, {200,200,100,200});
 
-        float cd_r = 1.0f - active[i]->remaining_cooldown(game_time) / active[i]->cooldown;
-        draw_progress_bar({x + 26, ry + 16, 90, 8}, cd_r,
-                          ready ? Color{60, 180, 255, 255} : Color{70, 70, 70, 255});
-    }
-}
-
-// ============================================================
-// 玩家 Buff HUD — 技能栏下方，全名 + 层数 + 剩余时间
-// ============================================================
-void GameScene::_draw_player_buffs() {
-    if (!player || player->active_buffs.empty() || !g_font_loaded) return;
-    auto& buffs = player->active_buffs;
-    float x = 10;
-    float y = 56.0f + player->skills.active_skills.size() * 28.0f + 4.0f;
-    for (auto& b : buffs) {
-        std::string line = get_buff_display_name(b.id)
-            + " x" + std::to_string(b.stacks)
-            + "  " + format_buff_time(b.remaining);
-        DrawTextEx(g_font_small, line.c_str(), {x, y}, 14, 1, get_buff_hud_color(b.id));
-        y += 18;
-    }
-}
-
-// ============================================================
-// B12: 玩家 Relic HUD — Buff 下方, 简写列表 (按 rarity 着色)
-// ============================================================
-// B12: rarity → 颜色映射
-static Color _relic_rarity_color(const std::string& rarity) {
-    if (rarity == "rare")  return Color{100, 170, 255, 255};
-    if (rarity == "epic") return Color{190, 100, 255, 255};
-    return Color{255, 220, 100, 255}; // common
-}
-static std::string _rarity_label_cn(const std::string& rarity) {
-    if (rarity == "rare")  return "稀有";
-    if (rarity == "epic") return "史诗";
-    return "普通";
-}
-
-void GameScene::_draw_player_relics() {
-    if (!player || player->relics.empty() || !g_font_loaded) return;
-
-    // 放在 Buff HUD 下方
-    float x = 10;
-    float base_y = 56.0f + player->skills.active_skills.size() * 28.0f + 4.0f;
-    if (!player->active_buffs.empty())
-        base_y += player->active_buffs.size() * 18.0f + 4.0f;
-
-    DrawTextEx(g_font_small, "圣物:", {x, base_y}, 13, 1, Color{255, 220, 100, 255});
-    float cx = x + MeasureTextEx(g_font_small, "圣物:", 13, 1).x + 4.0f;
-
-    for (auto& r : player->relics) {
-        const RelicDef* def = get_relic_def(r.id);
-        if (!def) continue;
-        Color rc = _relic_rarity_color(def->rarity);
-        std::string token = def->short_name + std::string(" ");
-        DrawTextEx(g_font_small, token.c_str(), {cx, base_y}, 13, 1, rc);
-        cx += MeasureTextEx(g_font_small, token.c_str(), 13, 1).x;
-    }
-}
-
-// ============================================================
-// B12: Relic 面板 — R 键切换, 显示 name / rarity / desc
-// ============================================================
-void GameScene::_draw_relic_panel() {
-    if (!player || !g_font_loaded) return;
-    int sw = get_tree()->get_width();
-
-    int count = (int)player->relics.size();
-    float line_h = 24.0f;
-    float panel_w = 370.0f;
-    float panel_x = (float)sw - panel_w - 20.0f;
-    float panel_y = 70.0f;
-    float panel_h = 56.0f + (count > 0 ? count * line_h : line_h);
-
-    // 背景 + 边框
-    DrawRectangleRounded({panel_x, panel_y, panel_w, panel_h}, 0.08f, 8, Color{15, 15, 35, 220});
-    DrawRectangleRoundedLines({panel_x, panel_y, panel_w, panel_h}, 0.08f, 8, 1.5f, Color{100, 100, 160, 200});
-
-    // 标题
-    DrawTextEx(g_font_small, "圣物图鉴", {panel_x + 14, panel_y + 10}, 18, 1, Color{255, 255, 200, 255});
-
-    // 无 relic
-    if (count == 0) {
-        DrawTextEx(g_font_small, "尚未获得任何圣物。",
-                   {panel_x + 14, panel_y + 38}, 14, 1, Color{160, 160, 180, 255});
-        return;
-    }
-
-    // 逐行 relic
-    float ly = panel_y + 40.0f;
-    for (auto& r : player->relics) {
-        const RelicDef* def = get_relic_def(r.id);
-        if (!def) continue;
-
-        Color rc = _relic_rarity_color(def->rarity);
-        std::string label = "[" + _rarity_label_cn(def->rarity) + "]";
-
-        char line[256];
-        snprintf(line, sizeof(line), "%s %s - %s", label.c_str(), def->name.c_str(), def->desc.c_str());
-
-        DrawTextEx(g_font_small, line, {panel_x + 14, ly}, 14, 1, rc);
-        ly += line_h;
-    }
-}
-
-// ============================================================
-// 怪物 Buff 标签 — 怪物头顶简写
-// ============================================================
-void GameScene::_draw_monster_buffs(const Monster& m, float draw_x, float draw_y) {
-    if (m.active_buffs.empty() || !g_font_loaded) return;
-    std::string label;
-    for (auto& b : m.active_buffs) {
-        if (!label.empty()) label += " ";
-        label += get_buff_short_name(b.id) + "x" + std::to_string(b.stacks);
-    }
-    float tw = MeasureTextEx(g_font_small, label.c_str(), 12, 1).x;
-    float px = draw_x + (m.entity.size.x - tw) / 2;
-    float py = draw_y - 16;
-    Color c = get_buff_hud_color(m.active_buffs[0].id);
-    DrawTextEx(g_font_small, label.c_str(), {px + 1, py + 1}, 12, 1, {0, 0, 0, 180});
-    DrawTextEx(g_font_small, label.c_str(), {px, py}, 12, 1, c);
-}
-
-void GameScene::_draw_inventory_panel() {
-    int sw = get_tree()->get_width(), sh = get_tree()->get_height();
-    DrawRectangle(0, 0, sw, sh, {0, 0, 0, 180});
-    float pw = 440, ph = 480;
-    Rectangle pr = {sw / 2.0f - pw / 2, sh / 2.0f - ph / 2, pw, ph};
-    draw_panel(pr, "背包 I关闭");
-
-    auto& inv = player->inventory;
-    float y0 = pr.y + 40;
-
-    // 装备槽
-    std::string eq = "装备: weapon:";
-    eq += inv.equipped["weapon"] ? inv.equipped["weapon"]->get_description() : "空";
-    eq += " armor:";
-    eq += inv.equipped["armor"] ? inv.equipped["armor"]->get_description() : "空";
-    if (g_font_loaded)
-        DrawTextEx(g_font_small, eq.c_str(), {pr.x + 30, y0}, 18, 1, {255, 200, 50, 255});
-    DrawLine(pr.x + 30, y0 + 26, pr.x + pw - 30, y0 + 26, {60, 60, 90, 255});
-
-    // 物品列表
-    for (int i = 0; i < (int)inv.items.size(); i++) {
-        float ry = y0 + 38 + i * 30;
-        std::string mk = (i == inventory_cursor) ? ">" : " ";
-        char idx[4]; snprintf(idx, sizeof(idx), "%2d", i + 1);
-        std::string txt = mk + " [" + idx + "] " + inv.items[i]->get_description();
-        if (g_font_loaded)
-            DrawTextEx(g_font_small, txt.c_str(), {pr.x + 30, ry}, 18, 1, inv.items[i]->color);
-    }
-    if (g_font_loaded) {
-        DrawTextEx(g_font_small, "^v择 X装 U用 D丢 I关",
-                   {pr.x + (pw - 220) / 2, pr.y + ph - 30}, 16, 1, {140, 140, 140, 255});
-    }
-}
-
-void GameScene::_draw_effects() {
-    for (auto& e : active_effects) {
-        float sx = e.world_x - _cam_x, sy = e.world_y - _cam_y;
-        float alpha = 1.0f - e.elapsed / e.duration;
-        if (alpha <= 0) continue;
-        Color c = e.color; c.a = (unsigned char)(c.a * alpha);
-
-        if (e.kind == "pulse") {
-            float r = e.radius * (0.5f + 0.5f * e.elapsed / e.duration);
-            DrawRing({sx, sy}, r * 0.6f, r, 0, 360, 24, c);
-        } else if (e.kind == "spark") {
-            DrawCircle(sx, sy, e.radius, c);
-        } else if (e.kind == "bolt") {
-            DrawLineEx({sx, sy}, {e.target_x - _cam_x, e.target_y - _cam_y}, 2, c);
-        } else if (e.kind == "flash") {
-            DrawCircle(sx, sy, e.radius, Fade(c, 0.3f));
-        } else if (e.kind == "slash_arc") {
-            // 朝向锥形弧线
-            float arc_r = e.radius * (0.6f + 0.4f * e.elapsed / e.duration);
-            float startAngle = 0, endAngle = 180;
-            switch (e.direction) {
-                case Direction::DOWN:  startAngle = 0;   break;
-                case Direction::UP:    startAngle = 180; break;
-                case Direction::RIGHT: startAngle = 270; break;
-                case Direction::LEFT:  startAngle = 90;  break;
+        float y = pr.y+45;
+        for (auto& q : quests) {
+            if (q.hidden) continue;
+            const char* status;
+            Color c;
+            switch (q.state) {
+                case QuestState::COMPLETED: status = "[✓完成]"; c = Color{100,200,100,255}; break;
+                case QuestState::ACCEPTED:  status = "[▶进行中]"; c = Color{255,200,50,255}; break;
+                case QuestState::AVAILABLE: status = "[○可接]"; c = Color{180,180,220,255}; break;
+                case QuestState::FAILED:    status = "[✗失败]"; c = Color{200,100,100,255}; break;
+                default: status = "[锁]"; c = Color{100,100,100,200}; break;
             }
-            endAngle = startAngle + 120;
-            DrawRing({sx, sy}, arc_r * 0.4f, arc_r, startAngle, endAngle, 12, c);
-            DrawLineEx({sx, sy}, {sx + cosf((startAngle+60)*DEG2RAD)*arc_r, sy + sinf((startAngle+60)*DEG2RAD)*arc_r}, 3, c);
-            // 散布火花
-            for (int i = 0; i < 5; i++) {
-                float a = (startAngle + (float)(rand()%120)) * DEG2RAD;
-                float dist = arc_r * (0.5f + (float)(rand()%50)/100.0f);
-                DrawCircle(sx + cosf(a)*dist, sy + sinf(a)*dist, 2.5f, Fade(c, 0.5f));
+            char buf[128];
+            snprintf(buf, sizeof(buf), "%s %s", status, q.title.c_str());
+            DrawTextEx(g_font_small, buf, {pr.x+25, y}, 16, 1, c);
+            DrawTextEx(g_font_small, q.desc.c_str(), {pr.x+40, y+22}, 13, 1, {180,180,200,200});
+            y += 44;
+            if (y > pr.y + ph - 100) break; // 防止溢出
+        }
+
+        // D4 Step5.3: NPC关系摘要
+        auto& rels = _gameplay.rels.all();
+        if (!rels.empty()) {
+            DrawLine(pr.x+15, pr.y+ph-85, pr.x+pw-15, pr.y+ph-85, {60,60,90,180});
+            float ry = pr.y+ph-78;
+            DrawTextEx(g_font_small, "NPC关系:", {pr.x+20, ry}, 12, 1, {200,180,140,220});
+            ry += 16;
+            for (auto& r : rels) {
+                if (r.total() == 0) continue;
+                // NPC名字简写
+                const char* npc_name = "???";
+                if (r.npc_id == 20) npc_name = "埃德加";
+                else if (r.npc_id == 70) npc_name = "泰伦斯";
+                else if (r.npc_id == 90) npc_name = "索拉斯";
+                else if (r.npc_id == 110) npc_name = "灵魂";
+                else if (r.npc_id == 140) npc_name = "守望者";
+                char rbuf[80];
+                snprintf(rbuf, sizeof(rbuf), "%s  Tr:%d Rs:%d Fr:%d",
+                    npc_name, r.trust, r.respect, r.fear);
+                DrawTextEx(g_font_small, rbuf, {pr.x+25, ry}, 12, 1, {180,180,200,200});
+                ry += 14;
+                if (ry > pr.y + ph - 10) break;
             }
-        } else if (e.kind == "cone") {
-            // 矩形锥形 (Boss技能等)
-            DrawRectangleLines(sx - e.radius/2, sy - e.radius/4, e.radius, e.radius/2, c);
         }
     }
 }
 
-void GameScene::_draw_time_stop_overlay() {
-    int sw = get_tree()->get_width(), sh = get_tree()->get_height();
-    DrawRectangle(0, 0, sw, sh, {90, 90, 100, 130});
-    int remain = (int)time_stop_remaining;
-    char buf[4]; snprintf(buf, sizeof(buf), "%d", remain);
-    draw_glow_text(buf, sw / 2.0f, sh / 2.0f, 80, WHITE, true);
-    draw_glow_text("The World · 时停", sw / 2.0f, 60, 24, WHITE, true);
-}
-
-void GameScene::_draw_boss_cinematic_overlay() {
-    int sw = get_tree()->get_width(), sh = get_tree()->get_height();
-    DrawRectangle(0, 0, sw, sh, {0, 0, 0, 160});
-    float pulse = 1.0f + sinf((float)GetTime() * 8) * 0.08f;
-    draw_glow_text("BOSS 来了！", sw / 2.0f, sh / 2.0f, 48, {230, 50, 50, 255}, true);
-}
-
-void GameScene::_draw_boss_intro() {
-    ClearBackground(BLACK);
-    int sw = get_tree()->get_width(), sh = get_tree()->get_height();
-    float pw = 500, ph = 380;
-    Rectangle pr = {sw / 2.0f - pw / 2, sh / 2.0f - ph / 2, pw, ph};
-    draw_panel(pr, "! Boss 遭遇 !");
-
-    draw_glow_text(boss_intro_title.c_str(), sw / 2.0f, pr.y + 45, 30, boss_intro_color, true);
-
-    if (g_font_loaded) {
-        auto info = get_boss_info(boss_floor);
-        DrawTextEx(g_font_small, boss_intro_skills.c_str(), {pr.x + 80, pr.y + 160}, 16, 1, {180, 180, 180, 255});
-        DrawTextEx(g_font, boss_intro_lore.c_str(), {pr.x + 40, pr.y + 210}, 18, 1, {160, 160, 180, 255});
-    }
-    draw_glow_text("按 Enter 进入战斗...", sw / 2.0f, (float)(sh - 60), 20, {140, 20, 20, 255}, true);
-}
+// _draw_player_buffs, _draw_player_relics, _draw_relic_panel,
+// _draw_monster_buffs, _draw_inventory_panel 已迁移到 GameRenderer
+// _draw_effects, _draw_time_stop_overlay, _draw_boss_cinematic_overlay, _draw_boss_intro
+// 已迁移到 GameRenderer

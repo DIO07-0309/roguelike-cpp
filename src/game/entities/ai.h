@@ -9,9 +9,35 @@ class Monster;
 class Player;
 class GameMap;
 struct Effect;
+class MonsterAI;
+
+// ============================================================
+// D2 Step3: MonsterSkillType — 敌人主动技能
+// ============================================================
+enum class MonsterSkillType {
+    NONE,
+    RAPID_SHOT,   // Archer: 连续3发弹幕
+    TOTEM,        // Shaman: 放置图腾(范围友方buff)
+    LEAP,         // Bomber: 跳跃接近玩家
+    SHIELD,       // Tank: 举盾减伤70%
+    SUMMON,       // Elite: 召唤1只小怪
+};
+
+// D2 Step3: 技能状态 (每只怪物独立, 非共享)
+struct MonsterSkillState {
+    MonsterSkillType type = MonsterSkillType::NONE;
+    float cooldown = 0.0f;       // 当前冷却
+    float max_cooldown = 5.0f;   // 基础冷却 (按type不同)
+    float cast_left = 0.0f;      // 蓄力剩余 (>0表示正在蓄力)
+    float duration_left = 0.0f;  // 持续技能剩余 (>0表示效果持续中)
+    float shot_timer = 0.0f;     // Rapid Shot 连发计时
+    int   shot_count = 0;        // Rapid Shot 已发射数
+    bool  active = false;        // 技能激活中
+};
 
 // ============================================================
 // MonsterAI — 怪物行为状态机 (IDLE → CHASE → ATTACK)
+// D2 Step3: Think → Skill → Move → Attack 管线
 // ============================================================
 enum class AIState { IDLE, CHASE, ATTACK };
 
@@ -32,6 +58,16 @@ public:
                         std::vector<Monster*>* all_monsters = nullptr,
                         std::vector<Effect>* effects = nullptr);
 
+    // D2 Step3: 怪物技能池 (在 spawn_monster 中分配)
+    std::vector<MonsterSkillState> _skills;
+
+    // D2 Step4: Elite 指挥冷却 (10s)
+    float _command_cooldown = 0.0f;
+    // D2 Step4: 被保护标记 (Tank→Ally 连线目标)
+    Monster* _protect_target = nullptr;
+    // D2 Step4: 本层协同概率 (由 FloorManager::spawn_floor_monsters 设置)
+    float team_coop_chance = 0.0f;
+
 protected:
     float _patrol_timer = 0.0f;
     Vector2 _patrol_dir{0, 0};
@@ -44,4 +80,24 @@ protected:
     void _apply_movement(Monster* self, GameMap* map, float mx, float my, double dt);
     float _dist_to(Monster* self, Player* player) const;
     void _pick_new_dir();
+
+    // D2 Step4: Team决策 — 协同站位/保护/治疗/侧翼/指挥
+    void _team_decision(Monster* self, Player* player, GameMap* map,
+                        double dt, std::vector<Monster*>* all);
+
+    // D2 Step3: Think层 — 决策是否释放技能
+    bool _think_and_cast(Monster* self, Player* player, GameMap* map,
+                         double dt, double gt,
+                         std::vector<Monster*>* all, std::vector<Effect>* effects);
+    // D2 Step3: 各技能执行
+    void _exec_rapid_shot(Monster* self, Player* player, double gt,
+                          std::vector<Effect>* effects, MonsterSkillState& sk);
+    void _exec_totem(Monster* self, Player* player, std::vector<Monster*>* all,
+                     std::vector<Effect>* effects, MonsterSkillState& sk);
+    void _exec_leap(Monster* self, Player* player, GameMap* map,
+                    MonsterSkillState& sk);
+    void _exec_shield(Monster* self, MonsterSkillState& sk);
+    void _exec_summon(Monster* self, Player* player, GameMap* map,
+                      std::vector<Monster*>* all, std::vector<Effect>* effects,
+                      MonsterSkillState& sk);
 };

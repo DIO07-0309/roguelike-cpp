@@ -48,6 +48,9 @@ public:
     void set_process(bool enabled) { _processing = enabled; }
     bool is_processing() const { return _processing; }
 
+    // ---- BGM 映射 (各场景重写返回自己的 BGM 名) ----
+    virtual const char* get_bgm_name() const { return nullptr; }
+
 protected:
     Node* _parent = nullptr;
     std::vector<std::shared_ptr<Node>> _children;

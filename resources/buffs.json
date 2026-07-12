@@ -28,5 +28,25 @@
     "tick_interval": 0.0,
     "tick_damage": 0,
     "hud_color": [255, 150, 50]
+  },
+  {
+    "id": "bleed",
+    "display_name": "流血",
+    "short_name": "血",
+    "duration": 3.0,
+    "max_stacks": 5,
+    "tick_interval": 0.6,
+    "tick_damage": 4,
+    "hud_color": [220, 40, 40]
+  },
+  {
+    "id": "shield",
+    "display_name": "护盾",
+    "short_name": "盾",
+    "duration": 8.0,
+    "max_stacks": 1,
+    "tick_interval": 0.0,
+    "tick_damage": 0,
+    "hud_color": [80, 180, 255]
   }
 ]

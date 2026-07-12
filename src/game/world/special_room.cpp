@@ -3,6 +3,8 @@
 #include "combat_system.h"
 #include "item.h"
 #include "core/logger.h"
+#include "build_score.h"
+#include "relic_progression.h"
 #include <algorithm>
 
 SpecialRoomType special_room_from_index(int idx) {
@@ -114,16 +116,35 @@ static std::string _try_grant_random_relic(Player* player, float drop_chance) {
         if (!slot.ids.empty()) total_w += slot.weight;
     }
 
-    // 没有可用 relic
+    // D3 Step4: 根据 BuildScore 调整 relic 权重 (匹配+60%)
+    {
+        BuildScore bs = calculate_build(player);
+        for (auto& slot : slots) {
+            std::vector<std::string> matched;
+            for (auto& id : slot.ids)
+                if (relic_matches_build(bs, id))
+                    matched.push_back(id);
+            if (!matched.empty()) slot.weight = slot.weight * 8 / 5; // +60%
+        }
+    }
+
     if (total_w == 0) return "";
 
-    // 按权重选 rarity 档
     int roll = (int)(rng() % (uint32_t)total_w);
     std::string chosen;
     for (auto& slot : slots) {
         if (slot.ids.empty()) continue;
         if (roll < slot.weight) {
-            chosen = slot.ids[(int)(rng() % (uint32_t)slot.ids.size())];
+            // D3 Step4: 匹配 Build 的 relic 概率翻倍
+            std::vector<std::string>& pool = slot.ids;
+            std::vector<std::string> build_ids;
+            BuildScore bs2 = calculate_build(player);
+            for (auto& id : pool)
+                if (relic_matches_build(bs2, id)) build_ids.push_back(id);
+            if (!build_ids.empty() && (rng() % 100) < 40)
+                chosen = build_ids[(int)(rng() % (uint32_t)build_ids.size())];
+            else
+                chosen = pool[(int)(rng() % (uint32_t)pool.size())];
             break;
         }
         roll -= slot.weight;
@@ -142,7 +163,10 @@ static std::string _try_grant_random_relic(Player* player, float drop_chance) {
     const RelicDef* def = get_relic_def(chosen);
     std::string name = def ? def->name : chosen;
     LOG_INFO("[RELIC] 获得圣物: %s (%s)", name.c_str(), def ? def->rarity.c_str() : "?");
-    return "你获得了圣物：" + name + "。";
+    // D4.6 Step4: 记录到永久Archive + 熟练度
+    if (def) g_relic_archive.mark_obtained(chosen, rarity_level(def->rarity));
+    // C1: 圣物获得仪式感 — 特殊消息格式
+    return "RELIC:" + name;  // GameScene 会识别 RELIC: 前缀显示大提示
 }
 
 // ============================================================
@@ -176,8 +200,8 @@ static std::string _exec_treasure(Player* player) {
         }
     }
 
-    // B12: 宝箱品质分级 relic 掉率 (普通10% / 丰厚20% / 祝福35%)
-    float relic_chance = (roll < 10) ? 0.35f : (roll < 40) ? 0.20f : 0.10f;
+    // B13: 宝箱品质分级 relic 掉率 (普通40% / 丰厚70% / 祝福100%)
+    float relic_chance = (roll < 10) ? 1.00f : (roll < 40) ? 0.70f : 0.40f;
     // B12: merchant_coin — relic 掉率 +15%
     if (player_has_relic(player, "merchant_coin")) {
         relic_chance += 0.15f;

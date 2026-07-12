@@ -15,6 +15,23 @@ class GameMap;
 class MonsterAI;
 
 // ============================================================
+// D2 Step4: TeamRole — 怪物在队伍中的职责 (自动按 MonsterType 分配)
+// ============================================================
+enum class TeamRole { FRONTLINE, BACKLINE, SUPPORT, FLANK, COMMAND, NONE };
+
+// ============================================================
+// B14: MonsterType — 怪物生态定位
+// ============================================================
+enum class MonsterType {
+    NORMAL,   // 普通怪 (slime/orc)
+    ARCHER,   // 哥布林弓箭手: 远程, 玩家靠近后退
+    SHAMAN,   // 萨满: 辅助附近怪物
+    BOMBER,   // 爆炸怪: 靠近玩家自爆
+    TANK,     // 重甲怪: 高HP低速
+    ELITE,    // 精英怪: 强化属性+随机Buff
+};
+
+// ============================================================
 // Monster — 怪物实体
 // ============================================================
 class Monster {
@@ -25,10 +42,17 @@ public:
     std::string name;
     Color color{200, 80, 80, 255};
     bool is_boss = false;
+    MonsterType monster_type = MonsterType::NORMAL;  // B14
+    bool is_elite = false;                            // B14: Elite 标记
+    TeamRole team_role = TeamRole::NONE;              // D2 Step4: 协同职责
     std::vector<BuffTrigger> on_hit_triggers;  // 命中玩家时触发的 Buff 规则
     AttackType attack_type = AttackType::PHYSICAL;
     float attack_cooldown = 1.5f;
     float last_attack_time = 0.0f;
+
+    // B14: Bomber / Shaman 专用计时器
+    float explode_timer = 0.0f;      // 自爆倒计时 (Bomber)
+    float support_cooldown = 0.0f;   // 辅助冷却 (Shaman)
 
     // AI 组件 (在 ai.h 中定义)
     class MonsterAI* ai = nullptr;

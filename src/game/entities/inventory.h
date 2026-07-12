@@ -17,11 +17,7 @@ public:
     std::unordered_map<std::string, std::shared_ptr<EquipmentItem>> equipped;
     int max_size = 16;
 
-    Inventory(int capacity = 16) : max_size(capacity) {
-        equipped["weapon"] = nullptr;
-        equipped["armor"] = nullptr;
-        equipped["charm"] = nullptr;
-    }
+    Inventory(int capacity = 16);
 
     bool is_full() const { return (int)items.size() >= max_size; }
     int item_count() const { return (int)items.size(); }

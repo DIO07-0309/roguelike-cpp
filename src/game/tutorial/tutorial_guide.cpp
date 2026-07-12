@@ -9,6 +9,8 @@
 #include <cmath>
 #include <algorithm>
 
+void TutorialGuide::notify_skill_used() { _skill_used = true; }
+
 // ---- stage instructions ----
 std::vector<std::string> TutorialGuide::get_instructions() const {
     switch (stage) {

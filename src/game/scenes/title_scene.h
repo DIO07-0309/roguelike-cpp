@@ -19,4 +19,5 @@ public:
     void _process(double delta) override;
     void _render() override;
     void _input(const InputMap& input) override;
+    const char* get_bgm_name() const override { return "title"; }
 };

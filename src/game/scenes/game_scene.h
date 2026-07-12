@@ -8,6 +8,58 @@
 #include "item.h"
 #include "game_map.h"
 #include "vfx_server.h"
+#include "game_renderer.h"
+#include "interaction_handler.h"
+#include "floor_manager.h"
+#include "combat_coordinator.h"
+#include "build_score.h"
+#include "event_system.h"
+#include "floor_narrative.h"
+#include "npc_system.h"
+#include "world_state.h"
+#include "quest_manager.h"
+#include "relationship_system.h"
+#include "world_reaction.h"
+#include "boss_narrative.h"
+#include "growth_curve.h"
+#include "combat_feel.h"
+#include "flow_director.h"
+#include "relic_progression.h"
+#include "meta_progression.h"
+#include "boss_evolution.h"
+#include "boss_behavior.h"
+#include "boss_command.h"
+#include "arena_manager.h"
+#include "boss_replay.h"
+#include "boss_encounter.h"
+#include "camera_director.h"
+#include "boss_cinematic.h"
+#include "boss_timeline.h"
+#include "ending_director.h"
+#include "boss_system_director.h"
+#include "gameplay_system_director.h"
+#include "presentation_system_director.h"
+#include "game_flow_director.h"
+#include "player_controller.h"
+
+// ============================================================
+// D4 Step2: EventPresentation — 事件演出系统
+// ============================================================
+enum class EventPhase { INACTIVE, ENTER, DESC, CHOICE, ANIM, REWARD, COMPLETE };
+
+struct EventPresentation {
+    bool     active = false;
+    EventPhase phase = EventPhase::INACTIVE;
+    EventType current = EventType::NONE;
+    float timer = 0.0f;           // 阶段计时器
+    float fade = 0.0f;            // 淡入淡出 0~1
+    int  selected = 0;            // 选项索引
+    int  option_count = 0;        // 选项数 (0=确认型, >0=选择型)
+    std::string desc_text;        // 事件描述文字
+    std::string reward_text;      // 奖励文字 (phase=REWARD时显示)
+    std::string complete_text;    // 完成文字 (phase=COMPLETE时显示)
+    Color  anim_color{255,200,50,255}; // 动画颜色
+};
 
 // ============================================================
 // GameScene — 核心游戏场景（替代 game.py 的 PLAYING 状态）
@@ -16,6 +68,8 @@ enum class GameState { TITLE, PLAYING, BOSS_INTRO, BOSS_CINEMATIC,
                        FLOOR_SELECT, TUTORIAL, DEATH, VICTORY };
 
 class GameScene : public Node {
+    friend class GameFlowDirector;  // D6 Step6: flow director needs access
+    friend class PlayerController;  // D6 Step7: player controller needs access
 public:
     GameState state = GameState::TITLE;
 
@@ -64,11 +118,11 @@ public:
     // 场景间通信
     void enter_floor(int floor, uint32_t seed = 0);
     void new_game();
+    // B13: Relic 不再跨层 (load_saved_game 不再接收 relics 参数)
     void load_saved_game(int floor, int max_floor, std::unique_ptr<Player> p,
                          uint32_t seed = 0,
                          const std::vector<bool>& special_triggered = {},
-                         const std::vector<bool>& special_discovered = {},
-                         const std::vector<std::string>& relics = {});
+                         const std::vector<bool>& special_discovered = {});
 
     // 输入 (override Node::_input)
     void _input(const InputMap& input) override;
@@ -82,48 +136,76 @@ private:
     void _check_floor_clear();
     void _cleanup_dead_monsters();   // poison tick 后统一收尾
     void _apply_pending_damage();
-    void _handle_debug_buff_test_input();  // F1-F6 Debug Buff 测试 (仅 _DEBUG)
+    void _handle_debug_buff_test_input();  // F1-F10 Debug测试
+    // D4.6 Debug flags (按F键切换的面板) — moved to presentation
+    // D6 Step3: Boss全子系统
+    BossSystemDirector _boss;
+    // D6 Step4: Gameplay全子系统 (Flow/Quest/Relationship/Story/Ending/Meta)
+    GameplaySystemDirector _gameplay;
+    // D6 Step5: Presentation全子系统 (Shake/Freeze/Damage/Msg/Intro/Overlays)
+    PresentationSystemDirector _presentation;
+    // D6 Step6: GameFlowDirector (生命周期状态机 + 场景切换)
+    GameFlowDirector _flow;
+    // D6 Step7: PlayerController (玩家输入/攻击/技能/移动/交互)
+    PlayerController _player_ctrl;
 
-    // 楼层
+    // 楼层 (委托给 FloorManager)
     void _activate_stairs();
     void _check_floor_transition();
 
-    // 道具
-    void _pickup();
-    void _interact_special();   // B8: 特殊房间交互 (E键优先)
-    void _spawn_floor_monsters(const std::vector<std::pair<int,int>>& rooms);
+    // 特殊房间 (委托给 InteractionHandler)
 
-    // B10: 特殊房间体验层
-    void _check_special_room_discovery();
-    void _show_room_message(const std::string& msg);
-    void _draw_room_message();
-    std::string _room_message;
-    float _room_message_timer = 0.0f;
-
-    // B12: Relic 面板
+    // Relic 面板
     bool _show_relic_panel = false;
-    void _draw_relic_panel();
-    bool _shown_relic_hint = false;   // B12.5: 首次获得 relic 时提示按 R
 
-    // Boss
+    // Boss (B15: Phase2 + entrance + 击杀奖励增强)
     Monster* _get_boss() const;
     void _drop_boss_reward(Monster* boss);
+    float _boss_entrance_timer = 0.0f;
+    bool  _boss_phase2_shown = false;
+    bool  _boss_entered = false;
 
-    // 渲染辅助
+    // C1: 伤害数字 / 震屏 / 冻结 (moved to PresentationSystemDirector)
+
+    // D3 Step3: The World 进化回调节 (E2 shockwave / E3 speed)
+    int _tw_evo_level = 0;
+    float _tw_speed_boost = 0.0f;
+
+    // D3 Step4: Build Fusion — 构筑通知追踪 (moved to GameplaySystemDirector)
+
+    // D4 Step2: 事件演出
+    EventPresentation _event_ui;
+    bool _is_event_running() const { return _event_ui.active; }
+    void _start_event_presentation(EventType et);
+    void _tick_event_ui(float dt);
+    void _draw_event_ui(int sw, int sh);
+    void _handle_event_input(const InputMap& input);
+
+    // D4 Step3: 楼层/章节叙事 — moved to PresentationSystemDirector
+
+    // D4 Step4: NPC / Dialogue
+    NPCState _npc_state[10];
+    int     _npc_count = 0;
+    int     _current_npc_index = -1;
+    DialogueState _dialogue;
+    bool _quest_log_open = false;
+    // NPC 放置位置 (瓦片坐标)
+    int    _npc_tile_x[10], _npc_tile_y[10];
+
+    NPCState* _find_or_create_npc_state(int npc_id);
+    void  _spawn_floor_npcs(int floor, const std::vector<std::pair<int,int>>& rooms);
+    void  _start_dialogue(int npc_index);
+    void  _update_dialogue(float dt);
+    void  _draw_dialogue(int sw, int sh);
+    void  _draw_quest_log(int sw, int sh);
+    void  _handle_dialogue_input(const InputMap& input);
+    GameRenderer _renderer;
+    InteractionHandler _interact;
+
+    // 渲染辅助 (保留 GameScene 中的轻量级方法)
     void _draw_map();
     void _draw_entities();
     void _draw_ground_items();
-    void _draw_hud();
-    void _draw_inventory_panel();
-    void _draw_skill_bar();
-    void _draw_player_buffs();     // 玩家 Buff HUD（技能栏下方，全名+层数+时间）
-    void _draw_player_relics();    // B11: 玩家 Relic HUD（buff 下方）
-    void _draw_monster_buffs(const Monster& m, float draw_x, float draw_y);  // 怪物 Buff 简写标签
-    void _draw_effects();
-    void _draw_time_stop_overlay();
-    void _draw_boss_cinematic_overlay();
-    void _draw_boss_intro();
 
     float _cam_x = 0, _cam_y = 0;
-    void _update_camera();
 };

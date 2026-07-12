@@ -28,7 +28,7 @@ public:
                            std::vector<Monster*>& monsters,
                            std::vector<DroppedItem>& items);
     void advance_stage();
-    void notify_skill_used() { _skill_used = true; }
+    void notify_skill_used();
 
     // 状态
     float move_distance = 0;

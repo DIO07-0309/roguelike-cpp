@@ -15,6 +15,14 @@
 
 std::mt19937 rng(std::random_device{}());
 
+// ---- 伤害公式 ----
+int calculate_damage(int atk, int def, AttackType type) {
+    (void)type;  // reserved for future type-specific logic
+    float base = std::max(1.0f, atk - def * 0.5f);
+    float variance = 0.8f + (float)(rng() % 401) / 1000.0f;
+    return std::max(1, (int)(base * variance));
+}
+
 // ---- Buff config table (populated by load_buff_defs) ----
 static std::unordered_map<std::string, BuffDef> g_buff_defs;
 static bool g_buff_defs_loaded = false;
@@ -147,6 +155,13 @@ bool load_buff_defs(const std::string& path) {
             skipped++; continue;
         }
         _apply_defaults(def);
+
+        // D3 Step1: post-fill buff tags (from id)
+        if (def.id == "poison") def.tags = {BuildTag::POISON, BuildTag::DOT};
+        else if (def.id == "slow") def.tags = {BuildTag::ICE};
+        else if (def.id == "attack_up") def.tags = {BuildTag::SUPPORT};
+        else if (def.id == "bleed") def.tags = {BuildTag::BLEED, BuildTag::DOT};
+        else if (def.id == "shield") def.tags = {BuildTag::DEFENSE};
 
         if (g_buff_defs.count(def.id))
             LOG_WARN("[BUFF] Duplicate id '%s' -- overwrite", def.id.c_str());
@@ -486,6 +501,19 @@ bool load_relic_defs(const std::string& path) {
             skipped++; continue;
         }
         _apply_relic_defaults(def);
+
+        // D3 Step1: post-fill relic tags (from id)
+        if (def.id == "blood_charm") def.favorite_tags = {BuildTag::DEFENSE};
+        else if (def.id == "venom_fang") def.favorite_tags = {BuildTag::POISON};
+        else if (def.id == "golden_dice") def.favorite_tags = {BuildTag::SUPPORT};
+        else if (def.id == "hunters_eye") def.favorite_tags = {BuildTag::PROJECTILE};
+        else if (def.id == "leech_blade") def.favorite_tags = {BuildTag::MELEE};
+        else if (def.id == "war_drum") def.favorite_tags = {BuildTag::MELEE};
+        else if (def.id == "battle_totem") def.favorite_tags = {BuildTag::MELEE};
+        else if (def.id == "iron_heart") def.favorite_tags = {BuildTag::DEFENSE};
+        else if (def.id == "sage_leaf") def.favorite_tags = {BuildTag::HEAL};
+        else if (def.id == "merchant_coin") def.favorite_tags = {BuildTag::SUPPORT};
+        else if (def.id == "plague_mask") def.favorite_tags = {BuildTag::POISON};
 
         LOG_INFO("[RELIC] Loaded '%s': %s param=%.2f param2=%d",
             def.id.c_str(), def.name.c_str(), def.param, def.param2);

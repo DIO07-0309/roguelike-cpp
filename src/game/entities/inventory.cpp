@@ -1,6 +1,12 @@
 #include "inventory.h"
 #include "player.h"
 
+Inventory::Inventory(int capacity) : max_size(capacity) {
+    equipped["weapon"] = nullptr;
+    equipped["armor"] = nullptr;
+    equipped["charm"] = nullptr;
+}
+
 bool Inventory::add(std::shared_ptr<Item> item, Player* player) {
     if (is_full()) return false;
     items.push_back(item);

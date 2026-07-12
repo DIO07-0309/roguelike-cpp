@@ -18,11 +18,11 @@ struct BSPNode {
     int rx = 0, ry = 0, rw = 0, rh = 0;
     bool has_room = false;
 
-    BSPNode(int x_, int y_, int w_, int h_) : x(x_), y(y_), w(w_), h(h_) {}
-    ~BSPNode() { delete left; delete right; }
-    bool is_leaf() const { return !left && !right; }
-    std::pair<int,int> center() const { return {x + w/2, y + h/2}; }
-    std::pair<int,int> room_center() const { return {rx + rw/2, ry + rh/2}; }
+    BSPNode(int x_, int y_, int w_, int h_);
+    ~BSPNode();
+    bool is_leaf() const;
+    std::pair<int,int> center() const;
+    std::pair<int,int> room_center() const;
 };
 
 // ============================================================
@@ -33,7 +33,8 @@ public:
     DungeonGenerator(int w, int h, int ts,
                      int min_part = 8, int min_room = 5, int margin = 1);
 
-    std::shared_ptr<GameMap> generate(uint32_t seed = 0);
+    std::shared_ptr<GameMap> generate(uint32_t seed = 0, int special_room_count = 3,
+                                     int arena_density = 0);
     std::vector<std::pair<int,int>> get_room_centers() const;
     std::vector<SpecialRoom> get_special_rooms() const { return _special_rooms; }
 
@@ -49,7 +50,8 @@ private:
     std::mt19937 _local_rng;
 
     int _rand_int(int max_exclusive);
-    void _assign_special_rooms();
+    void _assign_special_rooms(int count);
+    void _assign_arena_objects(GameMap* gm, int density);
 
     void _partition(BSPNode* node);
     void _create_child_nodes(BSPNode* node, bool vertical, int split);

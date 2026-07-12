@@ -13,7 +13,7 @@ struct SaveData {
     uint32_t dungeon_seed = 0;                  // B8: 当前楼层地牢种子
     std::vector<bool> special_triggered;         // B8: 特殊房间触发状态
     std::vector<bool> special_discovered;        // B10: 特殊房间发现状态
-    std::vector<std::string> relics;             // B11: 局内圣物 id 列表
+    // B13: Relic 不再跨层 (存档不保存圣物)
 };
 
 class SaveManager {
@@ -22,8 +22,7 @@ public:
     static bool save_game(Player* player, int floor, int max_floor,
                           uint32_t dungeon_seed = 0,
                           const std::vector<bool>& special_triggered = {},
-                          const std::vector<bool>& special_discovered = {},
-                          const std::vector<std::string>& relics = {});
+                          const std::vector<bool>& special_discovered = {});
     static SaveData* load_save();
     static void delete_save();
 

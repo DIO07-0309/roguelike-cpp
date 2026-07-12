@@ -6,6 +6,68 @@
 #include <cmath>
 #include <algorithm>
 
+// ---- 从 skill.h 移出的实现 ----
+
+// ============================================================
+// D3 Step2: Evolution 实现
+// ============================================================
+void Skill::add_evolution(int lv, const char* name, const char* desc,
+                           std::initializer_list<BuildTag> req) {
+    SkillEvolution ev;
+    ev.level = lv; ev.name = name; ev.desc = desc;
+    for (auto t : req) ev.required_tags.push_back(t);
+    evolutions.push_back(ev);
+}
+
+bool Skill::can_evolve() const {
+    return evolution_level < (int)evolutions.size();
+}
+
+std::string Skill::evolve() {
+    if (!can_evolve()) return "";
+    evolution_level++;
+    const SkillEvolution* ev = current_evolution();
+    return ev ? ev->name : "";
+}
+
+const SkillEvolution* Skill::current_evolution() const {
+    if (evolution_level <= 0 || evolution_level > (int)evolutions.size()) return nullptr;
+    return &evolutions[evolution_level - 1];
+}
+
+std::string Skill::get_evolution_text() const {
+    if (evolution_level <= 0) return "";
+    const SkillEvolution* ev = current_evolution();
+    if (!ev) return "Evo" + std::to_string(evolution_level);
+    return ev->name;
+}
+
+// Skill 基类
+Skill::Skill(const std::string& n, float cd, int ml)
+    : name(n), base_cooldown(cd), cooldown(cd), max_level(ml) {}
+bool Skill::can_upgrade() const { return level < max_level; }
+
+// SkillManager
+bool SkillManager::can_learn() const { return (int)active_skills.size() < max_active; }
+
+// IronSkinSkill
+int IronSkinSkill::get_value() const {
+    int v[] = {0, 3, 7, 12};
+    return v[std::min(level, 3)];
+}
+std::string IronSkinSkill::get_level_text() const {
+    return "Lv" + std::to_string(level) + " DEF+" + std::to_string(get_value());
+}
+
+// BerserkSkill
+int BerserkSkill::get_value() const {
+    int v[] = {0, 3, 7, 12};
+    return v[std::min(level, 3)];
+}
+std::string BerserkSkill::get_level_text() const {
+    return "Lv" + std::to_string(level) + " ATK+" + std::to_string(get_value());
+}
+
 // ---- Skill 基类 ----
 bool Skill::can_use(double game_time) const {
     return (game_time - last_use_time) >= cooldown;
@@ -70,6 +132,11 @@ void PassiveSkill::remove(Player* player) {
 SlashSkill::SlashSkill() : ActiveSkill("斩击", 2.0f, 3) {
     _cone_range = 1;
     triggers = {{"poison", 1, 0.30f, BuffTarget::ENEMY}};
+    tags = {BuildTag::MELEE, BuildTag::COMBO};
+    // D3 Step2: Evolution path
+    add_evolution(1, "广域斩", "攻击范围+30%", {BuildTag::MELEE});
+    add_evolution(2, "流血斩", "100%附加1层Bleed", {BuildTag::MELEE, BuildTag::BLEED});
+    add_evolution(3, "冲击斩", "Heavy: 冲击波向前延伸", {BuildTag::MELEE, BuildTag::COMBO, BuildTag::HEAVY});
 }
 
 void SlashSkill::_on_level_up() {
@@ -78,24 +145,33 @@ void SlashSkill::_on_level_up() {
     _recalc_cooldown();
 }
 
-std::string SlashSkill::execute(Player* caster, std::vector<Monster*>& targets, GameMap*) {
-    auto hit = get_targets_in_cone(caster, targets, _cone_range);
-    if (hit.empty()) return "斩击挥空了（无目标）";
+std::string SlashSkill::execute(Player* caster, std::vector<Monster*>& targets,
+                                 GameMap*, bool is_heavy) {
+    int cr = _cone_range;
+    float dmg_bonus = 1.0f;
+    // D3 Step3 E1: 范围+30%
+    if (evolution_level >= 1) cr = (int)(cr * 1.3f);
+    // D2 Step2: Heavy → 范围+40%, 伤害+30%
+    if (is_heavy) { cr = (int)(cr * 1.4f); if (cr < 2) cr = 2; dmg_bonus = 1.3f; }
+    auto hit = get_targets_in_cone(caster, targets, cr);
+    if (hit.empty()) return is_heavy ? "重·斩击挥空了" : "斩击挥空了（无目标）";
 
-    // Buff 触发规则 (统一到 triggers)
     std::string extra;
     for (auto* t : hit) {
         for (auto& tr : triggers) {
             if (tr.target == BuffTarget::ENEMY
                 && (tr.chance >= 1.0f || (float)(rng() % 1000) / 1000.0f < tr.chance)) {
-                apply_buff(t, tr.buff_id, tr.stacks);
+                int stacks = is_heavy ? (tr.stacks + 1) : tr.stacks;
+                apply_buff(t, tr.buff_id, stacks);
                 extra += " " + t->name + get_buff_display_name(tr.buff_id) + "!";
             }
         }
+        // D3 Step3 E2: 100%附加 bleed
+        if (evolution_level >= 2) { apply_buff(t, "bleed", 1); extra += " 流血!"; }
     }
 
     int total = 0;
-    float base = get_effective_attack(caster) * 1.5f;
+    float base = get_effective_attack(caster) * 1.5f * dmg_bonus;
     float power = get_power_multiplier();
     int hits_per = (level >= 3) ? 2 : 1;
     for (auto* t : hit) {
@@ -106,7 +182,37 @@ std::string SlashSkill::execute(Player* caster, std::vector<Monster*>& targets, 
             total += dmg;
         }
     }
-    std::string d = "斩击Lv" + std::to_string(level) + " 命中 " + std::to_string(hit.size()) + " 目标";
+
+    // D3 Step3 E3: Heavy冲击波 — 向前方直线敌人施加70%二次伤害
+    if (evolution_level >= 3 && is_heavy) {
+        float cx = caster->entity.rect.x + caster->entity.rect.width/2;
+        float cy = caster->entity.rect.y + caster->entity.rect.height/2;
+        for (auto* t : targets) {
+            if (!t || !t->combat.is_alive) continue;
+            float tx = t->entity.rect.x + t->entity.rect.width/2;
+            float ty = t->entity.rect.y + t->entity.rect.height/2;
+            float dx = tx - cx, dy = ty - cy; float dist = sqrtf(dx*dx+dy*dy);
+            if (dist > cr * 48.0f) continue;
+            // 检查是否在朝向方向
+            bool in_dir = false;
+            switch (caster->direction) {
+                case Direction::DOWN:  in_dir = (dy > 0  && fabsf(dx) < fabsf(dy)); break;
+                case Direction::UP:    in_dir = (dy < 0  && fabsf(dx) < fabsf(dy)); break;
+                case Direction::RIGHT: in_dir = (dx > 0  && fabsf(dy) < fabsf(dx)); break;
+                case Direction::LEFT:  in_dir = (dx < 0  && fabsf(dy) < fabsf(dx)); break;
+            }
+            if (in_dir) {
+                int wave_dmg = (int)(calculate_damage((int)(base * power * 0.7f),
+                    t->combat.get_effective_defense(AttackType::PHYSICAL)));
+                t->combat.take_damage(wave_dmg);
+                total += wave_dmg;
+                extra += " 冲击波!";
+            }
+        }
+    }
+
+    std::string d = (is_heavy ? "重·" : "") + std::string("斩击Lv") + std::to_string(level)
+                  + " 命中 " + std::to_string(hit.size()) + " 目标";
     if (hits_per > 1) d += "（二连击）";
     if (!extra.empty()) d += extra;
     return d + "，造成 " + std::to_string(total) + " 伤害";
@@ -119,6 +225,11 @@ std::string SlashSkill::get_level_text() const {
 // ---- FireballSkill ----
 FireballSkill::FireballSkill() : ActiveSkill("神罚", 5.0f, 3) {
     triggers = {{"slow", 1, 0.25f, BuffTarget::ENEMY}};
+    tags = {BuildTag::MAGIC, BuildTag::FIRE, BuildTag::PROJECTILE, BuildTag::AOE, BuildTag::RANGED};
+    // D3 Step2: Evolution path
+    add_evolution(1, "爆炸火球", "半径+40%", {BuildTag::FIRE, BuildTag::AOE});
+    add_evolution(2, "燃烧地面", "3秒燃烧区域持续DOT", {BuildTag::FIRE, BuildTag::DOT});
+    add_evolution(3, "分裂火球", "分裂3颗小火球", {BuildTag::FIRE, BuildTag::PROJECTILE, BuildTag::AOE});
 }
 
 void FireballSkill::_on_level_up() {
@@ -127,7 +238,8 @@ void FireballSkill::_on_level_up() {
     _recalc_cooldown();
 }
 
-std::string FireballSkill::execute(Player* caster, std::vector<Monster*>& targets, GameMap*) {
+std::string FireballSkill::execute(Player* caster, std::vector<Monster*>& targets,
+                                    GameMap*, bool is_heavy) {
     std::vector<Monster*> alive;
     for (auto* t : targets) if (t && t->combat.is_alive) alive.push_back(t);
 
@@ -141,15 +253,18 @@ std::string FireballSkill::execute(Player* caster, std::vector<Monster*>& target
         return da < db;
     });
 
+    float frng = is_heavy ? _range * 1.5f : _range;
+    // D3 Step3 E1: 半径+40%
+    if (evolution_level >= 1) frng *= 1.4f;
+    float range_px = frng * 32.0f;
     std::vector<Monster*> chosen;
-    float range_px = _range * 32.0f;
     for (auto* t : alive) {
         if ((int)chosen.size() >= _target_count) break;
         float d = hypotf(t->entity.rect.x + t->entity.rect.width/2 - pcx,
                          t->entity.rect.y + t->entity.rect.height/2 - pcy);
         if (d <= range_px) chosen.push_back(t);
     }
-    if (chosen.empty()) return "神罚没有击中任何目标";
+    if (chosen.empty()) return is_heavy ? "重·神罚没有击中任何目标" : "神罚没有击中任何目标";
 
     int total = 0;
     float base = get_effective_attack(caster) * 2.5f;
@@ -159,20 +274,47 @@ std::string FireballSkill::execute(Player* caster, std::vector<Monster*>& target
             t->combat.get_effective_defense(AttackType::MAGICAL), AttackType::MAGICAL);
         t->combat.take_damage(dmg);
         total += dmg;
+        if (is_heavy) apply_buff(t, "poison", 2);
+        // D3 Step3 E2: 燃烧地面 → 命中目标+poison
+        if (evolution_level >= 2) apply_buff(t, "poison", 1);
     }
-    // Buff 触发规则 (统一到 triggers)
+
+    // D3 Step3 E3: 分裂火球 — 对所有非主目标敌人施加35%伤害
+    if (evolution_level >= 3) {
+        int split_count = 0;
+        for (auto* t : alive) {
+            if (split_count >= 3) break;
+            bool already = false;
+            for (auto* c : chosen) if (c == t) { already = true; break; }
+            if (already) continue;
+            float d = hypotf(t->entity.rect.x + t->entity.rect.width/2 - pcx,
+                             t->entity.rect.y + t->entity.rect.height/2 - pcy);
+            if (d <= range_px * 1.5f) {
+                int s_dmg = (int)(calculate_damage((int)(base * power * 0.35f),
+                    t->combat.get_effective_defense(AttackType::MAGICAL), AttackType::MAGICAL));
+                t->combat.take_damage(s_dmg);
+                total += s_dmg;
+                split_count++;
+            }
+        }
+    }
+
+    // Buff 触发规则
     std::string extra;
     if (!chosen.empty()) {
         for (auto& tr : triggers) {
             if (tr.target == BuffTarget::ENEMY
                 && (tr.chance >= 1.0f || (float)(rng() % 1000) / 1000.0f < tr.chance)) {
-                apply_buff(chosen[0], tr.buff_id, tr.stacks);
+                int stacks = is_heavy ? (tr.stacks + 1) : tr.stacks;
+                apply_buff(chosen[0], tr.buff_id, stacks);
                 extra += " " + chosen[0]->name + get_buff_display_name(tr.buff_id) + "!";
             }
         }
     }
-    return "神罚Lv" + std::to_string(level) + " 命中 " + std::to_string(chosen.size())
-           + " 目标，造成 " + std::to_string(total) + " 伤害" + extra;
+    std::string label = (is_heavy ? "重·" : "") + std::string("神罚Lv") + std::to_string(level);
+    return label + " 命中 " + std::to_string(chosen.size())
+           + " 目标，造成 " + std::to_string(total) + " 伤害" + extra
+           + (is_heavy ? " +燃烧!" : "");
 }
 
 std::string FireballSkill::get_level_text() const {
@@ -182,6 +324,11 @@ std::string FireballSkill::get_level_text() const {
 // ---- SelfHealSkill ----
 SelfHealSkill::SelfHealSkill() : ActiveSkill("自愈", 8.0f, 3) {
     triggers = {{"attack_up", 1, 1.0f, BuffTarget::SELF}};
+    tags = {BuildTag::HEAL, BuildTag::SUPPORT};
+    // D3 Step2: Evolution path
+    add_evolution(1, "深度自愈", "回血量+50%", {BuildTag::HEAL});
+    add_evolution(2, "战意自愈", "回血后attack_up×1", {BuildTag::HEAL, BuildTag::SUPPORT});
+    add_evolution(3, "守护自愈", "回血后获得护盾", {BuildTag::HEAL, BuildTag::DEFENSE});
 }
 
 void SelfHealSkill::_on_level_up() {
@@ -190,17 +337,29 @@ void SelfHealSkill::_on_level_up() {
     _recalc_cooldown();
 }
 
-std::string SelfHealSkill::execute(Player* caster, std::vector<Monster*>&, GameMap*) {
+std::string SelfHealSkill::execute(Player* caster, std::vector<Monster*>&, GameMap*,
+                                     bool is_heavy) {
     float pcts[] = {0, 0.20f, 0.35f, 0.35f};
     float pct = pcts[std::min(level, 3)];
+    // D3 Step3 E1: 回血+50%
+    if (evolution_level >= 1) pct *= 1.5f;
     float power = get_power_multiplier();
     int instant = (int)(caster->combat.max_hp * pct * power);
     int recovered = caster->combat.heal(instant);
     std::string d = "自愈Lv" + std::to_string(level) + " 瞬回 " + std::to_string(recovered) + " HP";
     if (level >= 3) { _regen_left = 4.0f; d += "（+4秒持续再生）"; }
-    // Buff 触发规则 (统一到 triggers)
     apply_triggers_self(triggers, caster);
     if (!triggers.empty()) d += " " + get_buff_display_name(triggers[0].buff_id) + "!";
+    // D2 Step2: Heavy → 额外获得 attack_up
+    if (is_heavy) { apply_buff(caster, "attack_up", 1); d += " +ATK↑!"; }
+    // D3 Step3 E2: 回血后额外attack_up
+    if (evolution_level >= 2) { apply_buff(caster, "attack_up", 1); d += " +战意!"; }
+    // D3 Step3 E3: 护盾 (数值 = 20% max_hp)
+    if (evolution_level >= 3) {
+        apply_buff(caster, "shield", 1);
+        caster->combat.shield_hp = (float)(caster->combat.max_hp * 0.20f);
+        d += " +护盾!";
+    }
     return d;
 }
 
@@ -218,7 +377,13 @@ std::string SelfHealSkill::get_level_text() const {
 }
 
 // ---- TheWorldSkill ----
-TheWorldSkill::TheWorldSkill() : ActiveSkill("The World", 20.0f, 3) {}
+TheWorldSkill::TheWorldSkill() : ActiveSkill("The World", 20.0f, 3) {
+    tags = {BuildTag::TIME, BuildTag::SUPPORT};
+    // D3 Step2: Evolution path
+    add_evolution(1, "延长时间", "停止时间+20%", {BuildTag::TIME});
+    add_evolution(2, "时停冲击", "结束时释放Shockwave", {BuildTag::TIME, BuildTag::AOE});
+    add_evolution(3, "时间加速", "结束后移速+25% 3秒", {BuildTag::TIME, BuildTag::SUPPORT});
+}
 void TheWorldSkill::_on_level_up() {
     if (level == 2) base_cooldown = 16.0f;
     else if (level == 3) base_cooldown = 12.0f;
@@ -227,7 +392,9 @@ void TheWorldSkill::_on_level_up() {
 float TheWorldSkill::get_stop_duration() const {
     return _stop_duration[std::min(level, 3)] * (1.0f + charm_power_bonus);
 }
-std::string TheWorldSkill::execute(Player*, std::vector<Monster*>&, GameMap*) {
+std::string TheWorldSkill::execute(Player*, std::vector<Monster*>&, GameMap*,
+                                    bool is_heavy) {
+    (void)is_heavy; // D2 Step2: The World 暂不做 heavy 变化 (已足够强大)
     return "__TIME_STOP__";
 }
 std::string TheWorldSkill::get_level_text() const {

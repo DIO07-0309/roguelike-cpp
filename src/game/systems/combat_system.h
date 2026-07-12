@@ -5,6 +5,7 @@
 #include <random>
 #include "entity.h"
 #include "combat_stats.h"
+#include "build_tag.h"
 
 class Player;
 class Monster;
@@ -16,11 +17,7 @@ class GameMap;
 extern std::mt19937 rng;
 
 // ---- 伤害公式 ----
-inline int calculate_damage(int atk, int def, AttackType type = AttackType::PHYSICAL) {
-    float base = std::max(1.0f, atk - def * 0.5f);
-    float variance = 0.8f + (float)(rng() % 401) / 1000.0f;
-    return std::max(1, (int)(base * variance));
-}
+int calculate_damage(int atk, int def, AttackType type = AttackType::PHYSICAL);
 
 // 找最近可攻击目标 (实现移入 combat_system.cpp)
 Monster* find_attack_target(Rectangle attacker_rect,
@@ -49,6 +46,8 @@ struct BuffDef {
     std::string display_name;       // "中毒"
     std::string short_name;         // "毒"
     unsigned char hud_color_r = 200;
+    // D3: tags (from JSON "tags" comma-separated)
+    std::vector<BuildTag> tags;
     unsigned char hud_color_g = 200;
     unsigned char hud_color_b = 200;
 };
@@ -126,6 +125,8 @@ struct RelicDef {
     int hud_color_r = 200;
     int hud_color_g = 200;
     int hud_color_b = 200;
+    // D3: 圣物偏好的构筑标签 (from JSON "tags" comma-separated)
+    std::vector<BuildTag> favorite_tags;
 };
 
 bool load_relic_defs(const std::string& json_path);

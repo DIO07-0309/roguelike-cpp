@@ -11,6 +11,24 @@
 #include "input_map.h"
 
 // ============================================================
+// D2: ComboState — 四段连击状态 (挂在 Player 上)
+// 后续 D3~D5 的 Skill/Boss/Relic 全部可以查询此状态
+// ============================================================
+struct ComboState {
+    int count = 0;           // 当前连击段数: 0=站立, 1-3=普通连击, 4=重击
+    float timer = 0.0f;      // 连击窗口剩余时间
+    float last_hit_time = 0;
+
+    static constexpr float WINDOW = 0.85f;
+    static constexpr float COOLDOWN = 0.35f;
+
+    float multiplier() const;   // 当前段伤害倍率: 1.0/1.15/1.4/2.2
+    bool  is_heavy() const;     // 是否为重击段 (count==4)
+    void  hit(double game_time); // 命中: 推进连击段数 + 重置窗口
+    void  tick(float dt);        // 逐帧衰减窗口
+};
+
+// ============================================================
 // Player — 玩家实体
 // ============================================================
 class Player {
@@ -38,17 +56,23 @@ public:
 
     void reset_attack_timers();
     bool can_attack(double game_time) const;
-    int attack_target(Player* target, double game_time) { return 0; } // 玩家打怪物用 combat_system
+    int attack_target(Player* target, double game_time);
 
     // 移动
     Vector2 handle_input(const InputMap& input);
 
     // 等级
-    static int calc_xp_for_level(int lvl) { return lvl * lvl * 20; }
+    static int calc_xp_for_level(int lvl);
     void give_xp(int amount);
     void auto_level_to(int target);
 
     // 渲染
-    void render(Camera2D& cam) {}
+    void render(Camera2D& cam);
     void draw_no_cam(float cam_x, float cam_y);
+
+    // D2: 连击状态
+    ComboState combo;
+
+    // D2 Step2: 消耗重击标记 (技能/Relic/Boss 统一调用此接口)
+    bool consume_heavy_combo();
 };

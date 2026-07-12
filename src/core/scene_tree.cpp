@@ -4,6 +4,7 @@
 #include "win_center.h"
 #include "audio_server.h"
 #include <algorithm>
+#include <cstring>
 
 SceneTree::SceneTree(int w, int h, const char* title) {
     InitWindow(w, h, title);
@@ -24,11 +25,14 @@ SceneTree::~SceneTree() {
 
 void SceneTree::change_scene(std::shared_ptr<Node> new_scene) {
     LOG_INFO("场景切换 -> %s", new_scene->name.c_str());
-    // BGM 随场景切换
-    const auto& name = new_scene->name;
-    if (name == "TitleScene") _audio->play_bgm("title", 0.35f);
-    else if (name == "GameScene") _audio->play_bgm("dungeon", 0.38f);
-    else if (name == "BossIntroScene" || name.find("Boss") != std::string::npos) _audio->play_bgm("boss", 0.45f);
+    // BGM 由场景自身声明 (组合优于硬编码映射表)
+    const char* bgm = new_scene->get_bgm_name();
+    if (bgm) {
+        float vol = 0.38f;
+        if (strcmp(bgm, "title") == 0) vol = 0.35f;
+        else if (strcmp(bgm, "boss") == 0) vol = 0.45f;
+        _audio->play_bgm(bgm, vol);
+    }
     _pending_scene = new_scene;
     _scene_changed = true;
 }

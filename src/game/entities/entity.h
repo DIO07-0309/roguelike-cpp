@@ -8,21 +8,14 @@ enum class Direction { DOWN, UP, LEFT, RIGHT };
 
 class Entity {
 public:
-    Entity(float x, float y, float w, float h)
-        : position{x, y}, size{w, h} {
-        sync_rect();
-    }
+    Entity(float x, float y, float w, float h);
 
-    void sync_rect() {
-        rect = {position.x, position.y, size.x, size.y};
-    }
+    void sync_rect();
 
     Vector2 position;
     Vector2 size;
     Rectangle rect;
 
     // 摄像机偏移后的绘制矩形
-    Rectangle draw_rect(float cam_x, float cam_y) const {
-        return {position.x - cam_x, position.y - cam_y, size.x, size.y};
-    }
+    Rectangle draw_rect(float cam_x, float cam_y) const;
 };

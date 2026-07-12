@@ -8,4 +8,5 @@ public:
     int cursor = 0;
     void _render() override;
     void _input(const InputMap& input) override;
+    const char* get_bgm_name() const override { return "select"; }
 };

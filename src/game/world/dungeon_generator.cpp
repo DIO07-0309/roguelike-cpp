@@ -5,7 +5,15 @@
 DungeonGenerator::DungeonGenerator(int w, int h, int ts, int mp, int mr, int mg)
     : _w(w), _h(h), _ts(ts), _min_part(mp), _min_room(mr), _margin(mg) {}
 
-std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed) {
+// ---- BSPNode 实现 ----
+BSPNode::BSPNode(int x_, int y_, int w_, int h_) : x(x_), y(y_), w(w_), h(h_) {}
+BSPNode::~BSPNode() { delete left; delete right; }
+bool BSPNode::is_leaf() const { return !left && !right; }
+std::pair<int,int> BSPNode::center() const { return {x + w/2, y + h/2}; }
+std::pair<int,int> BSPNode::room_center() const { return {rx + rw/2, ry + rh/2}; }
+
+std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_room_count,
+                                                  int arena_density) {
     _seed = seed;
     if (seed != 0) _local_rng.seed(seed);
 
@@ -21,11 +29,44 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed) {
     auto tmpl = _build_template();
     gm->load_from_template(tmpl);
 
-    // B8: 分配特殊房间并传至 GameMap
-    _assign_special_rooms();
+    _assign_special_rooms(special_room_count);
     gm->special_rooms = _special_rooms;
 
+    // D2 Step5: 战场元素
+    if (arena_density > 0) _assign_arena_objects(gm.get(), arena_density);
+
     return gm;
+}
+
+// D2 Step5: 在每个非特殊房间放置战场元素
+void DungeonGenerator::_assign_arena_objects(GameMap* gm, int density) {
+    static const ArenaObjectType POOL[] = {
+        ArenaObjectType::EXPLOSIVE_BARREL, ArenaObjectType::HEALING_TOTEM,
+        ArenaObjectType::POISON_POOL, ArenaObjectType::ROCK, ArenaObjectType::SPIKE
+    };
+    for (auto& [rx, ry, rw, rh] : _rooms) {
+        if (_special_rooms.size() > 0) {
+            // 跳过已有特殊房间
+            bool is_special = false;
+            for (auto& sr : _special_rooms)
+                if (rx == sr.rx && ry == sr.ry) { is_special = true; break; }
+            if (is_special) continue;
+        }
+        for (int i = 0; i < density; i++) {
+            int tx = rx + 1 + _rand_int(std::max(1, rw - 2));
+            int ty = ry + 1 + _rand_int(std::max(1, rh - 2));
+            if (!gm->is_walkable(tx, ty)) continue;
+            // 检查不在已有 Arena 上
+            bool dup = false;
+            for (auto& ao : gm->arena_objects)
+                if (ao.tile_x == tx && ao.tile_y == ty) { dup = true; break; }
+            if (dup) continue;
+            ArenaObject obj;
+            obj.type = POOL[_rand_int(5)];
+            obj.tile_x = tx; obj.tile_y = ty; obj.active = true;
+            gm->arena_objects.push_back(obj);
+        }
+    }
 }
 
 std::vector<std::pair<int,int>> DungeonGenerator::get_room_centers() const {
@@ -42,8 +83,8 @@ int DungeonGenerator::_rand_int(int max_exclusive) {
     return (int)(rng() % max_exclusive);
 }
 
-// B8: 从 _rooms 中挑选 2~3 个作为特殊房间
-void DungeonGenerator::_assign_special_rooms() {
+// B8: 从 _rooms 中挑选 N 个作为特殊房间 (D1: N 从 FloorConfig 读取)
+void DungeonGenerator::_assign_special_rooms(int count) {
     // 需要至少 4 个房间: 玩家 + 楼梯 + 2 特殊
     if (_rooms.size() < 4) return;
 
@@ -58,8 +99,8 @@ void DungeonGenerator::_assign_special_rooms() {
         std::swap(candidates[i], candidates[j]);
     }
 
-    int count = std::min(3, (int)candidates.size());
-    for (int i = 0; i < count; i++) {
+    int scount = std::min(count, (int)candidates.size());
+    for (int i = 0; i < scount; i++) {
         auto [rx, ry, rw, rh] = _rooms[candidates[i]];
         SpecialRoom sr;
         sr.cx = rx + rw / 2;

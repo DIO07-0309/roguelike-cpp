@@ -3,6 +3,71 @@
 #include "skill.h"
 #include "combat_system.h"
 
+// ---- 从 item.h 移出的实现 ----
+
+float rarity_mult(Rarity r) {
+    float m[] = {1.0f, 1.5f, 2.0f, 3.0f};
+    return m[static_cast<int>(r)];
+}
+
+Color rarity_color(Rarity r) {
+    Color c[] = {
+        {180, 180, 180, 255},  // COMMON
+        {80, 160, 255, 255},   // RARE
+        {180, 80, 255, 255},   // EPIC
+        {255, 140, 40, 255},   // LEGENDARY
+    };
+    return c[static_cast<int>(r)];
+}
+
+std::string rarity_label(Rarity r) {
+    const char* l[] = {"普通", "稀有", "史诗", "传说"};
+    return l[static_cast<int>(r)];
+}
+
+Item::Item(const std::string& name, Rarity r, const std::string& tc)
+    : base_name(name), rarity(r), tile_char(tc), color(rarity_color(r)) {}
+
+std::string Item::get_description() const {
+    return rarity_label(rarity) + " " + base_name;
+}
+
+EquipmentItem::EquipmentItem(const std::string& name, Rarity r, const std::string& sl,
+                             int atk, int pdef, int mdef)
+    : Item(name, r, (sl == "weapon" ? "W" : sl == "armor" ? "A" : "C")),
+      slot(sl) {
+    float m = rarity_mult(r);
+    atk_bonus = std::max(1, (int)(atk * m));
+    pdef_bonus = std::max(1, (int)(pdef * m));
+    mdef_bonus = std::max(1, (int)(mdef * m));
+}
+
+CharmItem::CharmItem(const std::string& name, Rarity r, const std::string& sk,
+                     float cd, float pw)
+    : EquipmentItem(name, r, "charm", 0, 0, 0),
+      skill_class_name(sk), cd_bonus(cd), power_bonus(pw) {
+    tile_char = "C";
+}
+
+ConsumableItem::ConsumableItem(const std::string& name, Rarity r,
+                               const std::string& type, int val,
+                               const std::string& buf)
+    : Item(name, r, "P"), effect_type(type),
+      effect_value(std::max(1, (int)(val * rarity_mult(r)))),
+      buff_id(buf) {
+    if (!buf.empty()) triggers = {{buf, 1, 1.0f, BuffTarget::SELF}};
+}
+
+std::string ConsumableItem::get_description() const {
+    if (!triggers.empty())
+        return rarity_label(rarity) + " " + base_name + " (" + get_buff_display_name(triggers[0].buff_id) + " 6s)";
+    if (effect_type == "heal")
+        return rarity_label(rarity) + " " + base_name + " (恢复" + std::to_string(effect_value) + " HP)";
+    return Item::get_description();
+}
+
+// ---- 原有实现 ----
+
 Rarity random_rarity() {
     int w[] = {60, 25, 12, 3};
     int total = 100;
