@@ -348,28 +348,65 @@ roguelike_cpp/
 │       │   ├── item.h / .cpp    # Item层次: Equipment/Consumable/Charm + 4Rarity
 │       │   ├── skill.h / .cpp   # Skill层次: 4Active + 2Passive + SkillManager + 3级升级
 │       │   └── inventory.h/.cpp # Inventory: 背包+装备+使用
-│       ├── systems/        #  游戏系统（纯函数）
-│       │   ├── combat_system.h /.cpp  # calculate_damage / find_target / cone
-│       │   └── vfx_server.h / .cpp    # 攻击特效 (pulse/spark/bolt/flash/slash_arc)
-│       ├── world/          #  世界模块
-│       │   ├── game_map.h / .cpp            # GameMap: 2D瓦片网格+碰撞
-│       │   ├── dungeon_generator.h / .cpp   # BSPNode + BSP生成器 + seed驱动
-│       │   ├── special_room.h / .cpp          # 特殊房间: 3类型/交互/发现提示
-│       ├── audio/          #  音频模块（程序化合成）
-│       │   ├── wave_synth.h / .cpp   # 波形合成 (方波/正弦/噪声/ADSR)
-│       │   ├── bgm_engine.h / .cpp   # 4支BGM (和弦+旋律+低音+鼓轨)
-│       │   └── audio_server.h / .cpp # AudioServer: SFX+BGM统一管理
-│       ├── scenes/         #  场景模块（替代原状态机）
-│       │   ├── title_scene.h / .cpp         # 标题画面
-│       │   ├── game_scene.h / .cpp          # 核心游戏场景 (~26KB)
-│       │   ├── floor_select_scene.h / .cpp  # 选关界面
-│       │   ├── tutorial_scene.h / .cpp      # 教程场景
-│       │   ├── death_scene.h / .cpp         # 死亡画面
-│       │   └── victory_scene.h / .cpp       # 通关画面
-│       ├── save/           #  存档模块
-│       │   └── save_manager.h / .cpp  # JSON存档/读档 (complete)
-│       └── tutorial/       #  教程逻辑
-│           └── tutorial_guide.h / .cpp  # 7阶段教程引导
+│       ├── systems/        #  游戏系统
+│       │   ├── combat_system.h/.cpp     # 伤害公式 / Buff定义
+│       │   ├── combat_coordinator.h/.cpp # 连击 + 弱点 + 组合技 (D2)
+│       │   ├── floor_manager.h / .cpp   # 楼层生成 / 怪物生成
+│       │   ├── game_renderer.h / .cpp   # HUD / 面板 / 特效 / 覆盖层
+│       │   ├── interaction_handler.h/.cpp # 拾取 / 特殊房间交互
+│       │   └── vfx_server.h / .cpp      # 攻击特效
+│       ├── world/            # 世界模块
+│       │   ├── game_map.h / .cpp        # 2D瓦片网格+碰撞
+│       │   ├── dungeon_generator.h/.cpp # BSP + seed驱动
+│       │   └── special_room.h / .cpp    # 特殊房间
+│       ├── audio/            # 音频模块
+│       │   ├── wave_synth.h / .cpp
+│       │   ├── bgm_engine.h / .cpp
+│       │   └── audio_server.h / .cpp
+│       ├── scenes/           # 场景模块
+│       │   ├── title_scene.h / .cpp
+│       │   ├── game_scene.h / .cpp      (~48KB, Director驱动)
+│       │   ├── floor_select_scene.h/.cpp
+│       │   ├── tutorial_scene.h / .cpp
+│       │   ├── death_scene.h / .cpp
+│       │   ├── victory_scene.h / .cpp
+│       │   └── credits_scene.h / .cpp   (D6)
+│       ├── save/             # 存档
+│       │   └── save_manager.h / .cpp
+│       ├── tutorial/         # 教程
+│       │   └── tutorial_guide.h / .cpp
+│       │
+│       ├── floor_config.h/.cpp    # D1: 15层统一配置
+│       ├── floor_narrative.h/.cpp # D1: 15层叙事+随机旁白
+│       ├── build_tag.h           # D3: BuildTag 19标签
+│       ├── build_score.h/.cpp    # D3: BuildScore 六流派
+│       ├── event_system.h/.cpp   # D4: EventType 10事件
+│       ├── world_state.h/.cpp    # D4: WorldState 标志位
+│       ├── npc_system.h/.cpp     # D4: 6 NPC
+│       ├── quest_manager.h/.cpp  # D4: 7任务
+│       ├── relationship_system.h/.cpp # D4: 好感度
+│       ├── world_reaction.h/.cpp # D4: 世界反应
+│       ├── growth_curve.h/.cpp   # D4: 难度曲线
+│       ├── flow_director.h/.cpp  # D4: 动态内容流
+│       ├── relic_progression.h/.cpp # D4: RelicArchive
+│       ├── boss_narrative.h/.cpp # D5: Boss自适应对话
+│       ├── boss_evolution.h/.cpp # D5: Boss进化
+│       ├── boss_behavior.h/.cpp  # D5: Boss行为决策
+│       ├── boss_command.h/.cpp   # D5: 命令执行层
+│       ├── boss_encounter.h/.cpp # D5: 阶段控制
+│       ├── boss_replay.h/.cpp    # D5: 战斗评估
+│       ├── boss_timeline.h/.cpp  # D5: 关键时间线
+│       ├── boss_cinematic.h/.cpp # D5: 演出控制
+│       ├── arena_manager.h/.cpp  # D5: 战场元素
+│       ├── boss_system_director.h/.cpp  # D6: Boss总编排
+│       ├── gameplay_system_director.h/.cpp # D6: 世界/叙事
+│       ├── presentation_system_director.h/.cpp # D6: 视觉表现
+│       ├── game_flow_director.h/.cpp  # D6: 场景流程
+│       ├── player_controller.h/.cpp   # D6: 输入分离
+│       ├── meta_progression.h/.cpp    # D6: 局外成长
+│       ├── ending_director.h/.cpp     # D6: 五结局
+│       ├── camera_director.h          # D6: 镜头常量
+│       └── combat_feel.h              # D6: 打击感
 └── resources/              #  JSON 资源配置（外部数据）
     ├── buffs.json         # Buff 配置 (3种)
     └── relics.json        # Relic 配置 (11种 + rarity)
@@ -589,3 +626,17 @@ rlc:blood_charm,war_drum,plague_mask
 | M18 | 圣物内容扩展（11 relic + rarity + 宝箱权重掉落 + R 面板） | ✅ |
 | M19 | UI 引导 + 字体覆盖稳定化（操作说明 / 快捷键提示 / 首次 relic 提示 / 混合码位） | ✅ |
 | M20 | 中文显示修复：精确码位扫描替代全量CJK，字体图集从溢出变为1446码点 | ✅ |
+| D1  | FloorConfig 统一配置 + FloorNarrative 15层叙事 + 章节/楼层入场演出 + 随机旁白 | ✅ |
+| D2  | CombatCoordinator 连击系统 + MonsterType 6种 + ArenaObject 战场元素 | ✅ |
+| D3  | BuildTag 19标签 + BuildScore 评分 + BuildType 六流派判定 + 时停E2/E3进化 | ✅ |
+| D4  | EventSystem 10事件 + WorldState 标志位 + NPC系统/6NPC + QuestManager 7任务 | ✅ |
+| D4  | RelationshipSystem 好感度 + WorldReaction 世界反应 + FlowDirector 动态内容 | ✅ |
+| D4  | GrowthCurve 难度曲线 + RelicArchive 跨局收集/套装 + BossNarrative 自适应对话 | ✅ |
+| D5  | BossEvolution 技能变体/净化/LastStand + BossBehavior 决策/人格/记忆 | ✅ |
+| D5  | BossCommand 执行层 + BossArena 战场元素 + BossEncounter 阶段控制 | ✅ |
+| D5  | BossReplay 学习/评估 + BossTimeline 时间线 + BossCinematic 演出/Phase2/白闪 | ✅ |
+| D5  | BossSkillQueue 技能队列 + BossReport 战斗报告 + BossModifier 难度修饰 | ✅ |
+| D6  | BossSystemDirector 统一编排 + GameplaySystemDirector 世界/叙事/任务/结局 | ✅ |
+| D6  | PresentationSystemDirector 视觉表现层 + GameFlowDirector 场景流程 | ✅ |
+| D6  | MetaProgression 局外永久成长 + EndingDirector 五结局 + CreditsScene 片尾 | ✅ |
+| D6  | PlayerController 输入分离 + CameraDirector 镜头常量 + CombatFeel 打击感系统 | ✅ |
