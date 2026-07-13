@@ -39,4 +39,5 @@ public:
     void on_game_clear(int floor, int level, const Player* player,
                        const class BossBattleReport& boss_report,
                        float collection_pct);
+    void init_events();  // D7 Step5: 订阅 EventBus
 };

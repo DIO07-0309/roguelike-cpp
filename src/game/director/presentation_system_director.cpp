@@ -1,4 +1,5 @@
 #include "presentation_system_director.h"
+#include "event_bus.h"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
@@ -60,4 +61,15 @@ void PresentationSystemDirector::tick(float dt) {
         chapter_intro_timer -= dt;
         if (chapter_intro_timer <= 0) chapter_intro_active = false;
     }
+}
+
+void PresentationSystemDirector::init_events() {
+    EventBus::inst().subscribe(GameEventType::PLAYER_LEVEL_UP,
+        [](const GameEvent& ev) {
+            (void)ev;  // reserved: 升级特效
+        }, "Presentation");
+    EventBus::inst().subscribe(GameEventType::MONSTER_DIED,
+        [](const GameEvent& ev) {
+            (void)ev;  // reserved: 击杀飘字/震动
+        }, "Presentation");
 }

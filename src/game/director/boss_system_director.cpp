@@ -1,4 +1,5 @@
 #include "boss_system_director.h"
+#include "event_bus.h"
 #include "monster.h"
 #include "player.h"
 #include "game_map.h"
@@ -164,4 +165,15 @@ void BossSystemDirector::notify_death(const WorldState& ws,
     cinematic.trigger_death();
     timeline.record(encounter.total_time(), "DEATH");
     (void)ws; (void)rels; (void)qm;
+}
+
+void BossSystemDirector::init_events() {
+    EventBus::inst().subscribe(GameEventType::BOSS_DEAD,
+        [this](const GameEvent& ev) { notify_death_ev(ev); }, "BossSys");
+    EventBus::inst().subscribe(GameEventType::FLOOR_ENTER,
+        [this](const GameEvent&) { reset(); }, "BossSys");
+}
+
+void BossSystemDirector::notify_death_ev(const GameEvent&) {
+    // D7 Step5: reserved — Boss死亡事件处理
 }

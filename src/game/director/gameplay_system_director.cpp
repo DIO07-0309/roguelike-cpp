@@ -1,4 +1,5 @@
 #include "gameplay_system_director.h"
+#include "event_bus.h"
 #include "player.h"
 #include "core/logger.h"
 #include "item.h"  // rng
@@ -73,4 +74,16 @@ void GameplaySystemDirector::on_game_clear(int floor, int level, const Player* p
     mc.ancient_memory = 2;
     g_meta.add_currency(mc);
     g_meta.save();
+}
+
+void GameplaySystemDirector::init_events() {
+    EventBus::inst().subscribe(GameEventType::RELIC_GAIN,
+        [this](const GameEvent& ev) {
+            if (ev.str_val) run_stats.relics_collected++;
+            (void)ev.int_val;
+        }, "Gameplay");
+    EventBus::inst().subscribe(GameEventType::FLOOR_ENTER,
+        [this](const GameEvent& ev) {
+            (void)ev;  // reserved: world state updates
+        }, "Gameplay");
 }

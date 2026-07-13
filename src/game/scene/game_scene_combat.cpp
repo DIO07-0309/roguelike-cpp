@@ -1,5 +1,6 @@
 #include "game_scene_combat.h"
 #include "game_scene.h"
+#include "event_bus.h"
 #include "combat_system.h"
 #include "growth_curve.h"
 #include "relic_progression.h"
@@ -24,6 +25,11 @@
 // GameSceneCombat — 战斗善后
 // ============================================================
 void GameSceneCombat::on_monster_killed(Monster* m) {
+    // D7 Step5: EventBus 广播
+    EventBus::inst().emit(m->is_boss ? GameEventType::BOSS_DEAD
+                                     : GameEventType::MONSTER_DIED,
+                          m, _s.current_floor, 0.0f, m->name.c_str());
+
     // D4.6: run stats
     _s._gameplay.run_stats.total_kills++;
     if (m->is_boss) _s._gameplay.run_stats.bosses_killed++;
@@ -36,8 +42,9 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
     if (m->is_elite && !m->is_boss) xp = xp * 3 / 2;
 
     _s.player->xp += xp;
+    bool leveled = false;
     while (_s.player->xp >= _s.player->xp_to_next) {
-        _s.player->level++;
+        _s.player->level++; leveled = true;
         _s.player->xp -= _s.player->xp_to_next;
         _s.player->xp_to_next = Player::calc_xp_for_level(_s.player->level + 1);
         _s.player->combat.attack += 2;
@@ -56,6 +63,8 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
         }
         _s.on_player_leveled.emit(_s.player->level);
     }
+    if (leveled) EventBus::inst().emit(GameEventType::PLAYER_LEVEL_UP,
+                                        _s.player.get(), _s.player->level);
 
     // Boss reward
     if (m->is_boss) {
@@ -121,6 +130,8 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
             if (def) {
                 _s._presentation.room_msg = "RELIC:" + def->name;
                 g_relic_archive.mark_obtained(chosen, rarity_level(def->rarity));
+                EventBus::inst().emit(GameEventType::RELIC_GAIN, _s.player.get(),
+                                       rarity_level(def->rarity), 0.0f, chosen.c_str());
             }
             _s._presentation.room_msg_timer = 3.5f;
         }

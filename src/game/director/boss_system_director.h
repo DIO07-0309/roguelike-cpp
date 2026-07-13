@@ -17,6 +17,7 @@ class GameMap;
 class WorldState;
 class RelationshipSystem;
 struct Effect;
+struct GameEvent;
 
 // ============================================================
 // D6 Step3: BossSystemDirector — 收纳所有Boss子系统
@@ -55,6 +56,12 @@ public:
     void notify_death(const WorldState& ws, const RelationshipSystem& rels,
                       const QuestManager& qm);
 
+    void init_events();  // D7 Step5: 订阅 EventBus
+
+private:
+    void notify_death_ev(const struct GameEvent&);
+
+public:
     // ── 查询接口 ──
     const BossBattleReport& report() const { return battle_report; }
     BossCommand command() const { return current_cmd; }

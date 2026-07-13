@@ -54,6 +54,7 @@ public:
 
     // ── Tick (更新所有表现层计时器) ──
     void tick(float dt);
+    void init_events();  // D7 Step5: 订阅 EventBus
 };
 
 // C1 helper

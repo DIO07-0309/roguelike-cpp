@@ -14,6 +14,7 @@
 #include "audio_server.h"
 #include "floor_config.h"
 #include "event_system.h"
+#include "event_bus.h"
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -51,7 +52,10 @@ void GameScene::_draw_event_ui(int sw, int sh) { _interaction.draw_event_ui(sw, 
 // GameScene 实现
 // ============================================================
 void GameScene::_ready() {
-    // D6: 场景入树时绑定Director (new_game/load_saved_game都会走这里)
+    // D6: 场景入树时绑定Director
+    _boss.init_events();
+    _gameplay.init_events();
+    _presentation.init_events();
     _flow.bind(this);
     _player_ctrl.bind(this);
 }
@@ -237,6 +241,8 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
             floor, fcfg->chapter_label, (int)monsters.size(),
             fcfg->hp_mult, fcfg->atk_mult);
     }
+    EventBus::inst().emit(GameEventType::FLOOR_ENTER, this, floor,
+                           fcfg->is_boss ? 1.0f : 0.0f);
 }
 
 // ============================================================
