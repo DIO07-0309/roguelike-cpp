@@ -42,6 +42,7 @@
 #include "game_flow_director.h"
 #include "player_controller.h"
 #include "scene/game_scene_input.h"
+#include "scene/game_scene_combat.h"
 
 // ============================================================
 // D4 Step2: EventPresentation — 事件演出系统
@@ -72,6 +73,7 @@ class GameScene : public Node {
     friend class GameFlowDirector;
     friend class PlayerController;
     friend class GameSceneInput;
+    friend class GameSceneCombat;
 public:
     GameState state = GameState::TITLE;
 
@@ -199,6 +201,7 @@ private:
     void  _draw_dialogue(int sw, int sh);
     void  _draw_quest_log(int sw, int sh);
     GameSceneInput  _input_handler{*this};
+    GameSceneCombat _combat{*this};
     GameRenderer _renderer;
     InteractionHandler _interact;
 
