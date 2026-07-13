@@ -15,6 +15,7 @@
 #include "floor_config.h"
 #include "event_system.h"
 #include "event_bus.h"
+#include "service_locator.h"
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -58,6 +59,14 @@ void GameScene::_ready() {
     _presentation.init_events();
     _flow.bind(this);
     _player_ctrl.bind(this);
+
+    // D7 Step6: 注册场景级服务
+    ServiceLocator::provide(&_boss);
+    ServiceLocator::provide(&_gameplay);
+    ServiceLocator::provide(&_presentation);
+    ServiceLocator::provide(&_flow);
+    ServiceLocator::provide(&_renderer);
+    ServiceLocator::provide(&_interact);
 }
 
 void GameScene::new_game() {

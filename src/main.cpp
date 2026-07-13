@@ -11,6 +11,8 @@
 #include "save/save_manager.h"
 #include "systems/combat_system.h"
 #include "resources/resource_manager.h"
+#include "core/service_locator.h"
+#include "core/event_bus.h"
 #include "config.h"
 #include <cstdio>
 #include <memory>
@@ -64,6 +66,11 @@ int main() {
     // Font 通过 ResourceManager 加载
     load_fonts();
 
+    // D7 Step6: 注册全局服务
+    ServiceLocator::provide(&ResourceManager::inst());
+    ServiceLocator::provide(&EventBus::inst());
+    LOG_INFO("ServiceLocator: 全局服务已注册");
+
     bool has_save = SaveManager::save_exists();
     if (has_save) { auto* d = SaveManager::load_save(); delete d; }
     LOG_INFO(has_save ? "存档存在" : "暂无存档");
@@ -74,6 +81,7 @@ int main() {
     tree.change_scene(title);
     tree.run();
 
+    ServiceLocator::remove_all();
     ResourceManager::inst().unload_all();
     CloseAudioDevice();
     Logger::inst().close();
