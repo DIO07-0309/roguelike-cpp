@@ -1,11 +1,8 @@
 #pragma once
+#include "types/boss_types.h"
 #include "boss_replay.h"
 
-// ============================================================
 // D5 Step5: BossEncounterController — Boss战阶段控制器
-// ============================================================
-
-enum class EncounterPhase { OPENING, PRESSURE, CONTROL, LAST_STAND, ENDED };
 
 class BossEncounterController {
 public:

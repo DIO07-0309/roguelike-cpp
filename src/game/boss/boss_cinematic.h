@@ -1,12 +1,8 @@
 #pragma once
 #include <string>
+#include "types/boss_types.h"
 
-// ============================================================
 // D5 Step6: BossCinematicController — Boss战演出控制
-// 不修改BossAI, 仅控制镜头/时序/动画状态
-// ============================================================
-
-enum class CinematicPhase { NONE, INTRO, PHASE2_TRANSITION, LAST_STAND, DEATH };
 
 class BossCinematicController {
 public:
