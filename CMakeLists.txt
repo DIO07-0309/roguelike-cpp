@@ -29,6 +29,7 @@ include_directories("${CMAKE_SOURCE_DIR}/src/game/audio")
 include_directories("${CMAKE_SOURCE_DIR}/src/game/save")
 include_directories("${CMAKE_SOURCE_DIR}/src/game/tutorial")
 include_directories("${CMAKE_SOURCE_DIR}/src/game/boss")
+include_directories("${CMAKE_SOURCE_DIR}/src/game/director")
 
 # ---- Sources ----
 file(GLOB_RECURSE SOURCES src/*.cpp)
