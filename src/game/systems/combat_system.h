@@ -5,7 +5,7 @@
 #include <random>
 #include "entity.h"
 #include "combat_stats.h"
-#include "build_tag.h"
+#include "types/combat_types.h"
 
 class Player;
 class Monster;
@@ -28,44 +28,15 @@ Monster* find_attack_target(Rectangle attacker_rect,
 std::vector<Monster*> get_targets_in_cone(Player* caster,
     const std::vector<Monster*>& targets, int cone_range);
 
+// Buff / Relic 类型定义 — 见 types/combat_types.h
 // ============================================================
-// Buff 系统
-// ============================================================
-
-// Buff 完整定义 (逻辑 + HUD 显示，来自 resources/buffs.json)
-struct BuffDef {
-    std::string id;
-
-    // 逻辑
-    float duration = 0.0f;
-    int max_stacks = 1;
-    float tick_interval = 0.0f;
-    int tick_damage = 0;
-
-    // 显示
-    std::string display_name;       // "中毒"
-    std::string short_name;         // "毒"
-    unsigned char hud_color_r = 200;
-    // D3: tags (from JSON "tags" comma-separated)
-    std::vector<BuildTag> tags;
-    unsigned char hud_color_g = 200;
-    unsigned char hud_color_b = 200;
-};
 
 // 加载/查询 Buff 配置表
 bool load_buff_defs(const std::string& json_path);
 const BuffDef* get_buff_def(const std::string& id);
 Color get_buff_hud_color(const std::string& id);   // 用于 HUD 渲染
 
-// Buff 事件 (轻量级, 用于日志 / 飘字 / UI)
-enum class BuffEventType { APPLIED, TICK_DAMAGE, EXPIRED };
-struct BuffEvent {
-    BuffEventType type;
-    std::string buff_id;
-    std::string target;     // 目标名
-    int stacks = 0;
-    int value = 0;          // tick damage / 0
-};
+// BuffEvent / BuffTrigger — 见 types/combat_types.h
 
 // 逐帧结算 (使用 while 处理大 dt 跨多个 tick_interval)
 // events 可选 — 非 nullptr 时写入事件
@@ -92,17 +63,7 @@ std::string get_buff_display_name(const std::string& id);   // "poison" → "中
 std::string get_buff_short_name(const std::string& id);     // "poison" → "毒"
 std::string format_buff_time(float sec);                     // 3.2 → "3.2s"
 
-// ============================================================
-// BuffTrigger — 统一 Buff 触发规则 (技能/怪物/道具共用)
-// ============================================================
-enum class BuffTarget { SELF, ENEMY };
-
-struct BuffTrigger {
-    std::string buff_id;          // "poison" | "slow" | "attack_up"
-    int stacks = 1;               // 施加层数
-    float chance = 1.0f;          // 触发概率 (0.0~1.0, 1.0=必定触发)
-    BuffTarget target = BuffTarget::ENEMY;
-};
+// BuffTrigger — 见 types/combat_types.h
 
 // 对敌人目标应用 triggers (技能命中 / 怪物普攻)
 void apply_triggers(const std::vector<BuffTrigger>& triggers,

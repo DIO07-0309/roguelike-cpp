@@ -4,23 +4,11 @@
 #include <vector>
 #include "entity.h"
 #include "item.h"
+#include "types/combat_types.h"
 
 class Player;
 
-// ============================================================
-// Effect — 攻击特效数据结构
-// ============================================================
-struct Effect {
-    std::string kind;  // "pulse", "circle", "cone", "spark", "bolt", "flash", "slash_arc"
-    float world_x, world_y;
-    float radius = 32;
-    Color color{255, 200, 50, 255};
-    float duration = 0.35f;
-    float elapsed = 0.0f;
-    Direction direction = Direction::DOWN;  // for slash_arc
-    float target_x = 0, target_y = 0;       // for bolt
-    int level = 1;
-};
+// Effect / Buff — 见 types/combat_types.h
 
 // ============================================================
 // VFXServer — 特效管理 (单例)
