@@ -41,6 +41,7 @@
 #include "presentation_system_director.h"
 #include "game_flow_director.h"
 #include "player_controller.h"
+#include "scene/game_scene_input.h"
 
 // ============================================================
 // D4 Step2: EventPresentation — 事件演出系统
@@ -68,8 +69,9 @@ enum class GameState { TITLE, PLAYING, BOSS_INTRO, BOSS_CINEMATIC,
                        FLOOR_SELECT, TUTORIAL, DEATH, VICTORY };
 
 class GameScene : public Node {
-    friend class GameFlowDirector;  // D6 Step6: flow director needs access
-    friend class PlayerController;  // D6 Step7: player controller needs access
+    friend class GameFlowDirector;
+    friend class PlayerController;
+    friend class GameSceneInput;
 public:
     GameState state = GameState::TITLE;
 
@@ -134,9 +136,8 @@ private:
     void _update_monsters(float dt);
     void _on_monster_killed(Monster* m);
     void _check_floor_clear();
-    void _cleanup_dead_monsters();   // poison tick 后统一收尾
+    void _cleanup_dead_monsters();
     void _apply_pending_damage();
-    void _handle_debug_buff_test_input();  // F1-F10 Debug测试
     // D4.6 Debug flags (按F键切换的面板) — moved to presentation
     // D6 Step3: Boss全子系统
     BossSystemDirector _boss;
@@ -179,7 +180,6 @@ private:
     void _start_event_presentation(EventType et);
     void _tick_event_ui(float dt);
     void _draw_event_ui(int sw, int sh);
-    void _handle_event_input(const InputMap& input);
 
     // D4 Step3: 楼层/章节叙事 — moved to PresentationSystemDirector
 
@@ -198,7 +198,7 @@ private:
     void  _update_dialogue(float dt);
     void  _draw_dialogue(int sw, int sh);
     void  _draw_quest_log(int sw, int sh);
-    void  _handle_dialogue_input(const InputMap& input);
+    GameSceneInput  _input_handler{*this};
     GameRenderer _renderer;
     InteractionHandler _interact;
 

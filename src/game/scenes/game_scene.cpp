@@ -142,46 +142,6 @@ void GameScene::_tick_event_ui(float dt) {
     }
 }
 
-void GameScene::_handle_event_input(const InputMap& input) {
-    auto& ui = _event_ui;
-    if (!ui.active) return;
-
-    if (input.is_action_just_pressed("cancel")) {
-        if (ui.phase == EventPhase::DESC || ui.phase == EventPhase::CHOICE) {
-            // 退出事件 (不触发)
-            ui.active = false;
-            ui.phase = EventPhase::INACTIVE;
-            _presentation.room_msg = "你离开了这里。";
-            _presentation.room_msg_timer = 1.5f;
-        }
-        return;
-    }
-
-    if (ui.phase == EventPhase::DESC) {
-        if (input.is_action_just_pressed("confirm")) {
-            if (ui.option_count > 0) {
-                ui.phase = EventPhase::CHOICE;
-                ui.selected = 0;
-            } else {
-                // No options, start anim
-                ui.phase = EventPhase::ANIM;
-                ui.timer = 0.8f;
-                _presentation.trigger_shake(3.0f);
-            }
-        }
-    } else if (ui.phase == EventPhase::CHOICE) {
-        if (input.is_action_just_pressed("move_left"))
-            ui.selected = (ui.selected - 1 + ui.option_count) % ui.option_count;
-        if (input.is_action_just_pressed("move_right"))
-            ui.selected = (ui.selected + 1) % ui.option_count;
-        if (input.is_action_just_pressed("confirm")) {
-            ui.phase = EventPhase::ANIM;
-            ui.timer = 0.8f;
-            _presentation.trigger_shake(4.0f);
-        }
-    }
-}
-
 void GameScene::_draw_event_ui(int sw, int sh) {
     auto& ui = _event_ui;
     if (!ui.active) return;
@@ -844,131 +804,9 @@ void GameScene::_process(double delta) {
 // ============================================================
 // 输入处理
 // ============================================================
+// _input / debug / event / dialogue — delegated to GameSceneInput
 void GameScene::_input(const InputMap& input) {
-    if (!player) return;
-    auto* tree = get_tree();
-    if (!tree) return;
-
-    // D4 Step2: 事件UI拦截所有输入
-    if (_is_event_running()) { _handle_event_input(input); return; }
-    // D4 Step4: 对话UI拦截
-    if (_dialogue.active) { _handle_dialogue_input(input); return; }
-    // D4 Step4: Quest log (Q键)
-    if (IsKeyPressed(KEY_Q)) {
-        _quest_log_open = !_quest_log_open;
-        if (_quest_log_open) inventory_open = false;
-        return;
-    }
-    if (_quest_log_open) { if (IsKeyPressed(KEY_Q) || input.is_action_just_pressed("cancel")) _quest_log_open = false; return; }
-
-    if (input.is_action_just_pressed("cancel")) {
-        if (state == GameState::PLAYING && player->combat.is_alive) {
-            max_unlocked_floor = std::max(max_unlocked_floor, current_floor);
-            std::vector<bool> spr, spd;
-            // B13: Relic 不再跨层 (无需保存圣物列表)
-            if (game_map) for (auto& sr : game_map->special_rooms) {
-                spr.push_back(sr.triggered);
-                spd.push_back(sr.discovered);
-            }
-            // B13: Relic 不再跨层 (无需保存圣物)
-            SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
-                                   _dungeon_seed, spr, spd);
-            LOG_INFO("中途退出→存档 (第%d层)", current_floor);
-        }
-        // 切换到标题场景
-        auto ts = std::make_shared<TitleScene>();
-        ts->name = "TitleScene";
-        ts->has_save = SaveManager::save_exists();
-        tree->change_scene(ts);
-        return;
-    }
-    if (state == GameState::BOSS_INTRO) {
-        if (input.is_action_just_pressed("confirm")) {
-            auto pos = game_map->tile_to_pixel(stairs_pos.first, stairs_pos.second);
-            auto* boss = spawn_boss(stairs_pos.first, stairs_pos.second, boss_floor);
-            monsters.emplace_back(boss);
-
-            // D6 Step3: BossSystemDirector — 统一初始化所有Boss子系统
-            BuildType bt = calculate_build(player.get()).identify();
-            _boss.init_on_spawn(boss, boss_floor, _gameplay.world_state, bt, _gameplay.rels, game_map.get());
-            _presentation.boss_modifier_text = _boss.modifier_text;
-
-            boss_cinematic_timer = 1.0f;
-            _boss_entrance_timer = 2.0f;
-            _boss_entered = false;
-            _boss_phase2_shown = false;
-            state = GameState::BOSS_CINEMATIC;
-            _flow.on_boss_intro_confirm();  // D6 Step6
-        }
-        return;
-    }
-
-    if (state != GameState::PLAYING) return;
-
-    // B12: R 键开关 relic 面板
-    if (IsKeyPressed(KEY_R)) _show_relic_panel = !_show_relic_panel;
-
-#ifdef _DEBUG
-    _handle_debug_buff_test_input();   // F1-F6 Buff 调试
-#endif
-
-    // D6 Step7: 玩家攻击/技能/拾取/交互/背包 — 委托给 PlayerController
-    _player_ctrl.handle_input(input);
-}
-
-// ============================================================
-// Debug Buff 测试入口 (仅 _DEBUG 构建)
-// ============================================================
-void GameScene::_handle_debug_buff_test_input() {
-    if (!player) return;
-    if (IsKeyPressed(KEY_F1))
-        apply_buff(player.get(), "attack_up", 1);
-    if (IsKeyPressed(KEY_F2))
-        apply_buff(player.get(), "slow", 1);
-    if (IsKeyPressed(KEY_F3) && !monsters.empty())
-        apply_buff(monsters[0].get(), "poison", 2);
-    if (IsKeyPressed(KEY_F4)) {
-        auto dump = [](const std::vector<BuffInstance>& buffs, const char* who) {
-            if (buffs.empty()) { LOG_INFO("[F4] %s buffs: (none)", who); return; }
-            for (auto& b : buffs)
-                LOG_INFO("[F4] %s buff: %s stacks=%d rem=%.2f tick=%.2f",
-                    who, b.id.c_str(), b.stacks, b.remaining, b.tick_timer);
-        };
-        dump(player->active_buffs, "Player");
-        if (!monsters.empty()) dump(monsters[0]->active_buffs, "Monster[0]");
-    }
-    if (IsKeyPressed(KEY_F5) && !monsters.empty())
-        apply_buff(monsters[0].get(), "slow", 2);
-    if (IsKeyPressed(KEY_F6) && !monsters.empty())
-        apply_buff(monsters[0].get(), "attack_up", 2);
-    // D4.6: F8 = 显示/隐藏 GrowthCurve debug面板
-    if (IsKeyPressed(KEY_F8))
-        _presentation.show_growth_debug = !_presentation.show_growth_debug;
-    // D4.6: F9 = 开关打击感效果 (除伤害数字外全部)
-    if (IsKeyPressed(KEY_F9))
-        _presentation.combat_juice_on = !_presentation.combat_juice_on;
-    // D4.6: F10 = 显示FlowDirector调试面板
-    if (IsKeyPressed(KEY_F10))
-        _presentation.show_flow_debug = !_presentation.show_flow_debug;
-    // D5 Step3: F11 = 显示BossBehavior调试面板
-    if (IsKeyPressed(KEY_F11))
-        _presentation.show_boss_behavior = !_presentation.show_boss_behavior;
-    // D5 Step4: F12 = 显示BossCombat调试面板
-    if (IsKeyPressed(KEY_F12))
-        _presentation.show_boss_cmd = !_presentation.show_boss_cmd;
-    // D5 Step5: Shift+F12 = toggle BossReport
-    if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_F12))
-        _presentation.show_boss_report = !_presentation.show_boss_report;
-    // D6 Step1: Ctrl+F12 = 循环切换Ending Type预览
-    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_F12)) {
-        static int ending_idx = 0;
-        EndingType all[] = {EndingType::BAD_END, EndingType::NORMAL_END,
-                            EndingType::GOOD_END, EndingType::TRUE_END, EndingType::SECRET_END};
-        ending_idx = (ending_idx + 1) % 5;
-        _gameplay.ending_dir.debug_override(all[ending_idx]);
-        _presentation.room_msg = std::string("[Preview] ") + _gameplay.ending_dir.ending_name();
-        _presentation.room_msg_timer = 2.0f;
-    }
+    _input_handler.handle_input(input);
 }
 
 // ============================================================
@@ -1622,41 +1460,6 @@ void GameScene::_start_dialogue(int npc_index) {
 void GameScene::_update_dialogue(float dt) {
     if (!_dialogue.active) return;
     _dialogue.timer += dt;
-}
-
-void GameScene::_handle_dialogue_input(const InputMap& input) {
-    auto& d = _dialogue;
-    if (!d.active) return;
-
-    if (input.is_action_just_pressed("confirm") || input.is_action_just_pressed("attack")) {
-        d.page++;
-        d.timer = 0.0f;
-        if (d.page >= (int)d.pages.size()) {
-            // 对话结束
-            if (d.target_npc) {
-                d.target_npc->finished = true;
-                // D4 Step5: 对话完成WorldFlag
-                int npc_floor = d.target_npc->id / 10;
-                if (npc_floor == 2) { _gameplay.world_state.set(WorldFlag::Saved_Prisoner); _gameplay.rels.apply_reward(RR_SAVE_PRISONER); }
-                else if (npc_floor == 7) { _gameplay.world_state.set(WorldFlag::Saved_Priest); _gameplay.rels.apply_reward(RR_SAVE_PRIEST); }
-                else if (npc_floor == 9) { /* F9 flag set by event flow */ _gameplay.rels.add_respect(90, 1); }
-                else if (npc_floor == 14) { _gameplay.rels.add_trust(140, 1); _gameplay.rels.add_respect(140, 2); }
-                // 告别语
-                const NPCData* cfg = get_npc_config(d.target_npc->id / 10, d.target_npc->id % 10);
-                if (cfg && cfg->farewell) {
-                    _presentation.room_msg = cfg->farewell;
-                    _presentation.room_msg_timer = 2.0f;
-                }
-            }
-            d.active = false;
-            d.target_npc = nullptr;
-        }
-    }
-    if (input.is_action_just_pressed("cancel")) {
-        d.active = false; d.target_npc = nullptr;
-        _presentation.room_msg = "你转身离开了。";
-        _presentation.room_msg_timer = 1.5f;
-    }
 }
 
 void GameScene::_draw_dialogue(int sw, int sh) {
