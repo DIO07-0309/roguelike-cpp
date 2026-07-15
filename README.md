@@ -312,6 +312,99 @@ Relic 是挂在 Player 身上的局内常驻被动构筑物，不占技能栏、
 - 每次生成 ~12 房间，结构完全不同
 - 玩家出生在第一个房间，Boss/楼梯在最远房间
 
+### 5.10 敌人系统 (D8 扩展)
+
+8 种怪物类型，8 种技能，按 FloorConfig 权重生成：
+
+| 类型 | 名称 | HP | ATK | 技能 | 定位 |
+|------|------|----|-----|------|------|
+| NORMAL | 史莱姆/兽人 | 15/30 | 3/7 | 无 | 基础 |
+| ARCHER | 哥布林弓箭手 | 22 | 8 | RapidShot(3连) | 远程后排 |
+| SHAMAN | 哥布林萨满 | 28 | 4 | Totem(范围buff) | 辅助 |
+| BOMBER | 爆炸史莱姆 | 25 | 0 | Leap(跳跃)+自爆 | 侧面突袭 |
+| TANK | 重甲兽人 | 70 | 6 | Shield(举盾) | 前排肉盾 |
+| ELITE | 精英怪 | 45-75 | 10-16 | Summon(召唤)+随机Buff | 指挥 |
+| CHARGER | 冲锋兽人 | 40 | 10 | Charge(蓄力冲刺+击退) | 爆发 |
+| SUMMONER | 哥布林召唤师 | 35 | 5 | MassSummon(一次召唤2只) | 召唤 |
+
+### 5.11 Boss 系统 (D8 扩展)
+
+5 种 Boss，F5/F10 支持随机抽取：
+
+| Boss | 楼层 | HP | 定位 | Phase2 |
+|------|------|----|------|--------|
+| 暗影骑士 | F5 | 250 | 均衡 | 移速+50%, ATK+25% |
+| 亡灵法师 | F5 | 240 | 召唤特化 | 双倍召唤量 |
+| 地狱火魔 | F10 | 500 | 均衡 | 移速+50%, ATK+25% |
+| 远古魔像 | F10 | 520 | 防御特化 | DEFEND减伤60% |
+| 深渊之主·终焉 | F15 | 900 | 终局 | 移速+50%, ATK+25% |
+
+**BossSystemDirector** 统一管理 Narrative/Evolution/Behavior/Command/Encounter/Replay/Cinematic/Timeline。
+
+### 5.12 Buff 系统 (D8 扩展)
+
+20 种 Buff，JSON 配置驱动，按分类：
+
+| 分类 | Buff |
+|------|------|
+| 已有 | poison, slow, attack_up, bleed, shield |
+| 攻击类 | berserk, blessing, momentum, adrenaline |
+| 持续类 | regen, burn, curse |
+| 控制类 | freeze, stun, fear, blind |
+| 防御类 | defense_up, stone_skin |
+| 成长/特殊 | growth, lifesteal |
+
+控制 Buff 持续时间已平衡 (freeze 1.5s/stun 1.2s/fear 2.0s/blind 2.5s)。
+
+### 5.13 特殊房间 (D8 扩展)
+
+9 种特殊房间，每层轮转分配：
+
+| 房间 | 图标 | 效果 |
+|------|------|------|
+| ALTAR | + | 4结果池 (攻击/治疗/代价/净化) |
+| TREASURE | $ | 3档品质宝箱 + relic掉落 |
+| FOUNTAIN | ~ | 回满HP + 净化负面 |
+| SHOP | S | 2件稀有+物品 |
+| BLACKSMITH | B | 1件随机装备 |
+| LIBRARY | L | 随机技能升级1级 |
+| GAMBLER | G | 60%胜率 (golden_dice→85%) |
+| SHRINE | ! | 祝福/治疗/50% relic |
+| SECRET | ? | 1 relic + 50%传说装备 |
+
+### 5.14 动态事件 (D8 扩展)
+
+18 种事件，按楼层权重随机：
+
+| 事件 | 内容 |
+|------|------|
+| 已有 (10) | 旅行商人/伏击/诅咒/3选祭坛/雕像/囚犯/营地/宝库/血祭/空房 |
+| D8 新增 (8) | 陷阱房/命运之盒/祝福圣殿/诅咒之地/远古记忆/NPC相遇/圣物祭坛/宝箱缓存 |
+
+### 5.15 NPC & 任务 (D8 扩展)
+
+10 个 NPC 分布在 F2-F14，12 个任务：
+
+| NPC | 楼层 | 任务 |
+|------|------|------|
+| 埃德加(囚犯) | F2 | 救出囚犯 |
+| 瑞卡(猎人) | F3 | 猎人悬赏 (F5 Boss) |
+| 卡利安(幸存者) | F4 | — |
+| 卡兹(收藏家) | F6 | 收集3圣物 |
+| 泰伦斯(祭司) | F7 | 谒见神官 |
+| 维拉(侦察兵) | F8 | 到达F10 |
+| 索拉斯(朝圣者) | F9 | — |
+| 迷失灵魂(鬼魂) | F11 | — |
+| 眠者(梦见者) | F12 | 击败深渊之主 |
+| 守望者(学者) | F14 | — |
+
+### 5.16 D9 体验优化
+
+- **数值平衡**：15层难度平滑化、控制Buff削弱、Boss HP对齐
+- **战斗反馈**：Boss击杀 shake+freeze、升级消息提示、圣物获得 shake+freeze
+- **UI 优化**：Buff剩余时间进度条+闪烁、Relic面板描边、Boss状态标签、Debug overlay
+- **字体修复**：ResourceManager 动态码点构建 (原版全项目860基线 + relic/buff/NPC文本动态追加)
+
 ---
 
 ## 六、项目结构
