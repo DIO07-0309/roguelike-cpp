@@ -9,7 +9,7 @@ class Player;
 // D4 Step4: NPC & Quest & Dialogue Framework
 // ============================================================
 
-enum class NPCType { MERCHANT, BLACKSMITH, PRIEST, SCHOLAR, PRISONER, PILGRIM, GHOST, UNKNOWN };
+enum class NPCType { MERCHANT, BLACKSMITH, PRIEST, SCHOLAR, PRISONER, PILGRIM, GHOST, HUNTER, COLLECTOR, SCOUT, DREAMER, UNKNOWN };
 
 // 单次对话片段 (多页)
 struct DialoguePage {

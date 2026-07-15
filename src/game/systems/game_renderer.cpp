@@ -226,7 +226,21 @@ void GameRenderer::draw_player_buffs(const Player* player) {
     float y = 56.0f + player->skills.active_skills.size() * 28.0f + 4.0f;
     for (auto& b : buffs) {
         Color c = get_buff_hud_color(b.id);
-        // C1: icon + name
+        const BuffDef* def = get_buff_def(b.id);
+        // D9: 高亮即将结束的 buff (<1.5s 闪烁)
+        if (b.remaining < 1.5f) {
+            float flicker = sinf((float)GetTime() * 10.0f);
+            c.a = (unsigned char)(160 + (int)(flicker * 80));
+        }
+        // D9: 剩余时间进度条 (宽60px, 高4px)
+        if (def && def->duration > 0) {
+            float bar_w = 60.0f, bar_h = 4.0f;
+            float ratio = b.remaining / def->duration;
+            Color bar_c = ratio > 0.3f ? Color{100, 200, 100, 220}
+                        : ratio > 0.1f ? Color{200, 200, 40, 220} : Color{200, 40, 40, 220};
+            DrawRectangle(x + 26, y + 12, bar_w, bar_h, Color{30, 30, 30, 200});
+            DrawRectangle(x + 26, y + 12, bar_w * ratio, bar_h, bar_c);
+        }
         std::string line = std::string(_buff_icon(b.id)) + " "
             + get_buff_display_name(b.id)
             + " x" + std::to_string(b.stacks)
@@ -293,15 +307,22 @@ void GameRenderer::draw_relic_panel(const Player* player, int sw) {
         if (!def) continue;
 
         Color rc = _relic_rarity_color(def->rarity);
+        // D9: 稀有度描边色 (边框+左侧小条)
+        Color border_c = rc;
+        border_c.a = 120;
+        DrawRectangleRoundedLines({panel_x + 8, ly - 2, panel_w - 24, line_h},
+                                  0.10f, 3, 1, border_c);
+        // rarity indicator bar
+        DrawRectangle(panel_x + 14, ly + 2, 4, line_h - 8, rc);
+
         std::string label = "[" + _rarity_label_cn(def->rarity) + "]";
-        // D4.6 Step4: mastery 星标
         int mlv = g_relic_archive.mastery_level(r.id);
         std::string mstars;
         for (int s = 0; s < mlv; s++) mstars += "★";
         char line[256];
         snprintf(line, sizeof(line), "%s %s %s - %s",
                  mstars.c_str(), label.c_str(), def->name.c_str(), def->desc.c_str());
-        DrawTextEx(g_font_small, line, {panel_x + 14, ly}, 14, 1, rc);
+        DrawTextEx(g_font_small, line, {panel_x + 24, ly}, 14, 1, rc);
         ly += line_h;
     }
 }
@@ -418,9 +439,15 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
             bar_fg, bar_bg);
         if (g_font_loaded) {
             char buf[80];
-            const char* phase_tag = (bai && bai->phase2) ? "[Phase2] " : "";
-            snprintf(buf, sizeof(buf), "%s%s HP:%d/%d",
-                phase_tag, boss->name.c_str(), boss->combat.current_hp, boss->combat.max_hp);
+            // D9: Boss 状态标签组合
+            const char* phase_tag = (bai && bai->phase2) ? "[狂暴] " : "";
+            const char* defend_tag = (bai && bai->boss_state == BossState::DEFEND)
+                ? "[护盾] " : "";
+            const char* summon_tag = (bai && bai->boss_state == BossState::SUMMON)
+                ? "[召唤] " : "";
+            snprintf(buf, sizeof(buf), "%s%s%s%s HP:%d/%d",
+                phase_tag, defend_tag, summon_tag,
+                boss->name.c_str(), boss->combat.current_hp, boss->combat.max_hp);
             float tw = MeasureTextEx(g_font_small, buf, 18, 1).x;
             DrawTextEx(g_font_small, buf, {bx + (bw - tw) / 2, by + bh + 3}, 18, 1,
                        {255, 220, 100, 255});

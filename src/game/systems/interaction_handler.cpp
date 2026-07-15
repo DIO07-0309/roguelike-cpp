@@ -65,9 +65,15 @@ std::string InteractionHandler::check_special_discovery(Player* player, GameMap*
 
     room->discovered = true;
     switch (room->type) {
-        case SpecialRoomType::ALTAR:  return "你发现了一座古老祭坛。";
-        case SpecialRoomType::TREASURE: return "你发现了一个隐藏宝箱房。";
-        case SpecialRoomType::FOUNTAIN: return "你发现了一处治愈泉水。";
+        case SpecialRoomType::ALTAR:      return "你发现了一座古老祭坛。";
+        case SpecialRoomType::TREASURE:   return "你发现了一个隐藏宝箱房。";
+        case SpecialRoomType::FOUNTAIN:   return "你发现了一处治愈泉水。";
+        case SpecialRoomType::SHOP:       return "你发现了一间神秘商店。";
+        case SpecialRoomType::BLACKSMITH: return "你发现了一间铁匠铺。";
+        case SpecialRoomType::LIBRARY:    return "你发现了一间古老的图书馆。";
+        case SpecialRoomType::GAMBLER:    return "你发现了一个赌徒的房间。";
+        case SpecialRoomType::SHRINE:     return "你发现了一座神圣的神殿。";
+        case SpecialRoomType::SECRET:     return "你发现了一间隐藏密室！";
     }
     return "";
 }

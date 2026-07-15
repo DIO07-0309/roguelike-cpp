@@ -87,6 +87,47 @@ static std::vector<BossDialogue> _build_boss_dialogues() {
         "狱卒。火魔。深渊之主。三个——你全都杀了。\n现在唯一的狱卒——是你。",
         nullptr, "你以为你赢了——但每一次胜利都让我的碎片更多。", false});
 
+    // ── D8 Step2: Necromancer (F5) ──
+    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::NONE, 0, 0,
+        "亡者们，起来吧。你们的新同伴来了。",
+        "死亡不是终点——是我的兵源。",
+        "原来……死亡也可以结束。", false});
+    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::POISON_MASTER, 0, 0,
+        "毒？有趣。但亡灵不怕毒。",
+        "你身上的那股味道……和我召唤的东西很像。", nullptr, false});
+    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::BERSERKER, 0, 0,
+        "你的刀很快。但我的亡者比你更快。",
+        nullptr, nullptr, false});
+    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::SUPPORT, 0, 0,
+        "药剂救不了你。死人不需要药剂。",
+        nullptr, nullptr, false});
+
+    // ── D8 Step2: Golem (F10) ──
+    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::NONE, 0, 0,
+        "……。 （魔像没有嘴，只有沉闷的震动声）",
+        "魔像开始裂开——但仍在战斗。",
+        "魔像化为了碎石。一切归于沉寂。", false});
+    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::BERSERKER, 0, 0,
+        "你只是依赖外物——你的武器伤不了我。",
+        nullptr, nullptr, false});
+    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::FIRE_MAGE, 0, 0,
+        "火没有用。我是熔岩的孩子。",
+        nullptr, nullptr, false});
+    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::SUPPORT, 0, 0,
+        "治疗？这里没有你治得好的东西。",
+        nullptr, nullptr, false});
+
+    // ── D8 Step2: BuildTag 专属对话 (所有Boss通用) ──
+    out.push_back({StoryStage::CHAPTER_1, 0, WorldFlag::NONE, BuildType::POISON_MASTER, 0, 0,
+        "毒药？你离我想象的还要黯淡。",
+        nullptr, nullptr, false});
+    out.push_back({StoryStage::CHAPTER_1, 0, WorldFlag::NONE, BuildType::BERSERKER, 0, 0,
+        "你的刀很快。", nullptr, nullptr, false});
+    out.push_back({StoryStage::CHAPTER_1, 0, WorldFlag::NONE, BuildType::SUPPORT, 0, 0,
+        "药剂救不了你。", nullptr, nullptr, false});
+    out.push_back({StoryStage::CHAPTER_1, 0, WorldFlag::NONE, BuildType::PROJECTILE, 0, 0,
+        "你只是依赖外物。", nullptr, nullptr, false});
+
     return out;
 }
 

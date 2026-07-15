@@ -104,9 +104,15 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                     // 特殊房间地板颜色区分
                     Color base;
                     switch (sr->type) {
-                        case SpecialRoomType::ALTAR:    base = {50, 35, 15, 255}; break;
-                        case SpecialRoomType::TREASURE: base = {25, 35, 60, 255}; break;
-                        case SpecialRoomType::FOUNTAIN: base = {20, 45, 25, 255}; break;
+                        case SpecialRoomType::ALTAR:      base = {50, 35, 15, 255}; break;
+                        case SpecialRoomType::TREASURE:   base = {25, 35, 60, 255}; break;
+                        case SpecialRoomType::FOUNTAIN:   base = {20, 45, 25, 255}; break;
+                        case SpecialRoomType::SHOP:       base = {50, 45, 15, 255}; break;  // gold
+                        case SpecialRoomType::BLACKSMITH: base = {55, 30, 20, 255}; break;  // orange
+                        case SpecialRoomType::LIBRARY:    base = {15, 30, 55, 255}; break;  // blue
+                        case SpecialRoomType::GAMBLER:    base = {45, 15, 50, 255}; break;  // purple
+                        case SpecialRoomType::SHRINE:     base = {40, 40, 10, 255}; break;  // gold-dark
+                        case SpecialRoomType::SECRET:     base = {50, 10, 10, 255}; break;  // deep red
                         default: base = {25, 25, 35, 255}; break;
                     }
                     if (sr->triggered) {
@@ -120,9 +126,15 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                     if (x == sr->cx && y == sr->cy) {
                         const char* icon = "?";
                         switch (sr->type) {
-                            case SpecialRoomType::ALTAR:    icon = "+"; break;
-                            case SpecialRoomType::TREASURE: icon = "$"; break;
-                            case SpecialRoomType::FOUNTAIN: icon = "~"; break;
+                            case SpecialRoomType::ALTAR:      icon = "+"; break;
+                            case SpecialRoomType::TREASURE:   icon = "$"; break;
+                            case SpecialRoomType::FOUNTAIN:   icon = "~"; break;
+                            case SpecialRoomType::SHOP:       icon = "S"; break;
+                            case SpecialRoomType::BLACKSMITH: icon = "B"; break;
+                            case SpecialRoomType::LIBRARY:    icon = "L"; break;
+                            case SpecialRoomType::GAMBLER:    icon = "G"; break;
+                            case SpecialRoomType::SHRINE:     icon = "!"; break;
+                            case SpecialRoomType::SECRET:     icon = "?"; break;
                         }
                         Color ic = sr->triggered ? Color{100, 100, 100, 255}
                                                  : Color{255, 255, 200, 255};

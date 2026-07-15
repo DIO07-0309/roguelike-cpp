@@ -60,6 +60,19 @@ void Monster::draw(float cam_x, float cam_y) {
         DrawRectangleLinesEx({dr.x - 2, dr.y - 2, dr.width + 4, dr.height + 4},
                              3, Color{180, 180, 200, 200});
     }
+    // D8: Charger — 红色箭头方向指示
+    if (monster_type == MonsterType::CHARGER) {
+        float cx = dr.x + dr.width/2, cy = dr.y + dr.height/2;
+        float arrow = 6 + sinf((float)GetTime() * 8) * 3;
+        DrawTriangle({cx + arrow, cy}, {cx - arrow/2, cy - arrow/2},
+                     {cx - arrow/2, cy + arrow/2}, Color{255, 100, 40, 255});
+    }
+    // D8: Summoner — 紫色魔法光环
+    if (monster_type == MonsterType::SUMMONER) {
+        float ring = 14 + sinf((float)GetTime() * 6) * 3;
+        DrawRing({dr.x + dr.width/2, dr.y + dr.height/2}, ring - 2, ring,
+                 0, 360, 16, Color{180, 120, 220, 160});
+    }
 
     // 阴影
     DrawEllipse(dr.x + dr.width/2, dr.y + dr.height + 2, dr.width/2 - 2, 3,
@@ -186,6 +199,29 @@ Monster* spawn_monster(float px, float py, const std::string& type) {
             m->ai->_skills.push_back(sm);
             return m;
         }
+    }
+    // D8: 冲锋怪 — 中距蓄力冲刺, 高爆发
+    if (type == "charger") {
+        auto* m = new Monster(px, py, "冲锋兽人", 40, 10, 4, 2, {200, 140, 60, 255});
+        m->monster_type = MonsterType::CHARGER; m->team_role = TeamRole::FRONTLINE;
+        m->attack_cooldown = 2.5f;
+        auto* ai = new MonsterAI(7.0f, 110.0f, 2.5f, 2.0f);
+        m->ai = ai;
+        MonsterSkillState ch = {MonsterSkillType::CHARGE, 0, 5.0f};
+        ai->_skills.push_back(ch);
+        return m;
+    }
+    // D8: 召唤师 — 低攻, 定期召唤2只小怪
+    if (type == "summoner") {
+        auto* m = new Monster(px, py, "哥布林召唤师", 35, 5, 3, 5, {180, 120, 220, 255});
+        m->monster_type = MonsterType::SUMMONER; m->team_role = TeamRole::SUPPORT;
+        m->attack_type = AttackType::MAGICAL;
+        m->attack_cooldown = 4.0f;
+        auto* ai = new MonsterAI(6.0f, 60.0f, 3.0f, 3.0f);
+        m->ai = ai;
+        MonsterSkillState ms = {MonsterSkillType::MASS_SUMMON, 3, 12.0f};
+        ai->_skills.push_back(ms);
+        return m;
     }
     // fallback
     auto* m = new Monster(px, py, "史莱姆", 15, 3, 0, 1, {100, 180, 100, 255});

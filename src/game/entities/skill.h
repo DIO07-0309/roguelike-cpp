@@ -63,6 +63,7 @@ public:
     bool can_use(double game_time) const;
     float remaining_cooldown(double game_time) const;
     void mark_used(double game_time);
+    void reset_cooldown() { last_use_time = -999.0f; }  // D8: time_fragment
     bool can_upgrade() const;
     bool upgrade();
 

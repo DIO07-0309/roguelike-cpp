@@ -20,8 +20,8 @@ struct FloorConfig {
     float atk_mult;              // 怪物 ATK 倍率
     int   monster_count;         // 基础怪物数量
 
-    // 怪物池 (累积权重，各浮层可独立调整)
-    int enemy_weights[6];        // [0]=普通 [1]=Archer [2]=Shaman [3]=Bomber [4]=Tank [5]=Elite
+    // D8: 怪物池 (累积权重，各浮层可独立调整)
+    int enemy_weights[8];        // [0]=NORMAL [1]=Archer [2]=Shaman [3]=Bomber [4]=Tank [5]=Elite [6]=Charger [7]=Summoner
 
     // 特殊房间数量
     int special_room_count;

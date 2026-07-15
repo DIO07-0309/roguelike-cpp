@@ -162,14 +162,15 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     }
 
     // 放置怪物
+    const BossTemplate* btmpl = nullptr;  // D8: 提前决定 Boss 类型
     if (is_boss_floor(floor)) {
         auto pos = rooms.back();
         boss_floor = floor;
-        auto info = get_boss_info(floor);
-        boss_intro_title = info.title;
-        boss_intro_lore = info.lore;
-        boss_intro_skills = info.skills_text;
-        boss_intro_color = info.color;
+        btmpl = boss_factory_lookup(boss_type_for_floor(floor, _dungeon_seed));
+        boss_intro_title = btmpl->title;
+        boss_intro_lore = btmpl->lore;
+        boss_intro_skills = btmpl->is_summoner ? "召唤·尸爆·亡灵大军" : btmpl->is_defender ? "重锤·震地·石甲" : "冲锋·冲击波·召唤手下";
+        boss_intro_color = btmpl->color;
         state = GameState::BOSS_INTRO;
 
         // D4 Step5.5: BossNarrative覆盖intro对话
@@ -215,6 +216,12 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     player->combat.current_hp = get_effective_max_hp(player.get());
     player->reset_attack_timers();
 
+    // D8: soul_lantern — 进入新楼层获得 attack_up + heal 10
+    if (player_has_relic(player.get(), "soul_lantern")) {
+        apply_buff(player.get(), "attack_up", 1);
+        heal_player(player.get(), 10);
+    }
+
     // D4 Step3: 楼层入场演出 (非Boss层, 首次进入, new_game)
     if (!fcfg->is_boss && !_gameplay.narr_state.floor_intro_played[floor - 1]) {
         _gameplay.narr_state.floor_intro_played[floor - 1] = true;
@@ -241,10 +248,9 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     }
 
     if (fcfg->is_boss) {
-        LOG_INFO("进入第%d层 (Boss: %s) - HP:%d ATK:%d DEF:%d",
-            floor, get_boss_info(floor).name.c_str(),
-            get_boss_info(floor).max_hp, get_boss_info(floor).attack,
-            get_boss_info(floor).pdef);
+        LOG_INFO("进入第%d层 (Boss: %s) - HP:%d ATK:%d PD:%d MD:%d",
+            floor, btmpl->name, btmpl->max_hp, btmpl->attack,
+            btmpl->pdef, btmpl->mdef);
     } else {
         LOG_INFO("进入第%d层 [%s] - %d只怪物, HPx%.2f ATKx%.2f",
             floor, fcfg->chapter_label, (int)monsters.size(),
@@ -786,6 +792,26 @@ void GameScene::_render() {
                         _get_boss(), _show_relic_panel,
                         inventory_open, inventory_cursor,
                         _presentation.room_msg, _presentation.room_msg_timer, sw, sh);
+
+#ifdef _DEBUG
+    // D9: Debug overlay (右上角, fps/floor/seed/build/monsters)
+    if (g_font_loaded) {
+        char dbg[256]; int fps = GetFPS();
+        const char* bn = "无";
+        BuildType bt = calculate_build(player.get()).identify();
+        if (bt == BuildType::BERSERKER) bn = "狂战士";
+        else if (bt == BuildType::FIRE_MAGE) bn = "火法师";
+        else if (bt == BuildType::POISON_MASTER) bn = "毒术师";
+        else if (bt == BuildType::TIME_MASTER) bn = "时间术士";
+        else if (bt == BuildType::SUPPORT) bn = "辅助";
+        snprintf(dbg, sizeof(dbg),
+            "FPS:%d Fl:%d/%d Seed:%u Mon:%zu Buf:%zu Rel:%zu | %s",
+            fps, current_floor, MAX_FLOORS, _dungeon_seed,
+            monsters.size(), player->active_buffs.size(), player->relics.size(), bn);
+        float dw = MeasureTextEx(g_font_small, dbg, 11, 1).x;
+        DrawTextEx(g_font_small, dbg, {sw - dw - 10.0f, 4.0f}, 11, 1, Color{120, 200, 120, 180});
+    }
+#endif
 
     if (inventory_open) _renderer.draw_inventory_panel(player.get(), inventory_cursor, sw, sh);
 

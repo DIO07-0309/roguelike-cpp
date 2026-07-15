@@ -35,7 +35,8 @@ BossRank calc_boss_rank(const BossReplayMemory& mem, int dmg_taken, int dmg_done
     return BossRank::D;
 }
 
-BossBattleReport generate_battle_report(const BossReplayMemory& mem, int dmg_d, int dmg_t, float time, int az) {
+BossBattleReport generate_battle_report(const BossReplayMemory& mem, int dmg_d, int dmg_t,
+                                        float time, int az) {
     BossBattleReport r;
     r.replay = mem; r.total_damage = dmg_d; r.damage_taken = dmg_t;
     r.battle_time = time; r.arena_zones_spawned = az;

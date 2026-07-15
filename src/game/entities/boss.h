@@ -19,6 +19,7 @@ enum class BossState {
     CHARGE,      // 冲锋: 蓄力→冲刺
     SHOCKWAVE,   // 冲击波: 蓄力→AOE
     SUMMON,      // 召唤: 召唤小怪
+    DEFEND,      // D8: 防御: 举盾减伤 (Golem)
 };
 
 // ============================================================
@@ -94,6 +95,10 @@ public:
     bool phase2 = false;
     float phase2_pause = 0.0f;     // 进入二阶段暂停计时
 
+    // D8 Step2: Boss-specific config
+    int   skill_cycle_bias = 6;    // Necromancer: 改成更频繁的召唤循环
+    float golem_shield_pct = 0.0f; // Golem: DEFEND 减伤比例
+
     // 三个技能实例 (B15 新)
     std::unique_ptr<ChargeSkill>   _charge;
     std::unique_ptr<ShockwaveSkill> _shockwave;
@@ -117,3 +122,35 @@ struct BossInfo {
     Color color;
 };
 BossInfo get_boss_info(int floor);
+
+// ============================================================
+// D8 Step2: BossType — 新增 Boss 类型 + BossFactory
+// ============================================================
+enum class BossType {
+    SHADOW_KNIGHT,  // 暗影骑士 (F5)
+    FIRE_DEMON,     // 地狱火魔 (F10)
+    DEMON_LORD,     // 深渊之主 (F15)
+    NECROMANCER,    // 亡灵法师 (F5/F10)
+    GOLEM,          // 远古魔像 (F10/F15)
+};
+
+struct BossTemplate {
+    BossType type;
+    int floor;
+    const char* name;
+    const char* title;
+    const char* lore;
+    bool is_summoner;    // Necromancer
+    bool is_defender;    // Golem
+    int max_hp, attack, pdef, mdef;
+    Color color;
+    float summon_speed;  // Phase2 summoned count multiplier
+    float shield_pct;    // Golem DEFEND damage reduction
+};
+
+// BossFactory: 按类型创建 + 配置化
+Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
+                              std::vector<Monster*>* out_monsters = nullptr,
+                              GameMap* map = nullptr);
+const BossTemplate* boss_factory_lookup(BossType type);
+BossType boss_type_for_floor(int floor, uint32_t seed);  // 支持随机Boss

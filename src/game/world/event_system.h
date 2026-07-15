@@ -13,16 +13,25 @@ struct ChapterConfig;
 
 enum class EventType {
     NONE = 0,
-    MERCHANT,        // 旅行商人: 卖药水/Relic/技能进化/Buff
-    AMBUSH,          // 伏击: 四周刷怪, 双倍经验
-    CURSED_ROOM,     // 诅咒房: 拿传奇奖励得永久诅咒
+    MERCHANT,        // 旅行商人
+    AMBUSH,          // 伏击: 四周刷怪
+    CURSED_ROOM,     // 诅咒房
     ALTAR_CHOICE,    // 3选1祭坛
-    STATUE,          // 神秘雕像: 随机Buff/Debuff/Nothing
-    PRISONER,        // 囚犯: 救→NPC, 不救→金币
-    LOST_CAMP,       // 迷失营地: 恢复+剧情+日志
-    TREASURE_GUARD,  // 宝库守卫: Boss战赢传奇奖励
-    BLOOD_RITUAL,    // 血祭: 献祭HP换强化
-    NOTHING,         // 空房间: 仅剧情文字
+    STATUE,          // 神秘雕像
+    PRISONER,        // 囚犯
+    LOST_CAMP,       // 迷失营地
+    TREASURE_GUARD,  // 宝库守卫
+    BLOOD_RITUAL,    // 血祭
+    NOTHING,         // 空房间
+    // D8 Step6: new event types
+    TRAP,            // 陷阱房: 扣血/Burn/Poison/Fear/Freeze, 可能反给奖励
+    MYSTERY,         // 完全随机: 从任意事件池抽取
+    BLESSING,        // 祝福房: 永久成长/攻击/生命/速度/恢复
+    CURSE,           // 诅咒: Curse/减速/攻击下降/失去金币
+    LORE,            // 剧情: 纯文本沉浸
+    NPC_EVENT,       // NPC事件: 接受任务/完成任务/提升好感
+    RELIC_DROP,     // 圣物房: 直接获得Relic
+    TREASURE_CACHE,  // 宝箱缓存: 金币+装备+Buff+Relic随机
 };
 
 struct DungeonEvent {

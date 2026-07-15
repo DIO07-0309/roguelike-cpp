@@ -100,34 +100,114 @@ static const char* TEXTS[][10] = {
      "你听到了水滴的声音，但找不到来源。",
      "这里曾经可能有过什么，但现在只剩下遗迹。",
      "此地空无一物，但你感到一丝不安。"},
+    // D8: TRAP (10)
+    {"地板上的符号突然发出红光——陷阱！",
+     "你踩到了一块松动的石板，机关启动了！",
+     "暗箭从墙上的孔里射出！",
+     "脚下一空，毒雾从地板裂缝中涌出。",
+     "房间开始旋转，尖刺从天花板降下。",
+     "\"别再往前走了，\" 一个机械的声音警告道。",
+     "炽热的火焰从墙上的喷口喷出。",
+     "你触发了古老的地牢防御机关。"},
+    // D8: MYSTERY (11)
+    {"一个发光的盒子放在房间中央，上面没有任何标记。",
+     "空气中有一种奇怪的能量——你无法判断它是好是坏。",
+     "墙上挂着一面破旧的镜子，里面却照出了不同的东西。",
+     "地上散落着六张不同的命运卡片。",
+     "一个嗡嗡作响的传送门在你面前展开。",
+     "你感到命运在摆弄这个房间——一切都有可能。",
+     "这个房间里没有规则——只有无法预测的结果。",
+     "七个颜色的光环在地板上旋转，每一个都通向不同的可能。"},
+    // D8: BLESSING (12)
+    {"一束温暖的光从天花板的裂缝倾泻而下。",
+     "房间中央喷涌着圣洁的光芒，照亮了每一个角落。",
+     "墙壁上爬满了发光的藤蔓——这是生命的力量。",
+     "\"你被祝福了，\" 一个温柔的声音低语。",
+     "空气中弥漫着花与蜂蜜的香气，令人心旷神怡。",
+     "金色的光尘在你周围旋转，渗入你的皮肤。",
+     "一道古老的祝福铭刻在地板上，散发出温暖。",
+     "这个房间散发着治愈与成长的能量。"},
+    // D8: CURSE (13)
+    {"即使最明亮的火把也无法照亮这个房间的角落。",
+     "一股令人窒息的重压落在你的肩膀上。",
+     "角落里的影子在移动——它们在等你。",
+     "\"凡是进入者，必受诅咒，\" 墙上的文字变黑了。",
+     "你感觉到有什么在吸走你的力量。",
+     "黑暗像一张网，缠绕在你的四肢上。",
+     "空气中弥漫着腐烂和绝望的气息。",
+     "你踏入了地牢最阴暗的角落——这里没有祝福。"},
+    // D8: LORE (14)
+    {"墙上的壁画描绘着一场远古的战斗。",
+     "一本碎裂的日记躺在桌上，等待着读者。",
+     "墙壁上刻着一首古老的诗歌，讲述着地牢的起源。",
+     "\"我是第127位进入这里的冒险者，\" 墙上写着。",
+     "一张褪色的地图被钉在墙上，标注了多条消失的路线。",
+     "这里曾经是地牢中最热闹的广场——现在只剩灰烬。",
+     "一块石碑上刻着无数个名字，最下面的那个……是刚添上去的。",
+     "这间房间本身就是一个故事——记录着地牢从辉煌到衰败。"},
+    // D8: NPC_EVENT (15)
+    {"一个孤独的身影坐在角落，听到你的脚步声后抬起了头。",
+     "\"嘿……你知道出去的路吗？\" 一个探险家问道。",
+     "一位年老的学者正在研究墙上的文字。",
+     "一个受伤的士兵靠在墙上，手臂上绑着染血的绷带。",
+     "\"帮我一个忙，我会给你回报。\" 陌生人开口道。",
+     "一位戴着兜帽的旅行者默默地注视着你。",
+     "\"你看起来像能打的人——我这里有个目标，\" 一个低沉的嗓音。",
+     "一个商人正对着他的货物发愁……也许你需要什么。"},
+    // D8: RELIC_DROP (16)
+    {"房间中央漂浮着一块发光的碎片——一件圣物。",
+     "玻璃展柜里静静地躺着一件古老的遗物。",
+     "强大的能量从地板中心涌出，形成一个发光的球体。",
+     "\"这间房间只给予最适合的访客，\" 一个声音宣布道。",
+     "祭坛上放着一件闪亮的护符，静静地等待它的主人。",
+     "墙壁上的凹槽里镶嵌着半透明的晶体——其中一块闪烁着你的颜色。",
+     "一个透明的水晶球中悬浮着小巧的圣物。",
+     "古老的文字刻在石碑上：\"只有一次机会。\""},
+    // D8: TREASURE_CACHE (17)
+    {"一堆金币和宝物从倒塌的墙壁中倾泻而出。",
+     "打开的木箱里塞满了金币和装备。",
+     "\"发货了！\" 一个小妖精在你面前倒空了它的藏宝箱。",
+     "一个被遗弃的探险家背包，装满了旅途的收获。",
+     "几只宝箱沿墙排列——但这看起来不像是陷阱。",
+     "彩色的光芒从板条箱的缝隙中透出。",
+     "\"拿你需要的东西，\" 一张纸条写道。",
+     "此地遍地都是宝物——但你必须迅速决定拿什么。"},
 };
 
 static const char* pick_text(int type, std::mt19937& rng) {
-    if (type < 0 || type > 9) return "???";
+    if (type < 0 || type > 17) return "???";
     int idx = rng() % 8;
     return TEXTS[type][idx];
 }
 
 std::vector<std::string> event_text_pool(int idx) {
     std::vector<std::string> out;
-    if (idx < 0 || idx > 9) return out;
+    if (idx < 0 || idx > 17) return out;
     for (int i = 0; i < 8; i++) out.push_back(TEXTS[idx][i]);
     return out;
 }
 
 const char* event_type_name(EventType t) {
     switch (t) {
-        case EventType::MERCHANT:       return "旅行商人";
-        case EventType::AMBUSH:         return "伏击!";
-        case EventType::CURSED_ROOM:    return "诅咒房间";
-        case EventType::ALTAR_CHOICE:   return "三选祭坛";
-        case EventType::STATUE:         return "神秘雕像";
-        case EventType::PRISONER:       return "囚犯";
-        case EventType::LOST_CAMP:      return "迷失营地";
-        case EventType::TREASURE_GUARD: return "宝库守卫";
-        case EventType::BLOOD_RITUAL:   return "血祭仪式";
-        case EventType::NOTHING:        return "寂静房间";
-        default:                        return "???";
+        case EventType::MERCHANT:        return "旅行商人";
+        case EventType::AMBUSH:          return "伏击!";
+        case EventType::CURSED_ROOM:     return "诅咒房间";
+        case EventType::ALTAR_CHOICE:    return "三选祭坛";
+        case EventType::STATUE:          return "神秘雕像";
+        case EventType::PRISONER:        return "囚犯";
+        case EventType::LOST_CAMP:       return "迷失营地";
+        case EventType::TREASURE_GUARD:  return "宝库守卫";
+        case EventType::BLOOD_RITUAL:    return "血祭仪式";
+        case EventType::NOTHING:         return "寂静房间";
+        case EventType::TRAP:            return "陷阱房";
+        case EventType::MYSTERY:         return "命运之盒";
+        case EventType::BLESSING:        return "祝福圣殿";
+        case EventType::CURSE:           return "诅咒之地";
+        case EventType::LORE:            return "远古记忆";
+        case EventType::NPC_EVENT:       return "相遇";
+        case EventType::RELIC_DROP:      return "圣物祭坛";
+        case EventType::TREASURE_CACHE:  return "宝箱缓存";
+        default:                         return "???";
     }
 }
 
@@ -138,35 +218,35 @@ DungeonEvent generate_event(int floor, const ChapterConfig& ch, std::mt19937& rn
     DungeonEvent ev;
     int chap = ch.chapter;
 
-    // 权重表: {MERCHANT,AMBUSH,CURSED,ALTAR,STATUE,PRISONER,CAMP,GUARD,BLOOD,NOTHING}
-    int weights[10];
+    // D8: 扩展权重表: {MERCHANT,AMBUSH,CURSED,ALTAR,STATUE,PRISONER,CAMP,GUARD,BLOOD,NOTHING,
+    //                   TRAP,MYSTERY,BLESSING,CURSE,LORE,NPC_EVENT,RELIC_DROP,TREASURE_CACHE}
+    int weights[18] = {0};
     if (chap == 0) {
-        // 序章: 多商人/营地, 少诅咒
-        int w[] = {30, 10, 5, 8, 8, 10, 15, 0, 0, 14};
-        for (int i = 0; i < 10; i++) weights[i] = w[i];
+        // D9: 序章友好 — 少Trap/Curse, 多Blessing/LORE
+        int w[] = {25,8, 5,8,8,10,15,0,0,10,4,5,14,1,12,10,8,14};
+        for (int i = 0; i < 18; i++) weights[i] = w[i];
     } else if (chap == 1) {
-        // 深渊: 诅咒/雕像增多
-        int w[] = {20, 15, 12, 8, 12, 8, 10, 5, 5, 5};
-        for (int i = 0; i < 10; i++) weights[i] = w[i];
+        // D9: 深渊均衡 — 减Trap, 增NPC/Mystery
+        int w[] = {18,10,10,8,10,8,8,5,5,5,6,10,10,4,12,12,10,10};
+        for (int i = 0; i < 18; i++) weights[i] = w[i];
     } else {
-        // 炼狱: 伏击/守护/血祭增多
-        int w[] = {15, 18, 12, 8, 10, 8, 8, 8, 8, 5};
-        for (int i = 0; i < 10; i++) weights[i] = w[i];
+        // D9: 炼狱挑战 — 适度Trap/Curse
+        int w[] = {12,12,10,8,8,6,6,8,8,4,10,10,8,8,14,10,12,8};
+        for (int i = 0; i < 18; i++) weights[i] = w[i];
     }
 
-    // 总权重
     int total = 0;
-    for (int i = 0; i < 10; i++) total += weights[i];
+    for (int i = 0; i < 18; i++) total += weights[i];
     int roll = (int)(rng() % (uint32_t)total);
     int sum = 0;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 18; i++) {
         sum += weights[i];
         if (roll < sum) {
-            ev.type = (EventType)(i + 1); // skip NONE=0
+            ev.type = (EventType)(i + 1);
             break;
         }
     }
-    if (ev.type == EventType::NONE) ev.type = EventType::STATUE; // fallback
+    if (ev.type == EventType::NONE) ev.type = EventType::NOTHING;
 
     ev.title  = event_type_name(ev.type);
     ev.text   = pick_text((int)ev.type - 1, rng);
@@ -302,6 +382,131 @@ std::string execute_event(DungeonEvent& ev, Player* player, int floor) {
     }
     case EventType::NOTHING:
         return "MSG:这里什么也没有发生。";
+    // D8 Step6: New event type executions
+    case EventType::TRAP: {
+        int r = rng() % 6;
+        if (r == 0) {
+            int dmg = std::max(5, player->combat.current_hp / 6);
+            player->combat.take_damage(dmg);
+            return "MSG:暗箭击中了你的肩膀！受到" + std::to_string(dmg) + "伤害。";
+        } else if (r == 1) {
+            apply_buff(player, "burn", 2);
+            return "MSG:火焰陷阱喷出烈焰——你被灼伤了！";
+        } else if (r == 2) {
+            apply_buff(player, "poison", 3);
+            return "MSG:毒雾从地板裂缝中涌出——你中毒了。";
+        } else if (r == 3) {
+            apply_buff(player, "fear", 1);
+            return "MSG:黑暗中的低语让你毛骨悚然——你中了恐惧。";
+        } else if (r == 4) {
+            apply_buff(player, "freeze", 1);
+            return "MSG:冰霜陷阱瞬间将你的双脚冻住！";
+        } else {
+            // 小概率反给奖励
+            auto item = generate_random_item();
+            if (item) { player->inventory.add(item, player); return "MSG:陷阱被触发——但里面竟藏着一件东西！"; }
+            return "MSG:陷阱只发出了一声闷响——你很幸运。";
+        }
+    }
+    case EventType::MYSTERY: {
+        // 从所有事件类型中随机抽取一个执行
+        int r = rng() % 17 + 1; // skip NONE
+        EventType fake_type = (EventType)r;
+        // 避免无限递归: exclude MYSTERY itself
+        if (fake_type == EventType::MYSTERY) fake_type = EventType::STATUE;
+        ev.type = fake_type;
+        ev.triggered = false; // allow re-trigger
+        return execute_event(ev, player, floor); // recursive dispatch
+    }
+    case EventType::BLESSING: {
+        int r = rng() % 5;
+        if (r == 0) { apply_buff(player, "blessing", 2); return "MSG:祝福的光芒环绕着你。"; }
+        if (r == 1) { apply_buff(player, "growth", 2); return "MSG:你感到体能在永久增强——成长2层。"; }
+        if (r == 2) { apply_buff(player, "attack_up", 2); return "MSG:圣光注入了你的武器——攻击力大幅提升。"; }
+        if (r == 3) { apply_buff(player, "regen", 3); return "MSG:生命之水渗入你的血液——再生3层。"; }
+        heal_player(player, (int)(get_effective_max_hp(player) * 0.25f));
+        return "MSG:神圣的力量治愈了你25%的生命。";
+    }
+    case EventType::CURSE: {
+        int r = rng() % 4;
+        if (r == 0) { apply_buff(player, "curse", 2); return "MSG:你被诅咒了——诅咒2层。"; }
+        if (r == 1) { apply_buff(player, "slow", 2); return "MSG:诅咒压制着你的步伐——减速2层。"; }
+        if (r == 2) { apply_buff(player, "blind", 2); return "MSG:诅咒遮障了你的视觉——致盲2层。"; }
+        int loss = std::max(5, player->combat.current_hp / 4);
+        player->combat.take_damage(loss);
+        return "MSG:黑暗之触吸取了" + std::to_string(loss) + "点生命。";
+    }
+    case EventType::LORE: {
+        static const char* lore_msgs[] = {
+            "这些废墟曾经是地牢中最繁荣的区域——三千年前。",
+            "你读到: '吾王永恒，吾等永守。' 签名已经模糊。",
+            "一幅壁画描绘着一场巨大的战争——光与暗在空中碰撞。",
+            "日记最后一页写着: '今天是我第47天。我发现了新的东西。'",
+            "石碑记载着一位名为阿斯特拉的古代英雄——与你的旅程惊人地相似。",
+            "你找到了一封信，日期是1327年前——地址是你现在站的地方。",
+            "\"深渊不是地牢——它是监狱，\" 墙上潦草地写着。",
+            "一本古籍打开了，上面画着一棵树——深埋在地下但仍在生长。",
+        };
+        return "MSG:" + std::string(lore_msgs[rng() % 8]);
+    }
+    case EventType::NPC_EVENT: {
+        int r = rng() % 3;
+        if (r == 0) {
+            auto p = std::make_shared<ConsumableItem>("冒险家的礼物", Rarity::RARE, "heal", 35);
+            player->inventory.add(p, player);
+            return "MSG:陌生人微笑着递给你一份礼物。";
+        } else if (r == 1) {
+            apply_buff(player, "blessing", 1);
+            return "MSG:学者为你念了一段远古的祝福咒语。";
+        } else {
+            auto ids = get_all_relic_ids();
+            std::vector<std::string> avail;
+            for (auto& id : ids) if (!player_has_relic(player, id)) avail.push_back(id);
+            if (!avail.empty()) {
+                std::string ch = avail[rng() % avail.size()];
+                player->relics.push_back({ch});
+                return "RELIC:" + std::string(get_relic_def(ch)->name) + " (来自NPC)";
+            }
+            return "MSG:陌生人与你分享了故事——但没什么实质的东西。";
+        }
+    }
+    case EventType::RELIC_DROP: {
+        auto ids = get_all_relic_ids();
+        std::vector<std::string> avail;
+        for (auto& id : ids) if (!player_has_relic(player, id)) avail.push_back(id);
+        if (!avail.empty()) {
+            std::string ch = avail[rng() % avail.size()];
+            player->relics.push_back({ch});
+            return "RELIC:" + std::string(get_relic_def(ch)->name);
+        }
+        return "MSG:圣物祭坛已经空了——你已经集齐了所有圣物。";
+    }
+    case EventType::TREASURE_CACHE: {
+        int r = rng() % 4;
+        if (r == 0) {
+            auto eq = std::make_shared<EquipmentItem>("遗迹之宝", Rarity::RARE, "weapon", 10, 3, 2);
+            player->inventory.add(eq, player);
+            return "MSG:你找到了一件精心保护的武器。";
+        } else if (r == 1) {
+            auto pot = std::make_shared<ConsumableItem>("珍藏秘药", Rarity::EPIC, "heal", 60);
+            player->inventory.add(pot, player);
+            return "MSG:宝箱里藏着一瓶闪耀的药水。";
+        } else if (r == 2) {
+            apply_buff(player, "attack_up", 2);
+            apply_buff(player, "defense_up", 2);
+            return "MSG:宝箱中喷出魔法——你获得了攻击和防御双重增强。";
+        } else {
+            auto ids = get_all_relic_ids();
+            std::vector<std::string> avail;
+            for (auto& id : ids) if (!player_has_relic(player, id)) avail.push_back(id);
+            if (!avail.empty()) {
+                std::string ch = avail[rng() % avail.size()];
+                player->relics.push_back({ch});
+                return "RELIC:" + std::string(get_relic_def(ch)->name) + " (宝箱中)";
+            }
+            return "MSG:宝箱虽空，但金币仍能让你会心一笑。";
+        }
+    }
     default: break;
     }
     return "";

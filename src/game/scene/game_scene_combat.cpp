@@ -53,6 +53,14 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
         _s.player->combat.max_hp += 10;
         _s.player->combat.current_hp = get_effective_max_hp(_s.player.get());
         _s.get_tree()->get_audio()->play_sfx("levelup");
+        // D9: 升级反馈 — shake + freeze + message
+        _s._presentation.trigger_shake(CombatFeelSystem::SHAKE_LIGHT);
+        _s._presentation.trigger_freeze(CombatFeelSystem::HEAVY_HIT);
+        {
+            char lv_buf[64];
+            snprintf(lv_buf, sizeof(lv_buf), "升级了! Lv%d", _s.player->level);
+            _s._presentation.show_message(lv_buf, 1.8f);
+        }
         LOG_INFO("玩家升级! Lv%d HP:%d ATK:%d", _s.player->level,
             _s.player->combat.max_hp, _s.player->combat.get_effective_attack());
         if (_s.player->skills.can_learn()) {
@@ -74,7 +82,9 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
                                 _s._boss.dmg_taken, (int)_s._boss.arena.zones().size());
         _s._boss.battle_report = _s._boss.encounter.report();
         _s.get_tree()->get_audio()->play_sfx("victory");
+        // D9: Boss击杀强化 — shake + freeze + full flash
         _s._presentation.trigger_shake(CombatFeelSystem::SHAKE_BOSS);
+        _s._presentation.trigger_freeze(CombatFeelSystem::BOSS_HIT);
         _s._boss.cinematic.trigger_death();
         _s._boss.timeline.record(_s._boss.encounter.total_time(), "DEATH");
         {
@@ -164,6 +174,38 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
     if (_s.player && player_has_relic(_s.player.get(), "battle_totem")) {
         if ((rng() % 1000) < (int)(0.15f * 1000.0f))
             apply_buff(_s.player.get(), "attack_up", 1);
+    }
+    // D8: battle_medal — 击杀回3HP (100%)
+    if (_s.player && player_has_relic(_s.player.get(), "battle_medal"))
+        heal_player(_s.player.get(), 3);
+    // D8: vampire_fang — 击杀回8%最大生命
+    if (_s.player && player_has_relic(_s.player.get(), "vampire_fang")) {
+        int vheal = (int)(get_effective_max_hp(_s.player.get()) * 0.08f);
+        if (vheal > 0) heal_player(_s.player.get(), vheal);
+    }
+    // D8: thunder_core — 击杀30%触发AOE闪电 (对附近怪物造成ATK×1.5伤害)
+    if (_s.player && player_has_relic(_s.player.get(), "thunder_core")) {
+        if ((rng() % 100) < 30) {
+            float px = _s.player->entity.rect.x + _s.player->entity.rect.width/2;
+            float py = _s.player->entity.rect.y + _s.player->entity.rect.height/2;
+            int tdmg = (int)(get_effective_attack(_s.player.get()) * 1.5f);
+            for (auto& om : _s.monsters) {
+                if (!om->combat.is_alive) continue;
+                float d = hypotf(om->entity.rect.x + om->entity.rect.width/2 - px,
+                                 om->entity.rect.y + om->entity.rect.height/2 - py);
+                if (d < 4.0f * 32.0f)
+                    om->combat.take_damage(tdmg);
+            }
+            LOG_INFO("[RELIC] 雷霆核心触发AOE: %d伤害", tdmg);
+        }
+    }
+    // D8: time_fragment — 击杀5%概率重置所有技能冷却
+    if (_s.player && player_has_relic(_s.player.get(), "time_fragment")) {
+        if ((rng() % 100) < 5) {
+            for (auto& sk : _s.player->skills.active_skills)
+                sk->reset_cooldown();
+            LOG_INFO("[RELIC] 时之碎片重置所有技能冷却");
+        }
     }
 }
 

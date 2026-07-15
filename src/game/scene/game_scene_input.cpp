@@ -61,7 +61,10 @@ void GameSceneInput::handle_input(const InputMap& input) {
     if (_s.state == GameState::BOSS_INTRO) {
         if (input.is_action_just_pressed("confirm")) {
             auto pos = _s.game_map->tile_to_pixel(_s.stairs_pos.first, _s.stairs_pos.second);
-            auto* boss = spawn_boss(_s.stairs_pos.first, _s.stairs_pos.second, _s.boss_floor);
+            // D8: BossFactory 按 floor+seed 随机 Boss 类型
+BossType btype = boss_type_for_floor(_s.boss_floor, _s._dungeon_seed);
+auto* boss = boss_factory_create(btype, _s.stairs_pos.first, _s.stairs_pos.second,
+                                  _s.boss_floor);
             _s.monsters.emplace_back(boss);
 
             BuildType bt = calculate_build(_s.player.get()).identify();

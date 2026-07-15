@@ -203,7 +203,16 @@ bool MonsterAI::_think_and_cast(Monster* self, Player* player, GameMap* map,
                 warn.color = {255, 80, 40, 180};
                 effects->push_back(warn);
             }
-            if (sk.cast_left <= 0) sk.active = true; // 蓄力完毕
+            if (sk.cast_left <= 0) {
+                // D8: CHARGE 蓄力完毕 → 执行冲刺
+                if (sk.type == MonsterSkillType::CHARGE) {
+                    _exec_charge(self, player, map, effects, sk);
+                    sk.active = false;
+                    sk.cooldown = sk.max_cooldown;
+                    return true;
+                }
+                sk.active = true; // 蓄力完毕
+            }
             return true; // 蓄力中不移动
         }
 
@@ -253,6 +262,14 @@ bool MonsterAI::_think_and_cast(Monster* self, Player* player, GameMap* map,
         case MonsterSkillType::SUMMON:
             should_cast = ((int)(*all).size() < 8); // 场上怪不多时
             break;
+        // D8: Charger — 中距蓄力冲撞
+        case MonsterSkillType::CHARGE:
+            should_cast = (dist > 3.0f * 32.0f && dist < 8.0f * 32.0f);
+            break;
+        // D8: Summoner — 场上怪物不多时召唤
+        case MonsterSkillType::MASS_SUMMON:
+            should_cast = (all && (int)(*all).size() < 10);
+            break;
         default: break;
         }
         if (!should_cast) continue;
@@ -272,6 +289,13 @@ bool MonsterAI::_think_and_cast(Monster* self, Player* player, GameMap* map,
             sk.cast_left = 0.2f; break;
         case MonsterSkillType::SUMMON:
             _exec_summon(self, player, map, all, effects, sk);
+            sk.cooldown = sk.max_cooldown; break;
+        // D8: CHARGE — 蓄力冲刺 (0.5s蓄力→冲刺)
+        case MonsterSkillType::CHARGE:
+            sk.cast_left = 0.5f; break;
+        // D8: MASS_SUMMON — 一次召唤2只
+        case MonsterSkillType::MASS_SUMMON:
+            _exec_mass_summon(self, player, map, all, effects, sk);
             sk.cooldown = sk.max_cooldown; break;
         default: break;
         }
@@ -391,6 +415,89 @@ void MonsterAI::_exec_summon(Monster* self, Player*, GameMap* map,
         effects->push_back(e);
     }
     sk.active = false;
+}
+
+// ============================================================
+// D8 Step1: CHARGE — 蓄力后直线冲刺, 撞击造成伤害+击退
+// ============================================================
+void MonsterAI::_exec_charge(Monster* self, Player* player, GameMap* map,
+                              std::vector<Effect>* effects, MonsterSkillState& sk) {
+    float dx = player->entity.rect.x + player->entity.rect.width/2
+             - self->entity.rect.x - self->entity.rect.width/2;
+    float dy = player->entity.rect.y + player->entity.rect.height/2
+             - self->entity.rect.y - self->entity.rect.height/2;
+    float dist = sqrtf(dx*dx + dy*dy);
+    if (dist < 1) return;
+    float ndx = dx/dist, ndy = dy/dist;
+
+    // 冲刺距离: 4格
+    float charge_dist = std::min(dist, 4.0f * 32.0f);
+    self->entity.position.x += ndx * charge_dist;
+    self->entity.position.y += ndy * charge_dist;
+    self->entity.sync_rect();
+
+    // 穿墙回退
+    if (!map->is_rect_walkable(self->entity.rect)) {
+        self->entity.position.x -= ndx * charge_dist;
+        self->entity.position.y -= ndy * charge_dist;
+        self->entity.sync_rect();
+    }
+
+    // 碰撞检测: 如果冲刺后接触到玩家, 造成伤害+击退
+    float after_dist = _dist_to(self, player);
+    if (after_dist <= attack_range * 32.0f * 2.0f) {
+        int dmg = calculate_damage(self->combat.get_effective_attack() * 2,
+            player->combat.get_effective_defense(self->attack_type));
+        player->combat.take_damage(dmg);
+        // 击退玩家
+        float px = player->entity.position.x + ndx * 48.0f;
+        float py = player->entity.position.y + ndy * 48.0f;
+        player->entity.position = {px, py};
+        player->entity.sync_rect();
+    }
+
+    // 冲刺轨迹特效
+    if (effects) {
+        Effect trail;
+        trail.kind = "bolt";
+        trail.world_x = self->entity.rect.x + self->entity.rect.width/2 - ndx * charge_dist;
+        trail.world_y = self->entity.rect.y + self->entity.rect.height/2 - ndy * charge_dist;
+        trail.target_x = self->entity.rect.x + self->entity.rect.width/2;
+        trail.target_y = self->entity.rect.y + self->entity.rect.height/2;
+        trail.radius = 4; trail.duration = 0.3f; trail.elapsed = 0;
+        trail.color = {255, 180, 40, 200};
+        effects->push_back(trail);
+    }
+    (void)sk;
+}
+
+// ============================================================
+// D8 Step1: MASS_SUMMON — 一次召唤2只小怪
+// ============================================================
+void MonsterAI::_exec_mass_summon(Monster* self, Player*, GameMap* map,
+                                   std::vector<Monster*>* all,
+                                   std::vector<Effect>* effects,
+                                   MonsterSkillState& sk) {
+    for (int i = 0; i < 2; i++) {
+        int off_x = (int)(rng() % 7) - 3;
+        int off_y = (int)(rng() % 7) - 3;
+        float sx = self->entity.position.x + off_x * 32.0f;
+        float sy = self->entity.position.y + off_y * 32.0f;
+        auto [tx, ty] = map->pixel_to_tile(sx, sy);
+        if (map->is_walkable(tx, ty)) {
+            const char* type = (rng() % 2 == 0) ? "slime" : "archer";
+            Monster* m = spawn_monster(sx, sy, type);
+            if (m && all) all->push_back(m);
+            if (effects) {
+                Effect e;
+                e.kind = "pulse"; e.world_x = sx; e.world_y = sy;
+                e.radius = 24; e.duration = 0.25f; e.elapsed = 0;
+                e.color = {180, 120, 220, 150};
+                effects->push_back(e);
+            }
+        }
+    }
+    (void)sk;
 }
 
 // ============================================================

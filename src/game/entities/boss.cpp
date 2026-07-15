@@ -132,13 +132,14 @@ BossAI::BossAI() : MonsterAI(10.0f, 60.0f, 3.0f, 2.0f) {
 }
 
 int BossAI::_next_cycle_skill() {
-    // 技能循环: Charge → 普攻2次 → Shockwave → 普攻2次 → Summon → 普攻2次 → 重复
-    // skill_cycle_index: 0=Charge, 1=norm, 2=Shockwave, 3=norm, 4=Summon, 5=norm
-    int idx = skill_cycle_index % 6;
+    // D8: skill_cycle_bias defines pattern: 6=normal, 4=summon-heavy
+    int cycle_len = skill_cycle_bias;
+    int idx = skill_cycle_index % cycle_len;
     skill_cycle_index++;
     if (idx == 0) return 0;       // Charge
     if (idx == 2) return 1;       // Shockwave
-    if (idx == 4) return 2;       // Summon
+    if (cycle_len == 4 && idx == 3) return 2; // Necromancer: Summon at idx 3 (every 2nd after norm)
+    if (cycle_len == 6 && idx == 4) return 2; // Normal: Summon at idx 4
     return -1;                     // 普攻
 }
 
@@ -215,9 +216,13 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             _spawn_boss_vfx(self, "charge", effects); // reuse vfx for norm attack
             normal_attack_count++;
         }
-        // 普攻2次后 → 使用下个技能
+        // 普攻2次后 → 使用下个技能 (D8: Golem adds DEFEND to cycle)
         if (normal_attack_count >= 2) {
             int sk = _next_cycle_skill();
+            // D8: Golem — every other cycle, use DEFEND instead of Shockwave
+            if (golem_shield_pct > 0 && sk == 1 && (skill_cycle_index % 12) < 6) {
+                sk = 3; // override: DEFEND instead of Shockwave
+            }
             if (sk == 0) {
                 boss_state = BossState::CHARGE;
                 _charge->windup_left = 0.6f;
@@ -230,6 +235,9 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             } else if (sk == 2) {
                 boss_state = BossState::SUMMON;
                 _spawn_boss_vfx(self, "summon", effects);
+            } else if (sk == 3) {
+                boss_state = BossState::DEFEND;
+                _spawn_boss_vfx(self, "shockwave", effects); // reuse VFX
             }
             normal_attack_count = 0;
         }
@@ -324,12 +332,35 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
     }
     case BossState::SUMMON: {
         auto mlist = all ? *all : std::vector<Monster*>{};
-        _summon->execute(self, player, mlist, map, gt);
+        // D8: Necromancer Phase2 summons more
+        int extra = (phase2 && skill_cycle_bias == 4) ? 2 : 0;
+        for (int n = 0; n < 1 + extra; n++) {
+            _summon->execute(self, player, mlist, map, gt);
+        }
         _spawn_boss_vfx(self, "summon", effects);
         boss_state = BossState::ATTACK;
         normal_attack_count = 0;
         break;
     }
+    case BossState::DEFEND: {
+        // D8: Golem — 举盾减伤 3 秒
+        auto& mod = self->combat.modifiers;
+        float pct = golem_shield_pct > 0 ? golem_shield_pct : 0.70f;
+        mod["def_pct"] = (mod.count("def_pct") ? mod["def_pct"] : 0) + pct;
+        if (effects) {
+            Effect s;
+            s.kind = "pulse";
+            s.world_x = self->entity.rect.x + self->entity.rect.width/2;
+            s.world_y = self->entity.rect.y + self->entity.rect.height/2;
+            s.radius = 56; s.duration = 0.5f; s.elapsed = 0;
+            s.color = {60, 140, 255, 160};
+            effects->push_back(s);
+        }
+        boss_state = BossState::ATTACK;
+        normal_attack_count = 0;
+        break;
+    }
+    default: break;
     }
 }
 
@@ -337,7 +368,7 @@ float BossAI::_hp_ratio(Monster* self) const {
     return (float)self->combat.current_hp / self->combat.max_hp;
 }
 
-// ---- 工厂 ----
+// ---- BossInfo 表 (B7 compat) ----
 static BossInfo BOSSES[] = {
     {"暗影骑士", "第一狱守·暗影骑士",
      "曾是王城最荣耀的骑士，被黑暗吞噬后\n成为地牢第一道门的永恒守门人。",
@@ -367,5 +398,66 @@ Monster* spawn_boss(int tile_x, int tile_y, int floor) {
     boss->is_boss = true;
     boss->entity.size = {48, 48};
     boss->entity.rect = {boss->entity.position.x, boss->entity.position.y, 48, 48};
+    return boss;
+}
+
+// ============================================================
+// D8 Step2: BossFactory — 按类型创建 + 配置驱动
+// ============================================================
+static const BossTemplate BOSS_TEMPLATES[] = {
+    // type             floor name         title                    lore
+    {BossType::SHADOW_KNIGHT,5,"暗影骑士","第一狱守·暗影骑士","曾是王城最荣耀的骑士，被黑暗吞噬后\n成为地牢第一道门的永恒守门人。",
+     false,false, 250,15,10,4, {120,20,180,255}, 1.0f,0.0f},
+    {BossType::NECROMANCER, 5,"亡灵法师","第一狱守·亡灵法师","从墓地中召唤亡灵的黑暗法师，\n让你感受到死亡从未真正的离开。",
+     true, false, 240,14, 9,7, {80,180,80,255},   2.0f,0.0f},  // D9: HP/ATK closer to Shadow Knight
+    {BossType::FIRE_DEMON, 10,"地狱火魔","第二狱守·地狱火魔","熔岩深渊中诞生的远古恶魔，\n以灼热烈焰焚烧一切闯入者。",
+     false,false, 500,24,14,8, {240,100,20,255},  1.0f,0.0f},
+    {BossType::GOLEM,      10,"远古魔像","第二狱守·远古魔像","由熔岩冷却后的黑曜石组成，\n坚不可摧的魔法造物。",
+     false,true,  520,23,18,13,{100,100,130,255}, 1.0f, 0.60f},  // D9: DEFEND减60%(was70%), ATK closer to FireDemon
+    {BossType::DEMON_LORD, 15,"深渊之主·终焉","终焉·深渊之主","地牢最深处的终极存在，一切黑暗的源头。\n击败他，地牢将重获光明。",
+     false,false, 900,35,22,14,{180,20,20,255},   1.0f,0.0f},
+};
+
+const BossTemplate* boss_factory_lookup(BossType type) {
+    for (auto& t : BOSS_TEMPLATES)
+        if (t.type == type) return &t;
+    return &BOSS_TEMPLATES[0];
+}
+
+BossType boss_type_for_floor(int floor, uint32_t seed) {
+    // D8: 随机Boss池 — 当前简化实现, 后续可加权重
+    auto rng_local = std::mt19937(seed ? seed : (uint32_t)std::random_device{}());
+    if (floor == 5) {
+        return (rng_local() % 2 == 0) ? BossType::SHADOW_KNIGHT : BossType::NECROMANCER;
+    } else if (floor == 10) {
+        return (rng_local() % 2 == 0) ? BossType::FIRE_DEMON : BossType::GOLEM;
+    }
+    return BossType::DEMON_LORD; // F15 固定
+}
+
+Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
+                              std::vector<Monster*>* out_monsters, GameMap* map) {
+    const BossTemplate* tmpl = boss_factory_lookup(type);
+    BossAI* ai = new BossAI();
+    Monster* boss = new Monster(
+        (float)tile_x * TILE_SIZE, (float)tile_y * TILE_SIZE,
+        tmpl->name, tmpl->max_hp, tmpl->attack, tmpl->pdef, tmpl->mdef,
+        tmpl->color, ai);
+    boss->is_boss = true;
+    boss->entity.size = {48, 48};
+    boss->entity.rect = {boss->entity.position.x, boss->entity.position.y, 48, 48};
+
+    // D8: Necromancer — 调整技能循环 (SUMMON more frequent)
+    if (tmpl->is_summoner) {
+        ai->_summon->cooldown = 6.0f;  // faster
+        ai->skill_cycle_bias = 4;       // SUMMON every 2 norm attacks + bias
+    }
+    // D8: Golem — DEFEND state
+    if (tmpl->is_defender) {
+        ai->golem_shield_pct = tmpl->shield_pct;
+    }
+
+    // D4.6: 自动记录世界标记 (Boss击败后由 FlowDirector 设置)
+    (void)out_monsters; (void)map;
     return boss;
 }

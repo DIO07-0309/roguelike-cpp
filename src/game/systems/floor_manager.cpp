@@ -10,15 +10,14 @@
 
 // D1: 从 FloorConfig 读取概率 → 返回怪物类型
 static const char* _pick_monster_type(const FloorConfig& cfg) {
-    int w[6];
-    for (int i = 0; i < 6; i++) w[i] = cfg.enemy_weights[i];
-    // 计算总权重
+    int w[8];
+    for (int i = 0; i < 8; i++) w[i] = cfg.enemy_weights[i];
     int total = 0;
-    for (int i = 0; i < 6; i++) total += w[i];
+    for (int i = 0; i < 8; i++) total += w[i];
     if (total <= 0) return "slime";
     int roll = (int)(rng() % (uint32_t)total);
     int sum = 0;
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 8; i++) {
         if (w[i] == 0) continue;
         sum += w[i];
         if (roll < sum) {
@@ -29,10 +28,12 @@ static const char* _pick_monster_type(const FloorConfig& cfg) {
                 case 3: return "bomber";
                 case 4: return "tank";
                 case 5: return "elite";
+                case 6: return "charger";   // D8
+                case 7: return "summoner";  // D8
             }
         }
     }
-    return "slime"; // fallback
+    return "slime";
 }
 
 void FloorManager::spawn_floor_monsters(int floor_number, GameMap* map,

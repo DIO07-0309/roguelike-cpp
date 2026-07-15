@@ -85,28 +85,27 @@ int DungeonGenerator::_rand_int(int max_exclusive) {
 
 // B8: 从 _rooms 中挑选 N 个作为特殊房间 (D1: N 从 FloorConfig 读取)
 void DungeonGenerator::_assign_special_rooms(int count) {
-    // 需要至少 4 个房间: 玩家 + 楼梯 + 2 特殊
     if (_rooms.size() < 4) return;
 
-    // 排除 rooms[0] (玩家) 和 rooms.back() (楼梯)
     std::vector<int> candidates;
     for (int i = 1; i < (int)_rooms.size() - 1; i++)
         candidates.push_back(i);
 
-    // Fisher-Yates shuffle (用本地随机保证同 seed 同结果)
     for (int i = (int)candidates.size() - 1; i > 0; i--) {
         int j = _rand_int(i + 1);
         std::swap(candidates[i], candidates[j]);
     }
 
     int scount = std::min(count, (int)candidates.size());
+    // D8: SECRET rooms are rare — only appear at higher floors (ch6+)
+    int type_idx = 0;
     for (int i = 0; i < scount; i++) {
         auto [rx, ry, rw, rh] = _rooms[candidates[i]];
         SpecialRoom sr;
         sr.cx = rx + rw / 2;
         sr.cy = ry + rh / 2;
         sr.rx = rx; sr.ry = ry; sr.rw = rw; sr.rh = rh;
-        sr.type = special_room_from_index(i); // 0→ALTAR, 1→TREASURE, 2→FOUNTAIN
+        sr.type = special_room_from_index(type_idx++);
         sr.triggered = false;
         _special_rooms.push_back(sr);
     }

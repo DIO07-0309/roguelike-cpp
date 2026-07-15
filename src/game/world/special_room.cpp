@@ -8,27 +8,45 @@
 #include <algorithm>
 
 SpecialRoomType special_room_from_index(int idx) {
-    switch (idx % 3) {
+    switch (idx % 9) {
         case 0: return SpecialRoomType::ALTAR;
         case 1: return SpecialRoomType::TREASURE;
-        default: return SpecialRoomType::FOUNTAIN;
+        case 2: return SpecialRoomType::FOUNTAIN;
+        case 3: return SpecialRoomType::SHOP;
+        case 4: return SpecialRoomType::BLACKSMITH;
+        case 5: return SpecialRoomType::LIBRARY;
+        case 6: return SpecialRoomType::GAMBLER;
+        case 7: return SpecialRoomType::SHRINE;
+        default: return SpecialRoomType::SECRET;
     }
 }
 
 std::string special_room_to_string(SpecialRoomType type) {
     switch (type) {
-        case SpecialRoomType::ALTAR:    return "altar";
-        case SpecialRoomType::TREASURE: return "treasure";
-        case SpecialRoomType::FOUNTAIN: return "fountain";
+        case SpecialRoomType::ALTAR:      return "altar";
+        case SpecialRoomType::TREASURE:   return "treasure";
+        case SpecialRoomType::FOUNTAIN:   return "fountain";
+        case SpecialRoomType::SHOP:       return "shop";
+        case SpecialRoomType::BLACKSMITH: return "blacksmith";
+        case SpecialRoomType::LIBRARY:    return "library";
+        case SpecialRoomType::GAMBLER:    return "gambler";
+        case SpecialRoomType::SHRINE:     return "shrine";
+        case SpecialRoomType::SECRET:     return "secret";
     }
     return "unknown";
 }
 
 SpecialRoomType special_room_from_string(const std::string& s) {
-    if (s == "altar")    return SpecialRoomType::ALTAR;
-    if (s == "treasure") return SpecialRoomType::TREASURE;
-    if (s == "fountain") return SpecialRoomType::FOUNTAIN;
-    return SpecialRoomType::ALTAR; // safe fallback
+    if (s == "altar")      return SpecialRoomType::ALTAR;
+    if (s == "treasure")   return SpecialRoomType::TREASURE;
+    if (s == "fountain")   return SpecialRoomType::FOUNTAIN;
+    if (s == "shop")       return SpecialRoomType::SHOP;
+    if (s == "blacksmith") return SpecialRoomType::BLACKSMITH;
+    if (s == "library")    return SpecialRoomType::LIBRARY;
+    if (s == "gambler")    return SpecialRoomType::GAMBLER;
+    if (s == "shrine")     return SpecialRoomType::SHRINE;
+    if (s == "secret")     return SpecialRoomType::SECRET;
+    return SpecialRoomType::ALTAR;
 }
 
 // ============================================================
@@ -55,6 +73,8 @@ static std::string _altar_heal(Player* player) {
     int amount = std::max(1, eff_max * 3 / 10);
     // B12: sage_leaf — 祭坛治疗 +10
     if (player_has_relic(player, "sage_leaf")) amount += 10;
+    // D8: healing_herb — 所有治疗 +15%
+    if (player_has_relic(player, "healing_herb")) amount = (int)(amount * 1.15f);
     heal_player(player, amount);  // B11: 使用 effective max clamp
     return "祭坛赐福：你的伤势恢复了。";
 }
@@ -86,12 +106,13 @@ static std::string _exec_altar(Player* player) {
 }
 
 // ============================================================
-// B12: rarity 权重 relic 抽取 (common:100, rare:40, epic:10)
+// B12: rarity 权重 relic 抽取 (common:100, rare:40, epic:10, legendary:3)
 static int _rarity_weight(const std::string& rarity) {
-    if (rarity == "common") return 100;
-    if (rarity == "rare")   return 40;
-    if (rarity == "epic")   return 10;
-    return 100; // fallback
+    if (rarity == "common")    return 100;
+    if (rarity == "rare")      return 40;
+    if (rarity == "epic")      return 10;
+    if (rarity == "legendary") return 3;
+    return 100;
 }
 
 // B12: 宝箱房 relic 掉落 — 按 rarity 权重抽取, 支持 drop_chance 参数
@@ -103,7 +124,7 @@ static std::string _try_grant_random_relic(Player* player, float drop_chance) {
     auto all_ids = get_all_relic_ids();
     // 先按 rarity 权重选 rarity 档
     struct RaritySlot { std::string rarity; int weight; std::vector<std::string> ids; };
-    RaritySlot slots[] = {{"common", 100, {}}, {"rare", 40, {}}, {"epic", 10, {}}};
+    RaritySlot slots[] = {{"common", 100, {}}, {"rare", 40, {}}, {"epic", 10, {}}, {"legendary", 3, {}}};
     int total_w = 0;
     for (auto& slot : slots) {
         for (auto& id : all_ids) {
@@ -235,6 +256,8 @@ static std::string _exec_fountain(Player* player) {
     if (missing < 0) missing = 0;
     // B12: sage_leaf — 泉水治疗 +10
     if (player_has_relic(player, "sage_leaf")) missing += 10;
+    // D8: healing_herb — 所有治疗 +15%
+    if (player_has_relic(player, "healing_herb")) missing = (int)(missing * 1.15f);
     if (missing > 0) heal_player(player, missing);  // B11: 使用 effective max clamp
     _cleanse_debuffs(player);
     return "泉水治愈并净化了你的身体。";
@@ -243,11 +266,106 @@ static std::string _exec_fountain(Player* player) {
 // ============================================================
 // 统一交互入口
 // ============================================================
+// D8 Step5: 6 new room types
+// ============================================================
+
+// ---- SHOP (商店) — 随机提供1件稀有以上物品 ----
+static std::string _exec_shop(Player* player) {
+    // D9: 商店提供 2 件稀有+物品 (was 1)
+    int count = 0;
+    for (int t = 0; t < 2; t++) {
+        auto item = generate_random_item();
+        int tries = 0;
+        while (item && item->rarity < Rarity::RARE && tries < 5) {
+            item = generate_random_item(); tries++;
+        }
+        if (item && player->inventory.add(item, player)) count++;
+    }
+    if (count == 0) return "商店今天没有特别的货物。";
+    return "商店为你提供了" + std::to_string(count) + "件货物。";
+}
+
+// ---- BLACKSMITH (铁匠) — 随机强化武器或护甲 ----
+static std::string _exec_blacksmith(Player* player) {
+    auto& inv = player->inventory;
+    std::shared_ptr<EquipmentItem> target = inv.equipped["weapon"];
+    if (!target) target = inv.equipped["armor"];
+    // 若没有装备，给一件随机装备
+    (void)target; // MVP: 简化实现 — 随机给一件装备
+    auto eq = std::make_shared<EquipmentItem>("铁匠制品", Rarity::RARE, "weapon", 8, 2, 0);
+    inv.add(eq, player);
+    return "铁匠为你打造了一件新装备。";
+}
+
+// ---- LIBRARY (图书馆) — 随机获得1级技能升级 ----
+static std::string _exec_library(Player* player) {
+    auto& active = player->skills.active_skills;
+    if (active.empty()) return "图书馆里空无一人——你还没有技能可以研习。";
+    int idx = rng() % (int)active.size();
+    if (active[idx]->can_upgrade()) {
+        active[idx]->upgrade();
+        return active[idx]->name + " 升级了！";
+    }
+    return "你研习了古籍，但没有获得新的领悟。";
+}
+
+// ---- GAMBLER (赌徒) — 50% 奖励 / 50% 惩罚 ----
+static std::string _exec_gambler(Player* player) {
+    // D9: 基础胜率60%(was50%), golden_dice→85%
+    bool win = (rng() % 100 < 60);
+    if (player_has_relic(player, "golden_dice")) win = (rng() % 100 < 85);
+    if (win) {
+        auto item = generate_random_item();
+        if (item) { player->inventory.add(item, player); return "赌徒咧嘴一笑：运气不错！"; }
+        return "赌徒摊手：今天没货了。";
+    } else {
+        int loss = std::max(1, player->combat.current_hp / 5);
+        player->combat.take_damage(loss);
+        return "赌徒摇头：命运不站在你这边。受到 " + std::to_string(loss) + " 伤害。";
+    }
+}
+
+// ---- SHRINE (神殿) — 随机 Blessing / 回血 / Rare Relic ----
+static std::string _exec_shrine(Player* player) {
+    int roll = rng() % 3;
+    if (roll == 0) {
+        apply_buff(player, "blessing", 2);
+        return "神殿的光辉笼罩着你——你获得了祝福。";
+    } else if (roll == 1) {
+        int heal = get_effective_max_hp(player) / 2;
+        heal_player(player, heal);
+        return "神殿的力量治愈了你。";
+    } else {
+        // 概率获得 relic (高权重rare+)
+        std::string relic_msg = _try_grant_random_relic(player, 0.50f);
+        return relic_msg.empty() ? "神殿默默凝视着你。" : "神殿赐予了你一件圣物！" + relic_msg;
+    }
+}
+
+// ---- SECRET (隐藏房) — 必定给 1 relic + 1 传说物品 ----
+static std::string _exec_secret(Player* player) {
+    // D9: 必定1 relic, 概率给传说物品(50%)
+    std::string relic_msg = _try_grant_random_relic(player, 1.0f);
+    std::string extra;
+    if (rng() % 2 == 0) {
+        auto item = std::make_shared<EquipmentItem>("秘宝", Rarity::LEGENDARY, "weapon", 20, 5, 3);
+        if (player->inventory.add(item, player)) extra = " 而且找到了一件传说秘宝。";
+    }
+    return "你发现了一间隐藏房间！" + relic_msg + extra;
+}
+
+// ============================================================
 std::string execute_special_room(SpecialRoomType type, Player* player) {
     switch (type) {
-        case SpecialRoomType::ALTAR:    return _exec_altar(player);
-        case SpecialRoomType::TREASURE: return _exec_treasure(player);
-        case SpecialRoomType::FOUNTAIN: return _exec_fountain(player);
+        case SpecialRoomType::ALTAR:      return _exec_altar(player);
+        case SpecialRoomType::TREASURE:   return _exec_treasure(player);
+        case SpecialRoomType::FOUNTAIN:   return _exec_fountain(player);
+        case SpecialRoomType::SHOP:       return _exec_shop(player);
+        case SpecialRoomType::BLACKSMITH: return _exec_blacksmith(player);
+        case SpecialRoomType::LIBRARY:    return _exec_library(player);
+        case SpecialRoomType::GAMBLER:    return _exec_gambler(player);
+        case SpecialRoomType::SHRINE:     return _exec_shrine(player);
+        case SpecialRoomType::SECRET:     return _exec_secret(player);
     }
     return "未知房间。";
 }

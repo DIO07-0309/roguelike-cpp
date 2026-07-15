@@ -121,9 +121,14 @@ void PlayerController::handle_input(const InputMap& input) {
         std::string result = gs._interact.try_interact(gs.player.get(), gs.game_map.get(), gs.ground_items);
         if (!result.empty()) {
             gs._gameplay.flow.mark_reward();
-            bool is_relic = (result.size() > 6 && result.substr(0, 6) == "RELIC:");
+            bool is_relic = (result.find("圣物") != std::string::npos);
             gs._presentation.room_msg = result;
             gs._presentation.room_msg_timer = is_relic ? 3.5f : 2.5f;
+            // D9: 获得圣物 — shake+freeze 仪式感
+            if (is_relic && gs._presentation.combat_juice_on) {
+                gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_LIGHT);
+                gs._presentation.trigger_freeze(CombatFeelSystem::RELIC_PICKUP);
+            }
             if (!gs._interact.shown_relic_hint && !gs.player->relics.empty()) {
                 gs._interact.shown_relic_hint = true;
                 gs._presentation.room_msg = "按 R 可查看圣物面板";

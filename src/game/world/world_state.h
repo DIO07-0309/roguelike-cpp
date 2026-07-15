@@ -24,8 +24,16 @@ enum class WorldFlag {
     Boss2_Defeated,     // F10 地狱火魔
     Boss3_Defeated,     // F15 深渊之主
     All_Boss_Defeated,  // 三Boss全击杀
+    // ── D8 Step7: 新NPC与任务 ──
+    Hunter_Met,          // F3 猎人相遇
+    Collector_Met,       // F6 收藏家相遇
+    Scout_Met,           // F8 侦察兵相遇
+    Dreamer_Met,         // F12 梦见者相遇
+    Kill_10_Monsters,    // 击杀10只怪物
+    Reach_Floor_10,      // 到达F10
+    Collect_3_Relics,    // 收集3个圣物
     // ── 结局条件 ──
-    True_Ending_Ready,  // 好感+不诅咒+不血祭+不杀商人+全Boss
+    True_Ending_Ready,
 };
 
 namespace std {

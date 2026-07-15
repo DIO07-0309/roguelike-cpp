@@ -21,6 +21,8 @@ enum class MonsterSkillType {
     LEAP,         // Bomber: 跳跃接近玩家
     SHIELD,       // Tank: 举盾减伤70%
     SUMMON,       // Elite: 召唤1只小怪
+    CHARGE,       // D8: Charger: 蓄力冲刺撞击+击退
+    MASS_SUMMON,  // D8: Summoner: 一次召唤2只小怪
 };
 
 // D2 Step3: 技能状态 (每只怪物独立, 非共享)
@@ -100,4 +102,10 @@ protected:
     void _exec_summon(Monster* self, Player* player, GameMap* map,
                       std::vector<Monster*>* all, std::vector<Effect>* effects,
                       MonsterSkillState& sk);
+    // D8 Step1: 新技能执行器
+    void _exec_charge(Monster* self, Player* player, GameMap* map,
+                      std::vector<Effect>* effects, MonsterSkillState& sk);
+    void _exec_mass_summon(Monster* self, Player* player, GameMap* map,
+                           std::vector<Monster*>* all, std::vector<Effect>* effects,
+                           MonsterSkillState& sk);
 };
