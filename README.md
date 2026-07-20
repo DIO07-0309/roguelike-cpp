@@ -2,6 +2,7 @@
 
 > 重庆大学大数据与软件学院 ·《程序设计实训》  
 > 开发者：ruozhiDIO
+> **版本**: v0.9.0 (G6 Sync) || **Python 版**: v0.9.0 (双版同步)
 
 ---
 
@@ -814,3 +815,21 @@ rlc:blood_charm,war_drum,plague_mask
 | 结局 | 5 | EndingDef JSON |
 
 **Source files**: ~200+ (h/cpp/json) **· CLI flags**: --record / --replay / --sim N **· Mod support**: mods/ with mod.json
+
+---
+
+## Python 版同步 (G5-G6, 2026-07)
+
+Python 版 (pygame) 已同步 C++ 的核心玩法代码和架构模块：
+
+| 系统 | 状态 |
+|------|:--:|
+| 10 JSON 数据 | ✅ 100% 一致 (buffs 25, relics 63, enemies 31, bosses 6, skills 22, items ~30, quests 12, dialogues 34, endings 5, meta 10) |
+| 5 Signature Skill 行为类 | ✅ IceNova/ChainLightning/ShadowStrike/BloodFrenzy/SummonSpirit |
+| AIArchetype (4新) | ✅ Sniper/Controller/Ambush/Guardian + 12 MonsterSkillType |
+| Boss Phase2 (6 Boss) | ✅ Whirlwind/LaserBarrage/GravityPull + 6 Boss预设 |
+| BuildType 6→12 | ✅ 全部标签评分 |
+| EventBus (30事件) | ✅ src/core/event_bus.py |
+| Replay系统 | ✅ src/core/replay/ (Recorder/Player/StateHash) |
+| SimRunner | ✅ src/core/sim/ (SimAI + 自动模拟) |
+| Mod/Provider | 🔮 G6后续 |
