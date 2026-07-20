@@ -36,14 +36,17 @@ static std::string trim(const std::string& s) {
 bool SaveManager::save_game(Player* player, int floor, int max_f,
                               uint32_t dungeon_seed,
                               const std::vector<bool>& special_triggered,
-                              const std::vector<bool>& special_discovered) {
+                              const std::vector<bool>& special_discovered,
+                              const std::unordered_map<std::string, int>& rule_counters,
+                              const std::unordered_map<int, int>& quest_states,
+                              const std::vector<int>& unlocked_endings) {
     mkdir_impl(_save_dir().c_str());
     FILE* f = fopen(_save_path().c_str(), "w");
     if (!f) { LOG_ERROR("存档无法写入"); return false; }
     auto& c = player->combat;
     auto& inv = player->inventory;
 
-    fprintf(f, "v:1\n");
+    fprintf(f, "v:3\n");
     fprintf(f, "floor:%d\n", floor);
     fprintf(f, "maxf:%d\n", max_f);
     fprintf(f, "lv:%d\n", player->level);
@@ -55,25 +58,19 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     fprintf(f, "pd:%d\n", c.physical_defense);
     fprintf(f, "md:%d\n", c.magical_defense);
 
-    // 主动技能: name,lv;name,lv;...
+    // 主动技能: id,lv,evo,use;... (G3.2: _skill_id 替代 dynamic_cast)
     fprintf(f, "act:");
     for (auto& s : player->skills.active_skills) {
-        const char* nm = "?";
-        if      (dynamic_cast<SlashSkill*>(s.get()))    nm = "Slash";
-        else if (dynamic_cast<FireballSkill*>(s.get())) nm = "Fireball";
-        else if (dynamic_cast<SelfHealSkill*>(s.get())) nm = "SelfHeal";
-        else if (dynamic_cast<TheWorldSkill*>(s.get()))  nm = "TheWorld";
-        fprintf(f, "%s,%d;", nm, s->level);
+        const char* nm = s->_skill_id.empty() ? "slash" : s->_skill_id.c_str();
+        fprintf(f, "%s,%d,%d,%d;", nm, s->level, s->evolution_level, s->use_count);
     }
     fprintf(f, "\n");
 
-    // 被动技能
+    // 被动技能 (G3.2: _skill_id)
     fprintf(f, "pas:");
     for (auto& s : player->skills.passives) {
-        const char* nm = "?";
-        if      (dynamic_cast<IronSkinSkill*>(s.get())) nm = "IronSkin";
-        else if (dynamic_cast<BerserkSkill*>(s.get()))  nm = "Berserk";
-        fprintf(f, "%s,%d;", nm, s->level);
+        const char* nm = s->_skill_id.empty() ? "iron_skin" : s->_skill_id.c_str();
+        fprintf(f, "%s,%d,%d,%d;", nm, s->level, s->evolution_level, s->use_count);
     }
     fprintf(f, "\n");
 
@@ -126,6 +123,39 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     fprintf(f, "spr:%s\n", _encode_spr(special_triggered).c_str());
     fprintf(f, "spd:%s\n", _encode_spr(special_discovered).c_str());
     // B13: Relic 不再跨层 (不保存圣物)
+
+    // ── G1 Step7: Save v2 新增 ──
+    fprintf(f, "atl:%d\n", player->attack_evo.level);
+    fprintf(f, "rul:");
+    if (!rule_counters.empty()) {
+        bool first = true;
+        for (auto& kv : rule_counters) {
+            if (!first) fprintf(f, ";");
+            fprintf(f, "%s=%d", kv.first.c_str(), kv.second);
+            first = false;
+        }
+    }
+    fprintf(f, "\n");
+
+    // ── G2.4: Quest state ──
+    fprintf(f, "qst:");
+    if (!quest_states.empty()) {
+        bool first = true;
+        for (auto& kv : quest_states) {
+            if (!first) fprintf(f, ";");
+            fprintf(f, "%d=%d", kv.first, kv.second);
+            first = false;
+        }
+    }
+    fprintf(f, "\n");
+
+    // ── G2.5: 已解锁结局 ──
+    fprintf(f, "end:");
+    for (size_t i = 0; i < unlocked_endings.size(); i++) {
+        if (i > 0) fprintf(f, ";");
+        fprintf(f, "%d", unlocked_endings[i]);
+    }
+    fprintf(f, "\n");
 
     fclose(f);
     LOG_INFO("存档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff seed:%u",
@@ -192,7 +222,18 @@ SaveData* SaveManager::load_save() {
     p->xp = xp;
     p->xp_to_next = xpt;
 
-    // 恢复主动技能
+    // 恢复主动技能 (G3.2: SkillFactory 替代 dynamic_cast, 兼容旧格式 name)
+    // G3.2: 旧 save 名映射 ("Slash"→"slash", "Fireball"→"fireball", etc.)
+    static auto _map_old_name = [](const std::string& nm) -> std::string {
+        if (nm == "Slash")     return "slash";
+        if (nm == "Fireball")  return "fireball";
+        if (nm == "SelfHeal")  return "self_heal";
+        if (nm == "TheWorld")  return "the_world";
+        if (nm == "IronSkin")  return "iron_skin";
+        if (nm == "Berserk")   return "berserk";
+        return nm; // G3.2+ new format already has correct id
+    };
+
     std::string act = getS("act");
     if (!act.empty()) {
         for (size_t pos = 0; pos < act.size(); ) {
@@ -200,22 +241,37 @@ SaveData* SaveManager::load_save() {
             if (semi == std::string::npos) break;
             std::string tok = act.substr(pos, semi - pos);
             pos = semi + 1;
-            size_t comma = tok.find(',');
-            if (comma == std::string::npos) continue;
-            std::string nm = tok.substr(0, comma);
-            int lvl = atoi(tok.substr(comma + 1).c_str());
-            std::unique_ptr<Skill> sk;
-            if (nm == "Slash") sk = std::make_unique<SlashSkill>();
-            else if (nm == "Fireball") sk = std::make_unique<FireballSkill>();
-            else if (nm == "SelfHeal") sk = std::make_unique<SelfHealSkill>();
-            else if (nm == "TheWorld") sk = std::make_unique<TheWorldSkill>();
-            else continue;
+            int commas = 0;
+            for (char c : tok) if (c == ',') commas++;
+            size_t comma1 = tok.find(',');
+            if (comma1 == std::string::npos) continue;
+            std::string nm = _map_old_name(tok.substr(0, comma1));
+            size_t comma2 = tok.find(',', comma1 + 1);
+            std::string lvStr = (comma2 != std::string::npos)
+                ? tok.substr(comma1 + 1, comma2 - comma1 - 1)
+                : tok.substr(comma1 + 1);
+            int lvl = atoi(lvStr.c_str());
+            int evo = 0, use = 0;
+            if (commas >= 3 && comma2 != std::string::npos) {
+                size_t comma3 = tok.find(',', comma2 + 1);
+                std::string evoStr = (comma3 != std::string::npos)
+                    ? tok.substr(comma2 + 1, comma3 - comma2 - 1)
+                    : tok.substr(comma2 + 1);
+                evo = atoi(evoStr.c_str());
+                if (comma3 != std::string::npos)
+                    use = atoi(tok.substr(comma3 + 1).c_str());
+            }
+            // G3.2: SkillFactory::create — 替代 if-else 链
+            std::unique_ptr<Skill> sk = skill_factory_create(nm);
+            if (!sk) continue;
             while (sk->level < lvl) sk->upgrade();
+            sk->evolution_level = evo;
+            sk->use_count = use;
             p->skills.learn(std::move(sk));
         }
     }
 
-    // 被动
+    // 被动 (G3.2: SkillFactory)
     std::string pas = getS("pas");
     if (!pas.empty()) {
         for (size_t pos = 0; pos < pas.size(); ) {
@@ -223,18 +279,33 @@ SaveData* SaveManager::load_save() {
             if (semi == std::string::npos) break;
             std::string tok = pas.substr(pos, semi - pos);
             pos = semi + 1;
-            size_t comma = tok.find(',');
-            if (comma == std::string::npos) continue;
-            std::string nm = tok.substr(0, comma);
-            int lvl = atoi(tok.substr(comma + 1).c_str());
-            std::unique_ptr<Skill> sk;
-            if (nm == "IronSkin") sk = std::make_unique<IronSkinSkill>();
-            else if (nm == "Berserk") sk = std::make_unique<BerserkSkill>();
-            else continue;
+            int commas = 0;
+            for (char c : tok) if (c == ',') commas++;
+            size_t comma1 = tok.find(',');
+            if (comma1 == std::string::npos) continue;
+            std::string nm = _map_old_name(tok.substr(0, comma1));
+            size_t comma2 = tok.find(',', comma1 + 1);
+            std::string lvStr = (comma2 != std::string::npos)
+                ? tok.substr(comma1 + 1, comma2 - comma1 - 1)
+                : tok.substr(comma1 + 1);
+            int lvl = atoi(lvStr.c_str());
+            int evo = 0, use = 0;
+            if (commas >= 3 && comma2 != std::string::npos) {
+                size_t comma3 = tok.find(',', comma2 + 1);
+                evo = atoi(tok.substr(comma2 + 1,
+                    (comma3 != std::string::npos ? comma3 - comma2 - 1 : std::string::npos)).c_str());
+                if (comma3 != std::string::npos)
+                    use = atoi(tok.substr(comma3 + 1).c_str());
+            }
+            std::unique_ptr<Skill> sk = skill_factory_create(nm);
+            if (!sk) continue;
             while (sk->level < lvl) sk->upgrade();
+            sk->evolution_level = evo;
+            sk->use_count = use;
             p->skills.learn(std::move(sk));
         }
     }
+    p->attack_evo.level = getV("atl", 1);  // G1 Step7
     p->skills.apply_all_passives(p.get());
 
     // 背包物品: name,RARITY,type,v1,v2,v3;...
@@ -343,6 +414,52 @@ SaveData* SaveManager::load_save() {
     d->special_triggered = spr;
     d->special_discovered = spd;
     // B13: Relic 不再跨层 (不恢复圣物)
+
+    // ── G1 Step7: Save v2 新增字段解析 ──
+    // ── G2.4: Parse quest states ──
+    std::string qst = getS("qst");
+    if (!qst.empty()) {
+        for (size_t pos = 0; pos < qst.size(); ) {
+            size_t semi = qst.find(';', pos);
+            std::string tok = qst.substr(pos, (semi != std::string::npos ? semi - pos : std::string::npos));
+            pos = (semi != std::string::npos ? semi + 1 : qst.size());
+            size_t eq = tok.find('=');
+            if (eq != std::string::npos) {
+                int qid = atoi(tok.substr(0, eq).c_str());
+                int st  = atoi(tok.substr(eq + 1).c_str());
+                d->quest_states[qid] = st;
+            }
+        }
+    }
+
+    // ── G2.5: Parse unlocked endings ──
+    std::string ends = getS("end");
+    if (!ends.empty()) {
+        for (size_t pos = 0; pos < ends.size(); ) {
+            size_t semi = ends.find(';', pos);
+            std::string tok = ends.substr(pos, (semi != std::string::npos ? semi - pos : std::string::npos));
+            pos = (semi != std::string::npos ? semi + 1 : ends.size());
+            if (!tok.empty()) d->unlocked_endings.push_back(atoi(tok.c_str()));
+        }
+    }
+
+    d->attack_evo_level = getV("atl", 1);
+
+    std::string rul = getS("rul");
+    if (!rul.empty()) {
+        for (size_t pos = 0; pos < rul.size(); ) {
+            size_t semi = rul.find(';', pos);
+            std::string tok = rul.substr(pos, (semi != std::string::npos ? semi - pos : std::string::npos));
+            pos = (semi != std::string::npos ? semi + 1 : rul.size());
+            size_t eq = tok.find('=');
+            if (eq != std::string::npos) {
+                std::string key = tok.substr(0, eq);
+                int val = atoi(tok.substr(eq + 1).c_str());
+                if (!key.empty()) d->rule_counters[key] = val;
+            }
+        }
+    }
+
     d->player = std::move(p);
 
     LOG_INFO("读档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff",

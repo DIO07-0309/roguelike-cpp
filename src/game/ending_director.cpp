@@ -1,24 +1,8 @@
 #include "ending_director.h"
 #include "relationship_system.h"
 #include "quest_manager.h"
-
-const WorldEnding WORLD_ENDINGS[5] = {
-    {EndingType::BAD_END,    "深红",
-     "黑暗吞噬了一切。你在深渊中迷失——成为了它新的狱卒。",
-     "BAD END",    5, 1},
-    {EndingType::NORMAL_END, "灰暗",
-     "深渊之主倒下了。黑暗开始褪去——\n但你已被地牢改变，再也无法回到从前。",
-     "NORMAL END", 10, 2},
-    {EndingType::GOOD_END,   "金色",
-     "你救下了能够拯救的灵魂。\n神殿重新亮起了光——虽然微弱，但足以指引后人。",
-     "GOOD END",   20, 3},
-    {EndingType::TRUE_END,   "纯白",
-     "你战胜了深渊，也战胜了自己。\n守望者的祈祷穿越三千年，终于得到了回应。\n你自由了——真正的自由。",
-     "TRUE END",   30, 5},
-    {EndingType::SECRET_END, "彩虹",
-     "你做到了凡人不可能做到的事。\n每一座神殿的灯火都被重新点燃。\n守望者流泪了——三千年来的第一滴泪。",
-     "ABSOLUTE END", 50, 10},
-};
+#include "data/ending_defs.h"    // G2.5
+#include "core/event_bus.h"      // G2.5: ENDING_REACHED
 
 void EndingDirector::begin(const WorldState& ws, BossRank rank, float coll_pct,
                             const RelationshipSystem& rels,
@@ -26,7 +10,7 @@ void EndingDirector::begin(const WorldState& ws, BossRank rank, float coll_pct,
     (void)qm;
     _npc_endings.clear();
 
-    // 判定EndingType
+    // 判定EndingType (算法不变)
     if (ws.has(WorldFlag::True_Ending_Ready) && rank >= BossRank::S && coll_pct >= 0.90f)
         _type = EndingType::SECRET_END;
     else if (ws.has(WorldFlag::True_Ending_Ready) && rank >= BossRank::A)
@@ -40,7 +24,31 @@ void EndingDirector::begin(const WorldState& ws, BossRank rank, float coll_pct,
     else // 死亡或Boss未全杀
         _type = EndingType::BAD_END;
 
-    _world = WORLD_ENDINGS[(int)_type];
+    // ── G2.5: flavor text / meta reward 从 registry 读取 (替代 WORLD_ENDINGS[5]) ──
+    const EndingDef* def = get_ending_def((int)_type);
+    if (def) {
+        _texts.sky   = def->sky_color;
+        _texts.line  = def->final_line;
+        _texts.title = def->title;
+        _world = { _type,
+                   _texts.sky.c_str(),
+                   _texts.line.c_str(),
+                   _texts.title.c_str(),
+                   def->meta_soul_bonus,
+                   def->meta_knowledge_bonus };
+    } else {
+        _world = { _type, "灰暗", "一切归于沉寂。", "END", 0, 0 };
+    }
+
+    // G2.5: 记录已解锁结局 (去重)
+    {
+        int et = (int)_type;
+        bool found = false;
+        for (int v : _unlocked) if (v == et) { found = true; break; }
+        if (!found) _unlocked.push_back(et);
+        // EventBus emit (保持与 Quest/Attack/Skill Evolution 一致的风格)
+        EventBus::inst().emit(GameEventType::ENDING_REACHED, nullptr, et);
+    }
 
     // NPC 结局
     _build_npc_endings(ws, rels);

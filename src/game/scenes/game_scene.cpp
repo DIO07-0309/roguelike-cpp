@@ -13,6 +13,13 @@
 #include "save/save_manager.h"
 #include "audio_server.h"
 #include "floor_config.h"
+#include "attack_evolution.h"   // G1
+#include "skill_evolution.h"   // G1 Step3
+#include "rule_chain.h"         // G1 Step4
+#include "data/boss_defs.h"     // G1 Step6
+#include "core/replay/state_hash.h"  // G4.5
+#include "core/sim/sim_ai.h"         // G5.6
+#include "core/sim/sim_runner.h"     // G5.6
 #include "event_system.h"
 #include "event_bus.h"
 #include "service_locator.h"
@@ -25,6 +32,14 @@
 extern Font g_font;
 extern Font g_font_small;
 extern bool g_font_loaded;
+
+// ═══ G4.5: Replay static config ═══
+std::string GameScene::g_record_path;
+std::string GameScene::g_replay_path;
+bool GameScene::g_record_mode = false;
+bool GameScene::g_replay_mode = false;
+bool GameScene::g_sim_mode = false;
+int  GameScene::g_sim_runs = 100;
 
 // ============================================================
 // C1: 体验打磨 — 伤害数字/震动/冻结 辅助函数
@@ -60,6 +75,11 @@ void GameScene::_ready() {
     _flow.bind(this);
     _player_ctrl.bind(this);
 
+    // G1: 注册 AttackEvolutionManager EventBus 监听
+    AttackEvolutionManager::register_listener();
+    SkillEvolutionManager::register_listener();  // G1 Step3
+    RuleChainManager::register_listener();        // G1 Step4
+
     // D7 Step6: 注册场景级服务
     ServiceLocator::provide(&_boss);
     ServiceLocator::provide(&_gameplay);
@@ -82,15 +102,43 @@ void GameScene::new_game() {
     current_floor = 1;
     max_unlocked_floor = 1;
     enter_floor(1);
+
+    // ── G4.5: Replay/Record auto-start ──
+    if (g_replay_mode && !g_replay_path.empty())
+        start_replay(g_replay_path);
+    else if (g_record_mode && !g_record_path.empty())
+        start_recording(_dungeon_seed);
+
+    // ── G5.6: Sim mode init ──
+    if (g_sim_mode) {
+        _sim_mode = true;
+        _sim_ai = std::make_unique<SimAI>();
+        _sim_ai->start();
+        seed_rng(_dungeon_seed ? _dungeon_seed : (uint32_t)(SimRunner::inst().current_run() * 1234567));
+    }
 }
 
 void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
                                  uint32_t seed,
                                  const std::vector<bool>& special_triggered,
-                                 const std::vector<bool>& special_discovered) {
+                                 const std::vector<bool>& special_discovered,
+                                 const std::unordered_map<std::string, int>& rule_counters,
+                                 const std::unordered_map<int, int>& quest_states,
+                                 const std::vector<int>& unlocked_endings) {
     player = std::move(p);
     current_floor = floor;
     max_unlocked_floor = max_f;
+
+    // ── G1 Step7: 恢复 WorldState rule_* counters ──
+    for (auto& kv : rule_counters)
+        _gameplay.world_state.add_counter(kv.first, kv.second);
+
+    // ── G2.4: 恢复 Quest states ──
+    _gameplay.quest_mgr.restore_states(quest_states);
+
+    // ── G2.5: 恢复已解锁结局 ──
+    _gameplay.ending_dir.restore_unlocked(unlocked_endings);
+
     enter_floor(floor, seed);
 
     // B8: 地图生成完成后恢复特殊房间触发状态
@@ -162,15 +210,16 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     }
 
     // 放置怪物
-    const BossTemplate* btmpl = nullptr;  // D8: 提前决定 Boss 类型
+    const BossDef* bdef = nullptr;  // G1 Step6: BossDef replaces BossTemplate
     if (is_boss_floor(floor)) {
         auto pos = rooms.back();
         boss_floor = floor;
-        btmpl = boss_factory_lookup(boss_type_for_floor(floor, _dungeon_seed));
-        boss_intro_title = btmpl->title;
-        boss_intro_lore = btmpl->lore;
-        boss_intro_skills = btmpl->is_summoner ? "召唤·尸爆·亡灵大军" : btmpl->is_defender ? "重锤·震地·石甲" : "冲锋·冲击波·召唤手下";
-        boss_intro_color = btmpl->color;
+        BossType btype = boss_type_for_floor(floor, _dungeon_seed);
+        bdef = get_boss_def_for_type((int)btype);  // G1 Step6: BossType → BossDef
+        boss_intro_title = bdef->title.c_str();
+        boss_intro_lore = bdef->lore.c_str();
+        boss_intro_skills = get_boss_skills_text(bdef);
+        boss_intro_color = get_boss_visual_color(bdef->visual_id);
         state = GameState::BOSS_INTRO;
 
         // D4 Step5.5: BossNarrative覆盖intro对话
@@ -187,11 +236,13 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
 
     stairs_pos = rooms.back();
 
-    // D4 Step1: 非Boss层生成动态事件 (25%概率, 休息层50%)
+    // ── G5.5: 非Boss层生成动态事件 (概率提升 + 深层多事件) ──
     if (!fcfg->is_boss && rooms.size() > 3) {
-        float ev_chance = fcfg->is_rest_floor ? 0.50f : 0.25f;
+        float ev_chance = fcfg->is_rest_floor ? 0.70f : 0.40f; // G5.5: up from 0.50/0.25
         ChapterConfig ch = *get_chapter_config(fcfg->chapter);
-        if ((float)(rng() % 1000) / 1000.0f < ev_chance) {
+        int ev_count = (fcfg->chapter >= 1) ? 2 : 1; // G5.5: ch2+ spawns 2 events
+        for (int ei = 0; ei < ev_count; ei++) {
+            if ((float)(rng() % 1000) / 1000.0f >= ev_chance) continue;
             DungeonEvent ev = generate_event(floor, ch, rng);
             int ev_room = 1 + (int)(rng() % ((uint32_t)rooms.size() - 2));
             auto [etx, ety] = rooms[ev_room];
@@ -358,24 +409,8 @@ void GameScene::_process(double delta) {
             // D5 Step4: Behavior→Command (决策→执行)
             _boss.current_cmd = boss_decision_to_command(
                 (int)_boss.behavior.current);
-            // Boss战 arena tick
+            // Boss战 arena tick (G2.3: 生成逻辑移入 BossSystemDirector)
             _boss.arena.tick(dt, player.get(), monsters);
-            // Phase2: 生成 arena (每8秒随机放置)
-            static float _arena_spawn_timer = 0;
-            _arena_spawn_timer += dt;
-            if (_arena_spawn_timer > 8.0f) {
-                _arena_spawn_timer = 0;
-                float bx = boss->entity.rect.x + boss->entity.rect.width/2
-                         + (float)((int)rng()%200 - 100);
-                float by = boss->entity.rect.y + boss->entity.rect.height/2
-                         + (float)((int)rng()%200 - 100);
-                if (current_floor == 5)
-                    _boss.arena.spawn_shadow_wall(bx, by, 3.0f);
-                else if (current_floor == 10)
-                    _boss.arena.spawn_lava(bx, by, 2.5f);
-                else if (current_floor == 15)
-                    _boss.arena.spawn_void_crack(bx, by, 3.5f);
-            }
         }
     }
 
@@ -521,9 +556,9 @@ void GameScene::_process(double delta) {
     if (_tw_speed_boost > 0) _tw_speed_boost -= dt;
 
     if (!player->combat.is_alive) {
+        // G5.6: collect sim stats before death flow
+        if (_sim_mode) _collect_sim_stats();
         LOG_INFO("玩家死亡! 第%d层 Lv%d - 存档已保留", current_floor, player->level);
-        // D4.6 Step5: 完成本局统计并结算Meta货币
-        // D6 Step6: 死亡 — 委托给 Director 链
         _gameplay.on_player_dead(current_floor, player->level, player.get());
         g_meta.end_run(_gameplay.run_stats);
         _flow.on_player_dead();
@@ -639,9 +674,86 @@ void GameScene::_process(double delta) {
 // ============================================================
 // 输入处理
 // ============================================================
+// ── G4.5: Replay recording control ──
+void GameScene::start_recording(uint32_t seed) {
+    std::vector<ModSnapshot> mods;
+    _recorder.start(seed, "0.8.5", mods);
+    seed_rng(seed);
+}
+
+void GameScene::start_replay(const std::string& path) {
+    if (_replay_player.load(path)) {
+        _replay_player.start();
+        seed_rng(_replay_player.replay_seed());
+    }
+}
+
+bool GameScene::_is_action_just_pressed(const InputMap& input, const char* name) {
+    // G5.6: SimAI drives the player
+    if (_sim_mode && _sim_ai) {
+        std::vector<Monster*> mlist;
+        for (auto& m : monsters) mlist.push_back(m.get());
+        bool boss_intro = (state == GameState::BOSS_INTRO);
+        return _sim_ai->is_action_just_pressed(name, player.get(), mlist,
+            game_map.get(), stairs_active, boss_intro);
+    }
+    if (_replay_player.is_active())
+        return _replay_player.is_action_just_pressed(name);
+    bool pressed = input.is_action_just_pressed(name);
+    if (pressed && _recorder.is_active())
+        _recorder.record(name);
+    return pressed;
+}
+
+void GameScene::_tick_replay_hash() {
+    if (_recorder.is_active() || _replay_player.is_active()) {
+        uint64_t prev = _recorder.file().hash_chain.empty() ? 0
+            : _recorder.file().hash_chain.back();
+        uint64_t h = compute_state_hash(prev, *player, current_floor, monsters);
+        if (_recorder.is_active()) _recorder.record_hash(h);
+    }
+}
+
 // _input / debug / event / dialogue — delegated to GameSceneInput
 void GameScene::_input(const InputMap& input) {
+    // G4.5: frame tick
+    if (_recorder.is_active()) _recorder.tick();
+    if (_replay_player.is_active()) _replay_player.tick();
+    // G5.6: SimAI tick
+    if (_sim_mode && _sim_ai) _sim_ai->tick();
+
     _input_handler.handle_input(input);
+
+    // G4.5: hash computation
+    _tick_replay_hash();
+}
+
+// ── G5.6: Simulation stats collection ──
+void GameScene::_collect_sim_stats() {
+    RunStats s;
+    s.seed = _dungeon_seed;
+    s.floor_reached = current_floor;
+    s.total_kills = _gameplay.run_stats.total_kills;
+    s.elite_kills = _gameplay.run_stats.elite_kills;
+    s.bosses_killed = _gameplay.run_stats.bosses_killed;
+    s.relics_collected = (int)player->relics.size();
+    s.build_type = (int)calculate_build(player.get()).identify();
+    s.build_name = calculate_build(player.get()).build_name();
+
+    auto& sim = SimRunner::inst();
+    sim.record_run(s);
+
+    if (sim.should_restart()) {
+        // Prepare next seed
+        uint32_t next_seed = s.seed ? s.seed + sim.current_run() : (uint32_t)(sim.current_run() * 1234567);
+        // Restart run
+        _dungeon_seed = next_seed;
+        seed_rng(next_seed);
+        new_game();
+    } else {
+        sim.finalize();
+        if (get_tree()) get_tree()->quit();
+    }
 }
 
 // ============================================================
@@ -681,8 +793,22 @@ void GameScene::_activate_stairs() {
         spd.push_back(sr.discovered);
     }
     // B13: Relic 不再跨层 (无需保存圣物)
-    SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
-                           _dungeon_seed, spr, spd);
+    // ── G1 Step7: 收集 rule_* counters ──
+    {
+        std::unordered_map<std::string, int> rcm;
+        static const char* ALL_RULES[] = {
+            "rule_shadow_charge","rule_summon_priority","rule_arena_movement",
+            "rule_shield_patience","rule_rule_override", nullptr
+        };
+        for (int i = 0; ALL_RULES[i]; i++) {
+            int v = _gameplay.world_state.counter(ALL_RULES[i]);
+            if (v > 0) rcm[ALL_RULES[i]] = v;
+        }
+        SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
+                               _dungeon_seed, spr, spd, rcm,
+                               _gameplay.quest_mgr.export_states(),
+                               _gameplay.ending_dir.unlocked());
+    }
     on_floor_cleared.emit();
 }
 
@@ -693,6 +819,8 @@ void GameScene::_check_floor_transition() {
     if (next < 0) return;  // 不下楼
 
     if (next == MAX_FLOORS) {
+        // G5.6: sim stats on game clear
+        if (_sim_mode) _collect_sim_stats();
         LOG_INFO("通关! 最终第%d层 Lv%d", current_floor, player->level);
         // D6 Step6: 通关 — 委托给 FlowDirector (ending → VictoryScene → Credits)
         _gameplay.on_game_clear(current_floor, player->level, player.get(),

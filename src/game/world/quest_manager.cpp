@@ -3,140 +3,81 @@
 #include "combat_system.h"
 #include "relationship_system.h"
 #include "core/logger.h"
+#include "core/event_bus.h"        // G2.4: EventBus
+#include "data/quest_defs.h"       // G2.4: QuestDef
 
-// ============================================================
-// D4 Step5.2: 7个预设任务 + D4 Step5.3: 关系奖励
-// ============================================================
-const int QUEST_SAVE_PRISONER   = 0;
-const int QUEST_SAVE_PRIEST     = 1;
-const int QUEST_KILL_WARDEN     = 2;
-const int QUEST_KILL_FIRE_DEMON = 3;
-const int QUEST_TALK_PILGRIM    = 4;
-const int QUEST_TALK_WATCHER    = 5;
-const int QUEST_KILL_ABYSS      = 6;
-// D8 Step7: 新任务
-const int QUEST_HUNTER_BOUNTY   = 7;
-const int QUEST_COLLECTOR_ITEMS = 8;
-const int QUEST_SCOUT_INTEL     = 9;
-const int QUEST_DREAMER_QUEST   = 10;
-const int QUEST_KILL_10         = 11;
-
-// helper: make QuestReward inline
-static QuestReward REW(const char* rid, const char* bid, int bs, WorldFlag sf,
-                        const char* ck, int ca, const char* sm,
-                        int npc, int t, int r, int f, int g, int c) {
-    QuestReward rw;
-    rw.relic_id = rid; rw.buff_id = bid; rw.buff_stacks = bs;
-    rw.set_flag = sf; rw.counter_name = ck; rw.counter_add = ca;
-    rw.story_msg = sm;
-    rw.relation.npc_id = npc;
-    rw.relation.trust = t; rw.relation.respect = r;
-    rw.relation.fear = f; rw.relation.gratitude = g; rw.relation.corruption = c;
-    return rw;
+// ── G2.4: String → enum 辅助映射 ──
+static WorldFlag _str_to_flag(const std::string& s) {
+    if (s == "saved_prisoner")   return WorldFlag::Saved_Prisoner;
+    if (s == "saved_priest")     return WorldFlag::Saved_Priest;
+    if (s == "saved_merchant")   return WorldFlag::Saved_Merchant;
+    if (s == "accepted_curse")   return WorldFlag::Accepted_Curse;
+    if (s == "blood_ritual")     return WorldFlag::Blood_Ritual;
+    if (s == "ignored_npc")      return WorldFlag::Ignored_NPC;
+    if (s == "merchant_killed")  return WorldFlag::Merchant_Killed;
+    if (s == "boss1_defeated")   return WorldFlag::Boss1_Defeated;
+    if (s == "boss2_defeated")   return WorldFlag::Boss2_Defeated;
+    if (s == "boss3_defeated")   return WorldFlag::Boss3_Defeated;
+    if (s == "all_boss_defeated") return WorldFlag::All_Boss_Defeated;
+    if (s == "hunter_met")       return WorldFlag::Hunter_Met;
+    if (s == "collector_met")    return WorldFlag::Collector_Met;
+    if (s == "scout_met")        return WorldFlag::Scout_Met;
+    if (s == "dreamer_met")      return WorldFlag::Dreamer_Met;
+    if (s == "kill_10_monsters") return WorldFlag::Kill_10_Monsters;
+    if (s == "reach_floor_10")   return WorldFlag::Reach_Floor_10;
+    if (s == "collect_3_relics") return WorldFlag::Collect_3_Relics;
+    return WorldFlag::NONE;
 }
 
+static StoryStage _str_to_stage(const std::string& s) {
+    if (s == "chapter_1") return StoryStage::CHAPTER_1;
+    if (s == "chapter_2") return StoryStage::CHAPTER_2;
+    if (s == "final")     return StoryStage::FINAL;
+    return StoryStage::INTRO;
+}
+
+// ============================================================
+// G2.4: QuestManager 构造函数 — 从 QuestDef registry 构建
+// ============================================================
 QuestManager::QuestManager() {
-    _quests = {
-        {0, "救出囚犯", "F2的囚犯埃德加已经三十年没见过新面孔了。",
-         QuestState::AVAILABLE, 1, false,
-         WorldFlag::NONE, StoryStage::CHAPTER_1, 0, "",
-         WorldFlag::NONE,
-         REW("","",0,WorldFlag::Saved_Prisoner,"prisoner_saved",1,"囚犯的祝福似乎让你更勇敢了.",
-             20,2,0,0,0,0),
-         0, false},
+    for (auto& kv : get_all_quest_defs()) {
+        auto& d = kv.second;
 
-        {1, "谒见神官", "F7神殿最后的祭司——泰伦斯。",
-         QuestState::AVAILABLE, 1, false,
-         WorldFlag::NONE, StoryStage::CHAPTER_2, 0, "",
-         WorldFlag::NONE,
-         REW("","",0,WorldFlag::Saved_Priest,"priest_trust",2,"神官的祈祷仍然在神殿中回荡。",
-             70,3,1,0,0,0),
-         0, false},
+        Quest q;
+        q.id              = d.quest_id;
+        q.title           = d.title;
+        q.desc            = d.desc;
+        q.state           = QuestState::LOCKED;  // all start locked
+        q.chapter         = d.chapter;
+        q.hidden          = d.hidden;
+        q.auto_accept     = d.auto_accept;
+        q.required_flag   = _str_to_flag(d.required_flag);
+        q.required_stage  = _str_to_stage(d.required_stage);
+        q.required_counter = d.required_counter;
+        q.counter_key     = d.counter_key;
+        q.complete_flag   = _str_to_flag(d.complete_flag);
+        q.next_quest_id   = d.next_quest_id;
 
-        {2, "击杀狱卒", "暗影骑士——第一狱守。",
-         QuestState::AVAILABLE, 1, false,
-         WorldFlag::NONE, StoryStage::CHAPTER_1, 0, "",
-         WorldFlag::Boss1_Defeated,
-         REW("","attack_up",1,WorldFlag::NONE,"boss_kills",1,"暗影骑士的盔甲化为了灰烬。",
-             0,0,1,0,0,0),
-         QUEST_TALK_PILGRIM, false},
+        q.reward.relic_id     = d.reward.relic_id;
+        q.reward.buff_id      = d.reward.buff_id;
+        q.reward.buff_stacks  = d.reward.buff_stacks;
+        q.reward.set_flag     = _str_to_flag(d.reward.set_flag);
+        q.reward.counter_name = d.reward.counter_name;
+        q.reward.counter_add  = d.reward.counter_add;
+        q.reward.story_msg    = d.reward.story_msg.empty() ? nullptr
+                               : d.reward.story_msg.c_str();  // QuestDef 生命周期长于 QuestManager
+        q.reward.relation.npc_id     = d.reward.npc_id;
+        q.reward.relation.trust      = d.reward.trust;
+        q.reward.relation.respect    = d.reward.respect;
+        q.reward.relation.fear       = d.reward.fear;
+        q.reward.relation.gratitude  = d.reward.gratitude;
+        q.reward.relation.corruption = d.reward.corruption;
 
-        {3, "击败火魔", "地狱火魔——熔岩深渊的远古恶魔。",
-         QuestState::LOCKED, 1, false,
-         WorldFlag::Boss1_Defeated, StoryStage::CHAPTER_2, 0, "",
-         WorldFlag::Boss2_Defeated,
-         REW("","attack_up",2,WorldFlag::NONE,"boss_kills",1,"火焰终于熄灭了。",
-             0,0,1,0,0,0),
-         QUEST_TALK_WATCHER, false},
-
-        {4, "对话朝圣者", "F9迷失的朝圣者索拉斯。",
-         QuestState::LOCKED, 1, false,
-         WorldFlag::Boss1_Defeated, StoryStage::CHAPTER_2, 0, "",
-         WorldFlag::NONE,
-         REW("","",0,WorldFlag::NONE,"pilgrim_met",1,"索拉斯的目光穿过黑暗看着你。",
-             90,0,1,0,0,0),
-         0, false},
-
-        {5, "守望者之约", "F14铸光者最后的弟子。",
-         QuestState::LOCKED, 1, false,
-         WorldFlag::Boss2_Defeated, StoryStage::CHAPTER_3, 0, "",
-         WorldFlag::NONE,
-         REW("","",0,WorldFlag::NONE,"watcher_met",1,"你被守望了三千年。",
-             140,1,2,0,0,0),
-         QUEST_KILL_ABYSS, false},
-
-        {6, "终结深渊", "决战深渊之主·终焉。",
-         QuestState::LOCKED, 1, false,
-         WorldFlag::Boss2_Defeated, StoryStage::FINAL, 0, "",
-         WorldFlag::Boss3_Defeated,
-         REW("","",0,WorldFlag::All_Boss_Defeated,"boss_kills",1,"深渊终于安静了。",
-             0,0,3,0,0,0),
-         0, false},
-
-        // ---- D8 Step7: 5 新任务 ----
-        {7, "猎人悬赏", "F3猎人瑞卡拜托你击杀第5层Boss。",
-         QuestState::AVAILABLE, 0, false,
-         WorldFlag::Hunter_Met, StoryStage::CHAPTER_1, 0, "",
-         WorldFlag::Boss1_Defeated,
-         REW("","attack_up",2,WorldFlag::NONE,"hunter_quest",1,"瑞卡点了点头——刀已经磨好了。",
-             30,2,0,0,0,0),
-         0, false},
-
-        {8, "收藏家的委托", "F6收藏家卡兹想收集3件圣物。",
-         QuestState::AVAILABLE, 1, false,
-         WorldFlag::Collector_Met, StoryStage::CHAPTER_2, 0, "",
-         WorldFlag::Collect_3_Relics,
-         REW("golden_dice","",0,WorldFlag::NONE,"collector_quest",1,"卡兹激动地记录下了这一刻。",
-             60,0,1,0,0,0),
-         0, false},
-
-        {9, "侦察兵的情报", "F8侦察兵维拉需要你到达F10。",
-         QuestState::AVAILABLE, 1, false,
-         WorldFlag::Scout_Met, StoryStage::CHAPTER_2, 0, "",
-         WorldFlag::Reach_Floor_10,
-         REW("","defense_up",2,WorldFlag::NONE,"scout_quest",1,"维拉松了口气——情报是对的。",
-             80,1,0,0,0,0),
-         0, false},
-
-        {10, "梦见者的愿望", "F12梦见者希望你击杀深渊之主。",
-         QuestState::LOCKED, 1, false,
-         WorldFlag::Boss2_Defeated, StoryStage::FINAL, 0, "",
-         WorldFlag::Boss3_Defeated,
-         REW("infinity_orb","blessing",2,WorldFlag::NONE,"dreamer_quest",1,"梦见者的梦终于醒了。",
-             120,2,1,0,0,0),
-         0, false},
-
-        {11, "怪物猎人", "击杀10只地牢怪物。",
-         QuestState::AVAILABLE, 0, true,
-         WorldFlag::NONE, StoryStage::INTRO, 0, "",
-         WorldFlag::Kill_10_Monsters,
-         REW("","growth",2,WorldFlag::NONE,"monster_kills",5,"你证明了你在黑暗中的价值。",
-             0,0,1,0,0,0),
-         0, true},   // auto_accept = true
-    };
+        _quests.push_back(q);
+    }
 }
 
-// ---- 自动解锁 & 自动完成 ----
+// ---- 自动解锁 & 自动完成 (算法不变) ----
 void QuestManager::update(WorldState& ws, const StoryDirector& story) {
     for (auto& q : _quests) {
         _auto_unlock(q, ws, story);
@@ -166,6 +107,10 @@ void QuestManager::_auto_complete(Quest& q, WorldState& ws) {
     if (q.reward.set_flag != WorldFlag::NONE) ws.set(q.reward.set_flag);
     if (!q.reward.counter_name.empty()) ws.add_counter(q.reward.counter_name, q.reward.counter_add);
     if (_rels && q.reward.relation.npc_id != 0) _rels->apply_reward(q.reward.relation);
+
+    // G2.4: EventBus emit
+    EventBus::inst().emit(GameEventType::QUEST_COMPLETE, nullptr,
+                          q.id, 0.0f, q.title.c_str());
     LOG_INFO("[QUEST] Completed #%d: %s", q.id, q.title.c_str());
 }
 
@@ -174,6 +119,8 @@ bool QuestManager::accept(int quest_id, WorldState& ws) {
     Quest* q = find(quest_id);
     if (!q || q->state != QuestState::AVAILABLE) return false;
     q->state = QuestState::ACCEPTED;
+    EventBus::inst().emit(GameEventType::QUEST_ACCEPT, nullptr,
+                          quest_id, 0.0f, q->title.c_str());
     (void)ws;
     return true;
 }
@@ -183,6 +130,8 @@ void QuestManager::complete(int quest_id, WorldState& ws, Player* player) {
     if (!q || q->state != QuestState::ACCEPTED) return;
     q->state = QuestState::COMPLETED;
     grant_reward(q->reward, player, ws);
+    EventBus::inst().emit(GameEventType::QUEST_COMPLETE, nullptr,
+                          quest_id, 0.0f, q->title.c_str());
 }
 
 void QuestManager::fail(int quest_id) {
@@ -204,21 +153,36 @@ void QuestManager::grant_reward(const QuestReward& r, Player* player, WorldState
     if (_rels && r.relation.npc_id != 0) _rels->apply_reward(r.relation);
 }
 
+// ---- G2.4: Save v3 ----
+void QuestManager::restore_states(const std::unordered_map<int, int>& states) {
+    for (auto& q : _quests) {
+        auto it = states.find(q.id);
+        if (it != states.end())
+            q.state = (QuestState)it->second;
+    }
+}
+
+std::unordered_map<int, int> QuestManager::export_states() const {
+    std::unordered_map<int, int> out;
+    for (auto& q : _quests)
+        if (q.state != QuestState::LOCKED)
+            out[q.id] = (int)q.state;
+    return out;
+}
+
 // ---- 查询 ----
 Quest* QuestManager::find(int quest_id) {
     for (auto& q : _quests) if (q.id == quest_id) return &q;
     return nullptr;
 }
 
+// G2.4: 按 npc_floor 查询 (替代硬编码 floor→id 映射)
 Quest* QuestManager::get_npc_quest(int npc_floor) {
-    if (npc_floor == 2) return find(0);
-    if (npc_floor == 7) return find(1);
-    if (npc_floor == 9) return find(4);
-    if (npc_floor == 14) return find(5);
-    if (npc_floor == 3) return find(7);   // D8: Hunter
-    if (npc_floor == 6) return find(8);   // D8: Collector
-    if (npc_floor == 8) return find(9);   // D8: Scout
-    if (npc_floor == 12) return find(10); // D8: Dreamer
+    for (auto& q : _quests) {
+        // 查 QuestDef 的 npc_floor
+        const QuestDef* def = get_quest_def(q.id);
+        if (def && def->npc_floor == npc_floor) return &q;
+    }
     return nullptr;
 }
 

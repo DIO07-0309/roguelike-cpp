@@ -8,16 +8,16 @@
 #include "floor_config.h"
 #include "growth_curve.h"
 
-// D1: 从 FloorConfig 读取概率 → 返回怪物类型
+// D1: 从 FloorConfig 读取概率 → 返回怪物类型 (G5.3: 12 slots)
 static const char* _pick_monster_type(const FloorConfig& cfg) {
-    int w[8];
-    for (int i = 0; i < 8; i++) w[i] = cfg.enemy_weights[i];
+    int w[12];
+    for (int i = 0; i < 12; i++) w[i] = cfg.enemy_weights[i];
     int total = 0;
-    for (int i = 0; i < 8; i++) total += w[i];
+    for (int i = 0; i < 12; i++) total += w[i];
     if (total <= 0) return "slime";
     int roll = (int)(rng() % (uint32_t)total);
     int sum = 0;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 12; i++) {
         if (w[i] == 0) continue;
         sum += w[i];
         if (roll < sum) {
@@ -30,6 +30,10 @@ static const char* _pick_monster_type(const FloorConfig& cfg) {
                 case 5: return "elite";
                 case 6: return "charger";   // D8
                 case 7: return "summoner";  // D8
+                case 8: return (rng()%2==0)?"skeleton_archer":"goblin_hunter";   // G5.3: Sniper
+                case 9: return (rng()%2==0)?"dark_mage":"void_walker";           // G5.3: Controller
+                case 10:return (rng()%2==0)?"shadow_assassin":"night_stalker";   // G5.3: Ambush
+                case 11:return (rng()%2==0)?"stone_guardian":"iron_sentinel";    // G5.3: Guardian
             }
         }
     }

@@ -5,20 +5,30 @@
 // 所有HitStop/Shake/Crit/DamageNumber从此读取
 // ============================================================
 struct CombatFeelSystem {
-    // HitStop (秒)
-    static constexpr float LIGHT_HIT     = 0.025f;
-    static constexpr float HEAVY_HIT     = 0.06f;
-    static constexpr float BOSS_HIT      = 0.08f;
-    static constexpr float CRITICAL_HIT  = 0.05f;
-    static constexpr float KILL_SLOWMO   = 0.10f;
-    static constexpr float RELIC_PICKUP  = 0.18f;
-    static constexpr float BUILD_COMPLETE = 0.15f;
+    // ── G5.7: HitStop tuning (juicier) ──
+    static constexpr float LIGHT_HIT     = 0.030f;
+    static constexpr float HEAVY_HIT     = 0.075f;
+    static constexpr float BOSS_HIT      = 0.10f;
+    static constexpr float CRITICAL_HIT  = 0.07f;
+    static constexpr float KILL_SLOWMO   = 0.14f;
+    static constexpr float RELIC_PICKUP  = 0.20f;
+    static constexpr float BUILD_COMPLETE = 0.18f;
+    static constexpr float SKILL_EVOLVED  = 0.12f;  // G5.7
 
-    // CameraShake (像素)
-    static constexpr float SHAKE_LIGHT   = 2.5f;
-    static constexpr float SHAKE_MEDIUM  = 6.0f;
-    static constexpr float SHAKE_HEAVY   = 12.0f;
-    static constexpr float SHAKE_BOSS    = 16.0f;
+    // ── G5.7: CameraShake tuning (more impact) ──
+    static constexpr float SHAKE_LIGHT   = 3.0f;
+    static constexpr float SHAKE_MEDIUM  = 8.0f;
+    static constexpr float SHAKE_HEAVY   = 15.0f;
+    static constexpr float SHAKE_BOSS    = 20.0f;
+    static constexpr float SHAKE_CRIT    = 5.0f;   // G5.7
+    static constexpr float SHAKE_COMBO   = 4.0f;   // G5.7
+
+    // ── Damage float tuning ──
+    static constexpr float DMG_FLOAT_LIFE_LIGHT  = 0.55f;
+    static constexpr float DMG_FLOAT_LIFE_HEAVY  = 0.75f;
+    static constexpr float DMG_FLOAT_LIFE_CRIT   = 0.90f;
+    static constexpr float DMG_FLOAT_SCALE_MIN   = 1.0f;
+    static constexpr float DMG_FLOAT_SCALE_CRIT  = 1.6f;  // crit numbers are bigger
 
     // Combo里程碑 (hit数)
     static constexpr int COMBO_5   = 5;

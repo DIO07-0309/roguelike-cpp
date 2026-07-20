@@ -29,6 +29,15 @@ enum class GameEventType {
     ITEM_USE,
     RELIC_GAIN,
 
+    // ── G1: Attack Evolution ──
+    ATTACK_EVOLVED,
+
+    // ── G1: Skill Evolution ──
+    SKILL_EVOLVED,
+
+    // ── G1: Rule Chain ──
+    BOSS_RULE_ACTIVATED,
+
     // ── Buff ──
     BUFF_APPLIED,
     BUFF_EXPIRED,

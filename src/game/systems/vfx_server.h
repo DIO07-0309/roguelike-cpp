@@ -5,6 +5,7 @@
 #include "entity.h"
 #include "item.h"
 #include "types/combat_types.h"
+#include "attack_evolution_state.h"  // G1
 
 class Player;
 
@@ -20,7 +21,8 @@ public:
     void update(float dt);
     void draw(float cam_x, float cam_y) const;
 
-    void player_attack(float cx, float cy, float range);
+    void player_attack(float cx, float cy, float range,
+                       const AttackEvolutionState& evo = AttackEvolutionState{});  // G1
     void slash_skill(float cx, float cy, Direction dir, int level);
     void fireball(float cx, float cy, float tx, float ty, int level);
     void heal(float cx, float cy, int level);

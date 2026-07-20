@@ -9,6 +9,7 @@
 #include "inventory.h"
 #include "skill.h"
 #include "input_map.h"
+#include "attack_evolution_state.h"   // G1: 普攻进化
 
 // ============================================================
 // D2: ComboState — 四段连击状态 (挂在 Player 上)
@@ -72,6 +73,9 @@ public:
 
     // D2: 连击状态
     ComboState combo;
+
+    // G1: 普攻进化状态
+    AttackEvolutionState attack_evo;
 
     // D2 Step2: 消耗重击标记 (技能/Relic/Boss 统一调用此接口)
     bool consume_heavy_combo();

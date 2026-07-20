@@ -218,20 +218,16 @@ DungeonEvent generate_event(int floor, const ChapterConfig& ch, std::mt19937& rn
     DungeonEvent ev;
     int chap = ch.chapter;
 
-    // D8: 扩展权重表: {MERCHANT,AMBUSH,CURSED,ALTAR,STATUE,PRISONER,CAMP,GUARD,BLOOD,NOTHING,
-    //                   TRAP,MYSTERY,BLESSING,CURSE,LORE,NPC_EVENT,RELIC_DROP,TREASURE_CACHE}
+    // G5.5: 扩展权重 — 减少NOTHING, 增加剧情/商人/圣物/Blessing
     int weights[18] = {0};
     if (chap == 0) {
-        // D9: 序章友好 — 少Trap/Curse, 多Blessing/LORE
-        int w[] = {25,8, 5,8,8,10,15,0,0,10,4,5,14,1,12,10,8,14};
+        int w[] = {25,10,5,10,10,12,15,0,0,4,4,6,16,2,14,12,12,16};
         for (int i = 0; i < 18; i++) weights[i] = w[i];
     } else if (chap == 1) {
-        // D9: 深渊均衡 — 减Trap, 增NPC/Mystery
-        int w[] = {18,10,10,8,10,8,8,5,5,5,6,10,10,4,12,12,10,10};
+        int w[] = {20,12,10,10,10,10,8,5,5,3,6,10,12,4,14,14,12,12};
         for (int i = 0; i < 18; i++) weights[i] = w[i];
     } else {
-        // D9: 炼狱挑战 — 适度Trap/Curse
-        int w[] = {12,12,10,8,8,6,6,8,8,4,10,10,8,8,14,10,12,8};
+        int w[] = {14,14,10,10,8,6,6,10,8,2,10,12,10,10,14,12,14,10};
         for (int i = 0; i < 18; i++) weights[i] = w[i];
     }
 

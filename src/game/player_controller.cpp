@@ -9,6 +9,7 @@
 #include "item.h"
 #include "vfx_server.h"
 #include "combat_feel.h"
+#include "skill_evolution.h"   // G1
 #include "flow_director.h"
 #include "input_map.h"
 #include "event_system.h"
@@ -79,11 +80,11 @@ void PlayerController::handle_input(const InputMap& input) {
     auto& gs = *_scene;
 
     if (gs.inventory_open) {
-        if (input.is_action_just_pressed("inventory") || input.is_action_just_pressed("cancel"))
+        if (gs._is_action_just_pressed(input,"inventory") || gs._is_action_just_pressed(input,"cancel"))
             gs.inventory_open = false;
-        else if (input.is_action_just_pressed("move_up"))
+        else if (gs._is_action_just_pressed(input,"move_up"))
             gs.inventory_cursor = std::max(0, gs.inventory_cursor - 1);
-        else if (input.is_action_just_pressed("move_down"))
+        else if (gs._is_action_just_pressed(input,"move_down"))
             gs.inventory_cursor = std::min(std::max(0, (int)gs.player->inventory.items.size() - 1), gs.inventory_cursor + 1);
         else if (IsKeyPressed(KEY_X))
             { gs.player->inventory.equip(gs.inventory_cursor, gs.player.get()); gs.inventory_cursor = std::min(gs.inventory_cursor, std::max(0, (int)gs.player->inventory.items.size() - 1)); }
@@ -94,8 +95,8 @@ void PlayerController::handle_input(const InputMap& input) {
         return;
     }
 
-    if (input.is_action_just_pressed("attack")) player_attack();
-    else if (input.is_action_just_pressed("pickup")) {
+    if (gs._is_action_just_pressed(input,"attack")) player_attack();
+    else if (gs._is_action_just_pressed(input,"pickup")) {
         // D4 Step4: NPC交互 + D4 Step1: 事件交互 + B8: 特殊房间
         {
             auto [ptx, pty] = gs.game_map->pixel_to_tile(
@@ -136,11 +137,11 @@ void PlayerController::handle_input(const InputMap& input) {
             }
         }
     }
-    else if (input.is_action_just_pressed("inventory")) { gs.inventory_open = true; gs.inventory_cursor = 0; }
-    else if (input.is_action_just_pressed("skill_1")) use_skill(0);
-    else if (input.is_action_just_pressed("skill_2")) use_skill(1);
-    else if (input.is_action_just_pressed("skill_3")) use_skill(2);
-    else if (input.is_action_just_pressed("skill_4")) use_skill(3);
+    else if (gs._is_action_just_pressed(input,"inventory")) { gs.inventory_open = true; gs.inventory_cursor = 0; }
+    else if (gs._is_action_just_pressed(input,"skill_1")) use_skill(0);
+    else if (gs._is_action_just_pressed(input,"skill_2")) use_skill(1);
+    else if (gs._is_action_just_pressed(input,"skill_3")) use_skill(2);
+    else if (gs._is_action_just_pressed(input,"skill_4")) use_skill(3);
 }
 
 void PlayerController::player_attack() {
@@ -180,6 +181,9 @@ void PlayerController::player_attack() {
         gs._presentation.room_msg = cb_msg;
         gs._presentation.room_msg_timer = 1.0f;
         gs._presentation.last_combo_announced = p.combo.count;
+        // G5.7: combo milestone shake + freeze
+        gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_COMBO);
+        gs._presentation.trigger_freeze(CombatFeelSystem::LIGHT_HIT);
         if (p.combo.count > gs._gameplay.run_stats.combo_max)
             gs._gameplay.run_stats.combo_max = p.combo.count;
     }
@@ -235,7 +239,8 @@ void PlayerController::player_attack() {
     VFXServer vfx;
     float range = is_heavy ? PLAYER_ATTACK_RANGE * 1.5f : PLAYER_ATTACK_RANGE;
     vfx.player_attack(p.entity.rect.x + p.entity.rect.width/2,
-                      p.entity.rect.y + p.entity.rect.height/2, range * TILE_SIZE);
+                      p.entity.rect.y + p.entity.rect.height/2, range * TILE_SIZE,
+                      p.attack_evo);  // G1: 按进化等级差异化视觉
     for (auto& e : vfx.effects) gs.active_effects.push_back(e);
 }
 
@@ -261,6 +266,9 @@ void PlayerController::use_skill(int index) {
         gs._presentation.room_msg_timer = 0.8f;
     }
     if (!was_heavy) gs.player->combo.timer = ComboState::WINDOW;
+
+    // G1: 每次技能使用后检查进化条件
+    SkillEvolutionManager::check_unlock(gs.player.get());
 
     auto it = gs.monsters.begin();
     while (it != gs.monsters.end()) {

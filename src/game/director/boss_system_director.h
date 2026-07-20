@@ -67,4 +67,8 @@ public:
     BossCommand command() const { return current_cmd; }
     bool cinematic_active() const { return cinematic.is_running(); }
     const BossTimeline& get_timeline() const { return timeline; }
+
+    // ── G2.3: Arena spawn timer (属于 BossSystemDirector — Encounter 节奏) ──
+    float _arena_spawn_timer = 0.0f;
+    const BossArenaDef* _arena_cfg = nullptr;
 };

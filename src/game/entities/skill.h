@@ -12,6 +12,7 @@
 class Player;
 class Monster;
 class GameMap;
+struct SkillDef;  // G3.2: SkillDef 来自 src/data/
 
 // ============================================================
 // D3 Step2: SkillEvolution — 技能进化数据
@@ -40,6 +41,8 @@ public:
     float charm_cd_bonus = 0.0f;
     float charm_power_bonus = 0.0f;
 
+    std::string _skill_id;     // G3.2: "slash"|"fireball"|... (替代 dynamic_cast 类型判断)
+
     Skill(const std::string& n, float cd, int ml = 5);
     virtual ~Skill() = default;
 
@@ -49,6 +52,7 @@ public:
     bool has_all_tags(std::initializer_list<BuildTag> list) const { return ::has_all_tags(tags, list); }
 
     std::vector<BuildTag> tags;   // D3 Step1: 构筑标签
+    int use_count = 0;            // G1: 技能使用次数 — SkillEvolutionManager 驱动
 
     // D3 Step2: 技能进化 (Evolution 系统)
     std::vector<SkillEvolution> evolutions;    // 进化路径 (在构造器中填充)
@@ -108,7 +112,8 @@ public:
 // ---- 具体主动技能 ----
 class SlashSkill : public ActiveSkill {
 public:
-    SlashSkill();
+    SlashSkill();                                      // 旧构造器 (向后兼容)
+    explicit SlashSkill(const SkillDef& def);          // G3.2: 数据驱动构造器
     std::string execute(Player* caster, std::vector<Monster*>& targets,
                         GameMap* map, bool is_heavy = false) override;
     std::string get_level_text() const override;
@@ -120,6 +125,7 @@ protected:
 class FireballSkill : public ActiveSkill {
 public:
     FireballSkill();
+    explicit FireballSkill(const SkillDef& def);       // G3.2
     std::string execute(Player* caster, std::vector<Monster*>& targets,
                         GameMap* map, bool is_heavy = false) override;
     std::string get_level_text() const override;
@@ -132,6 +138,7 @@ protected:
 class SelfHealSkill : public ActiveSkill {
 public:
     SelfHealSkill();
+    explicit SelfHealSkill(const SkillDef& def);       // G3.2
     std::string execute(Player* caster, std::vector<Monster*>& targets,
                         GameMap* map, bool is_heavy = false) override;
     std::string get_level_text() const override;
@@ -144,6 +151,7 @@ protected:
 class TheWorldSkill : public ActiveSkill {
 public:
     TheWorldSkill();
+    explicit TheWorldSkill(const SkillDef& def);       // G3.2
     std::string execute(Player* caster, std::vector<Monster*>& targets,
                         GameMap* map, bool is_heavy = false) override;
     std::string get_level_text() const override;
@@ -156,16 +164,75 @@ protected:
 // ---- 具体被动技能 ----
 class IronSkinSkill : public PassiveSkill {
 public:
-    IronSkinSkill() : PassiveSkill("铁壁", "def_flat", 3, 3) { tags = {BuildTag::DEFENSE}; }
+    IronSkinSkill() : PassiveSkill("铁壁", "def_flat", 3, 3) { _skill_id = "iron_skin"; tags = {BuildTag::DEFENSE}; }
+    explicit IronSkinSkill(const SkillDef& def);       // G3.2
     int get_value() const override;
     std::string get_level_text() const override;
 };
 
 class BerserkSkill : public PassiveSkill {
 public:
-    BerserkSkill() : PassiveSkill("狂暴", "atk_flat", 3, 3) { tags = {BuildTag::MELEE}; }
+    BerserkSkill() : PassiveSkill("狂暴", "atk_flat", 3, 3) { _skill_id = "berserk"; tags = {BuildTag::MELEE}; }
+    explicit BerserkSkill(const SkillDef& def);       // G3.2
     int get_value() const override;
     std::string get_level_text() const override;
+};
+
+// ── G5.2: Signature Skills (新行为类) ──
+
+// 冰爆: AOE冻结+对已冻结目标追加碎冰伤害
+class IceNovaSkill : public ActiveSkill {
+public:
+    IceNovaSkill(); explicit IceNovaSkill(const SkillDef& def);
+    std::string execute(Player* caster, std::vector<Monster*>& targets,
+                        GameMap* map, bool is_heavy = false) override;
+    std::string get_level_text() const override;
+protected: void _on_level_up() override;
+    float _radius = 4.0f; int _shatter_bonus = 30;  // 碎冰伤害%
+};
+
+// 连锁闪电: 主目标AOE→弹射链N次，递减伤害
+class ChainLightningSkill : public ActiveSkill {
+public:
+    ChainLightningSkill(); explicit ChainLightningSkill(const SkillDef& def);
+    std::string execute(Player* caster, std::vector<Monster*>& targets,
+                        GameMap* map, bool is_heavy = false) override;
+    std::string get_level_text() const override;
+protected: void _on_level_up() override;
+    int _bounces = 3; float _decay = 0.30f;  // 每次弹射衰减30%
+};
+
+// 暗影突袭: 瞬移至目标身后→背刺(方向判定+倍率)
+class ShadowStrikeSkill : public ActiveSkill {
+public:
+    ShadowStrikeSkill(); explicit ShadowStrikeSkill(const SkillDef& def);
+    std::string execute(Player* caster, std::vector<Monster*>& targets,
+                        GameMap* map, bool is_heavy = false) override;
+    std::string get_level_text() const override;
+protected: void _on_level_up() override;
+    float _backstab_mult = 2.5f;
+};
+
+// 血怒: 消耗自身HP→范围流血→根据命中数回血
+class BloodFrenzySkill : public ActiveSkill {
+public:
+    BloodFrenzySkill(); explicit BloodFrenzySkill(const SkillDef& def);
+    std::string execute(Player* caster, std::vector<Monster*>& targets,
+                        GameMap* map, bool is_heavy = false) override;
+    std::string get_level_text() const override;
+protected: void _on_level_up() override;
+    float _hp_cost_pct = 0.10f; float _heal_per_hit = 0.05f;
+};
+
+// 召唤英灵: spawn_monster→加入targets列表→AI驱动
+class SummonSpiritSkill : public ActiveSkill {
+public:
+    SummonSpiritSkill(); explicit SummonSpiritSkill(const SkillDef& def);
+    std::string execute(Player* caster, std::vector<Monster*>& targets,
+                        GameMap* map, bool is_heavy = false) override;
+    std::string get_level_text() const override;
+protected: void _on_level_up() override;
+    int _spirit_count = 1; int _spirit_hp = 30; int _spirit_atk = 8;
 };
 
 // ---- 技能管理器 ----
@@ -187,3 +254,6 @@ public:
 std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>& exclude = {});
 std::unique_ptr<Skill> random_skill(const std::vector<std::string>& exclude = {});
 std::vector<std::string> get_learned_names(const SkillManager& mgr);
+
+// G3.2: SkillFactory — 数据驱动创建
+std::unique_ptr<Skill> skill_factory_create(const std::string& skill_id);

@@ -119,29 +119,36 @@ std::string CombatCoordinator::use_skill(int index, Player* player,
     std::string result = sk->execute(player, mlist, map, is_heavy);
     sk->mark_used(game_time);
 
-    // 技能 SFX (D2: Heavy 额外播放 hit SFX)
+    // 技能 SFX (G3.2: _skill_id 替代 dynamic_cast)
     if (audio) {
-        if (dynamic_cast<SlashSkill*>(sk.get()))      audio->play_sfx("slash");
-        else if (dynamic_cast<FireballSkill*>(sk.get())) audio->play_sfx("bolt");
-        else if (dynamic_cast<SelfHealSkill*>(sk.get())) audio->play_sfx("heal");
-        if (is_heavy) audio->play_sfx("melee");  // 重击双重音效
+        const std::string& sid = sk->_skill_id;
+        if (sid == "slash" || sid == "shadow_strike" || sid == "blood_frenzy")
+            audio->play_sfx("slash");
+        else if (sid == "fireball" || sid == "ice_nova" || sid == "chain_lightning")
+            audio->play_sfx("bolt");
+        else if (sid == "self_heal") audio->play_sfx("heal");
+        else if (sid == "summon_spirit") audio->play_sfx("bolt");
+        if (is_heavy) audio->play_sfx("melee");
     }
 
-    // 技能 VFX (D2: Heavy 放大)
+    // 技能 VFX (G3.2: _skill_id 替代 dynamic_cast)
     VFXServer vfx;
     float cx = player->entity.rect.x + player->entity.rect.width / 2;
     float cy = player->entity.rect.y + player->entity.rect.height / 2;
-    if (dynamic_cast<SlashSkill*>(sk.get())) {
+    const std::string& sid_v = sk->_skill_id;
+    if (sid_v == "slash" || sid_v == "shadow_strike" || sid_v == "blood_frenzy") {
         int lvl = is_heavy ? sk->level + 1 : sk->level;
         vfx.slash_skill(cx, cy, player->direction, lvl);
-    } else if (dynamic_cast<FireballSkill*>(sk.get())) {
+    } else if (sid_v == "fireball" || sid_v == "ice_nova" || sid_v == "chain_lightning") {
         auto t = find_attack_target(player->entity.rect,
             reinterpret_cast<const std::vector<Monster*>&>(monsters), 10.0f);
         float tx = t ? t->entity.rect.x + t->entity.rect.width / 2 : cx + 100;
         float ty = t ? t->entity.rect.y + t->entity.rect.height / 2 : cy;
         vfx.fireball(cx, cy, tx, ty, is_heavy ? sk->level + 1 : sk->level);
-    } else if (dynamic_cast<SelfHealSkill*>(sk.get())) {
+    } else if (sid_v == "self_heal") {
         vfx.heal(cx, cy, sk->level);
+    } else if (sid_v == "summon_spirit") {
+        vfx.heal(cx, cy, 1);  // summon VFX — reuse heal ring
     }
     // D2: Heavy 额外特效环
     if (is_heavy) skill_heavy_vfx(player, sk->name, effects);

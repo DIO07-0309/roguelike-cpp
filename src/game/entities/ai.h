@@ -23,6 +23,10 @@ enum class MonsterSkillType {
     SUMMON,       // Elite: 召唤1只小怪
     CHARGE,       // D8: Charger: 蓄力冲刺撞击+击退
     MASS_SUMMON,  // D8: Summoner: 一次召唤2只小怪
+    SNIPE,        // G5.3: Sniper 蓄力贯穿弹
+    SCATTER,      // G5.3: Controller 锥形散布弹
+    AMBUSH_ATTACK,// G5.3: Ambush 隐身→突袭
+    GUARD_AURA,   // G5.3: Guardian 群体防御光环
 };
 
 // D2 Step3: 技能状态 (每只怪物独立, 非共享)
@@ -35,6 +39,21 @@ struct MonsterSkillState {
     float shot_timer = 0.0f;     // Rapid Shot 连发计时
     int   shot_count = 0;        // Rapid Shot 已发射数
     bool  active = false;        // 技能激活中
+};
+
+// ============================================================
+// G5.3: AIArchetype — 行为原型 (与 MonsterType/外观解耦)
+// ============================================================
+enum class AIArchetype {
+    DEFAULT,     // 普通追逐攻击
+    BOMBER,      // 靠近自爆
+    SHAMAN,      // 远程辅助
+    SNIPER,      // 远程蓄力高伤
+    CONTROLLER,  // 放置危险区域
+    AMBUSH,      // 隐身突袭
+    GUARDIAN,    // 群体防御光环
+    CHARGER,      // 蓄力冲锋
+    SUMMONER,     // 召唤小怪
 };
 
 // ============================================================
@@ -69,6 +88,11 @@ public:
     Monster* _protect_target = nullptr;
     // D2 Step4: 本层协同概率 (由 FloorManager::spawn_floor_monsters 设置)
     float team_coop_chance = 0.0f;
+
+    // G5.3: AI Archetype (行为原型, 与 MonsterType 外观解耦)
+    AIArchetype archetype = AIArchetype::DEFAULT;
+    float _archetype_timer = 0.0f;   // 通用计时器 (sniper蓄力/controller间隔/ambush冷却)
+    bool  _archetype_active = false; // 特殊状态激活中 (ambush隐身中)
 
 protected:
     float _patrol_timer = 0.0f;

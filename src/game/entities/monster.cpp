@@ -2,6 +2,7 @@
 #include "ai.h"
 #include "player.h"
 #include "combat_system.h"
+#include "data/enemy_defs.h"   // G1 Step5
 
 Monster::Monster(float x, float y, const std::string& n, int hp, int atk,
                  int pdef, int mdef, Color c, MonsterAI* a)
@@ -115,117 +116,137 @@ void Monster::draw(float cam_x, float cam_y) {
     }
 }
 
+// ============================================================
+// String → Enum helpers (gameplay logic, stays in entity layer)
+// ============================================================
+
+static MonsterType _str_to_monster_type(const std::string& s) {
+    if (s == "archer")   return MonsterType::ARCHER;
+    if (s == "shaman")   return MonsterType::SHAMAN;
+    if (s == "bomber")   return MonsterType::BOMBER;
+    if (s == "tank")     return MonsterType::TANK;
+    if (s == "elite")    return MonsterType::ELITE;
+    if (s == "charger")  return MonsterType::CHARGER;
+    if (s == "summoner") return MonsterType::SUMMONER;
+    return MonsterType::NORMAL;
+}
+
+static TeamRole _str_to_team_role(const std::string& s) {
+    if (s == "frontline") return TeamRole::FRONTLINE;
+    if (s == "backline")  return TeamRole::BACKLINE;
+    if (s == "support")   return TeamRole::SUPPORT;
+    if (s == "flank")     return TeamRole::FLANK;
+    if (s == "command")   return TeamRole::COMMAND;
+    return TeamRole::NONE;
+}
+
+static AttackType _str_to_attack_type(const std::string& s) {
+    if (s == "magical") return AttackType::MAGICAL;
+    if (s == "true")    return AttackType::TRUE;
+    return AttackType::PHYSICAL;
+}
+
+static MonsterSkillType _str_to_skill_type(const std::string& s) {
+    if (s == "rapid_shot")   return MonsterSkillType::RAPID_SHOT;
+    if (s == "totem")        return MonsterSkillType::TOTEM;
+    if (s == "leap")         return MonsterSkillType::LEAP;
+    if (s == "shield")       return MonsterSkillType::SHIELD;
+    if (s == "summon")       return MonsterSkillType::SUMMON;
+    if (s == "charge")       return MonsterSkillType::CHARGE;
+    if (s == "mass_summon")  return MonsterSkillType::MASS_SUMMON;
+    if (s == "snipe")        return MonsterSkillType::SNIPE;
+    if (s == "scatter")      return MonsterSkillType::SCATTER;
+    if (s == "ambush_attack") return MonsterSkillType::AMBUSH_ATTACK;
+    if (s == "guard_aura")   return MonsterSkillType::GUARD_AURA;
+    return MonsterSkillType::NONE;
+}
+
+static AIArchetype _str_to_archetype(const std::string& s) {
+    if (s == "bomber" || s == "charger")   // old monster_type mapping fallback
+    { if (s == "bomber")   return AIArchetype::BOMBER;
+      if (s == "charger")  return AIArchetype::CHARGER; }
+    if (s == "shaman")    return AIArchetype::SHAMAN;
+    if (s == "sniper")    return AIArchetype::SNIPER;
+    if (s == "controller")return AIArchetype::CONTROLLER;
+    if (s == "ambush")    return AIArchetype::AMBUSH;
+    if (s == "guardian")  return AIArchetype::GUARDIAN;
+    if (s == "summoner")  return AIArchetype::SUMMONER;
+    return AIArchetype::DEFAULT;
+}
+
+// visual_id → Color (表现层映射, 未来替换为 texture/animation)
+static Color _visual_to_color(const std::string& vid) {
+    if (vid == "slime")       return {100, 180, 100, 255};
+    if (vid == "orc")         return {200,  80,  80, 255};
+    if (vid == "archer")      return { 80, 160,  80, 255};
+    if (vid == "shaman")      return {160, 100, 200, 255};
+    if (vid == "bomber")      return {255, 140,  40, 255};
+    if (vid == "tank")        return {120, 120, 140, 255};
+    if (vid == "elite_slime") return {100, 220, 100, 255};
+    if (vid == "elite_orc")   return {240,  60,  60, 255};
+    if (vid == "charger")     return {200, 140,  60, 255};
+    if (vid == "summoner")    return {180, 120, 220, 255};
+    return {100, 180, 100, 255}; // fallback: slime green
+}
+
+// ============================================================
+// G1 Step5: spawn_monster — generic factory driven by EnemyDef
+// 新增普通怪物只需修改 enemies.json, 无需改 C++ 代码
+// ============================================================
 Monster* spawn_monster(float px, float py, const std::string& type) {
-    // B14: 根据 MonsterType 创建不同定位的怪物
-    if (type == "slime") {
-        auto* m = new Monster(px, py, "史莱姆", 15, 3, 0, 1, {100, 180, 100, 255});
-        m->monster_type = MonsterType::NORMAL; m->team_role = TeamRole::NONE;
-        m->on_hit_triggers = {{"slow", 1, 0.25f, BuffTarget::ENEMY}};
-        return m;
-    }
-    if (type == "orc") {
-        auto* m = new Monster(px, py, "兽人", 30, 7, 3, 1, {200, 80, 80, 255});
-        m->monster_type = MonsterType::NORMAL; m->team_role = TeamRole::NONE;
-        m->on_hit_triggers = {{"poison", 1, 0.25f, BuffTarget::ENEMY}};
-        return m;
-    }
-    // B14: 哥布林弓箭手 — 远程低HP, 长视野
-    if (type == "archer") {
-        auto* m = new Monster(px, py, "哥布林弓箭手", 22, 8, 1, 1, {80, 160, 80, 255});
-        m->monster_type = MonsterType::ARCHER; m->team_role = TeamRole::BACKLINE;
-        m->attack_cooldown = 2.0f;
-        auto* ai = new MonsterAI(8.0f, 70.0f, 3.0f, 6.0f);
-        m->ai = ai;
-        MonsterSkillState rs = {MonsterSkillType::RAPID_SHOT, 0, 4.0f};
-        ai->_skills.push_back(rs);
-        return m;
-    }
-    // B14: 萨满 — 低攻, 辅助
-    if (type == "shaman") {
-        auto* m = new Monster(px, py, "哥布林萨满", 28, 4, 2, 4, {160, 100, 200, 255});
-        m->monster_type = MonsterType::SHAMAN; m->team_role = TeamRole::SUPPORT;
-        m->attack_type = AttackType::MAGICAL;
-        m->attack_cooldown = 3.0f;
-        MonsterSkillState tt = {MonsterSkillType::TOTEM, 3, 10.0f};
-        m->ai->_skills.push_back(tt);
-        return m;
-    }
-    // B14: 爆炸怪 — 靠近自爆
-    if (type == "bomber") {
-        auto* m = new Monster(px, py, "爆炸史莱姆", 25, 0, 2, 2, {255, 140, 40, 255});
-        m->monster_type = MonsterType::BOMBER; m->team_role = TeamRole::FLANK;
-        m->attack_cooldown = 99.0f;
-        auto* ai = new MonsterAI(5.0f, 100.0f, 2.0f, 1.5f);
-        m->ai = ai;
-        MonsterSkillState lp = {MonsterSkillType::LEAP, 2, 5.0f};
-        ai->_skills.push_back(lp);
-        return m;
-    }
-    // B14: 重甲怪 — 高HP低速
-    if (type == "tank") {
-        auto* m = new Monster(px, py, "重甲兽人", 70, 6, 8, 3, {120, 120, 140, 255});
-        m->monster_type = MonsterType::TANK; m->team_role = TeamRole::FRONTLINE;
-        auto* ai = new MonsterAI(4.0f, 40.0f, 3.0f, 1.5f);
-        m->ai = ai;
-        MonsterSkillState sw = {MonsterSkillType::SHIELD, 3, 8.0f};
-        ai->_skills.push_back(sw);
-        return m;
-    }
-    // B14: 精英怪 — 强化 + 随机buff + Summon技能
+    // Elite: 随机选择变体 (唯一的运行时分支逻辑)
+    std::string lookup = type;
     if (type == "elite") {
-        bool is_slime = (rng() % 2 == 0);
-        if (is_slime) {
-            auto* m = new Monster(px, py, "精英史莱姆", 45, 10, 4, 3, {100, 220, 100, 255});
-            m->monster_type = MonsterType::ELITE; m->team_role = TeamRole::COMMAND;
-            m->is_elite = true;
-            m->on_hit_triggers = {{"slow", 1, 0.40f, BuffTarget::ENEMY}};
-            int buff_roll = rng() % 3;
-            if (buff_roll == 0) apply_buff(m, "attack_up", 2);
-            else if (buff_roll == 1) apply_buff(m, "slow", 1);
-            else apply_buff(m, "attack_up", 1);
-            MonsterSkillState sm = {MonsterSkillType::SUMMON, 5, 14.0f};
-            m->ai->_skills.push_back(sm);
-            return m;
-        } else {
-            auto* m = new Monster(px, py, "精英兽人", 75, 16, 6, 3, {240, 60, 60, 255});
-            m->monster_type = MonsterType::ELITE; m->team_role = TeamRole::COMMAND;
-            m->is_elite = true;
-            m->on_hit_triggers = {{"poison", 2, 0.40f, BuffTarget::ENEMY}};
-            int buff_roll = rng() % 3;
-            if (buff_roll == 0) apply_buff(m, "attack_up", 3);
-            else if (buff_roll == 1) ;
-            else apply_buff(m, "attack_up", 1);
-            MonsterSkillState sm = {MonsterSkillType::SUMMON, 5, 14.0f};
-            m->ai->_skills.push_back(sm);
-            return m;
-        }
+        lookup = (rng() % 2 == 0) ? "elite_slime" : "elite_orc";
     }
-    // D8: 冲锋怪 — 中距蓄力冲刺, 高爆发
-    if (type == "charger") {
-        auto* m = new Monster(px, py, "冲锋兽人", 40, 10, 4, 2, {200, 140, 60, 255});
-        m->monster_type = MonsterType::CHARGER; m->team_role = TeamRole::FRONTLINE;
-        m->attack_cooldown = 2.5f;
-        auto* ai = new MonsterAI(7.0f, 110.0f, 2.5f, 2.0f);
-        m->ai = ai;
-        MonsterSkillState ch = {MonsterSkillType::CHARGE, 0, 5.0f};
-        ai->_skills.push_back(ch);
+
+    const EnemyDef* def = get_enemy_def(lookup);
+    if (!def) {
+        // fallback — 配置缺失时安全降级
+        auto* m = new Monster(px, py, "史莱姆", 15, 3, 0, 1,
+                              _visual_to_color("slime"));
+        m->monster_type = MonsterType::NORMAL;
+        m->team_role = TeamRole::NONE;
         return m;
     }
-    // D8: 召唤师 — 低攻, 定期召唤2只小怪
-    if (type == "summoner") {
-        auto* m = new Monster(px, py, "哥布林召唤师", 35, 5, 3, 5, {180, 120, 220, 255});
-        m->monster_type = MonsterType::SUMMONER; m->team_role = TeamRole::SUPPORT;
-        m->attack_type = AttackType::MAGICAL;
-        m->attack_cooldown = 4.0f;
-        auto* ai = new MonsterAI(6.0f, 60.0f, 3.0f, 3.0f);
-        m->ai = ai;
-        MonsterSkillState ms = {MonsterSkillType::MASS_SUMMON, 3, 12.0f};
-        ai->_skills.push_back(ms);
-        return m;
+
+    // 创建 AI (使用嵌套 ai 配置)
+    auto* ai = new MonsterAI(def->ai.sight, def->ai.speed,
+                             def->ai.patrol, def->ai.attack_range);
+
+    // 创建 Monster (visual_id → Color 映射在 _visual_to_color)
+    auto* m = new Monster(px, py, def->name, def->hp, def->atk,
+                          def->pdef, def->mdef,
+                          _visual_to_color(def->visual_id), ai);
+
+    // 枚举字段 (字符串 → enum 映射)
+    m->monster_type    = _str_to_monster_type(def->type_str);
+    m->team_role       = _str_to_team_role(def->role_str);
+    m->attack_type     = _str_to_attack_type(def->attack_type_str);
+    m->attack_cooldown = def->attack_cooldown;
+    m->is_elite        = def->is_elite;
+
+    // G5.3: AI Archetype (行为原型, 与 MonsterType 外观解耦)
+    if (ai) ai->archetype = _str_to_archetype(def->ai_archetype);
+
+    // on_hit 触发器 (直接拷贝)
+    m->on_hit_triggers = def->on_hit;
+
+    // 技能 (数据驱动, 每条 record → MonsterSkillState)
+    for (auto& sk : def->skills) {
+        MonsterSkillType st = _str_to_skill_type(sk.id);
+        if (st == MonsterSkillType::NONE) continue;
+        MonsterSkillState state = {st, sk.initial_cooldown, sk.max_cooldown};
+        ai->_skills.push_back(state);
     }
-    // fallback
-    auto* m = new Monster(px, py, "史莱姆", 15, 3, 0, 1, {100, 180, 100, 255});
-    m->monster_type = MonsterType::NORMAL;
-    m->on_hit_triggers = {{"slow", 1, 0.25f, BuffTarget::ENEMY}};
+
+    // 精英: 随机 Buff (从 buff_pool 中抽一条, 空 buff_id = 跳过)
+    if (def->is_elite && !def->elite_buff_pool.empty()) {
+        int roll = (int)(rng() % (uint32_t)def->elite_buff_pool.size());
+        auto& eb = def->elite_buff_pool[roll];
+        if (!eb.buff_id.empty())
+            apply_buff(m, eb.buff_id, eb.stacks);
+    }
+
     return m;
 }

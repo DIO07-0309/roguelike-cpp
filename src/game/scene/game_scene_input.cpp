@@ -35,12 +35,12 @@ void GameSceneInput::handle_input(const InputMap& input) {
         return;
     }
     if (_s._quest_log_open) {
-        if (IsKeyPressed(KEY_Q) || input.is_action_just_pressed("cancel"))
+        if (IsKeyPressed(KEY_Q) || _s._is_action_just_pressed(input,"cancel"))
             _s._quest_log_open = false;
         return;
     }
 
-    if (input.is_action_just_pressed("cancel")) {
+    if (_s._is_action_just_pressed(input,"cancel")) {
         if (_s.state == GameState::PLAYING && _s.player->combat.is_alive) {
             _s.max_unlocked_floor = std::max(_s.max_unlocked_floor, _s.current_floor);
             std::vector<bool> spr, spd;
@@ -48,8 +48,19 @@ void GameSceneInput::handle_input(const InputMap& input) {
                 spr.push_back(sr.triggered);
                 spd.push_back(sr.discovered);
             }
+            std::unordered_map<std::string, int> rcm;
+            static const char* ALL_RULES[] = {
+                "rule_shadow_charge","rule_summon_priority","rule_arena_movement",
+                "rule_shield_patience","rule_rule_override", nullptr
+            };
+            for (int i = 0; ALL_RULES[i]; i++) {
+                int v = _s._gameplay.world_state.counter(ALL_RULES[i]);
+                if (v > 0) rcm[ALL_RULES[i]] = v;
+            }
             SaveManager::save_game(_s.player.get(), _s.current_floor,
-                _s.max_unlocked_floor, _s._dungeon_seed, spr, spd);
+                _s.max_unlocked_floor, _s._dungeon_seed, spr, spd, rcm,
+                _s._gameplay.quest_mgr.export_states(),
+                _s._gameplay.ending_dir.unlocked());
             LOG_INFO("Save→第%d层", _s.current_floor);
         }
         auto ts = std::make_shared<TitleScene>();
@@ -59,7 +70,7 @@ void GameSceneInput::handle_input(const InputMap& input) {
         return;
     }
     if (_s.state == GameState::BOSS_INTRO) {
-        if (input.is_action_just_pressed("confirm")) {
+        if (_s._is_action_just_pressed(input,"confirm")) {
             auto pos = _s.game_map->tile_to_pixel(_s.stairs_pos.first, _s.stairs_pos.second);
             // D8: BossFactory 按 floor+seed 随机 Boss 类型
 BossType btype = boss_type_for_floor(_s.boss_floor, _s._dungeon_seed);
@@ -100,7 +111,7 @@ void GameSceneInput::handle_event_input(const InputMap& input) {
     auto& ui = _s._event_ui;
     if (!ui.active) return;
 
-    if (input.is_action_just_pressed("cancel")) {
+    if (_s._is_action_just_pressed(input,"cancel")) {
         if (ui.phase == EventPhase::DESC || ui.phase == EventPhase::CHOICE) {
             ui.active = false;
             ui.phase = EventPhase::INACTIVE;
@@ -111,7 +122,7 @@ void GameSceneInput::handle_event_input(const InputMap& input) {
     }
 
     if (ui.phase == EventPhase::DESC) {
-        if (input.is_action_just_pressed("confirm")) {
+        if (_s._is_action_just_pressed(input,"confirm")) {
             if (ui.option_count > 0) {
                 ui.phase = EventPhase::CHOICE;
                 ui.selected = 0;
@@ -122,11 +133,11 @@ void GameSceneInput::handle_event_input(const InputMap& input) {
             }
         }
     } else if (ui.phase == EventPhase::CHOICE) {
-        if (input.is_action_just_pressed("move_left"))
+        if (_s._is_action_just_pressed(input,"move_left"))
             ui.selected = (ui.selected - 1 + ui.option_count) % ui.option_count;
-        if (input.is_action_just_pressed("move_right"))
+        if (_s._is_action_just_pressed(input,"move_right"))
             ui.selected = (ui.selected + 1) % ui.option_count;
-        if (input.is_action_just_pressed("confirm")) {
+        if (_s._is_action_just_pressed(input,"confirm")) {
             ui.phase = EventPhase::ANIM;
             ui.timer = 0.8f;
             _s._presentation.trigger_shake(4.0f);
@@ -141,7 +152,7 @@ void GameSceneInput::handle_dialogue_input(const InputMap& input) {
     auto& d = _s._dialogue;
     if (!d.active) return;
 
-    if (input.is_action_just_pressed("confirm") || input.is_action_just_pressed("attack")) {
+    if (_s._is_action_just_pressed(input,"confirm") || _s._is_action_just_pressed(input,"attack")) {
         d.page++;
         d.timer = 0.0f;
         if (d.page >= (int)d.pages.size()) {
@@ -170,7 +181,7 @@ void GameSceneInput::handle_dialogue_input(const InputMap& input) {
             d.target_npc = nullptr;
         }
     }
-    if (input.is_action_just_pressed("cancel")) {
+    if (_s._is_action_just_pressed(input,"cancel")) {
         d.active = false; d.target_npc = nullptr;
         _s._presentation.room_msg = "你转身离开了。";
         _s._presentation.room_msg_timer = 1.5f;

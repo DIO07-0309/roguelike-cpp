@@ -3,10 +3,55 @@
 #include "monster.h"
 #include "game_map.h"
 #include "combat_system.h"
+#include "data/skill_defs.h"   // G3.2
 #include <cmath>
 #include <algorithm>
 
 // ---- 从 skill.h 移出的实现 ----
+
+// ── G3.2: String → BuildTag 辅助 ──
+static BuildTag _tag_from_string(const std::string& s) {
+    if (s == "melee")      return BuildTag::MELEE;
+    if (s == "ranged")     return BuildTag::RANGED;
+    if (s == "magic")      return BuildTag::MAGIC;
+    if (s == "fire")       return BuildTag::FIRE;
+    if (s == "ice")        return BuildTag::ICE;
+    if (s == "lightning")  return BuildTag::LIGHTNING;
+    if (s == "poison")     return BuildTag::POISON;
+    if (s == "bleed")      return BuildTag::BLEED;
+    if (s == "summon")     return BuildTag::SUMMON;
+    if (s == "combo")      return BuildTag::COMBO;
+    if (s == "heavy")      return BuildTag::HEAVY;
+    if (s == "aoe")        return BuildTag::AOE;
+    if (s == "projectile") return BuildTag::PROJECTILE;
+    if (s == "heal")       return BuildTag::HEAL;
+    if (s == "time")       return BuildTag::TIME;
+    if (s == "defense")    return BuildTag::DEFENSE;
+    if (s == "support")    return BuildTag::SUPPORT;
+    if (s == "dot")        return BuildTag::DOT;
+    if (s == "knockback")  return BuildTag::KNOCKBACK;
+    return BuildTag::NONE;
+}
+
+// ── G3.2: 从 SkillDef 填充通用字段 ──
+static void _fill_common(Skill* sk, const SkillDef& def) {
+    sk->_skill_id = def.id;
+    for (auto& t : def.tags) {
+        BuildTag bt = _tag_from_string(t);
+        if (bt != BuildTag::NONE) sk->tags.push_back(bt);
+    }
+    for (auto& ev : def.evolutions) {
+        SkillEvolution se;
+        se.level = ev.level;
+        se.name = ev.name;
+        se.desc = ev.desc;
+        for (auto& rt : ev.required_tags) {
+            BuildTag bt = _tag_from_string(rt);
+            if (bt != BuildTag::NONE) se.required_tags.push_back(bt);
+        }
+        sk->evolutions.push_back(se);
+    }
+}
 
 // ============================================================
 // D3 Step2: Evolution 实现
@@ -59,6 +104,11 @@ std::string IronSkinSkill::get_level_text() const {
     return "Lv" + std::to_string(level) + " DEF+" + std::to_string(get_value());
 }
 
+IronSkinSkill::IronSkinSkill(const SkillDef& def)
+    : PassiveSkill(def.name, def.modifier_key, def.base_value, def.max_level) {
+    _fill_common(this, def);
+}
+
 // BerserkSkill
 int BerserkSkill::get_value() const {
     int v[] = {0, 3, 7, 12};
@@ -68,6 +118,11 @@ std::string BerserkSkill::get_level_text() const {
     return "Lv" + std::to_string(level) + " ATK+" + std::to_string(get_value());
 }
 
+BerserkSkill::BerserkSkill(const SkillDef& def)
+    : PassiveSkill(def.name, def.modifier_key, def.base_value, def.max_level) {
+    _fill_common(this, def);
+}
+
 // ---- Skill 基类 ----
 bool Skill::can_use(double game_time) const {
     return (game_time - last_use_time) >= cooldown;
@@ -75,7 +130,10 @@ bool Skill::can_use(double game_time) const {
 float Skill::remaining_cooldown(double game_time) const {
     return std::max(0.0f, (float)(cooldown - (game_time - last_use_time)));
 }
-void Skill::mark_used(double game_time) { last_use_time = (float)game_time; }
+void Skill::mark_used(double game_time) {
+    last_use_time = (float)game_time;
+    use_count++;  // G1: SkillEvolutionManager 驱动
+}
 
 bool Skill::upgrade() {
     if (!can_upgrade()) return false;
@@ -130,13 +188,23 @@ void PassiveSkill::remove(Player* player) {
 
 // ---- SlashSkill ----
 SlashSkill::SlashSkill() : ActiveSkill("斩击", 2.0f, 3) {
+    _skill_id = "slash";
     _cone_range = 1;
     triggers = {{"poison", 1, 0.30f, BuffTarget::ENEMY}};
     tags = {BuildTag::MELEE, BuildTag::COMBO};
-    // D3 Step2: Evolution path
     add_evolution(1, "广域斩", "攻击范围+30%", {BuildTag::MELEE});
     add_evolution(2, "流血斩", "100%附加1层Bleed", {BuildTag::MELEE, BuildTag::BLEED});
     add_evolution(3, "冲击斩", "Heavy: 冲击波向前延伸", {BuildTag::MELEE, BuildTag::COMBO, BuildTag::HEAVY});
+}
+
+// G3.2: 数据驱动构造器
+SlashSkill::SlashSkill(const SkillDef& def) : ActiveSkill(def.name, def.cooldown, def.max_level) {
+    _cone_range = 1;
+    _fill_common(this, def);
+    for (auto& tr : def.triggers) {
+        BuffTarget bt = (tr.target == "self") ? BuffTarget::SELF : BuffTarget::ENEMY;
+        triggers.push_back({tr.buff_id, tr.stacks, tr.chance, bt});
+    }
 }
 
 void SlashSkill::_on_level_up() {
@@ -224,12 +292,20 @@ std::string SlashSkill::get_level_text() const {
 
 // ---- FireballSkill ----
 FireballSkill::FireballSkill() : ActiveSkill("神罚", 5.0f, 3) {
+    _skill_id = "fireball";
     triggers = {{"slow", 1, 0.25f, BuffTarget::ENEMY}};
     tags = {BuildTag::MAGIC, BuildTag::FIRE, BuildTag::PROJECTILE, BuildTag::AOE, BuildTag::RANGED};
-    // D3 Step2: Evolution path
     add_evolution(1, "爆炸火球", "半径+40%", {BuildTag::FIRE, BuildTag::AOE});
     add_evolution(2, "燃烧地面", "3秒燃烧区域持续DOT", {BuildTag::FIRE, BuildTag::DOT});
     add_evolution(3, "分裂火球", "分裂3颗小火球", {BuildTag::FIRE, BuildTag::PROJECTILE, BuildTag::AOE});
+}
+
+FireballSkill::FireballSkill(const SkillDef& def) : ActiveSkill(def.name, def.cooldown, def.max_level) {
+    _fill_common(this, def);
+    for (auto& tr : def.triggers) {
+        BuffTarget bt = (tr.target == "self") ? BuffTarget::SELF : BuffTarget::ENEMY;
+        triggers.push_back({tr.buff_id, tr.stacks, tr.chance, bt});
+    }
 }
 
 void FireballSkill::_on_level_up() {
@@ -323,12 +399,20 @@ std::string FireballSkill::get_level_text() const {
 
 // ---- SelfHealSkill ----
 SelfHealSkill::SelfHealSkill() : ActiveSkill("自愈", 8.0f, 3) {
+    _skill_id = "self_heal";
     triggers = {{"attack_up", 1, 1.0f, BuffTarget::SELF}};
     tags = {BuildTag::HEAL, BuildTag::SUPPORT};
-    // D3 Step2: Evolution path
     add_evolution(1, "深度自愈", "回血量+50%", {BuildTag::HEAL});
     add_evolution(2, "战意自愈", "回血后attack_up×1", {BuildTag::HEAL, BuildTag::SUPPORT});
     add_evolution(3, "守护自愈", "回血后获得护盾", {BuildTag::HEAL, BuildTag::DEFENSE});
+}
+
+SelfHealSkill::SelfHealSkill(const SkillDef& def) : ActiveSkill(def.name, def.cooldown, def.max_level) {
+    _fill_common(this, def);
+    for (auto& tr : def.triggers) {
+        BuffTarget bt = (tr.target == "self") ? BuffTarget::SELF : BuffTarget::ENEMY;
+        triggers.push_back({tr.buff_id, tr.stacks, tr.chance, bt});
+    }
 }
 
 void SelfHealSkill::_on_level_up() {
@@ -378,11 +462,15 @@ std::string SelfHealSkill::get_level_text() const {
 
 // ---- TheWorldSkill ----
 TheWorldSkill::TheWorldSkill() : ActiveSkill("The World", 20.0f, 3) {
+    _skill_id = "the_world";
     tags = {BuildTag::TIME, BuildTag::SUPPORT};
-    // D3 Step2: Evolution path
     add_evolution(1, "延长时间", "停止时间+20%", {BuildTag::TIME});
     add_evolution(2, "时停冲击", "结束时释放Shockwave", {BuildTag::TIME, BuildTag::AOE});
     add_evolution(3, "时间加速", "结束后移速+25% 3秒", {BuildTag::TIME, BuildTag::SUPPORT});
+}
+
+TheWorldSkill::TheWorldSkill(const SkillDef& def) : ActiveSkill(def.name, def.cooldown, def.max_level) {
+    _fill_common(this, def);
 }
 void TheWorldSkill::_on_level_up() {
     if (level == 2) base_cooldown = 16.0f;
@@ -435,44 +523,270 @@ void SkillManager::apply_all_passives(Player* player) {
     for (auto& p : passives) p->apply(player);
 }
 
-// ---- 工厂 ----
-std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>& exclude) {
-    std::vector<std::unique_ptr<ActiveSkill>> pool;
-    // 用类型标记来区分，简化起见按顺序
-    bool has[] = {false, false, false, false}; // Slash, Fireball, SelfHeal, TheWorld
-    for (auto& s : exclude) {
-        if (s == "SlashSkill") has[0] = true;
-        else if (s == "FireballSkill") has[1] = true;
-        else if (s == "SelfHealSkill") has[2] = true;
-        else if (s == "TheWorldSkill") has[3] = true;
-    }
-    if (!has[0]) pool.push_back(std::make_unique<SlashSkill>());
-    if (!has[1]) pool.push_back(std::make_unique<FireballSkill>());
-    if (!has[2]) pool.push_back(std::make_unique<SelfHealSkill>());
-    if (!has[3]) pool.push_back(std::make_unique<TheWorldSkill>());
-    if (pool.empty()) pool.push_back(std::make_unique<SlashSkill>());
+// ═══════════════════════════════════════════════════════════════
+// G5.2: Signature Skills — 5 new behavior classes
+// ═══════════════════════════════════════════════════════════════
 
-    int idx = (int)(rng() % pool.size());
-    auto out = std::move(pool[idx]);
-    return out;
+// ── IceNovaSkill: AOE冻结+碎冰 ──
+IceNovaSkill::IceNovaSkill() : ActiveSkill("冰爆", 6.0f, 3) {
+    _skill_id = "ice_nova"; _radius = 4.0f; _shatter_bonus = 30;
+    triggers = {{"freeze",1,0.30f,BuffTarget::ENEMY}};
+    tags = {BuildTag::MAGIC,BuildTag::ICE,BuildTag::AOE,BuildTag::RANGED};
+    add_evolution(1,"极寒","范围+30%",{BuildTag::ICE,BuildTag::AOE});
+    add_evolution(2,"碎冰","对冻结目标追加伤害",{BuildTag::ICE,BuildTag::DOT});
+    add_evolution(3,"暴风雪","多段AOE",{BuildTag::ICE,BuildTag::AOE,BuildTag::PROJECTILE});
+}
+IceNovaSkill::IceNovaSkill(const SkillDef& def) : ActiveSkill(def.name,def.cooldown,def.max_level) {
+    _skill_id="ice_nova"; _radius=4.0f;_shatter_bonus=30;
+    _fill_common(this,def);
+    for(auto& tr:def.triggers){BuffTarget bt=(tr.target=="self")?BuffTarget::SELF:BuffTarget::ENEMY;triggers.push_back({tr.buff_id,tr.stacks,tr.chance,bt});}
+}
+void IceNovaSkill::_on_level_up() { if(level==2)base_cooldown=5.0f;else if(level==3)base_cooldown=4.0f;_recalc_cooldown(); }
+std::string IceNovaSkill::execute(Player* caster,std::vector<Monster*>& targets,GameMap*,bool is_heavy){
+    float pcx=caster->entity.rect.x+caster->entity.rect.width/2;
+    float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
+    float rng=_radius*32.0f; if(evolution_level>=1)rng*=1.3f; if(is_heavy)rng*=1.5f;
+    int total=0; std::string extra; float base=get_effective_attack(caster)*2.0f*get_power_multiplier();
+    for(auto* t:targets){if(!t||!t->combat.is_alive)continue;
+        float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);
+        if(d>rng)continue;
+        int dmg=calculate_damage((int)base,t->combat.get_effective_defense(AttackType::MAGICAL),AttackType::MAGICAL);
+        // G5.2: 碎冰 — 对已冻结目标追加伤害
+        for(auto& b:t->active_buffs){if(b.id=="freeze"){dmg=dmg*(100+_shatter_bonus)/100;extra=" 碎冰!";break;}}
+        t->combat.take_damage(dmg); total+=dmg;
+        if((rng()%1000)/1000.0f<0.30f) apply_buff(t,"freeze",1);
+        if(is_heavy) apply_buff(t,"frostbite",1);
+    }
+    if(evolution_level>=3&&is_heavy){ // 暴风雪: 2nd wave
+        for(auto* t:targets){if(!t||!t->combat.is_alive)continue;
+            float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);
+            if(d>rng*1.3f)continue;
+            int dmg2=calculate_damage((int)(base*0.5f),t->combat.get_effective_defense(AttackType::MAGICAL),AttackType::MAGICAL);
+            t->combat.take_damage(dmg2);total+=dmg2;}}
+    return "冰爆Lv"+std::to_string(level)+" 造成"+std::to_string(total)+"伤害"+extra;}
+std::string IceNovaSkill::get_level_text() const { return "Lv"+std::to_string(level)+" R"+std::to_string((int)_radius)+" "+std::to_string(cooldown).substr(0,3)+"s"; }
+
+// ── ChainLightningSkill: 弹射链 ──
+ChainLightningSkill::ChainLightningSkill() : ActiveSkill("连锁闪电",4.0f,3) {
+    _skill_id="chain_lightning";_bounces=3;_decay=0.30f;
+    triggers={{ "electrified",1,0.25f,BuffTarget::ENEMY}};
+    tags={BuildTag::MAGIC,BuildTag::LIGHTNING,BuildTag::PROJECTILE,BuildTag::AOE,BuildTag::RANGED};
+    add_evolution(1,"过载","弹射+2",{BuildTag::LIGHTNING,BuildTag::AOE});
+    add_evolution(2,"麻痹","首次命中+眩晕",{BuildTag::LIGHTNING,BuildTag::DOT});
+    add_evolution(3,"雷暴","弹射至所有可见目标",{BuildTag::LIGHTNING,BuildTag::PROJECTILE,BuildTag::AOE});
+}
+ChainLightningSkill::ChainLightningSkill(const SkillDef& def):ActiveSkill(def.name,def.cooldown,def.max_level){_skill_id="chain_lightning";_bounces=3;_decay=0.30f;_fill_common(this,def);for(auto& tr:def.triggers){BuffTarget bt=(tr.target=="self")?BuffTarget::SELF:BuffTarget::ENEMY;triggers.push_back({tr.buff_id,tr.stacks,tr.chance,bt});}}
+void ChainLightningSkill::_on_level_up(){if(level==2)base_cooldown=3.5f;else if(level==3)base_cooldown=2.8f;_recalc_cooldown();}
+std::string ChainLightningSkill::execute(Player* caster,std::vector<Monster*>& targets,GameMap*,bool is_heavy){
+    std::vector<Monster*> alive; for(auto* t:targets)if(t&&t->combat.is_alive)alive.push_back(t);
+    if(alive.empty())return "连锁闪电: 无目标";
+    float pcx=caster->entity.rect.x+caster->entity.rect.width/2; float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
+    // find closest
+    Monster* closest=nullptr; float best_d=99999;
+    for(auto* t:alive){float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);if(d<best_d){best_d=d;closest=t;}}
+    if(!closest)return"";
+    int total=0,bounces=_bounces;if(evolution_level>=1)bounces+=2;if(is_heavy)bounces+=1;
+    if(evolution_level>=3)bounces=(int)alive.size(); // 雷暴: all
+    float mult=1.0f; Monster* prev=closest;
+    float base=get_effective_attack(caster)*1.8f*get_power_multiplier();
+    for(int i=0;i<=bounces&&prev&&prev->combat.is_alive;i++){
+        int dmg=(int)(calculate_damage((int)(base*mult),prev->combat.get_effective_defense(AttackType::MAGICAL),AttackType::MAGICAL));
+        prev->combat.take_damage(dmg);total+=dmg;
+        if(i==0&&evolution_level>=2)apply_buff(prev,"stun",1);
+        if((rng()%1000)/1000.0f<0.25f)apply_buff(prev,"electrified",1);
+        mult*=(1.0f-_decay); // find next closest to prev
+        Monster* next=nullptr; float nd=99999;
+        for(auto* t:alive){if(t==prev)continue; float d=hypotf(t->entity.rect.x-prev->entity.rect.x,t->entity.rect.y-prev->entity.rect.y);if(d<nd){nd=d;next=t;}}
+        prev=next;}return"连锁闪电Lv"+std::to_string(level)+" "+std::to_string(bounces)+"跳 造成"+std::to_string(total)+"伤害";}
+std::string ChainLightningSkill::get_level_text() const { return "Lv"+std::to_string(level)+" B"+std::to_string(_bounces)+" "+std::to_string(cooldown).substr(0,3)+"s"; }
+
+// ── ShadowStrikeSkill: 瞬移+背刺 ──
+ShadowStrikeSkill::ShadowStrikeSkill() : ActiveSkill("暗影突刺",5.0f,3) {
+    _skill_id="shadow_strike";_backstab_mult=2.5f;
+    triggers={{ "fear",1,0.20f,BuffTarget::ENEMY}};
+    tags={BuildTag::MELEE,BuildTag::TIME,BuildTag::COMBO,BuildTag::HEAVY};
+    add_evolution(1,"潜行","确定瞬移后获得隐身0.5s",{BuildTag::TIME,BuildTag::MELEE});
+    add_evolution(2,"暗杀术","背刺倍率+50%",{BuildTag::TIME,BuildTag::COMBO});
+    add_evolution(3,"影分身","施放时留下一个分身诱饵",{BuildTag::TIME,BuildTag::SUMMON});
+}
+ShadowStrikeSkill::ShadowStrikeSkill(const SkillDef& def):ActiveSkill(def.name,def.cooldown,def.max_level){_skill_id="shadow_strike";_backstab_mult=2.5f;_fill_common(this,def);for(auto& tr:def.triggers){BuffTarget bt=(tr.target=="self")?BuffTarget::SELF:BuffTarget::ENEMY;triggers.push_back({tr.buff_id,tr.stacks,tr.chance,bt});}}
+void ShadowStrikeSkill::_on_level_up(){if(level==2)base_cooldown=4.0f;else if(level==3)base_cooldown=3.2f;_recalc_cooldown();}
+std::string ShadowStrikeSkill::execute(Player* caster,std::vector<Monster*>& targets,GameMap* map,bool is_heavy){
+    std::vector<Monster*> alive;for(auto* t:targets)if(t&&t->combat.is_alive)alive.push_back(t);
+    if(alive.empty())return"暗影突刺: 无目标";
+    float pcx=caster->entity.rect.x+caster->entity.rect.width/2;float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
+    // find nearest
+    Monster* t=nullptr;float bd=99999;
+    for(auto* m:alive){float d=hypotf(m->entity.rect.x+m->entity.rect.width/2-pcx,m->entity.rect.y+m->entity.rect.height/2-pcy);if(d<bd){bd=d;t=m;}}
+    if(!t)return"";
+    // teleport behind target
+    float tx=t->entity.rect.x+t->entity.rect.width/2; float ty=t->entity.rect.y+t->entity.rect.height/2;
+    float dx=pcx-tx,dy=pcy-ty; float len=sqrtf(dx*dx+dy*dy);if(len<1)len=1;
+    float behind_x=tx+dx/len*40.0f;float behind_y=ty+dy/len*40.0f;
+    // clamp to walkable
+    auto bpos=caster->entity.position;
+    caster->entity.position={behind_x-caster->entity.rect.width/2,behind_y-caster->entity.rect.height/2};
+    caster->entity.sync_rect();
+    if(map&&!map->is_rect_walkable(caster->entity.rect)){caster->entity.position=bpos;caster->entity.sync_rect();}
+    // backstab check: is player behind target relative to target's "facing"?
+    // Simplified: always backstab if teleport succeeded (we teleported behind)
+    float mult=_backstab_mult;if(evolution_level>=2)mult*=1.5f;if(is_heavy)mult*=1.3f;
+    float base=get_effective_attack(caster)*1.8f*get_power_multiplier();
+    int dmg=calculate_damage((int)(base*mult),t->combat.get_effective_defense(AttackType::PHYSICAL));
+    t->combat.take_damage(dmg);
+    if((rng()%1000)/1000.0f<0.20f)apply_buff(t,"fear",1);
+    if(evolution_level>=1)apply_buff(caster,"shadow_veil",1);
+    return"暗影突刺Lv"+std::to_string(level)+" 背刺! 造成"+std::to_string(dmg)+"伤害";}
+std::string ShadowStrikeSkill::get_level_text() const { return "Lv"+std::to_string(level)+" x"+std::to_string((int)_backstab_mult)+" "+std::to_string(cooldown).substr(0,3)+"s"; }
+
+// ── BloodFrenzySkill: 自伤→AOE流血→回血 ──
+BloodFrenzySkill::BloodFrenzySkill() : ActiveSkill("血怒",7.0f,3) {
+    _skill_id="blood_frenzy";_hp_cost_pct=0.10f;_heal_per_hit=0.05f;
+    triggers={{ "bleed",2,0.60f,BuffTarget::ENEMY}};
+    tags={BuildTag::MELEE,BuildTag::BLEED,BuildTag::AOE,BuildTag::HEAL};
+    add_evolution(1,"深创","流血层数+1",{BuildTag::BLEED,BuildTag::MELEE});
+    add_evolution(2,"血之收割","每命中一个目标额外回血",{BuildTag::BLEED,BuildTag::HEAL});
+    add_evolution(3,"浴血","击杀流血目标→满血",{BuildTag::BLEED,BuildTag::HEAL,BuildTag::HEAVY});
+}
+BloodFrenzySkill::BloodFrenzySkill(const SkillDef& def):ActiveSkill(def.name,def.cooldown,def.max_level){_skill_id="blood_frenzy";_hp_cost_pct=0.10f;_heal_per_hit=0.05f;_fill_common(this,def);for(auto& tr:def.triggers){BuffTarget bt=(tr.target=="self")?BuffTarget::SELF:BuffTarget::ENEMY;triggers.push_back({tr.buff_id,tr.stacks,tr.chance,bt});}}
+void BloodFrenzySkill::_on_level_up(){if(level==2)base_cooldown=5.5f;else if(level==3)base_cooldown=4.5f;_recalc_cooldown();}
+std::string BloodFrenzySkill::execute(Player* caster,std::vector<Monster*>& targets,GameMap*,bool is_heavy){
+    // self-damage
+    int hp_cost=(int)(caster->combat.max_hp*_hp_cost_pct); if(is_heavy)hp_cost=(int)(hp_cost*1.5f);
+    caster->combat.current_hp=std::max(1,caster->combat.current_hp-hp_cost);
+    // AOE: all nearby enemies
+    float pcx=caster->entity.rect.x+caster->entity.rect.width/2;float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
+    float rng=4.0f*32.0f;if(is_heavy)rng*=1.4f;
+    int total=0,hit_count=0;float base=get_effective_attack(caster)*1.5f*get_power_multiplier();
+    for(auto* t:targets){if(!t||!t->combat.is_alive)continue;
+        float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);
+        if(d>rng)continue;
+        int dmg=calculate_damage((int)base,t->combat.get_effective_defense(AttackType::PHYSICAL));
+        t->combat.take_damage(dmg);total+=dmg;hit_count++;
+        int stacks=1;if(evolution_level>=1)stacks=2;if(is_heavy)stacks++;
+        apply_buff(t,"bleed",stacks);
+        if(evolution_level>=3&&t->combat.current_hp<=0)caster->combat.current_hp=caster->combat.max_hp; // 浴血
+    }
+    // heal per hit
+    int heal_per=(int)(caster->combat.max_hp*_heal_per_hit);if(evolution_level>=2)heal_per*=2;
+    int healed=caster->combat.heal(hp_cost+heal_per*hit_count);
+    return"血怒Lv"+std::to_string(level)+" 消耗"+std::to_string(hp_cost)+"HP 命中"+std::to_string(hit_count)+"目标 造成"+std::to_string(total)+"伤害 回复"+std::to_string(healed)+"HP";}
+std::string BloodFrenzySkill::get_level_text() const { return "Lv"+std::to_string(level)+" -"+std::to_string((int)(_hp_cost_pct*100))+"%HP "+std::to_string(cooldown).substr(0,3)+"s"; }
+
+// ── SummonSpiritSkill: 召唤友军 ──
+SummonSpiritSkill::SummonSpiritSkill() : ActiveSkill("召唤英灵",12.0f,3) {
+    _skill_id="summon_spirit";_spirit_count=1;_spirit_hp=30;_spirit_atk=8;
+    tags={BuildTag::SUMMON,BuildTag::SUPPORT};
+    add_evolution(1,"英灵强化","召唤物HP+50% ATK+30%",{BuildTag::SUMMON,BuildTag::SUPPORT});
+    add_evolution(2,"双灵","召唤2只",{BuildTag::SUMMON,BuildTag::AOE});
+    add_evolution(3,"亡灵大军","召唤3只+死亡爆炸",{BuildTag::SUMMON,BuildTag::AOE,BuildTag::HEAVY});
+}
+SummonSpiritSkill::SummonSpiritSkill(const SkillDef& def):ActiveSkill(def.name,def.cooldown,def.max_level){_skill_id="summon_spirit";_spirit_count=1;_spirit_hp=30;_spirit_atk=8;_fill_common(this,def);}
+void SummonSpiritSkill::_on_level_up(){if(level==2)base_cooldown=10.0f;else if(level==3)base_cooldown=8.0f;_recalc_cooldown();}
+std::string SummonSpiritSkill::execute(Player* caster,std::vector<Monster*>& targets,GameMap* map,bool is_heavy){
+    int count=_spirit_count;if(evolution_level>=2)count=2;if(evolution_level>=3)count=3;if(is_heavy)count++;
+    float pcx=caster->entity.rect.x+caster->entity.rect.width/2;float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
+    int hp=_spirit_hp,atk=_spirit_atk;if(evolution_level>=1){hp=(int)(hp*1.5f);atk=(int)(atk*1.3f);}
+    int spawned=0;
+    for(int i=0;i<count;i++){
+        float sx=pcx+(float)((int)rng()%80-40);float sy=pcy+(float)((int)rng()%80-40);
+        auto [tx,ty]=map?map->pixel_to_tile(sx,sy):std::make_pair(0,0);
+        if(map&&!map->is_walkable(tx,ty))continue;
+        // Spawn a friendly monster using spawn_monster factory
+        Monster* spirit=spawn_monster(sx,sy,"orc");
+        if(!spirit)continue;
+        spirit->combat.max_hp=hp;spirit->combat.current_hp=hp;
+        spirit->combat.attack=atk;spirit->name="英灵";
+        spirit->color={180,180,255,255};
+        spirit->entity.sync_rect();
+        targets.push_back(spirit);spawned++;
+    }
+    return"召唤英灵Lv"+std::to_string(level)+" 召唤"+std::to_string(spawned)+"只  HP"+std::to_string(hp)+" ATK"+std::to_string(atk);}
+std::string SummonSpiritSkill::get_level_text() const { return "Lv"+std::to_string(level)+" x"+std::to_string(_spirit_count)+" "+std::to_string(cooldown).substr(0,3)+"s"; }
+
+// ---- 工厂 ----
+// G3.2: SkillFactory — 数据驱动创建
+std::unique_ptr<Skill> skill_factory_create(const std::string& skill_id) {
+    const SkillDef* def = get_skill_def(skill_id);
+    if (!def) return nullptr;
+
+    if (def->class_type == "slash")
+        return std::make_unique<SlashSkill>(*def);
+    if (def->class_type == "fireball")
+        return std::make_unique<FireballSkill>(*def);
+    if (def->class_type == "self_heal")
+        return std::make_unique<SelfHealSkill>(*def);
+    if (def->class_type == "the_world")
+        return std::make_unique<TheWorldSkill>(*def);
+    if (def->class_type == "ice_nova")
+        return std::make_unique<IceNovaSkill>(*def);
+    if (def->class_type == "chain_lightning")
+        return std::make_unique<ChainLightningSkill>(*def);
+    if (def->class_type == "shadow_strike")
+        return std::make_unique<ShadowStrikeSkill>(*def);
+    if (def->class_type == "blood_frenzy")
+        return std::make_unique<BloodFrenzySkill>(*def);
+    if (def->class_type == "summon_spirit")
+        return std::make_unique<SummonSpiritSkill>(*def);
+    if (def->class_type == "iron_skin")
+        return std::make_unique<IronSkinSkill>(*def);
+    if (def->class_type == "berserk")
+        return std::make_unique<BerserkSkill>(*def);
+    return nullptr;
+}
+
+// G3.2: random_active_skill — 从 registry 随机
+std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>& exclude) {
+    std::vector<const SkillDef*> pool;
+    for (auto& kv : get_all_skill_defs()) {
+        auto& d = kv.second;
+        // 只选主动技能
+        if (d.class_type == "slash" || d.class_type == "fireball" ||
+            d.class_type == "self_heal" || d.class_type == "the_world" ||
+            d.class_type == "ice_nova" || d.class_type == "chain_lightning" ||
+            d.class_type == "shadow_strike" || d.class_type == "blood_frenzy" ||
+            d.class_type == "summon_spirit") {
+            bool ex = false;
+            for (auto& e : exclude) if (e == d.id || e == d.class_type) { ex = true; break; }
+            if (!ex) pool.push_back(&d);
+        }
+    }
+    if (pool.empty()) {
+        return std::make_unique<SlashSkill>();  // fallback
+    }
+    auto& chosen = pool[rng() % pool.size()];
+    if (chosen->class_type == "slash")     return std::make_unique<SlashSkill>(*chosen);
+    if (chosen->class_type == "fireball")  return std::make_unique<FireballSkill>(*chosen);
+    if (chosen->class_type == "self_heal") return std::make_unique<SelfHealSkill>(*chosen);
+    if (chosen->class_type == "the_world") return std::make_unique<TheWorldSkill>(*chosen);
+    if (chosen->class_type == "ice_nova")  return std::make_unique<IceNovaSkill>(*chosen);
+    if (chosen->class_type == "chain_lightning") return std::make_unique<ChainLightningSkill>(*chosen);
+    if (chosen->class_type == "shadow_strike")   return std::make_unique<ShadowStrikeSkill>(*chosen);
+    if (chosen->class_type == "blood_frenzy")    return std::make_unique<BloodFrenzySkill>(*chosen);
+    if (chosen->class_type == "summon_spirit")   return std::make_unique<SummonSpiritSkill>(*chosen);
+    return std::make_unique<SlashSkill>();  // fallback
 }
 
 std::unique_ptr<Skill> random_skill(const std::vector<std::string>& exclude) {
     if ((rng() % 100) < 70)
         return random_active_skill(exclude);
-    if ((rng() % 2) == 0)
-        return std::make_unique<IronSkinSkill>();
-    return std::make_unique<BerserkSkill>();
+    // 30%: 被动技能
+    if ((rng() % 2) == 0) {
+        const SkillDef* def = get_skill_def("iron_skin");
+        return def ? std::make_unique<IronSkinSkill>(*def)
+                   : std::make_unique<IronSkinSkill>();
+    }
+    const SkillDef* def = get_skill_def("berserk");
+    return def ? std::make_unique<BerserkSkill>(*def)
+               : std::make_unique<BerserkSkill>();
 }
 
+// G3.2: get_learned_names — 使用 _skill_id (替代 dynamic_cast)
 std::vector<std::string> get_learned_names(const SkillManager& mgr) {
     std::vector<std::string> names;
-    for (auto& s : mgr.active_skills) {
-        if (dynamic_cast<SlashSkill*>(s.get())) names.push_back("SlashSkill");
-        else if (dynamic_cast<FireballSkill*>(s.get())) names.push_back("FireballSkill");
-        else if (dynamic_cast<SelfHealSkill*>(s.get())) names.push_back("SelfHealSkill");
-        else if (dynamic_cast<TheWorldSkill*>(s.get())) names.push_back("TheWorldSkill");
-    }
+    for (auto& s : mgr.active_skills)
+        if (!s->_skill_id.empty())
+            names.push_back(s->_skill_id);
     return names;
 }
 

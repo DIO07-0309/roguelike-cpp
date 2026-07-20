@@ -5,8 +5,8 @@
 #include "game_map.h"
 #include "world_state.h"
 #include "relationship_system.h"
-#include "boss.h"          // BossAI, spawn_boss
-#include "combat_system.h"  // rng
+#include "boss.h"              // BossAI, spawn_boss
+#include "combat_system.h"     // rng
 
 // ============================================================
 // D6 Step3: BossSystemDirector — 组合所有Boss子系统
@@ -27,6 +27,8 @@ void BossSystemDirector::reset() {
     intro_text.clear();
     modifier_text.clear();
     dmg_done = 0; dmg_taken = 0;
+    _arena_spawn_timer = 0.0f;   // G2.3
+    _arena_cfg = nullptr;        // G2.3
 }
 
 void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
@@ -90,6 +92,12 @@ void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
 
     dmg_done = 0; dmg_taken = 0;
 
+    // G2.3: Arena 配置从 BossAI 读取 (boss_factory_create 已设置)
+    if (auto* bai = dynamic_cast<BossAI*>(boss->ai))
+        _arena_cfg = bai->_arena_cfg;
+    else
+        _arena_cfg = nullptr;
+
     // D5 Step2: Apply cooldown/area modifiers to BossAI
     if (auto* bai = dynamic_cast<BossAI*>(boss->ai)) {
         bai->_charge->cooldown    *= evolution.charge_mod.cooldown_scale;
@@ -137,6 +145,23 @@ void BossSystemDirector::tick(float dt, Monster* boss, const Player* player,
 
     // Cinematic tick
     cinematic.tick(dt);
+
+    // ── G2.3: Arena 生成 (原在 GameScene 中的硬编码) ──
+    if (_arena_cfg && _arena_cfg->danger_type != "none") {
+        _arena_spawn_timer += dt;
+        if (_arena_spawn_timer >= _arena_cfg->spawn_interval) {
+            _arena_spawn_timer = 0.0f;
+            ArenaEvent ev;
+            ev.type     = ArenaEventType::SPAWN_ZONE;
+            ev.count    = 1;
+            ev.duration = _arena_cfg->zone_duration;
+            float bx = boss->entity.rect.x + boss->entity.rect.width / 2;
+            float by = boss->entity.rect.y + boss->entity.rect.height / 2;
+            float px = player->entity.rect.x + player->entity.rect.width / 2;
+            float py = player->entity.rect.y + player->entity.rect.height / 2;
+            arena.execute_event(ev, *_arena_cfg, bx, by, px, py);
+        }
+    }
 }
 
 void BossSystemDirector::notify_phase2() {

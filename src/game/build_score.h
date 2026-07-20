@@ -19,6 +19,13 @@ enum class BuildType {
     TIME_MASTER,    // 时间术士: TIME+SUPPORT
     SUPPORT,        // 辅助者: HEAL+SUPPORT+DEFENSE
     PROJECTILE,     // 弹幕射手: PROJECTILE+RANGED
+    // ── G5.1: 新构筑流派 ──
+    ICE_MAGE,       // 冰霜法师: ICE+AOE+SLOW
+    LIGHTNING_MAGE, // 雷电法师: LIGHTNING+PROJECTILE+AOE
+    BLEED_BLADE,    // 流血剑士: BLEED+MELEE+DOT
+    SHADOW_STRIKER, // 暗影刺客: MELEE+COMBO+TIME
+    JUGGERNAUT,     // 重装守卫: DEFENSE+HEAVY+HEAL
+    SUMMON_LORD,    // 召唤领主: SUMMON+SUPPORT
 };
 
 struct BuildScore {
@@ -41,6 +48,9 @@ struct BuildScore {
 
 // 计算玩家当前构筑评分
 BuildScore calculate_build(const Player* player);
+
+// G1 Step3: 确认玩家构筑已成型 (消除 attack_evolution / skill_evolution 重复)
+bool has_confirmed_build(const Player* player);
 
 // 根据 BuildScore 推荐 relic (id, weight) — 越高越优先
 void recommend_relic_weights(const BuildScore& bs,

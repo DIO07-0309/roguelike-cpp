@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include <unordered_map>
 
 class Player;
 class GameMap;
@@ -44,7 +45,10 @@ public:
     void load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
                          uint32_t seed,
                          const std::vector<bool>& special_triggered,
-                         const std::vector<bool>& special_discovered);
+                         const std::vector<bool>& special_discovered,
+                         const std::unordered_map<std::string, int>& rule_counters = {},
+                         const std::unordered_map<int, int>& quest_states = {},
+                         const std::vector<int>& unlocked_endings = {});
 
     // ── 状态转换 ──
     void on_boss_intro_confirm();   // BOSS_INTRO → spawn boss → BOSS_FIGHT

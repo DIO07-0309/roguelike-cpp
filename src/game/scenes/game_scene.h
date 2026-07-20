@@ -2,6 +2,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include "node.h"
 #include "player.h"
 #include "monster.h"
@@ -44,6 +45,10 @@
 #include "scene/game_scene_input.h"
 #include "scene/game_scene_combat.h"
 #include "scene/game_scene_interaction.h"
+
+// ── G4.5: Replay ──
+#include "core/replay/recorder.h"
+#include "core/replay/player.h"
 
 // ============================================================
 // D4 Step2: EventPresentation — 事件演出系统
@@ -128,10 +133,26 @@ public:
     void load_saved_game(int floor, int max_floor, std::unique_ptr<Player> p,
                          uint32_t seed = 0,
                          const std::vector<bool>& special_triggered = {},
-                         const std::vector<bool>& special_discovered = {});
+                         const std::vector<bool>& special_discovered = {},
+                         const std::unordered_map<std::string, int>& rule_counters = {},
+                         const std::unordered_map<int, int>& quest_states = {},
+                         const std::vector<int>& unlocked_endings = {});
 
     // 输入 (override Node::_input)
     void _input(const InputMap& input) override;
+
+    // ── G4.5: Replay ──
+    void start_recording(uint32_t seed);
+    void start_replay(const std::string& path);
+    ReplayRecorder& recorder() { return _recorder; }
+    ReplayPlayer&  replay_player() { return _replay_player; }
+
+    static std::string g_record_path;   // --record <path>
+    static std::string g_replay_path;   // --replay <path>
+    static bool g_record_mode;
+    static bool g_replay_mode;
+    static bool g_sim_mode;             // G5.6: --sim mode
+    static int  g_sim_runs;             // G5.6: number of sim runs
 
 private:
     // 战斗
@@ -214,4 +235,16 @@ private:
     void _draw_ground_items();
 
     float _cam_x = 0, _cam_y = 0;
+
+    // ── G4.5: Replay ──
+    ReplayRecorder _recorder;
+    ReplayPlayer   _replay_player;
+    bool _is_action_just_pressed(const InputMap& input, const char* name);
+    void _tick_replay_hash();
+
+    // ── G5.6: Sim ──
+    class SimAI;
+    std::unique_ptr<SimAI> _sim_ai;
+    bool _sim_mode = false;
+    void _collect_sim_stats();
 };

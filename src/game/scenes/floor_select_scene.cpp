@@ -5,6 +5,7 @@
 #include "scene_tree.h"
 #include "config.h"
 #include "boss.h"
+#include "data/boss_defs.h"   // G1 Step6
 #include "core/logger.h"
 
 extern Font g_font, g_font_small;
@@ -46,10 +47,10 @@ void FloorSelectScene::_render() {
         DrawText(num, cx + cell_w/2 - 10, cy + 8, 28, is_boss ? RED : WHITE);
 
         if (is_boss && unlocked) {
-            auto info = get_boss_info(i + 1);
-            if (g_font_loaded) {
-                float w = MeasureTextEx(g_font_small, info.name.c_str(), 12, 1).x;
-                DrawTextEx(g_font_small, info.name.c_str(),
+            const BossDef* def = get_boss_def_for_floor(i + 1);  // G1 Step6
+            if (def && g_font_loaded) {
+                float w = MeasureTextEx(g_font_small, def->name.c_str(), 12, 1).x;
+                DrawTextEx(g_font_small, def->name.c_str(),
                            {(float)(cx + cell_w/2) - w/2, (float)(cy + cell_h - 20)}, 12, 1, RED);
             }
         }
@@ -73,7 +74,9 @@ void FloorSelectScene::_input(const InputMap& input) {
             // 尝试加载存档中的玩家数据
             auto* data = SaveManager::load_save();
             if (data && data->player) {
-                gs->load_saved_game(floor, max_unlocked, std::move(data->player));
+                gs->load_saved_game(floor, max_unlocked, std::move(data->player),
+                                    0, {}, {}, data->rule_counters, data->quest_states,
+                                    data->unlocked_endings);
                 delete data;
             } else {
                 // 无存档: 创建新玩家

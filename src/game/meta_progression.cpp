@@ -1,24 +1,42 @@
 #include "meta_progression.h"
 #include "core/logger.h"
+#include "data/meta_node_defs.h"  // G3.1
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
 
 MetaSystem g_meta;
 
-// 10个永久成长节点
+// G3.1: 构造器空 — 在 JSON 加载后由 load_from_defs() 填充
 MetaSystem::MetaSystem() {
-    _nodes[0] = {"hp_bonus",    "生命力",   "+2%% 最大HP",        5, 2, 2};
-    _nodes[1] = {"atk_bonus",   "攻击力",   "+2%% 攻击力",        5, 2, 2};
-    _nodes[2] = {"gold_start",  "初始金币", "+15 初始金币",       5, 2, 3};
-    _nodes[3] = {"potion_start","初始药水", "+1 初始药水",        3, 4, 4};
-    _nodes[4] = {"relic_bonus", "圣物掉落", "+2%% 圣物掉率",     5, 3, 2};
-    _nodes[5] = {"exp_bonus",   "经验",     "+3%% 经验获取",      5, 2, 3};
-    _nodes[6] = {"buff_dur",    "Buff持续", "+5%% Buff时间",      3, 4, 3};
-    _nodes[7] = {"skill_cd",    "技能冷却", "-2%% 冷却缩减",      5, 3, 3};
-    _nodes[8] = {"build_speed", "构筑速度", "+5%% Build成型速度", 3, 3, 4};
-    _nodes[9] = {"crit_bonus",  "暴击率",   "+1.5%% 暴击率",     5, 3, 3};
-    _node_count = 10;
+    _node_count = 0;
+}
+
+// G3.1: 从 MetaNodeDef registry 构建 (替代硬编码 10 个 MetaNode)
+void MetaSystem::load_from_defs() {
+    _node_texts.clear();
+    static const char* ORDER[] = {
+        "hp_bonus","atk_bonus","gold_start","potion_start","relic_bonus",
+        "exp_bonus","buff_dur","skill_cd","build_speed","crit_bonus",nullptr
+    };
+
+    int count = 0;
+    for (int i = 0; ORDER[i] && count < 10; i++) {
+        const MetaNodeDef* def = get_meta_node_def(ORDER[i]);
+        if (!def) continue;
+        _node_texts.push_back(def->id);
+        _node_texts.push_back(def->name);
+        _node_texts.push_back(def->description);
+        MetaNode& n = _nodes[count];
+        n.id         = _node_texts[_node_texts.size() - 3].c_str();
+        n.name       = _node_texts[_node_texts.size() - 2].c_str();
+        n.desc       = _node_texts[_node_texts.size() - 1].c_str();
+        n.max_level  = def->max_level;
+        n.cost_base  = def->cost_base;
+        n.cost_scale = def->cost_scale;
+        count++;
+    }
+    _node_count = count;
 }
 
 int MetaSystem::node_level(const char* id) const {
@@ -66,6 +84,11 @@ MetaCurrency MetaSystem::end_run(const RunSummary& rs) {
     _save.currency.knowledge += earned.knowledge;
     _save.currency.ancient_memory += earned.ancient_memory;
     _save.total_runs++;
+    // G3.5: 记录 RUN_SUMMARY 奖励
+    _reward_log.push_back({MetaRewardSource::RUN_SUMMARY,
+        "Run结算: F" + std::to_string(rs.floor_reached) + " "
+        + std::to_string(rs.bosses_killed) + "Boss "
+        + std::to_string(rs.quests_done) + "Quest", earned});
     save();
     return earned;
 }
@@ -75,6 +98,18 @@ void MetaSystem::add_currency(const MetaCurrency& c) {
     _save.currency.knowledge += c.knowledge;
     _save.currency.ancient_memory += c.ancient_memory;
 }
+
+// G3.5: 统一 Ending 奖励入口
+void MetaSystem::reward_from_ending(const char* name, int soul, int knowledge,
+                                     int ancient_memory) {
+    MetaCurrency mc{soul, knowledge, ancient_memory};
+    add_currency(mc);
+    _reward_log.push_back({MetaRewardSource::ENDING,
+        std::string("Ending: ") + name, mc});
+    save();
+}
+
+void MetaSystem::clear_reward_log() { _reward_log.clear(); }
 
 // ---- JSON save ----
 bool MetaSystem::save() const {

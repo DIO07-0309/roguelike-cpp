@@ -17,6 +17,9 @@
 // D9: MinGW std::random_device 确定性修复 — 混合时间戳
 std::mt19937 rng(std::random_device{}() ^ (uint32_t)time(nullptr));
 
+// G4.5: deterministic RNG seed for replay
+void seed_rng(uint32_t seed) { rng.seed(seed); }
+
 // ---- 伤害公式 ----
 int calculate_damage(int atk, int def, AttackType type) {
     (void)type;  // reserved for future type-specific logic
@@ -124,60 +127,68 @@ bool load_buff_defs(const std::string& path) {
     std::string buf(sz + 1, '\0');
     fread(&buf[0], 1, sz, f);
     fclose(f);
+    return load_buff_defs_from_json(buf.c_str(), MergeMode::Skip) > 0;
+}
 
-    const char* p = buf.c_str();
+const std::unordered_map<std::string, BuffDef>& get_all_buff_defs() { return g_buff_defs; }
+bool is_buff_defs_loaded() { return g_buff_defs_loaded; }
+
+// ── Post-fill BuffDef tags from id ──
+static void _post_fill_buff_tags(BuffDef& def) {
+    if (def.id == "poison") def.tags = {BuildTag::POISON, BuildTag::DOT};
+    else if (def.id == "slow") def.tags = {BuildTag::ICE};
+    else if (def.id == "attack_up") def.tags = {BuildTag::SUPPORT};
+    else if (def.id == "bleed") def.tags = {BuildTag::BLEED, BuildTag::DOT};
+    else if (def.id == "shield") def.tags = {BuildTag::DEFENSE};
+    else if (def.id == "burn") def.tags = {BuildTag::FIRE, BuildTag::DOT};
+    else if (def.id == "freeze") def.tags = {BuildTag::ICE};
+    else if (def.id == "stun") def.tags = {BuildTag::LIGHTNING};
+    else if (def.id == "fear") def.tags = {BuildTag::TIME};
+    else if (def.id == "regen") def.tags = {BuildTag::HEAL};
+    else if (def.id == "berserk") def.tags = {BuildTag::MELEE};
+    else if (def.id == "stone_skin") def.tags = {BuildTag::DEFENSE};
+    else if (def.id == "defense_up") def.tags = {BuildTag::DEFENSE, BuildTag::SUPPORT};
+    else if (def.id == "lifesteal") def.tags = {BuildTag::BLEED, BuildTag::MELEE};
+    else if (def.id == "adrenaline") def.tags = {BuildTag::MELEE, BuildTag::COMBO};
+    else if (def.id == "curse") def.tags = {BuildTag::SUMMON, BuildTag::DOT};
+    // ── G5.1: new buffs ──
+    else if (def.id == "electrified") def.tags = {BuildTag::LIGHTNING, BuildTag::DOT};
+    else if (def.id == "frostbite") def.tags = {BuildTag::ICE, BuildTag::DOT};
+    else if (def.id == "deep_wound") def.tags = {BuildTag::BLEED, BuildTag::DOT, BuildTag::HEAVY};
+    else if (def.id == "shadow_veil") def.tags = {BuildTag::TIME, BuildTag::DEFENSE};
+    else if (def.id == "summon_bless") def.tags = {BuildTag::SUMMON, BuildTag::SUPPORT};
+}
+
+// ── G4.1: from JSON text (RegistryBuilder 驱动, 复用现有 hand-rolled 解析器) ──
+int load_buff_defs_from_json(const char* json_text, MergeMode mode,
+                               const char* id_namespace) {
+    if (!json_text || !json_text[0]) return 0;
+    std::string ns = id_namespace ? (std::string(id_namespace)+":") : "";
+    const char* p = json_text;
     p = _skip_ws(p);
-    if (*p != '[') {
-        LOG_ERROR("[BUFF] JSON root must be array");
-        return false;
-    }
+    if (*p != '[') return 0;
     p++;
-
-    int loaded = 0, skipped = 0;
+    int count=0, skipped=0, dups=0, over=0;
     while (*p) {
         p = _skip_ws(p);
         if (*p == ']') { p++; break; }
         if (*p == ',') { p++; continue; }
-
         BuffDef def;
         std::string err = _parse_buff_obj(p, def);
-        if (!err.empty()) {
-            LOG_WARN("[BUFF] Parse error #%d: %s -- skip", loaded + skipped, err.c_str());
-            int depth = 0;
-            while (*p) {
-                if (*p == '{' && !depth) depth = 1;
-                else if (*p == '{') depth++;
-                else if (*p == '}') { depth--; if (!depth) { p++; break; } }
-                p++;
-            }
-            skipped++; continue;
-        }
-        if (def.id.empty()) {
-            LOG_WARN("[BUFF] Missing id -- skip");
-            skipped++; continue;
-        }
+        if (!err.empty() || def.id.empty()) { skipped++; continue; }
+        if (!ns.empty()) def.id = ns + def.id;
         _apply_defaults(def);
-
-        // D3 Step1: post-fill buff tags (from id)
-        if (def.id == "poison") def.tags = {BuildTag::POISON, BuildTag::DOT};
-        else if (def.id == "slow") def.tags = {BuildTag::ICE};
-        else if (def.id == "attack_up") def.tags = {BuildTag::SUPPORT};
-        else if (def.id == "bleed") def.tags = {BuildTag::BLEED, BuildTag::DOT};
-        else if (def.id == "shield") def.tags = {BuildTag::DEFENSE};
-
-        if (g_buff_defs.count(def.id))
-            LOG_WARN("[BUFF] Duplicate id '%s' -- overwrite", def.id.c_str());
-
-        LOG_INFO("[BUFF] Loaded '%s': %s dur=%.1f stacks=%d tick=%.2f dmg=%d",
-            def.id.c_str(), def.display_name.c_str(), def.duration,
-            def.max_stacks, def.tick_interval, def.tick_damage);
-        g_buff_defs[def.id] = def;
-        loaded++;
+        _post_fill_buff_tags(def);
+        if (g_buff_defs.count(def.id)) {
+            if (mode == MergeMode::Replace) { g_buff_defs[def.id] = def; over++; }
+            else dups++;
+            continue;
+        }
+        g_buff_defs[def.id] = def; count++;
     }
-
     g_buff_defs_loaded = true;
-    LOG_INFO("[BUFF] Loaded %d buffs, skipped %d", loaded, skipped);
-    return loaded > 0;
+    printf("[BUFF] +%d", count); if(over>0)printf(" ~%d",over); printf("\n");
+    return count+over;
 }
 
 const BuffDef* get_buff_def(const std::string& id) {
@@ -478,6 +489,33 @@ static std::string _parse_relic_obj(const char*& p, RelicDef& out) {
             p = _skip_ws(p); if (*p == ',') p++;
             out.hud_color_b = _read_int(p);
             p = _skip_ws(p); if (*p == ']') p++;
+        } else if (key == "tags") {
+            p = _skip_ws(p); if (*p == '[') p++;
+            out.favorite_tags.clear();
+            while (*p) {
+                p = _skip_ws(p);
+                if (*p == ']') { p++; break; }
+                if (*p == ',') { p++; continue; }
+                std::string tag = _read_string(p);
+                if (tag == "melee") out.favorite_tags.push_back(BuildTag::MELEE);
+                else if (tag == "ranged") out.favorite_tags.push_back(BuildTag::RANGED);
+                else if (tag == "magic") out.favorite_tags.push_back(BuildTag::MAGIC);
+                else if (tag == "fire") out.favorite_tags.push_back(BuildTag::FIRE);
+                else if (tag == "ice") out.favorite_tags.push_back(BuildTag::ICE);
+                else if (tag == "lightning") out.favorite_tags.push_back(BuildTag::LIGHTNING);
+                else if (tag == "poison") out.favorite_tags.push_back(BuildTag::POISON);
+                else if (tag == "bleed") out.favorite_tags.push_back(BuildTag::BLEED);
+                else if (tag == "summon") out.favorite_tags.push_back(BuildTag::SUMMON);
+                else if (tag == "combo") out.favorite_tags.push_back(BuildTag::COMBO);
+                else if (tag == "heavy") out.favorite_tags.push_back(BuildTag::HEAVY);
+                else if (tag == "aoe") out.favorite_tags.push_back(BuildTag::AOE);
+                else if (tag == "projectile") out.favorite_tags.push_back(BuildTag::PROJECTILE);
+                else if (tag == "heal") out.favorite_tags.push_back(BuildTag::HEAL);
+                else if (tag == "time") out.favorite_tags.push_back(BuildTag::TIME);
+                else if (tag == "defense") out.favorite_tags.push_back(BuildTag::DEFENSE);
+                else if (tag == "support") out.favorite_tags.push_back(BuildTag::SUPPORT);
+                else if (tag == "dot") out.favorite_tags.push_back(BuildTag::DOT);
+            }
         } else {
             p = _skip_ws(p);
             if (*p == '"') { _read_string(p); }
@@ -507,8 +545,8 @@ bool load_relic_defs(const std::string& path) {
     std::string buf(sz + 1, '\0');
     fread(&buf[0], 1, sz, f);
     fclose(f);
-
-    const char* p = buf.c_str();
+    return load_relic_defs_from_json(buf.c_str(), MergeMode::Skip) > 0;
+}
     p = _skip_ws(p);
     if (*p != '[') {
         LOG_ERROR("[RELIC] JSON root must be array");
@@ -516,7 +554,7 @@ bool load_relic_defs(const std::string& path) {
     }
     p++;
 
-    int loaded = 0, skipped = 0;
+    int loaded = 0, skipped = 0, dups = 0;
     while (*p) {
         p = _skip_ws(p);
         if (*p == ']') { p++; break; }
@@ -538,6 +576,10 @@ bool load_relic_defs(const std::string& path) {
         if (def.id.empty()) {
             LOG_WARN("[RELIC] Missing id -- skip");
             skipped++; continue;
+        }
+        if (g_relic_defs.count(def.id)) {
+            LOG_ERROR("[RELIC] Duplicate id '%s' -- skipped", def.id.c_str());
+            dups++; continue;
         }
         _apply_relic_defaults(def);
 
@@ -562,8 +604,42 @@ bool load_relic_defs(const std::string& path) {
 
     g_relic_defs_loaded = true;
     LOG_INFO("[RELIC] Loaded %d relics, skipped %d", loaded, skipped);
+    if (dups > 0) LOG_INFO("[RELIC]   (skipped %d duplicates)", dups);
     return loaded > 0;
 }
+
+int load_relic_defs_from_json(const char* json_text, MergeMode mode,
+                                const char* id_namespace) {
+    if (!json_text || !json_text[0]) return 0;
+    std::string ns = id_namespace ? (std::string(id_namespace)+":") : "";
+    const char* p = json_text;
+    p = _skip_ws(p);
+    if (*p != '[') return 0;
+    p++;
+    int count=0, skipped=0, dups=0, over=0;
+    while (*p) {
+        p = _skip_ws(p);
+        if (*p == ']') { p++; break; }
+        if (*p == ',') { p++; continue; }
+        RelicDef def;
+        std::string err = _parse_relic_obj(p, def);
+        if (!err.empty() || def.id.empty()) { skipped++; continue; }
+        if (!ns.empty()) def.id = ns + def.id;
+        _apply_relic_defaults(def);
+        if (g_relic_defs.count(def.id)) {
+            if (mode == MergeMode::Replace) { g_relic_defs[def.id] = def; over++; }
+            else dups++;
+            continue;
+        }
+        g_relic_defs[def.id] = def; count++;
+    }
+    g_relic_defs_loaded = true;
+    printf("[RELIC] +%d", count); if(over>0)printf(" ~%d",over); printf("\n");
+    return count+over;
+}
+
+const std::unordered_map<std::string, RelicDef>& get_all_relic_defs() { return g_relic_defs; }
+bool is_relic_defs_loaded() { return g_relic_defs_loaded; }
 
 const RelicDef* get_relic_def(const std::string& id) {
     auto it = g_relic_defs.find(id);

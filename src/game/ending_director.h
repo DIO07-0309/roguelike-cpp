@@ -47,6 +47,10 @@ public:
     const std::vector<NPCEnding>& npc_endings() const { return _npc_endings; }
     const WorldEnding& world_ending() const { return _world; }
 
+    // G2.5: 已解锁结局追踪 (供 Save v3)
+    const std::vector<int>& unlocked() const { return _unlocked; }
+    void restore_unlocked(const std::vector<int>& list) { _unlocked = list; }
+
     // 调试: 强制设置EndingType
     void debug_override(EndingType et) { _type = et; }
 
@@ -55,6 +59,8 @@ private:
     std::vector<NPCEnding> _npc_endings;
     WorldEnding _world;
     void _build_npc_endings(const WorldState& ws, const RelationshipSystem& rels);
+    // G2.5: string storage — 避免 registry c_str() 悬挂
+    struct _EndTexts { std::string sky, line, title; };
+    _EndTexts _texts;
+    std::vector<int> _unlocked;  // G2.5: 已解锁结局类型列表
 };
-
-extern const WorldEnding WORLD_ENDINGS[5];

@@ -42,9 +42,21 @@ void VFXServer::_sparks(float cx, float cy, int n, Color c, float dur) {
     }
 }
 
-void VFXServer::player_attack(float cx, float cy, float range) {
-    effects.push_back({"pulse", cx, cy, range, {255, 200, 50, 200}, 0.35f});
-    _sparks(cx, cy, 4, {255, 220, 100, 255}, 0.25f);
+void VFXServer::player_attack(float cx, float cy, float range,
+                               const AttackEvolutionState& evo) {
+    // G1: Lv1=铁剑(白金色), Lv2=剑气(橙色加宽), Lv3=旋风斩(金色更宽更多粒子)
+    if (evo.level == 1) {
+        effects.push_back({"pulse", cx, cy, range, {255, 200, 50, 200}, 0.35f});
+        _sparks(cx, cy, 4, {255, 220, 100, 255}, 0.25f);
+    } else if (evo.level == 2) {
+        effects.push_back({"pulse", cx, cy, range * 1.3f, {255, 150, 40, 220}, 0.40f});
+        _sparks(cx, cy, 6, {255, 180, 60, 255}, 0.30f);
+    } else { // Lv3+
+        effects.push_back({"pulse", cx, cy, range * 1.6f, {255, 200, 40, 240}, 0.45f});
+        _sparks(cx, cy, 10, {255, 220, 80, 255}, 0.35f);
+        // 额外微量震动 (视觉增强)
+        effects.push_back({"flash", cx, cy, range * 0.8f, {255, 220, 60, 100}, 0.20f});
+    }
 }
 
 void VFXServer::slash_skill(float cx, float cy, Direction dir, int level) {

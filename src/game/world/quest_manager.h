@@ -1,13 +1,14 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include "world_state.h"
 #include "relationship_system.h"
 
 class Player;
 
 // ============================================================
-// D4 Step5.2: QuestManager — 任务驱动游戏流程
+// D4 Step5.2: QuestManager (G2.4: Data Driven)
 // ============================================================
 
 enum class QuestState { LOCKED, AVAILABLE, ACCEPTED, COMPLETED, FAILED };
@@ -20,7 +21,7 @@ struct QuestReward {
     std::string counter_name;
     int         counter_add = 1;
     const char* story_msg = nullptr;
-    RelationReward relation;   // D4 Step5.3: 关系奖励
+    RelationReward relation;
 };
 
 struct Quest {
@@ -28,16 +29,16 @@ struct Quest {
     std::string title;
     std::string desc;
     QuestState  state = QuestState::LOCKED;
-    int         chapter = 0;       // 章节限制 0=any
+    int         chapter = 0;
     bool        hidden = false;
 
     // 解锁条件
     WorldFlag    required_flag = WorldFlag::NONE;
     StoryStage   required_stage = StoryStage::INTRO;
     int          required_counter = 0;
-    std::string  counter_key;       // counter name
+    std::string  counter_key;
 
-    // 完成条件 (auto-complete when flag set)
+    // 完成条件
     WorldFlag    complete_flag = WorldFlag::NONE;
 
     // 奖励
@@ -46,7 +47,7 @@ struct Quest {
     // 链式任务
     int         next_quest_id = 0;
 
-    bool        auto_accept = false;  // 条件满足自动接取
+    bool        auto_accept = false;
 };
 
 class QuestManager {
@@ -63,9 +64,13 @@ public:
     void complete(int quest_id, WorldState& ws, Player* player);
     void fail(int quest_id);
 
+    // G2.4: Save v3 读写
+    void restore_states(const std::unordered_map<int, int>& states);
+    std::unordered_map<int, int> export_states() const;
+
     // 查询
     Quest*       find(int quest_id);
-    Quest*       get_npc_quest(int npc_floor);  // 某层NPC关联的任务
+    Quest*       get_npc_quest(int npc_floor);
     int          available_count() const;
     int          completed_count() const;
     const std::vector<Quest>& all_quests() const { return _quests; }
@@ -79,12 +84,3 @@ private:
     void _auto_unlock(Quest& q, const WorldState& ws, const StoryDirector& story);
     void _auto_complete(Quest& q, WorldState& ws);
 };
-
-// ---- 预设任务表 ----
-extern const int QUEST_SAVE_PRISONER;  // 0: F2 NPC
-extern const int QUEST_SAVE_PRIEST;    // 1: F7 NPC
-extern const int QUEST_KILL_WARDEN;    // 2: Boss1
-extern const int QUEST_KILL_FIRE_DEMON; // 3: Boss2
-extern const int QUEST_TALK_PILGRIM;   // 4: F9 NPC
-extern const int QUEST_TALK_WATCHER;   // 5: F14 NPC
-extern const int QUEST_KILL_ABYSS;     // 6: Boss3

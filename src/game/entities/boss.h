@@ -20,6 +20,9 @@ enum class BossState {
     SHOCKWAVE,   // 冲击波: 蓄力→AOE
     SUMMON,      // 召唤: 召唤小怪
     DEFEND,      // D8: 防御: 举盾减伤 (Golem)
+    WHIRLWIND,   // G5.4: 旋风斩 (Shadow Knight Phase2)
+    LASER_BARRAGE,// G5.4: 激光弹幕 (Fire Demon Phase2)
+    GRAVITY_PULL,// G5.4: 引力拉扯 (Demon Lord Phase2)
 };
 
 // ============================================================
@@ -75,6 +78,27 @@ public:
                         GameMap* map, double game_time) override;
 };
 
+// G5.4: 旋风斩 (Shadow Knight Phase2) — 360°持续旋转+移动
+class WhirlwindSkill : public BossSkill {
+public:
+    WhirlwindSkill();
+    std::string execute(Monster* boss, Player* player,
+                        std::vector<Monster*>& monsters,
+                        GameMap* map, double game_time) override;
+    float spin_duration = 0.0f;
+    int   spin_hit_count = 0;
+};
+
+// G5.4: 激光弹幕 (Fire Demon Phase2) — 扇形3方向远程贯穿弹
+class LaserBarrageSkill : public BossSkill {
+public:
+    LaserBarrageSkill();
+    std::string execute(Monster* boss, Player* player,
+                        std::vector<Monster*>& monsters,
+                        GameMap* map, double game_time) override;
+    float windup_left = 0.0f;
+};
+
 // ============================================================
 // BossAI — 继承 MonsterAI，状态机驱动技能循环 + Phase2
 // ============================================================
@@ -99,10 +123,25 @@ public:
     int   skill_cycle_bias = 6;    // Necromancer: 改成更频繁的召唤循环
     float golem_shield_pct = 0.0f; // Golem: DEFEND 减伤比例
 
+    // G1 Step6: Phase2 参数 (来自 BossDef, 替代硬编码)
+    float _phase2_hp_threshold = 0.50f;
+    float _phase2_pause = 0.50f;
+    float _phase2_speed_mult = 1.50f;
+    float _phase2_atk_mult = 1.25f;
+    float _phase2_cd_mult = 0.70f;
+
+    // G2.3: Arena 配置指针 (来自 BossDef, 在 boss_factory_create 中设置)
+    const struct BossArenaDef* _arena_cfg = nullptr;
+
     // 三个技能实例 (B15 新)
-    std::unique_ptr<ChargeSkill>   _charge;
+    std::unique_ptr<ChargeSkill>    _charge;
     std::unique_ptr<ShockwaveSkill> _shockwave;
     std::unique_ptr<SummonMinions>  _summon;
+    // G5.4: Phase2 signature skill instances
+    std::unique_ptr<WhirlwindSkill>   _whirlwind;
+    std::unique_ptr<LaserBarrageSkill> _laser;
+
+    const char* _boss_id = nullptr;   // G5.4: 当前 Boss ID 用于 phase2 行为分支
 
 private:
     void _enter_phase2(Monster* self);
@@ -114,43 +153,29 @@ private:
 };
 
 // 工厂
-Monster* spawn_boss(int tile_x, int tile_y, int floor);
-
-struct BossInfo {
-    std::string name, title, lore, skills_text;
-    int max_hp, attack, pdef, mdef;
-    Color color;
-};
-BossInfo get_boss_info(int floor);
+Monster* spawn_boss(int tile_x, int tile_y, int floor);  // deprecated: use boss_factory_create
 
 // ============================================================
-// D8 Step2: BossType — 新增 Boss 类型 + BossFactory
+// D8 Step2: BossType — Boss 类型枚举
 // ============================================================
 enum class BossType {
     SHADOW_KNIGHT,  // 暗影骑士 (F5)
     FIRE_DEMON,     // 地狱火魔 (F10)
     DEMON_LORD,     // 深渊之主 (F15)
-    NECROMANCER,    // 亡灵法师 (F5/F10)
-    GOLEM,          // 远古魔像 (F10/F15)
+    NECROMANCER,    // 亡灵法师 (F5)
+    GOLEM,          // 远古魔像 (F10)
+    VAMPIRE,        // G1 Step6: 血族伯爵 (F5)
 };
 
-struct BossTemplate {
-    BossType type;
-    int floor;
-    const char* name;
-    const char* title;
-    const char* lore;
-    bool is_summoner;    // Necromancer
-    bool is_defender;    // Golem
-    int max_hp, attack, pdef, mdef;
-    Color color;
-    float summon_speed;  // Phase2 summoned count multiplier
-    float shield_pct;    // Golem DEFEND damage reduction
-};
+// ── 前向声明 (boss_defs.h 在 boss.cpp 中引用) ──
+struct BossDef;
 
-// BossFactory: 按类型创建 + 配置化
+// BossFactory: 数据驱动创建
 Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
                               std::vector<Monster*>* out_monsters = nullptr,
                               GameMap* map = nullptr);
-const BossTemplate* boss_factory_lookup(BossType type);
-BossType boss_type_for_floor(int floor, uint32_t seed);  // 支持随机Boss
+BossType boss_type_for_floor(int floor, uint32_t seed);
+
+// G1 Step6: visual_id → Color 映射 (表现层, 未来替换为 texture)
+Color get_boss_visual_color(const std::string& visual_id);
+const char* get_boss_skills_text(const BossDef* def);

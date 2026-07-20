@@ -37,10 +37,14 @@ void GameFlowDirector::new_game() {
 void GameFlowDirector::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
                                         uint32_t seed,
                                         const std::vector<bool>& special_triggered,
-                                        const std::vector<bool>& special_discovered) {
+                                        const std::vector<bool>& special_discovered,
+                                        const std::unordered_map<std::string, int>& rule_counters,
+                                        const std::unordered_map<int, int>& quest_states,
+                                        const std::vector<int>& unlocked_endings) {
     if (!_scene) return;
     current_state = GameFlowState::ENTER_FLOOR;
-    _scene->load_saved_game(floor, max_f, std::move(p), seed, special_triggered, special_discovered);
+    _scene->load_saved_game(floor, max_f, std::move(p), seed, special_triggered,
+                            special_discovered, rule_counters, quest_states, unlocked_endings);
     current_state = GameFlowState::PLAYING;
 }
 

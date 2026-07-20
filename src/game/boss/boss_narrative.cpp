@@ -1,137 +1,74 @@
 #include "boss_narrative.h"
 #include "relationship_system.h"
 #include "quest_manager.h"
+#include "data/dialogue_defs.h"   // G2.1
 
-// ============================================================
-// D4 Step5.5: Boss 对白数据 (22条)
-// ============================================================
-static std::vector<BossDialogue> _build_boss_dialogues() {
-    std::vector<BossDialogue> out;
-
-    // ── 暗影骑士 (F5) ──
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::NONE, 0, 0,
-        nullptr, // 默认intro用原有BossInfo
-        "你变强了……但你也会像我一样。", nullptr, false});
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::Blood_Ritual, BuildType::NONE, 0, 0,
-        "我闻到了鲜血——看来深渊已经接受了你。",
-        "你的血……和我的血……已经分不清了。",
-        "用鲜血换来的胜利——真的是胜利吗？", true});
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::Accepted_Curse, BuildType::NONE, 0, 0,
-        "诅咒？很好。你已经属于这里了。",
-        "黑暗不会只满足于一个灵魂。",
-        nullptr, true});
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::Saved_Prisoner, BuildType::NONE, 0, 0,
-        "你救了那个囚犯？他已经被关押了三十年——而你只用了三秒。",
-        nullptr, nullptr, true});
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::BERSERKER, 0, 0,
-        "很好。来。面对面。",
-        "你终于学会了用剑——但你永远学不会放手。",
-        nullptr, false});
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::POISON_MASTER, 0, 0,
-        "毒？真是令人怀念。我曾被毒死过一次。",
-        nullptr, nullptr, false});
-
-    // ── 地狱火魔 (F10) ──
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::NONE, 0, 0,
-        nullptr,
-        "火焰吞噬了你的武器。接下来——吞噬你。",
-        "火焰终于熄灭了……但这个世界的火焰永远不会真正熄灭。", false});
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::Saved_Priest, BuildType::NONE, 0, 0,
-        "那个祭司……居然还活着。他给了你力量——但你承受得起吗？",
-        "神官的祈祷在这里是无效的——这里是烈焰的神殿。", nullptr, true});
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::Blood_Ritual, BuildType::NONE, 0, 0,
-        "你献祭过自己的血？有趣。让我看看它有多烫。",
-        nullptr, nullptr, true});
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::FIRE_MAGE, 0, 0,
-        "火焰？你根本不配使用它。",
-        "你的火焰——太冷了。",
-        "也许……你比我更适合驾驭火焰。", false});
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::TIME_MASTER, 0, 0,
-        "时间？你以为你能改变什么？",
-        "这里的火已经烧了一千年——时间救不了你。", nullptr, false});
-
-    // ── 深渊之主 (F15) ──
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::NONE, BuildType::NONE, 0, 0,
-        "你终于来了。我等了你很久——我已经很久没有新的碎片了。",
-        "你感受到了吗？这是你体内的黑暗——它渴望被释放。",
-        "阳光照进来了……这是我死前最后一眼看到的东西吗？", false});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::Saved_Priest, BuildType::NONE, 3, 70,
-        "泰伦斯……那个傻瓜还在祈祷？三千年前我也听过他的祈祷——毫无用处。",
-        nullptr, nullptr, true});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::Saved_Prisoner, BuildType::NONE, 0, 0,
-        "你救了那个囚犯？你知道他为什么会被关进来吗？因为他杀了一个国王。",
-        nullptr, "连你救了的人都会成为我——这就是结局。", true});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::Boss1_Defeated, BuildType::NONE, 0, 0,
-        "你杀了狱卒。你杀了火魔。你很强——但你不是第一个。",
-        nullptr, nullptr, false});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::Boss2_Defeated, BuildType::NONE, 0, 0,
-        "两个了。只剩你了，还有我。",
-        "你的每一次胜利——都在给我力量。", nullptr, false});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::Blood_Ritual, BuildType::NONE, 0, 0,
-        "血祭……你已经成了深渊的一部分。来吧——回来。",
-        "你的血液里流淌着我。你不可能打败你自己。",
-        "黑暗说了一声谢谢——然后化为了虚无。", true});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::Merchant_Killed, BuildType::NONE, 0, 0,
-        "连商人都不放过。你比怪物更像怪物。",
-        nullptr, nullptr, true});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::NONE, BuildType::POISON_MASTER, 0, 0,
-        "毒？你以为毒能伤到我？我就来自比毒更古老的东西。",
-        "你一直在使用毒——但你有没有想过——你被感染了吗？", nullptr, false});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::NONE, BuildType::TIME_MASTER, 0, 0,
-        "时间？连神都无法控制时间——你能吗？",
-        "你以为时间是你的武器——但它只是我的一根手指。", nullptr, false});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::NONE, BuildType::BERSERKER, 0, 0,
-        "狂战士？用愤怒来填补恐惧。这是最古老的战术。",
-        nullptr, nullptr, false});
-    out.push_back({StoryStage::FINAL, 15, WorldFlag::All_Boss_Defeated, BuildType::NONE, 0, 0,
-        "狱卒。火魔。深渊之主。三个——你全都杀了。\n现在唯一的狱卒——是你。",
-        nullptr, "你以为你赢了——但每一次胜利都让我的碎片更多。", false});
-
-    // ── D8 Step2: Necromancer (F5) ──
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::NONE, 0, 0,
-        "亡者们，起来吧。你们的新同伴来了。",
-        "死亡不是终点——是我的兵源。",
-        "原来……死亡也可以结束。", false});
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::POISON_MASTER, 0, 0,
-        "毒？有趣。但亡灵不怕毒。",
-        "你身上的那股味道……和我召唤的东西很像。", nullptr, false});
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::BERSERKER, 0, 0,
-        "你的刀很快。但我的亡者比你更快。",
-        nullptr, nullptr, false});
-    out.push_back({StoryStage::CHAPTER_1, 5, WorldFlag::NONE, BuildType::SUPPORT, 0, 0,
-        "药剂救不了你。死人不需要药剂。",
-        nullptr, nullptr, false});
-
-    // ── D8 Step2: Golem (F10) ──
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::NONE, 0, 0,
-        "……。 （魔像没有嘴，只有沉闷的震动声）",
-        "魔像开始裂开——但仍在战斗。",
-        "魔像化为了碎石。一切归于沉寂。", false});
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::BERSERKER, 0, 0,
-        "你只是依赖外物——你的武器伤不了我。",
-        nullptr, nullptr, false});
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::FIRE_MAGE, 0, 0,
-        "火没有用。我是熔岩的孩子。",
-        nullptr, nullptr, false});
-    out.push_back({StoryStage::CHAPTER_2, 10, WorldFlag::NONE, BuildType::SUPPORT, 0, 0,
-        "治疗？这里没有你治得好的东西。",
-        nullptr, nullptr, false});
-
-    // ── D8 Step2: BuildTag 专属对话 (所有Boss通用) ──
-    out.push_back({StoryStage::CHAPTER_1, 0, WorldFlag::NONE, BuildType::POISON_MASTER, 0, 0,
-        "毒药？你离我想象的还要黯淡。",
-        nullptr, nullptr, false});
-    out.push_back({StoryStage::CHAPTER_1, 0, WorldFlag::NONE, BuildType::BERSERKER, 0, 0,
-        "你的刀很快。", nullptr, nullptr, false});
-    out.push_back({StoryStage::CHAPTER_1, 0, WorldFlag::NONE, BuildType::SUPPORT, 0, 0,
-        "药剂救不了你。", nullptr, nullptr, false});
-    out.push_back({StoryStage::CHAPTER_1, 0, WorldFlag::NONE, BuildType::PROJECTILE, 0, 0,
-        "你只是依赖外物。", nullptr, nullptr, false});
-
-    return out;
+// ── String → enum 辅助映射 (查询时使用, 保持 find_* 纯 C++ 算法) ──
+static StoryStage _str_to_stage(const std::string& s) {
+    if (s == "chapter_1") return StoryStage::CHAPTER_1;
+    if (s == "chapter_2") return StoryStage::CHAPTER_2;
+    if (s == "final")     return StoryStage::FINAL;
+    return StoryStage::INTRO;  // "" → 不参与 stage 匹配
 }
 
-BossNarrative::BossNarrative() : _dialogues(_build_boss_dialogues()) {}
+static WorldFlag _str_to_flag(const std::string& s) {
+    if (s == "saved_prisoner")   return WorldFlag::Saved_Prisoner;
+    if (s == "saved_priest")     return WorldFlag::Saved_Priest;
+    if (s == "saved_merchant")   return WorldFlag::Saved_Merchant;
+    if (s == "accepted_curse")   return WorldFlag::Accepted_Curse;
+    if (s == "blood_ritual")     return WorldFlag::Blood_Ritual;
+    if (s == "ignored_npc")      return WorldFlag::Ignored_NPC;
+    if (s == "merchant_killed")  return WorldFlag::Merchant_Killed;
+    if (s == "boss1_defeated")   return WorldFlag::Boss1_Defeated;
+    if (s == "boss2_defeated")   return WorldFlag::Boss2_Defeated;
+    if (s == "boss3_defeated")   return WorldFlag::Boss3_Defeated;
+    if (s == "all_boss_defeated") return WorldFlag::All_Boss_Defeated;
+    return WorldFlag::NONE;
+}
+
+static BuildType _str_to_build(const std::string& s) {
+    if (s == "berserker")      return BuildType::BERSERKER;
+    if (s == "fire_mage")      return BuildType::FIRE_MAGE;
+    if (s == "poison_master")  return BuildType::POISON_MASTER;
+    if (s == "time_master")    return BuildType::TIME_MASTER;
+    if (s == "support")        return BuildType::SUPPORT;
+    if (s == "projectile")     return BuildType::PROJECTILE;
+    return BuildType::NONE;
+}
+
+// ============================================================
+// G2.1: BossNarrative 构造函数 — 从 DialogueDef registry 构建
+// 一条 DialogueDef → 一条 BossDialogue, 1:1 映射, 不拆分
+// ============================================================
+BossNarrative::BossNarrative() {
+    for (auto& kv : get_all_dialogue_defs()) {
+        auto& d = kv.second;
+
+        // 跳过非 boss 对话 (未来 NPC/商店/教程用 type 字段区分)
+        // G2.1: 所有 dialogue 均视为 boss 对话
+
+        BossDialogue bd;
+        bd.stage      = _str_to_stage(d.stage);
+        bd.boss_floor = d.boss_floor;
+        bd.required_flag = _str_to_flag(d.required_flag);
+        bd.build      = _str_to_build(d.required_build);
+        bd.relation_threshold = d.relation_threshold;
+        bd.npc_id     = d.npc_id;
+        bd.once       = d.once;
+
+        // string storage — 避免 registry c_str() 悬挂
+        _Texts txt;
+        txt.intro   = d.intro_text;
+        txt.phase2  = d.phase2_text;
+        txt.death   = d.death_text;
+        bd.intro    = txt.intro.empty()   ? nullptr : txt.intro.c_str();
+        bd.phase2   = txt.phase2.empty()  ? nullptr : txt.phase2.c_str();
+        bd.death    = txt.death.empty()   ? nullptr : txt.death.c_str();
+        _texts.push_back(std::move(txt));
+
+        _dialogues.push_back(bd);
+    }
+}
 
 // ---- 查询 ----
 const BossDialogue* BossNarrative::find_intro(int boss_floor, const WorldState& ws,

@@ -29,6 +29,7 @@ void GameplaySystemDirector::on_enter_floor(int floor, bool is_boss, bool is_res
 void GameplaySystemDirector::on_new_game() {
     g_meta.load();
     run_stats = RunSummary{};
+    g_meta.clear_reward_log();  // G3.5
     quest_mgr.set_relationship_system(&rels);
 }
 
@@ -68,12 +69,10 @@ void GameplaySystemDirector::on_game_clear(int floor, int level, const Player* p
 
     ending_dir.begin(world_state, boss_report.rank, collection_pct, rels, quest_mgr);
 
-    MetaCurrency mc;
-    mc.soul_fragments = ending_dir.meta_reward_soul();
-    mc.knowledge = ending_dir.meta_reward_knowledge();
-    mc.ancient_memory = 2;
-    g_meta.add_currency(mc);
-    g_meta.save();
+    // G3.5: 统一 Ending 奖励 (替代手写 MetaCurrency mc)
+    g_meta.reward_from_ending(ending_dir.ending_name(),
+        ending_dir.meta_reward_soul(),
+        ending_dir.meta_reward_knowledge(), 2);
 }
 
 void GameplaySystemDirector::init_events() {

@@ -176,6 +176,8 @@ std::vector<DroppedItem> create_tutorial_items(int tx, int ty) {
 }
 
 void give_tutorial_skill(Player* p) {
-    auto sk = std::make_unique<SlashSkill>();
+    // G3.2: SkillFactory (fallback to direct SlashSkill if registry not loaded)
+    auto sk = skill_factory_create("slash");
+    if (!sk) sk = std::make_unique<SlashSkill>();
     p->skills.learn(std::move(sk));
 }

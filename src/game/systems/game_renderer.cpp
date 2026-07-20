@@ -10,6 +10,8 @@
 #include "boss.h"
 #include "build_score.h"
 #include "relic_progression.h"
+#include "attack_evolution.h"   // G1
+#include "skill_evolution.h"   // G1 Step3
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -130,7 +132,6 @@ void GameRenderer::draw_boss_intro(int sw, int sh, const std::string& title,
     draw_glow_text(title.c_str(), sw / 2.0f, pr.y + 45, 30, color, true);
 
     if (g_font_loaded) {
-        auto info = get_boss_info(boss_floor);
         DrawTextEx(g_font_small, skills_text.c_str(), {pr.x + 80, pr.y + 160}, 16, 1,
                    {180, 180, 180, 255});
         DrawTextEx(g_font, lore.c_str(), {pr.x + 40, pr.y + 210}, 18, 1,
@@ -461,15 +462,35 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
     {
         BuildScore bs = calculate_build(player);
         BuildType bt = bs.identify();
+        float y = 56.0f + player->skills.active_skills.size() * 28.0f + 4.0f;
+        if (!player->active_buffs.empty())
+            y += player->active_buffs.size() * 18.0f + 4.0f;
+        if (!player->relics.empty())
+            y += 22.0f;
         if (bt != BuildType::NONE && g_font_loaded) {
-            float y = 56.0f + player->skills.active_skills.size() * 28.0f + 4.0f;
-            if (!player->active_buffs.empty())
-                y += player->active_buffs.size() * 18.0f + 4.0f;
-            if (!player->relics.empty())
-                y += 22.0f;
             char buf[64];
             snprintf(buf, sizeof(buf), "流派: %s", bs.build_name());
             DrawTextEx(g_font_small, buf, {12, y}, 12, 1, {255, 220, 100, 230});
+            y += 16;
+        }
+        // G1: 普攻进化等级显示 (通过 Manager 查询 — 不直接读 struct)
+        int atk_lv = AttackEvolutionManager::current_level(player);
+        if (atk_lv >= 2 && g_font_loaded) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "普攻: %s", AttackEvolutionManager::current_name(player));
+            DrawTextEx(g_font_small, buf, {12, y}, 12, 1, {255, 200, 60, 230});
+            y += 16;
+        }
+        // G1 Step3: 技能进化显示 (取第一个已进化的技能, 简写)
+        for (int si = 0; si < (int)player->skills.active_skills.size(); si++) {
+            const char* ev = SkillEvolutionManager::evo_name(player, si);
+            if (ev && ev[0] && g_font_loaded) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%s: %s",
+                         player->skills.active_skills[si]->name.c_str(), ev);
+                DrawTextEx(g_font_small, buf, {12, y}, 11, 1, {180, 220, 255, 220});
+                y += 14;
+            }
         }
     }
     if (show_relic_panel) draw_relic_panel(player, screen_w);

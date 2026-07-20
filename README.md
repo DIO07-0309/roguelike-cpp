@@ -133,21 +133,33 @@ build/roguelike_cpp.exe
 
 ### 5.3 技能系统
 
-**主动技能**（按键 1-4 释放，带冷却 + 3 级升级 + 护符加成）：
+游戏现已拥有 **20 个技能**：6 个基础 + 14 个变体，覆盖 **12 种 Build 流派**。
 
-| 技能 | CD | 效果 |
-|------|----|------|
-| **斩击** (SlashSkill) | 2s → 1.2s | 前方扇形范围伤害（ATK×1.5，Lv3 二连击） |
-| **神罚** (FireballSkill) | 5s → 3s | 远程多目标魔法伤害（ATK×2.5，Lv3 三目标） |
-| **自愈** (SelfHealSkill) | 8s → 5s | 恢复 HP + Lv3 持续再生 |
-| **The World** (TheWorldSkill) | 20s → 12s | 时停冻结全屏怪物 5→10 秒 |
+**主动技能（6 基础 + 8 变体）**：
 
-**被动技能**（习得后常驻生效）：
+| 技能 | CD | 类型 | 对应 Build |
+|------|----|------|-----------|
+| **斩击** (Slash) | 2s → 1.2s | 锥形近战 + poison | BERSERKER |
+| **神罚** (Fireball) | 5s → 3s | 远程 AOE + slow | FIRE_MAGE |
+| **自愈** (SelfHeal) | 8s → 5s | 回血 + buff | SUPPORT |
+| **The World** | 20s → 12s | 时停 | TIME_MASTER |
+| **冰爆** (IceNova) | 6s → 4s | AOE 冻结 + 碎冰 | ICE_MAGE |
+| **连锁闪电** (ChainLightning) | 4s → 2.8s | 弹射链 N 跳 | LIGHTNING_MAGE |
+| **暗影突刺** (ShadowStrike) | 5s → 3.2s | 瞬移 + 背刺 | SHADOW_STRIKER |
+| **血怒** (BloodFrenzy) | 7s → 4.5s | 自伤→AOE 流血→回血 | BLEED_BLADE |
+| **召唤英灵** (SummonSpirit) | 12s → 8s | 召唤友军 AI | SUMMON_LORD |
+| **血刃** / **冰锋** / **影切** / **陨石** | - | 标签变体 | 多 Build |
+
+**被动技能（6 种）**：
 
 | 技能 | 效果 |
 |------|------|
-| **铁壁** (IronSkinSkill) | Lv1:+3 / Lv2:+7 / Lv3:+12 双防 |
-| **狂暴** (BerserkSkill) | Lv1:+3 / Lv2:+7 / Lv3:+12 攻击 |
+| 铁壁 | DEF +3/7/12 |
+| 狂暴 | ATK +3/7/12 |
+| 冰霜铠甲 | DEF +5/10/16 |
+| 雷速 | ATK +3/8/14 |
+| 嗜血 | ATK +4/9/15 |
+| 召唤契约 | ATK +2/5/10 |
 
 **升级机制**：
 - 击杀怪物 → XP（Boss 150、普通 10 + HP×0.5）
@@ -312,32 +324,37 @@ Relic 是挂在 Player 身上的局内常驻被动构筑物，不占技能栏、
 - 每次生成 ~12 房间，结构完全不同
 - 玩家出生在第一个房间，Boss/楼梯在最远房间
 
-### 5.10 敌人系统 (D8 扩展)
+### 5.10 敌人系统 (G5.3 扩展: 31 种敌人, 9 种 AI Archetype)
 
-8 种怪物类型，8 种技能，按 FloorConfig 权重生成：
+敌人多样性是 Build 系统真正发挥作用的关键。G5.3 新增了 4 个 AI Archetype — 行为与外观解耦：
 
-| 类型 | 名称 | HP | ATK | 技能 | 定位 |
-|------|------|----|-----|------|------|
-| NORMAL | 史莱姆/兽人 | 15/30 | 3/7 | 无 | 基础 |
-| ARCHER | 哥布林弓箭手 | 22 | 8 | RapidShot(3连) | 远程后排 |
-| SHAMAN | 哥布林萨满 | 28 | 4 | Totem(范围buff) | 辅助 |
-| BOMBER | 爆炸史莱姆 | 25 | 0 | Leap(跳跃)+自爆 | 侧面突袭 |
-| TANK | 重甲兽人 | 70 | 6 | Shield(举盾) | 前排肉盾 |
-| ELITE | 精英怪 | 45-75 | 10-16 | Summon(召唤)+随机Buff | 指挥 |
-| CHARGER | 冲锋兽人 | 40 | 10 | Charge(蓄力冲刺+击退) | 爆发 |
-| SUMMONER | 哥布林召唤师 | 35 | 5 | MassSummon(一次召唤2只) | 召唤 |
+| 类型 | 代表 | HP | ATK | Archetype | 玩法 |
+|------|------|----|-----|-----------|------|
+| NORMAL | 史莱姆/兽人/冰霜史莱姆… | 15-30 | 3-7 | DEFAULT | 追逐攻击 |
+| ARCHER | 哥布林弓箭手 | 22 | 8 | DEFAULT | 远程+后退 |
+| SHAMAN | 哥布林萨满/血祭司… | 28-42 | 4-7 | SHAMAN | 远程辅助 |
+| BOMBER | 爆炸史莱姆 | 25 | 0 | BOMBER | 靠近自爆 |
+| TANK | 重甲兽人/魔像… | 70-100 | 6-12 | DEFAULT | 高HP低速 |
+| ELITE | 精英/雷暴元素… | 45-75 | 10-16 | COMMAND | 召唤+buff |
+| CHARGER | 冲锋兽人/电光之核 | 18-40 | 9-10 | CHARGER | 蓄力冲刺 |
+| SUMMONER | 哥布林召唤师/亡语者 | 32-35 | 5-6 | SUMMONER | 召唤小怪 |
+| **SNIPER** | 骷髅弓手/哥布林猎手 | 22-26 | 12-14 | SNIPER | 远程高伤, 接近后退 |
+| **CONTROLLER** | 暗术师/虚空行者 | 30-35 | 6-8 | CONTROLLER | 危险区+减速 |
+| **AMBUSH** | 暗影刺客/夜行猎手 | 24-28 | 16-18 | AMBUSH | 隐身→瞬间突袭+眩晕 |
+| **GUARDIAN** | 石像守卫/铁卫 | 80-90 | 10-12 | GUARDIAN | 群体防御光环 |
 
-### 5.11 Boss 系统 (D8 扩展)
+### 5.11 Boss 系统 (G5.4 重构: 6 Boss, 各独特 Phase2 机制)
 
-5 种 Boss，F5/F10 支持随机抽取：
+每个 Boss 在 Phase2 (HP < 50%) 不再只是数值提升，而是拥有专属机制：
 
-| Boss | 楼层 | HP | 定位 | Phase2 |
-|------|------|----|------|--------|
-| 暗影骑士 | F5 | 250 | 均衡 | 移速+50%, ATK+25% |
-| 亡灵法师 | F5 | 240 | 召唤特化 | 双倍召唤量 |
-| 地狱火魔 | F10 | 500 | 均衡 | 移速+50%, ATK+25% |
-| 远古魔像 | F10 | 520 | 防御特化 | DEFEND减伤60% |
-| 深渊之主·终焉 | F15 | 900 | 终局 | 移速+50%, ATK+25% |
+| Boss | 楼层 | HP | Phase2 机制 | Arena |
+|------|------|----|-----------|-------|
+| 暗影骑士 | F5 | 250 | 旋风斩 (360° 持续旋转 + 缓慢追向) | shadow_wall |
+| 亡灵法师 | F5 | 240 | 召唤物获得 Guardian 护甲 buff | shadow_wall |
+| 血族伯爵 | F5 | 220 | 全 CD 加速 + 吸血 charge | fire_column |
+| 地狱火魔 | F10 | 500 | 炼狱激光 (扇形3方向贯穿弹幕) | lava |
+| 远古魔像 | F10 | 520 | 连续3波冲击波 | none |
+| 深渊之主·终焉 | F15 | 900 | 引力拉扯 (吸向Boss → 1.5x范围冲击波) | void_crack |
 
 **BossSystemDirector** 统一管理 Narrative/Evolution/Behavior/Command/Encounter/Replay/Cinematic/Timeline。
 
@@ -744,3 +761,56 @@ rlc:blood_charm,war_drum,plague_mask
 | D6  | PresentationSystemDirector 视觉表现层 + GameFlowDirector 场景流程 | ✅ |
 | D6  | MetaProgression 局外永久成长 + EndingDirector 五结局 + CreditsScene 片尾 | ✅ |
 | D6  | PlayerController 输入分离 + CameraDirector 镜头常量 + CombatFeel 打击感系统 | ✅ |
+| G1.1 | AttackEvolutionState + AttackEvolutionManager (普攻进化 Lv1→Lv3) | ✅ |
+| G1.2 | Attack Evolution Visual Layer (剑气/旋风斩 VFX, 无Gameplay修改) | ✅ |
+| G1.3 | SkillEvolutionManager (技能使用次数驱动进化 Lv1→Lv3) + has_confirmed_build() 重构 | ✅ |
+| G1.4 | RuleChainManager (Boss死亡→规则激活→WorldState→后续楼层影响) + BOSS_RULE_ACTIVATED 事件 | ✅ |
+| G1.5 | EnemyDef 数据模块 + enemies.json (10 enemies 全数据驱动) + spawn_monster 通用工厂 | ✅ |
+| G1.6 | BossDef 数据模块 + bosses.json (6 bosses 数据驱动) + Phase2 参数化 + Vampire 新Boss | ✅ |
+| G1.7 | Save v2: atl + skill evo/use + rule_counters 序列化 + 向后兼容旧存档 | ✅ |
+| G2.0 | Infrastructure Polish: 4 Def 统一接口 (get_all + is_loaded) + 重复 ID 检测 + 加载日志标准化 | ✅ |
+| G2.1 | Dialogue Data Driven: dialogues.json + DialogueDef + BossNarrative 重构 (string storage) | ✅ |
+| G2.2 | TeamAI: TeamCoordinator (static 分析器) + TeamDecision + MonsterAI 重构 (143→55 行) | ✅ |
+| G2.3 | Boss Arena v2: BossArenaDef + ArenaEvent + execute_event() + GameScene 清理 | ✅ |
+| G2.4 | QuestDef + quests.json (12 quests) + EventBus quest events + Save v3 qst: field | ✅ |
+| G2.5 | EndingDef + endings.json + WORLD_ENDINGS[] 删除 + Save v3 end: + ENDING_REACHED emit | ✅ |
+| G3.1 | MetaNodeDef + meta_nodes.json + MetaProgression::load_from_defs() (10 nodes 数据驱动) | ✅ |
+| G3.2 | SkillDef + skills.json (6 skills) + SkillFactory + _skill_id 替代 dynamic_cast (12处) | ✅ |
+| G3.3 | ItemDef + items.json (20 templates) + ItemFactory 替代硬编码数组 | ✅ |
+| G3.4 | Architecture Freeze: 命名统一 (ItemDef) + 12 模块 API 审计 | ✅ |
+| G3.5 | Meta Reward Integration: reward_from_ending() + MetaRewardRecord 审计日志 | ✅ |
+| G4.1 | Mod Loader: IRegistryProvider + RegistryBuilder + BuiltinProvider + ModProvider + 12×_from_json | ✅ |
+| G4.1.5 | Registry Validator: cross-ref checks (Skill→Buff, Item→Skill, Enemy→Buff) + required fields | ✅ |
+| G4.2 | Namespace ID (mod_id:entry_id) + DependencyResolver + Merge v2 (topological sort) | ✅ |
+| G4.3 | Advanced Merge: MergePatch (__patch field merge) + merge_patch.h helper + BuildRecord patch | ✅ |
+| G4.4 | ModManager: scan/enable/disable/list + mods/config.json + startup summary | ✅ |
+| G4.5 | Replay Regression: ReplayFile + Recorder + Player + _is_action + state_hash + seed_rng + CLI | ✅ |
+| G5.1 | Build Diversity: BuildType 6→12 + skills 6→20 + relics 33→63 + buffs 20→25 + items 20→36 + enemies 10→23 | ✅ |
+| G5.2 | Signature Skills: IceNovaSkill + ChainLightningSkill + ShadowStrikeSkill + BloodFrenzySkill + SummonSpiritSkill | ✅ |
+| G5.3 | Enemy Archetypes: AIArchetype (行为/外观解耦) + SNIPER/CONTROLLER/AMBUSH/GUARDIAN + enemies 23→31 | ✅ |
+| G5.4 | Boss Rework: WhirlwindSkill + LaserBarrageSkill + GravityPull + per-boss Phase2 identity (6 unique) | ✅ |
+| G5.5 | Run Events: spawn rate 25→40% + ch2+双事件 + special rooms 2-3→3-5 + NOTHING权重↓ + 商人/圣物↑ | ✅ |
+| G5.6 | Balance Pass: SimAI + SimRunner + --sim N CLI + automated 100-run balance report | ✅ |
+| G5.7 | Game Feel: hit-stop + shake + freeze boost + crit scale + combo milestone juice | ✅ |
+
+---
+
+## G5 最终数据一览
+
+| 系统 | 数量 | 驱动方式 |
+|------|:----:|------|
+| Build 流派 | 12 | C++ 判定 + JSON 标签 |
+| 技能 | 20 (6 基础 + 14 变体) | SkillDef JSON + C++ execute() |
+| 遗迹 | 63 | RelicDef JSON |
+| Buff | 25 | BuffDef JSON |
+| 道具 | 36 | ItemDef JSON |
+| 敌人 | 31 (9 Archetype) | EnemyDef JSON + AIArchetype C++ |
+| Boss | 6 (各唯一 Phase2) | BossDef JSON + BossAI C++ |
+| 特殊房间 | 9 | SpecialRoomType C++ |
+| 事件类型 | 18 | EventSystem C++ |
+| 任务 | 12 | QuestDef JSON |
+| 对话 | 34 | DialogueDef JSON |
+| Meta 节点 | 10 | MetaNodeDef JSON |
+| 结局 | 5 | EndingDef JSON |
+
+**Source files**: ~200+ (h/cpp/json) **· CLI flags**: --record / --replay / --sim N **· Mod support**: mods/ with mod.json

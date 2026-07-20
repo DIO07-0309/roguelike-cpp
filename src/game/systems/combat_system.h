@@ -1,11 +1,14 @@
 #pragma once
 #include <vector>
+#include <string>
+#include <unordered_map>
 #include <cstdint>
 #include <cmath>
 #include <random>
 #include "entity.h"
 #include "combat_stats.h"
 #include "types/combat_types.h"
+#include "core/registry_provider.h"  // G4.1: MergeMode
 
 class Player;
 class Monster;
@@ -15,6 +18,7 @@ class GameMap;
 // CombatSystem — 战斗公式 + Buff 管理
 // ============================================================
 extern std::mt19937 rng;
+void seed_rng(uint32_t seed);  // G4.5: deterministic RNG for replay
 
 // ---- 伤害公式 ----
 int calculate_damage(int atk, int def, AttackType type = AttackType::PHYSICAL);
@@ -33,7 +37,11 @@ std::vector<Monster*> get_targets_in_cone(Player* caster,
 
 // 加载/查询 Buff 配置表
 bool load_buff_defs(const std::string& json_path);
+int  load_buff_defs_from_json(const char* json_text, MergeMode mode,
+                               const char* id_namespace = nullptr);  // G4.2: namespace
 const BuffDef* get_buff_def(const std::string& id);
+const std::unordered_map<std::string, BuffDef>& get_all_buff_defs();  // G2.0
+bool is_buff_defs_loaded();  // G2.0
 Color get_buff_hud_color(const std::string& id);   // 用于 HUD 渲染
 
 // BuffEvent / BuffTrigger — 见 types/combat_types.h
@@ -91,7 +99,11 @@ struct RelicDef {
 };
 
 bool load_relic_defs(const std::string& json_path);
+int  load_relic_defs_from_json(const char* json_text, MergeMode mode,
+                                const char* id_namespace = nullptr);  // G4.2: namespace
 const RelicDef* get_relic_def(const std::string& id);
+const std::unordered_map<std::string, RelicDef>& get_all_relic_defs();  // G2.0
+bool is_relic_defs_loaded();  // G4.1
 bool player_has_relic(const Player* p, const std::string& id);
 std::vector<std::string> get_all_relic_ids();
 std::string get_relic_display_name(const std::string& id);

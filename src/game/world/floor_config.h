@@ -21,7 +21,7 @@ struct FloorConfig {
     int   monster_count;         // 基础怪物数量
 
     // D8: 怪物池 (累积权重，各浮层可独立调整)
-    int enemy_weights[8];        // [0]=NORMAL [1]=Archer [2]=Shaman [3]=Bomber [4]=Tank [5]=Elite [6]=Charger [7]=Summoner
+    int enemy_weights[12];       // [0]=NORMAL [1]=Archer [2]=Shaman [3]=Bomber [4]=Tank [5]=Elite [6]=Charger [7]=Summoner [8]=Sniper [9]=Controller [10]=Ambush [11]=Guardian
 
     // 特殊房间数量
     int special_room_count;

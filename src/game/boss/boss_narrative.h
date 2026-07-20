@@ -22,12 +22,7 @@ public:
                                            BuildType bt, const RelationshipSystem& rels);
 private:
     std::vector<BossDialogue> _dialogues;
+    // G2.1: string storage — 避免 registry c_str() 悬挂
+    struct _Texts { std::string intro, phase2, death; };
+    std::vector<_Texts> _texts;
 };
-
-extern const BossDialogue BOSS_DIALOGUE_BLOOD_RITUAL;
-extern const BossDialogue BOSS_DIALOGUE_CURSE;
-extern const BossDialogue BOSS_DIALOGUE_SAVED_PRIEST;
-extern const BossDialogue BOSS_DIALOGUE_FIRE_MAGE;
-extern const BossDialogue BOSS_DIALOGUE_POISON;
-extern const BossDialogue BOSS_DIALOGUE_TIME;
-extern const BossDialogue BOSS_DIALOGUE_MELEE;

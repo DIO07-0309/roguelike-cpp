@@ -3,6 +3,13 @@
 #include "combat_system.h"
 
 // ============================================================
+// G1 Step3: has_confirmed_build — 单一真源判定
+// ============================================================
+bool has_confirmed_build(const Player* player) {
+    return calculate_build(player).identify() != BuildType::NONE;
+}
+
+// ============================================================
 // BuildScore: 从玩家所有系统收集标签并累计
 // ============================================================
 BuildScore calculate_build(const Player* player) {
@@ -33,17 +40,23 @@ BuildScore calculate_build(const Player* player) {
 }
 
 // ============================================================
-// BuildType 判定 — 最高分的流派
+// BuildType 判定 — 最高分的流派 (G5.1: 6→12)
 // ============================================================
 BuildType BuildScore::identify() const {
     struct Candidate { BuildType type; int min; BuildTag main; int sec_req; BuildTag sec; };
     Candidate cands[] = {
-        {BuildType::BERSERKER,     5, BuildTag::MELEE,     3, BuildTag::COMBO},
-        {BuildType::FIRE_MAGE,     4, BuildTag::FIRE,      2, BuildTag::DOT},
-        {BuildType::POISON_MASTER, 4, BuildTag::POISON,    2, BuildTag::DOT},
-        {BuildType::TIME_MASTER,   4, BuildTag::TIME,      2, BuildTag::SUPPORT},
-        {BuildType::SUPPORT,        4, BuildTag::HEAL,     2, BuildTag::SUPPORT},
-        {BuildType::PROJECTILE,    3, BuildTag::PROJECTILE,2, BuildTag::RANGED},
+        {BuildType::BERSERKER,      5, BuildTag::MELEE,      3, BuildTag::COMBO},
+        {BuildType::FIRE_MAGE,      4, BuildTag::FIRE,       2, BuildTag::DOT},
+        {BuildType::POISON_MASTER,  4, BuildTag::POISON,     2, BuildTag::DOT},
+        {BuildType::TIME_MASTER,    4, BuildTag::TIME,       2, BuildTag::SUPPORT},
+        {BuildType::SUPPORT,        4, BuildTag::HEAL,       2, BuildTag::SUPPORT},
+        {BuildType::PROJECTILE,     3, BuildTag::PROJECTILE, 2, BuildTag::RANGED},
+        {BuildType::ICE_MAGE,       4, BuildTag::ICE,        2, BuildTag::AOE},
+        {BuildType::LIGHTNING_MAGE, 4, BuildTag::LIGHTNING,  2, BuildTag::AOE},
+        {BuildType::BLEED_BLADE,    4, BuildTag::BLEED,      2, BuildTag::MELEE},
+        {BuildType::SHADOW_STRIKER, 4, BuildTag::MELEE,      2, BuildTag::TIME},
+        {BuildType::JUGGERNAUT,     4, BuildTag::DEFENSE,    2, BuildTag::HEAL},
+        {BuildType::SUMMON_LORD,    3, BuildTag::SUMMON,     2, BuildTag::SUPPORT},
     };
 
     BuildType best = BuildType::NONE;
@@ -59,24 +72,36 @@ BuildType BuildScore::identify() const {
 
 const char* BuildScore::build_name_cn(BuildType bt) const {
     switch (bt) {
-        case BuildType::BERSERKER:     return "狂战士";
-        case BuildType::FIRE_MAGE:     return "火法师";
-        case BuildType::POISON_MASTER: return "毒术大师";
-        case BuildType::TIME_MASTER:   return "时间术士";
-        case BuildType::SUPPORT:       return "辅助者";
-        case BuildType::PROJECTILE:    return "弹幕射手";
-        default:                       return "无构筑";
+        case BuildType::BERSERKER:      return "狂战士";
+        case BuildType::FIRE_MAGE:      return "火法师";
+        case BuildType::POISON_MASTER:  return "毒术大师";
+        case BuildType::TIME_MASTER:    return "时间术士";
+        case BuildType::SUPPORT:        return "辅助者";
+        case BuildType::PROJECTILE:     return "弹幕射手";
+        case BuildType::ICE_MAGE:       return "冰霜法师";
+        case BuildType::LIGHTNING_MAGE: return "雷电法师";
+        case BuildType::BLEED_BLADE:    return "流血剑士";
+        case BuildType::SHADOW_STRIKER: return "暗影刺客";
+        case BuildType::JUGGERNAUT:     return "重装守卫";
+        case BuildType::SUMMON_LORD:    return "召唤领主";
+        default:                        return "无构筑";
     }
 }
 const char* BuildScore::build_name() const { return build_name_cn(identify()); }
 
 float BuildScore::progress(BuildType bt) const {
-    if (bt == BuildType::BERSERKER)     return std::min(1.0f, (float)get(BuildTag::MELEE) / 10.0f);
-    if (bt == BuildType::FIRE_MAGE)     return std::min(1.0f, (float)get(BuildTag::FIRE) / 8.0f);
-    if (bt == BuildType::POISON_MASTER) return std::min(1.0f, (float)get(BuildTag::POISON) / 8.0f);
-    if (bt == BuildType::TIME_MASTER)   return std::min(1.0f, (float)get(BuildTag::TIME) / 6.0f);
-    if (bt == BuildType::SUPPORT)       return std::min(1.0f, (float)get(BuildTag::HEAL) / 6.0f);
-    if (bt == BuildType::PROJECTILE)    return std::min(1.0f, (float)get(BuildTag::PROJECTILE) / 5.0f);
+    if (bt == BuildType::BERSERKER)      return std::min(1.0f, (float)get(BuildTag::MELEE) / 10.0f);
+    if (bt == BuildType::FIRE_MAGE)      return std::min(1.0f, (float)get(BuildTag::FIRE) / 8.0f);
+    if (bt == BuildType::POISON_MASTER)  return std::min(1.0f, (float)get(BuildTag::POISON) / 8.0f);
+    if (bt == BuildType::TIME_MASTER)    return std::min(1.0f, (float)get(BuildTag::TIME) / 6.0f);
+    if (bt == BuildType::SUPPORT)        return std::min(1.0f, (float)get(BuildTag::HEAL) / 6.0f);
+    if (bt == BuildType::PROJECTILE)     return std::min(1.0f, (float)get(BuildTag::PROJECTILE) / 5.0f);
+    if (bt == BuildType::ICE_MAGE)       return std::min(1.0f, (float)get(BuildTag::ICE) / 8.0f);
+    if (bt == BuildType::LIGHTNING_MAGE) return std::min(1.0f, (float)get(BuildTag::LIGHTNING) / 7.0f);
+    if (bt == BuildType::BLEED_BLADE)    return std::min(1.0f, (float)get(BuildTag::BLEED) / 8.0f);
+    if (bt == BuildType::SHADOW_STRIKER) return std::min(1.0f, (float)get(BuildTag::MELEE) / 7.0f);
+    if (bt == BuildType::JUGGERNAUT)     return std::min(1.0f, (float)get(BuildTag::DEFENSE) / 8.0f);
+    if (bt == BuildType::SUMMON_LORD)    return std::min(1.0f, (float)get(BuildTag::SUMMON) / 5.0f);
     return 0.0f;
 }
 
@@ -87,7 +112,7 @@ bool relic_matches_build(const BuildScore& bs, const std::string& relic_id) {
     const RelicDef* def = get_relic_def(relic_id);
     if (!def) return false;
     for (auto t : def->favorite_tags)
-        if (bs.get(t) >= 3) return true;  // 该标签得分≥3 → 匹配
+        if (bs.get(t) >= 3) return true;
     return false;
 }
 
@@ -96,12 +121,12 @@ void recommend_relic_weights(const BuildScore& bs,
                               std::vector<int>& out_weights) {
     for (size_t i = 0; i < out_ids.size(); i++) {
         if (relic_matches_build(bs, out_ids[i]))
-            out_weights[i] = out_weights[i] * 16 / 10;  // +60% weight
+            out_weights[i] = out_weights[i] * 16 / 10;
     }
 }
 
 // ============================================================
-// Build Bonus — 玩法变化
+// Build Bonus — 玩法变化 (G5.1: 新流派加成)
 // ============================================================
 BuildBonus get_build_bonus(BuildType bt) {
     BuildBonus bb;
