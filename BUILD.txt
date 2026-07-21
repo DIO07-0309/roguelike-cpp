@@ -1,0 +1,84 @@
+═══════════════════════════════════════
+  Roguelike C++ Edition — Build Guide
+  Version: v0.9.5 (G5.8 Presentation Final)
+═══════════════════════════════════════
+
+This package contains the latest JSON data files (G5.1-G5.7).
+The .exe may be outdated — recompile when MSVC/MinGW is available.
+
+━━━ Quick Build ━━━
+
+Prerequisites:
+  • CMake 3.16+
+  • Visual Studio 2022 (MSVC) —OR— MinGW-w64 + g++
+
+Steps (MSVC):
+  1. Open "Developer Command Prompt for VS 2022"
+  2. cd C:\Users\HP\Desktop\Roguelike-CPP版
+  3. cmake -B build -G "Visual Studio 17 2022"
+  4. cmake --build build --config Release
+  5. copy build\Release\roguelike_cpp.exe .
+
+Steps (MinGW):
+  1. cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+  2. cmake --build build
+  3. copy build\roguelike_cpp.exe .
+
+━━━ G5.1-G5.7 New Features ━━━
+
+G5.1: 12 Build types, 20 skills, 63 relics, 25 buffs, 36 items, 23 enemies
+G5.2: 5 new skill classes (IceNova, ChainLightning, ShadowStrike,
+      BloodFrenzy, SummonSpirit)
+G5.3: AIArchetype system (Sniper, Controller, Ambush, Guardian)
+G5.4: 6 unique boss Phase2 mechanics (Whirlwind, LaserBarrage,
+      GravityPull, etc.)
+G5.5: Run events 25→40% spawn rate, dual events in Chapter 2+,
+      3-5 special rooms per floor
+G5.6: Balance simulation (--sim N) — automated run stats
+G5.7: Combat feel tuning — hit-stop, camera shake, combo milestones
+
+━━━ CLI Flags ━━━
+
+  roguelike_cpp.exe                        Normal launch
+  roguelike_cpp.exe --record file.rpy      Record replay
+  roguelike_cpp.exe --replay file.rpy      Playback replay
+  roguelike_cpp.exe --sim 100              Run 100 automated runs
+
+━━━ Mod Support ━━━
+
+  Place mod folders in mods/<name>/ with mod.json:
+    {
+      "id": "my_mod", "name": "My Mod", "version": "1.0",
+      "priority": 100, "provides": ["boss", "enemy"]
+    }
+
+  See docs/G4_PLATFORM_BIBLE.md for full Mod API.
+
+━━━ Resources (JSON — data only, no recompile needed) ━━━
+
+  resources/buffs.json        25 buff definitions
+  resources/relics.json       63 relic definitions
+  resources/enemies.json      23 enemy templates
+  resources/bosses.json       6 boss templates
+  resources/skills.json       20 skill definitions
+  resources/items.json        36 item templates
+  resources/quests.json       12 quest templates
+  resources/dialogues.json    34 dialogue entries
+  resources/endings.json      5 ending templates
+  resources/vfx_recipes.json   12 VFX recipes + 11 color presets (G5.8.5)
+  resources/meta_nodes.json   10 meta progression nodes
+
+━━━ G5.8 Presentation (2026-07-21) ━━━
+
+  BuildTheme       12 visual themes by BuildType, 3-tier damage colors
+  VFX Recipes      vfx_recipes.json — 12 recipes with staged delays
+  Camera           shake/dash offset/boss landing zoom
+  Audio Director   crossfade + boss Phase2 cue + BGM ducking
+  Timeline         delay/duration/callback sequenced events
+  dispatch()       unified Gameplay→Presentation pipeline
+
+━━━ Python Edition ━━━
+
+  python_edition/main.py      Full Python/pygame source
+  Requires: Python 3.11+, pygame>=2.6
+  Launch:   py python_edition/main.py

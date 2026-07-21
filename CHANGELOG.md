@@ -10,6 +10,48 @@
 | Phase | G1-G3 Complete |
 | Status | Stable Baseline for G4 |
 
+---
+
+# v0.9.0 — C++/Python Dual Sync (G5-G6)
+
+| Field | Value |
+|-------|-------|
+| Version | v0.9.0 |
+| Codename | Dual Sync |
+| Date | 2026-07-21 |
+| Phase | G5-G6 Complete |
+| Status | Current Release |
+
+## G5 (C++ Sync)
+- 5 new skill behavior classes: IceNova, ChainLightning, ShadowStrike, BloodFrenzy, SummonSpirit
+- AIArchetype (4 types: Sniper/Controller/Ambush/Guardian) + MonsterSkillType (12)
+- Boss Phase2 (6 unique: Whirlwind/LaserBarrage/GravityPull/etc.)
+- BuildType 6→12 (Ice/Fire/Poison/Time/Support/Projectile/IceMage/LightningMage/BleedBlade/ShadowStriker/Juggernaut/SummonLord)
+- 10 JSON 100% C++ parity (buffs 25, relics 63, enemies 31, bosses 6, skills 20, items 36, quests 12, dialogues 34, endings 5, meta 10)
+
+## G6 (Architecture)
+- EventBus (30 event types, pub/sub)
+- ReplaySystem (Record + Playback + StateHash)
+- SimRunner (Automated balance testing, --sim N)
+
+## G5.8 (Presentation Layer — 4 commits)
+- **BuildTheme**: 7-field struct, 12 presets, 3-tier dmg_color_for()
+- **VFX Recipes**: vfx_recipes.json — 12 recipes, 11 color presets, play_recipe()
+- **Camera**: shake/dash offset/boss landing zoom
+- **Audio Director**: crossfade, boss Phase2 cue, BGM ducking
+- **Timeline**: delay/duration/callback sequenced events + include()
+- **PresentationEvent + dispatch()**: unified pipeline, Gameplay→Presentation fully decoupled
+- **Timeline Presentation**: 12 recipes with staged delays (IceNova: ring→explosion→shatter→flash, Boss Phase2: freeze→flash→roar→shockwave→zoom)
+
+## Python Edition
+
+桌面版同时包含 `python_edition/` 目录，含完整 Python/pygame 源码。
+启动方式：`python_edition/main.py`（需 Python 3.11+ + pygame）。
+
+---
+
+## Original v0.8.0 below
+
 ## Scope
 
 G1 (7 steps) — Architecture Foundation

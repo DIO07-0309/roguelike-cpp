@@ -2,7 +2,6 @@
 
 > 重庆大学大数据与软件学院 ·《程序设计实训》  
 > 开发者：ruozhiDIO
-> **版本**: v0.9.0 (G6 Sync) || **Python 版**: v0.9.0 (双版同步)
 
 ---
 
@@ -423,6 +422,60 @@ Relic 是挂在 Player 身上的局内常驻被动构筑物，不占技能栏、
 - **UI 优化**：Buff剩余时间进度条+闪烁、Relic面板描边、Boss状态标签、Debug overlay
 - **字体修复**：ResourceManager 动态码点构建 (原版全项目860基线 + relic/buff/NPC文本动态追加)
 
+### 5.17 G5.8 Presentation Layer (表现层)
+
+G5.8 将视觉/音频/镜头从 Gameplay 代码中完全解耦，建立统一的 `PresentationEvent → dispatch()` 管道。
+
+**BuildTheme（主题系统）**
+| BuildType | 主题名 | 主色 | 粒子速度 | 爆炸倍率 | VFX 预设 |
+|:---|:---|:---|:---|:---|:---|
+| ICE_MAGE | ice | (80,200,255) | 0.70× | 1.15× | ice |
+| FIRE_MAGE | fire | (255,140,0) | 1.30× | 1.25× | fire |
+| LIGHTNING_MAGE | lightning | (220,200,40) | 1.40× | 1.10× | lightning |
+| SHADOW_STRIKER | shadow | (140,80,200) | 0.85× | 0.90× | shadow |
+| JUGGERNAUT | white | (200,180,140) | 0.85× | 0.90× | white |
+| ... | (12种) | | | | |
+
+**伤害数字 3-tier 着色**：≥50 金色 / ≥25 主题副色 / ≥10 主题混合灰 / <10 中性灰
+
+**VFX Recipes** (`vfx_recipes.json`)
+- 12 recipes：`melee_hit` / `skill_slash` / `skill_fireball` / `skill_heal` / `skill_ice_nova` / `skill_chain_lightning` / `boss_cone_attack` / `boss_circle_aoe` / `boss_summon` / `time_stop` / `level_up` / `boss_phase2`
+- 11 color presets：`default` / `fire` / `ice` / `lightning` / `poison` / `time` / `heal` / `shadow` / `bleed` / `white` / `summon`
+
+**Timeline 时序编排（G5.8.8）**
+- 每个 recipe step 支持 `delay` 字段（秒），实现分阶段播放
+- IceNova：0ms ring → 120ms explosion → 250ms shatter → 350ms flash
+- Boss Phase2：0ms freeze → 80ms white flash → 250ms roar → 400ms shockwave → 700ms zoom
+
+**Audio Director**
+- BGM crossfade（渐变切换）
+- Boss Phase2 cue（狂暴音频提示 + BGM 音量增强）
+- BGM ducking（高优先级 SFX 时自动压低背景音乐）
+
+**Camera**
+- Screen shake（震屏，伤害驱动强度）
+- Dash offset（冲刺镜头偏移）
+- Boss landing zoom（1.15× 缩放动画，0.8s）
+
+**统一调度管道（G5.8.7）**
+```
+GameScene.emit(PresentationEvent)
+  → PresentationSystemDirector.dispatch()
+    → BuildTheme    (自动主题色)
+    → Recipe Table  (技能→配方映射)
+    → play_recipe() + recipe_to_timeline()
+    → Camera        (shake/zoom/dash)
+    → AudioDirector (SFX + BGM)
+    → Damage Numbers (3-tier着色)
+```
+
+### 5.18 Python 同步版
+
+桌面包内含 `python_edition/` 目录，与 C++ 版功能完全同步。
+- 入口：`python_edition/main.py`
+- 依赖：Python 3.11+，`pip install pygame`
+- JSON 资源文件与 C++ 版共用 `resources/` 目录
+
 ---
 
 ## 六、项目结构
@@ -511,16 +564,25 @@ roguelike_cpp/
 │       ├── arena_manager.h/.cpp  # D5: 战场元素
 │       ├── boss_system_director.h/.cpp  # D6: Boss总编排
 │       ├── gameplay_system_director.h/.cpp # D6: 世界/叙事
-│       ├── presentation_system_director.h/.cpp # D6: 视觉表现
+│       ├── presentation_system_director.h/.cpp # D6/G5.8: 视觉表现 + dispatch()
 │       ├── game_flow_director.h/.cpp  # D6: 场景流程
 │       ├── player_controller.h/.cpp   # D6: 输入分离
 │       ├── meta_progression.h/.cpp    # D6: 局外成长
 │       ├── ending_director.h/.cpp     # D6: 五结局
-│       ├── camera_director.h          # D6: 镜头常量
+│       ├── camera_director.h          # G5.8: 镜头常量（shake/zoom/dash）
+│       ├── build_theme.h              # G5.8.2: BuildTheme 12预设 + dmg_color_for()
+│       ├── audio_director.h           # G5.8.4: crossfade + Phase2 cue + ducking
+│       ├── timeline.h                 # G5.8.6: delay/duration/callback序列
 │       └── combat_feel.h              # D6: 打击感
-└── resources/              #  JSON 资源配置（外部数据）
-    ├── buffs.json         # Buff 配置 (3种)
-    └── relics.json        # Relic 配置 (11种 + rarity)
+├── resources/              #  JSON 资源配置（C++/Python 共享）
+│   ├── buffs.json          # Buff 配置 (25种)
+│   ├── relics.json         # Relic 配置 (63种)
+│   ├── vfx_recipes.json    # G5.8.5: VFX 配方 (12 recipe + 11 preset)
+│   └── ... (共11个JSON)
+└── python_edition/         # G5.8: Python/pygame 同步版源码
+    ├── main.py
+    ├── src/
+    └── ...
 ```
 
 ---
@@ -610,6 +672,8 @@ on_monster_killed.emit(target);
 | **Factory** | spawn_monster / spawn_boss / random_skill | 统一创建，隔离构造逻辑 |
 | **Strategy** | MonsterAI → BossAI (继承替换) | Boss 挂载派生 AI 获得特殊行为 |
 | **Singleton** | AudioServer / SaveManager | 全局音频/存档服务 |
+| **Event Mediator** | PresentationEvent + dispatch() | G5.8.7: Gameplay→Presentation 单一入口，解耦 VFX/Audio/Camera |
+| **Data-Driven** | vfx_recipes.json | G5.8.5: VFX recipe/color preset 完全由 JSON 驱动 |
 
 ### 7.6 伤害公式
 
@@ -641,11 +705,13 @@ modifiers 叠加:
 
 ### 7.8 音频系统
 
-**SFX**（8 种，纯程序化方波/正弦/噪声合成）：
-`melee` `hit` `slash` `bolt` `heal` `pickup` `levelup` `victory` + `timestop` (外部 MP3)
+**SFX**（13 种，纯程序化方波/正弦/噪声合成）：
+`melee` `hit` `slash` `bolt` `heal` `pickup` `levelup` `victory` `timestop` (外部 MP3)
+`ice_crack` `lightning` `shadow_step` `blood_frenzy` `summon` (G5.8 新增)
 
 **BGM**（4 支，和弦+旋律+低音+鼓轨，3遍循环 ~25s）：
 `title` (C大调/110BPM/管弦) `select` (Am/85BPM/竖琴) `dungeon` (75BPM/暗流) `boss` (150BPM/重金属)
++ Phase2 cue: Boss狂暴时 BGM 音量增强 + SFX 层叠
 
 ### 7.9 日志系统
 
@@ -793,6 +859,13 @@ rlc:blood_charm,war_drum,plague_mask
 | G5.5 | Run Events: spawn rate 25→40% + ch2+双事件 + special rooms 2-3→3-5 + NOTHING权重↓ + 商人/圣物↑ | ✅ |
 | G5.6 | Balance Pass: SimAI + SimRunner + --sim N CLI + automated 100-run balance report | ✅ |
 | G5.7 | Game Feel: hit-stop + shake + freeze boost + crit scale + combo milestone juice | ✅ |
+| G5.8.2 | BuildTheme: 7-field struct + 12 presets + dmg_color_for() 3-tier damage colors | ✅ |
+| G5.8.3 | Camera: shake/dash offset/boss landing zoom integrated | ✅ |
+| G5.8.4 | Audio Director: crossfade + boss Phase2 cue + BGM ducking | ✅ |
+| G5.8.5 | VFX Recipes: vfx_recipes.json (12 recipes/11 presets) + play_recipe() | ✅ |
+| G5.8.6 | Timeline: delay/duration/callback sequenced events + include() | ✅ |
+| G5.8.7 | Presentation Integration: PresentationEvent + dispatch() unified pipeline | ✅ |
+| G5.8.8 | Timeline Presentation: 12 recipes with staged delays → dramatic sequencing | ✅ |
 
 ---
 
@@ -815,21 +888,3 @@ rlc:blood_charm,war_drum,plague_mask
 | 结局 | 5 | EndingDef JSON |
 
 **Source files**: ~200+ (h/cpp/json) **· CLI flags**: --record / --replay / --sim N **· Mod support**: mods/ with mod.json
-
----
-
-## Python 版同步 (G5-G6, 2026-07)
-
-Python 版 (pygame) 已同步 C++ 的核心玩法代码和架构模块：
-
-| 系统 | 状态 |
-|------|:--:|
-| 10 JSON 数据 | ✅ 100% 一致 (buffs 25, relics 63, enemies 31, bosses 6, skills 22, items ~30, quests 12, dialogues 34, endings 5, meta 10) |
-| 5 Signature Skill 行为类 | ✅ IceNova/ChainLightning/ShadowStrike/BloodFrenzy/SummonSpirit |
-| AIArchetype (4新) | ✅ Sniper/Controller/Ambush/Guardian + 12 MonsterSkillType |
-| Boss Phase2 (6 Boss) | ✅ Whirlwind/LaserBarrage/GravityPull + 6 Boss预设 |
-| BuildType 6→12 | ✅ 全部标签评分 |
-| EventBus (30事件) | ✅ src/core/event_bus.py |
-| Replay系统 | ✅ src/core/replay/ (Recorder/Player/StateHash) |
-| SimRunner | ✅ src/core/sim/ (SimAI + 自动模拟) |
-| Mod/Provider | 🔮 G6后续 |
