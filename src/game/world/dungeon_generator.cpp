@@ -13,7 +13,8 @@ std::pair<int,int> BSPNode::center() const { return {x + w/2, y + h/2}; }
 std::pair<int,int> BSPNode::room_center() const { return {rx + rw/2, ry + rh/2}; }
 
 std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_room_count,
-                                                  int arena_density) {
+                                                  int arena_density,
+                                                  const std::string& biome_id) {
     _seed = seed;
     if (seed != 0) _local_rng.seed(seed);
 
@@ -29,10 +30,9 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_r
     auto tmpl = _build_template();
     gm->load_from_template(tmpl);
 
-    _assign_special_rooms(special_room_count);
+    _assign_special_rooms(special_room_count, biome_id);
     gm->special_rooms = _special_rooms;
 
-    // D2 Step5: 战场元素
     if (arena_density > 0) _assign_arena_objects(gm.get(), arena_density);
 
     return gm;
@@ -83,8 +83,8 @@ int DungeonGenerator::_rand_int(int max_exclusive) {
     return (int)(rng() % max_exclusive);
 }
 
-// B8: 从 _rooms 中挑选 N 个作为特殊房间 (D1: N 从 FloorConfig 读取)
-void DungeonGenerator::_assign_special_rooms(int count) {
+// B8/G6.2: 从 _rooms 中挑选 N 个作为特殊房间 (50% landmarks, 30% SECRET, rest normal)
+void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome_id) {
     if (_rooms.size() < 4) return;
 
     std::vector<int> candidates;
@@ -96,18 +96,42 @@ void DungeonGenerator::_assign_special_rooms(int count) {
         std::swap(candidates[i], candidates[j]);
     }
 
+    // G6.2: load landmarks for this biome
+    std::vector<const LandmarkDef*> landmarks;
+    if (!biome_id.empty())
+        landmarks = get_landmarks_for_biome(biome_id);
+
     int scount = std::min(count, (int)candidates.size());
-    // D8: SECRET rooms are rare — only appear at higher floors (ch6+)
     int type_idx = 0;
+    int placed_lm = 0;
     for (int i = 0; i < scount; i++) {
         auto [rx, ry, rw, rh] = _rooms[candidates[i]];
         SpecialRoom sr;
-        sr.cx = rx + rw / 2;
-        sr.cy = ry + rh / 2;
+        sr.cx = rx + rw / 2; sr.cy = ry + rh / 2;
         sr.rx = rx; sr.ry = ry; sr.rw = rw; sr.rh = rh;
-        sr.type = special_room_from_index(type_idx++);
+
+        // G6.2: ~50% chance → biome landmark
+        if (!landmarks.empty() && _rand_int(2) == 0 && placed_lm < 3) {
+            const LandmarkDef* lm = landmarks[_rand_int((int)landmarks.size())];
+            sr.type = SpecialRoomType::LANDMARK;
+            sr.landmark_id = lm->id;
+            sr.biome_id = biome_id;
+            placed_lm++;
+        } else {
+            sr.type = special_room_from_index(type_idx++);
+        }
         sr.triggered = false;
         _special_rooms.push_back(sr);
+    }
+
+    // G6.6: 30% chance to convert one existing room → SECRET
+    if (!biome_id.empty() && !_special_rooms.empty() && _rand_int(100) < 30) {
+        auto* enc = pick_encounter_by_trigger(biome_id, "wall_interact");
+        if (enc) {
+            int idx = _rand_int((int)_special_rooms.size());
+            if (_special_rooms[idx].type != SpecialRoomType::LANDMARK)
+                _special_rooms[idx].type = SpecialRoomType::SECRET;
+        }
     }
 }
 

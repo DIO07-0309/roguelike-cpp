@@ -6,6 +6,8 @@
 #include "game_map.h"
 #include "config.h"
 #include "special_room.h"
+#include "landmark.h"
+#include "encounter.h"
 
 // ============================================================
 // BSPNode — 二分空间划分节点
@@ -34,7 +36,8 @@ public:
                      int min_part = 8, int min_room = 5, int margin = 1);
 
     std::shared_ptr<GameMap> generate(uint32_t seed = 0, int special_room_count = 3,
-                                     int arena_density = 0);
+                                     int arena_density = 0,
+                                     const std::string& biome_id = "");
     std::vector<std::pair<int,int>> get_room_centers() const;
     std::vector<SpecialRoom> get_special_rooms() const { return _special_rooms; }
 
@@ -50,7 +53,7 @@ private:
     std::mt19937 _local_rng;
 
     int _rand_int(int max_exclusive);
-    void _assign_special_rooms(int count);
+    void _assign_special_rooms(int count, const std::string& biome_id = "");
     void _assign_arena_objects(GameMap* gm, int density);
 
     void _partition(BSPNode* node);

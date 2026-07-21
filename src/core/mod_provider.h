@@ -2,6 +2,7 @@
 #include "registry_provider.h"
 #include <vector>
 #include <string>
+#include <memory>
 
 // ============================================================
 // G4.1: ModProvider — 单个 Mod 目录的 Provider

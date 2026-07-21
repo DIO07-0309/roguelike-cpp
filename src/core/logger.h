@@ -1,4 +1,8 @@
 #pragma once
+// Fix: windows.h defines ERROR macro
+#ifdef ERROR
+#undef ERROR
+#endif
 #include <string>
 #include <cstdio>
 #include <ctime>

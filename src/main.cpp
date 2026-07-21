@@ -18,6 +18,12 @@
 #include "core/builtin_provider.h"     // G4.1
 #include "core/mod_provider.h"         // G4.1
 #include "core/mod_dependency.h"      // G4.2
+// G6: World layer data
+#include "world/biome.h"
+#include "world/landmark.h"
+#include "world/hazard.h"
+#include "world/encounter.h"
+#include "data/vfx_recipe.h"
 #include "core/sim/sim_runner.h"      // G5.6
 #include "core/mod_manager.h"         // G4.4
 #include "data/enemy_defs.h"
@@ -185,6 +191,12 @@ int main() {
     }
     g_meta.load_from_defs();  // G3.1: MetaNode 需在 meta 模块加载后重建
     load_vfx_recipes("resources/vfx_recipes.json");  // G5.8.5: VFX recipe registry
+
+    // G6.1-G6.7: World layer data loading
+    load_biome_defs("resources/biomes.json");
+    load_landmark_defs("resources/landmarks.json");
+    load_hazard_defs("resources/hazards.json");
+    load_encounter_defs("resources/encounters.json");
 
     // Font 通过 ResourceManager 加载
     load_fonts();

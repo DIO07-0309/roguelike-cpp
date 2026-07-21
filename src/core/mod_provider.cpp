@@ -6,6 +6,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#undef ERROR  // windows.h defines ERROR as macro, conflicts with LogLevel::ERROR
 #endif
 
 using json = nlohmann::json;
