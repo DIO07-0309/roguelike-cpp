@@ -199,9 +199,13 @@ CMakeFiles/roguelike_cpp.dir/src/game/scenes/tutorial_scene.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/bits/stl_numeric.h \
  C:/mingw64/include/c++/15.2.0/pstl/glue_numeric_defs.h \
  C:/Demo/roguelike_cpp/src/game/systems/combat_system.h \
+ C:/Demo/roguelike_cpp/src/game/types/combat_types.h \
+ C:/Demo/roguelike_cpp/src/game/build_tag.h \
  C:/Demo/roguelike_cpp/src/game/entities/skill.h \
+ C:/Demo/roguelike_cpp/src/game/systems/attack_evolution_state.h \
  C:/Demo/roguelike_cpp/src/game/entities/monster.h \
  C:/Demo/roguelike_cpp/src/game/world/game_map.h \
+ C:/Demo/roguelike_cpp/src/game/world/special_room.h \
  C:/Demo/roguelike_cpp/src/game/tutorial/tutorial_guide.h \
  C:\Demo\roguelike_cpp\src\game\scenes\title_scene.h \
  C:/Demo/roguelike_cpp/src/core/scene_tree.h \

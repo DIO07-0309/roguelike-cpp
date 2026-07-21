@@ -102,6 +102,7 @@ void GameScene::new_game() {
     current_floor = 1;
     max_unlocked_floor = 1;
     enter_floor(1);
+    _presentation.set_build_theme(BuildType::BERSERKER);  // G5.8.2: default theme
 
     // ── G4.5: Replay/Record auto-start ──
     if (g_replay_mode && !g_replay_path.empty())
@@ -427,6 +428,9 @@ void GameScene::_process(double delta) {
             _presentation.room_msg = msg;
             _presentation.room_msg_timer = 2.0f;
             _gameplay.last_notified_build = bt;
+            _presentation.set_build_theme(bt);  // G5.8.2: update HUD/VFX colors
+            _presentation.trigger_shake(CombatFeelSystem::SHAKE_LIGHT);
+            _presentation.trigger_freeze(CombatFeelSystem::BUILD_COMPLETE);
         }
     }
 

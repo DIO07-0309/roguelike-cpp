@@ -175,6 +175,7 @@ CMakeFiles/roguelike_cpp.dir/src/game/world/dungeon_generator.cpp.obj: \
  C:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/stdarg.h \
  C:/mingw64/x86_64-w64-mingw32/include/stdarg.h \
  C:/mingw64/x86_64-w64-mingw32/include/_mingw_stdarg.h \
+ C:\Demo\roguelike_cpp\src\game\world\special_room.h \
  C:/Demo/roguelike_cpp/src/game/config.h \
  C:/Demo/roguelike_cpp/src/game/entities/item.h \
  C:/Demo/roguelike_cpp/src/game/systems/combat_system.h \
@@ -190,4 +191,6 @@ CMakeFiles/roguelike_cpp.dir/src/game/world/dungeon_generator.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/bits/stl_algo.h \
  C:/mingw64/include/c++/15.2.0/bits/algorithmfwd.h \
  C:/mingw64/include/c++/15.2.0/bits/stl_heap.h \
- C:/mingw64/include/c++/15.2.0/pstl/glue_algorithm_defs.h
+ C:/mingw64/include/c++/15.2.0/pstl/glue_algorithm_defs.h \
+ C:/Demo/roguelike_cpp/src/game/types/combat_types.h \
+ C:/Demo/roguelike_cpp/src/game/build_tag.h

@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = @CMakeFiles/roguelike_cpp.dir/includes_CXX.rsp
 
-CXX_FLAGS = -O3 -DNDEBUG -std=c++17
+CXX_FLAGS = -finput-charset=UTF-8 -fexec-charset=UTF-8 -O3 -DNDEBUG -std=c++17
 

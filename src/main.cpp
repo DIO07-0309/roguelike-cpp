@@ -28,6 +28,7 @@
 #include "data/meta_node_defs.h"
 #include "data/skill_defs.h"
 #include "data/item_defs.h"
+#include "data/vfx_recipe.h"      // G5.8.5
 #include "systems/combat_system.h"
 #include <cstdio>
 #include <memory>
@@ -183,6 +184,7 @@ int main() {
         }
     }
     g_meta.load_from_defs();  // G3.1: MetaNode 需在 meta 模块加载后重建
+    load_vfx_recipes("resources/vfx_recipes.json");  // G5.8.5: VFX recipe registry
 
     // Font 通过 ResourceManager 加载
     load_fonts();

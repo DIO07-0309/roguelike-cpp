@@ -168,6 +168,7 @@ CMakeFiles/roguelike_cpp.dir/src/game/scenes/victory_scene.cpp.obj: \
  C:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/stdarg.h \
  C:/mingw64/x86_64-w64-mingw32/include/stdarg.h \
  C:/mingw64/x86_64-w64-mingw32/include/_mingw_stdarg.h \
+ C:\Demo\roguelike_cpp\src\game\scenes\credits_scene.h \
  C:\Demo\roguelike_cpp\src\game\scenes\title_scene.h \
  C:/Demo/roguelike_cpp/src/core/scene_tree.h \
  C:/Demo/roguelike_cpp/src/core/logger.h \
@@ -183,4 +184,5 @@ CMakeFiles/roguelike_cpp.dir/src/game/scenes/victory_scene.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/bits/parse_numbers.h \
  C:/mingw64/include/c++/15.2.0/bits/std_mutex.h \
  C:/mingw64/include/c++/15.2.0/bits/unique_lock.h \
- C:/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/error_constants.h
+ C:/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/error_constants.h \
+ C:/Demo/roguelike_cpp/src/game/meta_progression.h

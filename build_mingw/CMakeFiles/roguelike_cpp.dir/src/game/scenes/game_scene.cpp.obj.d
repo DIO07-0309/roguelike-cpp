@@ -199,11 +199,56 @@ CMakeFiles/roguelike_cpp.dir/src/game/scenes/game_scene.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/bits/stl_numeric.h \
  C:/mingw64/include/c++/15.2.0/pstl/glue_numeric_defs.h \
  C:/Demo/roguelike_cpp/src/game/systems/combat_system.h \
+ C:/Demo/roguelike_cpp/src/game/types/combat_types.h \
+ C:/Demo/roguelike_cpp/src/game/build_tag.h \
  C:/Demo/roguelike_cpp/src/game/entities/skill.h \
  C:/Demo/roguelike_cpp/src/core/input_map.h \
+ C:/Demo/roguelike_cpp/src/game/systems/attack_evolution_state.h \
  C:/Demo/roguelike_cpp/src/game/entities/monster.h \
  C:/Demo/roguelike_cpp/src/game/world/game_map.h \
+ C:/Demo/roguelike_cpp/src/game/world/special_room.h \
  C:/Demo/roguelike_cpp/src/game/systems/vfx_server.h \
+ C:/Demo/roguelike_cpp/src/game/systems/game_renderer.h \
+ C:/Demo/roguelike_cpp/src/game/systems/interaction_handler.h \
+ C:/Demo/roguelike_cpp/src/game/systems/floor_manager.h \
+ C:/mingw64/include/c++/15.2.0/utility \
+ C:/mingw64/include/c++/15.2.0/bits/stl_relops.h \
+ C:/Demo/roguelike_cpp/src/game/systems/combat_coordinator.h \
+ C:/Demo/roguelike_cpp/src/game/build_score.h \
+ C:/Demo/roguelike_cpp/src/game/world/event_system.h \
+ C:/Demo/roguelike_cpp/src/game/world/floor_narrative.h \
+ C:/Demo/roguelike_cpp/src/game/world/npc_system.h \
+ C:/Demo/roguelike_cpp/src/game/world/world_state.h \
+ C:/mingw64/include/c++/15.2.0/unordered_set \
+ C:/mingw64/include/c++/15.2.0/bits/unordered_set.h \
+ C:/Demo/roguelike_cpp/src/game/world/quest_manager.h \
+ C:/Demo/roguelike_cpp/src/game/world/relationship_system.h \
+ C:/Demo/roguelike_cpp/src/game/world/world_reaction.h \
+ C:/Demo/roguelike_cpp/src/game/boss/boss_narrative.h \
+ C:/Demo/roguelike_cpp/src/game/types/boss_types.h \
+ C:/Demo/roguelike_cpp/src/game/world/growth_curve.h \
+ C:/Demo/roguelike_cpp/src/game/combat_feel.h \
+ C:/Demo/roguelike_cpp/src/game/world/flow_director.h \
+ C:/Demo/roguelike_cpp/src/game/relic_progression.h \
+ C:/Demo/roguelike_cpp/src/game/meta_progression.h \
+ C:/Demo/roguelike_cpp/src/game/boss/boss_evolution.h \
+ C:/Demo/roguelike_cpp/src/game/boss/boss_behavior.h \
+ C:/Demo/roguelike_cpp/src/game/boss/boss_command.h \
+ C:/Demo/roguelike_cpp/src/game/boss/arena_manager.h \
+ C:/Demo/roguelike_cpp/src/game/boss/boss_replay.h \
+ C:/Demo/roguelike_cpp/src/game/boss/boss_encounter.h \
+ C:/Demo/roguelike_cpp/src/game/camera_director.h \
+ C:/Demo/roguelike_cpp/src/game/boss/boss_cinematic.h \
+ C:/Demo/roguelike_cpp/src/game/boss/boss_timeline.h \
+ C:/Demo/roguelike_cpp/src/game/ending_director.h \
+ C:/Demo/roguelike_cpp/src/game/director/boss_system_director.h \
+ C:/Demo/roguelike_cpp/src/game/director/gameplay_system_director.h \
+ C:/Demo/roguelike_cpp/src/game/director/presentation_system_director.h \
+ C:/Demo/roguelike_cpp/src/game/director/game_flow_director.h \
+ C:/Demo/roguelike_cpp/src/game/player_controller.h \
+ C:/Demo/roguelike_cpp/src/game/scene/game_scene_input.h \
+ C:/Demo/roguelike_cpp/src/game/scene/game_scene_combat.h \
+ C:/Demo/roguelike_cpp/src/game/scene/game_scene_interaction.h \
  C:\Demo\roguelike_cpp\src\game\scenes\title_scene.h \
  C:\Demo\roguelike_cpp\src\game\scenes\death_scene.h \
  C:\Demo\roguelike_cpp\src\game\scenes\victory_scene.h \
@@ -224,4 +269,15 @@ CMakeFiles/roguelike_cpp.dir/src/game/scenes/game_scene.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/error_constants.h \
  C:/Demo/roguelike_cpp/src/game/save/save_manager.h \
  C:/Demo/roguelike_cpp/src/game/audio/audio_server.h \
- C:/Demo/roguelike_cpp/src/game/audio/bgm_engine.h
+ C:/Demo/roguelike_cpp/src/game/audio/bgm_engine.h \
+ C:/Demo/roguelike_cpp/src/game/world/floor_config.h \
+ C:/Demo/roguelike_cpp/src/game/systems/attack_evolution.h \
+ C:/Demo/roguelike_cpp/src/game/systems/skill_evolution.h \
+ C:/Demo/roguelike_cpp/src/game/world/rule_chain.h \
+ C:/Demo/roguelike_cpp/src/game/core/event_bus.h \
+ C:/Demo/roguelike_cpp/src/game/core/event_types.h \
+ C:/Demo/roguelike_cpp/src/game/core/service_locator.h \
+ C:/mingw64/include/c++/15.2.0/typeindex \
+ C:/mingw64/include/c++/15.2.0/cstring \
+ C:/mingw64/x86_64-w64-mingw32/include/string.h \
+ C:/mingw64/x86_64-w64-mingw32/include/sec_api/string_s.h

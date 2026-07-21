@@ -128,6 +128,54 @@ roguelike_cpp/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/build
 .PHONY : roguelike_cpp/fast
 
+src/core/input_map.obj: src/core/input_map.cpp.obj
+.PHONY : src/core/input_map.obj
+
+# target to build an object file
+src/core/input_map.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/core/input_map.cpp.obj
+.PHONY : src/core/input_map.cpp.obj
+
+src/core/input_map.i: src/core/input_map.cpp.i
+.PHONY : src/core/input_map.i
+
+# target to preprocess a source file
+src/core/input_map.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/core/input_map.cpp.i
+.PHONY : src/core/input_map.cpp.i
+
+src/core/input_map.s: src/core/input_map.cpp.s
+.PHONY : src/core/input_map.s
+
+# target to generate assembly for a file
+src/core/input_map.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/core/input_map.cpp.s
+.PHONY : src/core/input_map.cpp.s
+
+src/core/logger.obj: src/core/logger.cpp.obj
+.PHONY : src/core/logger.obj
+
+# target to build an object file
+src/core/logger.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/core/logger.cpp.obj
+.PHONY : src/core/logger.cpp.obj
+
+src/core/logger.i: src/core/logger.cpp.i
+.PHONY : src/core/logger.i
+
+# target to preprocess a source file
+src/core/logger.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/core/logger.cpp.i
+.PHONY : src/core/logger.cpp.i
+
+src/core/logger.s: src/core/logger.cpp.s
+.PHONY : src/core/logger.s
+
+# target to generate assembly for a file
+src/core/logger.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/core/logger.cpp.s
+.PHONY : src/core/logger.cpp.s
+
 src/core/node.obj: src/core/node.cpp.obj
 .PHONY : src/core/node.obj
 
@@ -296,6 +344,414 @@ src/game/audio/wave_synth.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/audio/wave_synth.cpp.s
 .PHONY : src/game/audio/wave_synth.cpp.s
 
+src/game/boss/arena_manager.obj: src/game/boss/arena_manager.cpp.obj
+.PHONY : src/game/boss/arena_manager.obj
+
+# target to build an object file
+src/game/boss/arena_manager.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/arena_manager.cpp.obj
+.PHONY : src/game/boss/arena_manager.cpp.obj
+
+src/game/boss/arena_manager.i: src/game/boss/arena_manager.cpp.i
+.PHONY : src/game/boss/arena_manager.i
+
+# target to preprocess a source file
+src/game/boss/arena_manager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/arena_manager.cpp.i
+.PHONY : src/game/boss/arena_manager.cpp.i
+
+src/game/boss/arena_manager.s: src/game/boss/arena_manager.cpp.s
+.PHONY : src/game/boss/arena_manager.s
+
+# target to generate assembly for a file
+src/game/boss/arena_manager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/arena_manager.cpp.s
+.PHONY : src/game/boss/arena_manager.cpp.s
+
+src/game/boss/boss_behavior.obj: src/game/boss/boss_behavior.cpp.obj
+.PHONY : src/game/boss/boss_behavior.obj
+
+# target to build an object file
+src/game/boss/boss_behavior.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_behavior.cpp.obj
+.PHONY : src/game/boss/boss_behavior.cpp.obj
+
+src/game/boss/boss_behavior.i: src/game/boss/boss_behavior.cpp.i
+.PHONY : src/game/boss/boss_behavior.i
+
+# target to preprocess a source file
+src/game/boss/boss_behavior.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_behavior.cpp.i
+.PHONY : src/game/boss/boss_behavior.cpp.i
+
+src/game/boss/boss_behavior.s: src/game/boss/boss_behavior.cpp.s
+.PHONY : src/game/boss/boss_behavior.s
+
+# target to generate assembly for a file
+src/game/boss/boss_behavior.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_behavior.cpp.s
+.PHONY : src/game/boss/boss_behavior.cpp.s
+
+src/game/boss/boss_cinematic.obj: src/game/boss/boss_cinematic.cpp.obj
+.PHONY : src/game/boss/boss_cinematic.obj
+
+# target to build an object file
+src/game/boss/boss_cinematic.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_cinematic.cpp.obj
+.PHONY : src/game/boss/boss_cinematic.cpp.obj
+
+src/game/boss/boss_cinematic.i: src/game/boss/boss_cinematic.cpp.i
+.PHONY : src/game/boss/boss_cinematic.i
+
+# target to preprocess a source file
+src/game/boss/boss_cinematic.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_cinematic.cpp.i
+.PHONY : src/game/boss/boss_cinematic.cpp.i
+
+src/game/boss/boss_cinematic.s: src/game/boss/boss_cinematic.cpp.s
+.PHONY : src/game/boss/boss_cinematic.s
+
+# target to generate assembly for a file
+src/game/boss/boss_cinematic.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_cinematic.cpp.s
+.PHONY : src/game/boss/boss_cinematic.cpp.s
+
+src/game/boss/boss_command.obj: src/game/boss/boss_command.cpp.obj
+.PHONY : src/game/boss/boss_command.obj
+
+# target to build an object file
+src/game/boss/boss_command.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_command.cpp.obj
+.PHONY : src/game/boss/boss_command.cpp.obj
+
+src/game/boss/boss_command.i: src/game/boss/boss_command.cpp.i
+.PHONY : src/game/boss/boss_command.i
+
+# target to preprocess a source file
+src/game/boss/boss_command.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_command.cpp.i
+.PHONY : src/game/boss/boss_command.cpp.i
+
+src/game/boss/boss_command.s: src/game/boss/boss_command.cpp.s
+.PHONY : src/game/boss/boss_command.s
+
+# target to generate assembly for a file
+src/game/boss/boss_command.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_command.cpp.s
+.PHONY : src/game/boss/boss_command.cpp.s
+
+src/game/boss/boss_encounter.obj: src/game/boss/boss_encounter.cpp.obj
+.PHONY : src/game/boss/boss_encounter.obj
+
+# target to build an object file
+src/game/boss/boss_encounter.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_encounter.cpp.obj
+.PHONY : src/game/boss/boss_encounter.cpp.obj
+
+src/game/boss/boss_encounter.i: src/game/boss/boss_encounter.cpp.i
+.PHONY : src/game/boss/boss_encounter.i
+
+# target to preprocess a source file
+src/game/boss/boss_encounter.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_encounter.cpp.i
+.PHONY : src/game/boss/boss_encounter.cpp.i
+
+src/game/boss/boss_encounter.s: src/game/boss/boss_encounter.cpp.s
+.PHONY : src/game/boss/boss_encounter.s
+
+# target to generate assembly for a file
+src/game/boss/boss_encounter.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_encounter.cpp.s
+.PHONY : src/game/boss/boss_encounter.cpp.s
+
+src/game/boss/boss_evolution.obj: src/game/boss/boss_evolution.cpp.obj
+.PHONY : src/game/boss/boss_evolution.obj
+
+# target to build an object file
+src/game/boss/boss_evolution.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_evolution.cpp.obj
+.PHONY : src/game/boss/boss_evolution.cpp.obj
+
+src/game/boss/boss_evolution.i: src/game/boss/boss_evolution.cpp.i
+.PHONY : src/game/boss/boss_evolution.i
+
+# target to preprocess a source file
+src/game/boss/boss_evolution.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_evolution.cpp.i
+.PHONY : src/game/boss/boss_evolution.cpp.i
+
+src/game/boss/boss_evolution.s: src/game/boss/boss_evolution.cpp.s
+.PHONY : src/game/boss/boss_evolution.s
+
+# target to generate assembly for a file
+src/game/boss/boss_evolution.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_evolution.cpp.s
+.PHONY : src/game/boss/boss_evolution.cpp.s
+
+src/game/boss/boss_narrative.obj: src/game/boss/boss_narrative.cpp.obj
+.PHONY : src/game/boss/boss_narrative.obj
+
+# target to build an object file
+src/game/boss/boss_narrative.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_narrative.cpp.obj
+.PHONY : src/game/boss/boss_narrative.cpp.obj
+
+src/game/boss/boss_narrative.i: src/game/boss/boss_narrative.cpp.i
+.PHONY : src/game/boss/boss_narrative.i
+
+# target to preprocess a source file
+src/game/boss/boss_narrative.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_narrative.cpp.i
+.PHONY : src/game/boss/boss_narrative.cpp.i
+
+src/game/boss/boss_narrative.s: src/game/boss/boss_narrative.cpp.s
+.PHONY : src/game/boss/boss_narrative.s
+
+# target to generate assembly for a file
+src/game/boss/boss_narrative.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_narrative.cpp.s
+.PHONY : src/game/boss/boss_narrative.cpp.s
+
+src/game/boss/boss_replay.obj: src/game/boss/boss_replay.cpp.obj
+.PHONY : src/game/boss/boss_replay.obj
+
+# target to build an object file
+src/game/boss/boss_replay.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_replay.cpp.obj
+.PHONY : src/game/boss/boss_replay.cpp.obj
+
+src/game/boss/boss_replay.i: src/game/boss/boss_replay.cpp.i
+.PHONY : src/game/boss/boss_replay.i
+
+# target to preprocess a source file
+src/game/boss/boss_replay.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_replay.cpp.i
+.PHONY : src/game/boss/boss_replay.cpp.i
+
+src/game/boss/boss_replay.s: src/game/boss/boss_replay.cpp.s
+.PHONY : src/game/boss/boss_replay.s
+
+# target to generate assembly for a file
+src/game/boss/boss_replay.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_replay.cpp.s
+.PHONY : src/game/boss/boss_replay.cpp.s
+
+src/game/boss/boss_timeline.obj: src/game/boss/boss_timeline.cpp.obj
+.PHONY : src/game/boss/boss_timeline.obj
+
+# target to build an object file
+src/game/boss/boss_timeline.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_timeline.cpp.obj
+.PHONY : src/game/boss/boss_timeline.cpp.obj
+
+src/game/boss/boss_timeline.i: src/game/boss/boss_timeline.cpp.i
+.PHONY : src/game/boss/boss_timeline.i
+
+# target to preprocess a source file
+src/game/boss/boss_timeline.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_timeline.cpp.i
+.PHONY : src/game/boss/boss_timeline.cpp.i
+
+src/game/boss/boss_timeline.s: src/game/boss/boss_timeline.cpp.s
+.PHONY : src/game/boss/boss_timeline.s
+
+# target to generate assembly for a file
+src/game/boss/boss_timeline.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/boss/boss_timeline.cpp.s
+.PHONY : src/game/boss/boss_timeline.cpp.s
+
+src/game/build_score.obj: src/game/build_score.cpp.obj
+.PHONY : src/game/build_score.obj
+
+# target to build an object file
+src/game/build_score.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/build_score.cpp.obj
+.PHONY : src/game/build_score.cpp.obj
+
+src/game/build_score.i: src/game/build_score.cpp.i
+.PHONY : src/game/build_score.i
+
+# target to preprocess a source file
+src/game/build_score.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/build_score.cpp.i
+.PHONY : src/game/build_score.cpp.i
+
+src/game/build_score.s: src/game/build_score.cpp.s
+.PHONY : src/game/build_score.s
+
+# target to generate assembly for a file
+src/game/build_score.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/build_score.cpp.s
+.PHONY : src/game/build_score.cpp.s
+
+src/game/config.obj: src/game/config.cpp.obj
+.PHONY : src/game/config.obj
+
+# target to build an object file
+src/game/config.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/config.cpp.obj
+.PHONY : src/game/config.cpp.obj
+
+src/game/config.i: src/game/config.cpp.i
+.PHONY : src/game/config.i
+
+# target to preprocess a source file
+src/game/config.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/config.cpp.i
+.PHONY : src/game/config.cpp.i
+
+src/game/config.s: src/game/config.cpp.s
+.PHONY : src/game/config.s
+
+# target to generate assembly for a file
+src/game/config.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/config.cpp.s
+.PHONY : src/game/config.cpp.s
+
+src/game/core/event_bus.obj: src/game/core/event_bus.cpp.obj
+.PHONY : src/game/core/event_bus.obj
+
+# target to build an object file
+src/game/core/event_bus.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/core/event_bus.cpp.obj
+.PHONY : src/game/core/event_bus.cpp.obj
+
+src/game/core/event_bus.i: src/game/core/event_bus.cpp.i
+.PHONY : src/game/core/event_bus.i
+
+# target to preprocess a source file
+src/game/core/event_bus.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/core/event_bus.cpp.i
+.PHONY : src/game/core/event_bus.cpp.i
+
+src/game/core/event_bus.s: src/game/core/event_bus.cpp.s
+.PHONY : src/game/core/event_bus.s
+
+# target to generate assembly for a file
+src/game/core/event_bus.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/core/event_bus.cpp.s
+.PHONY : src/game/core/event_bus.cpp.s
+
+src/game/director/boss_system_director.obj: src/game/director/boss_system_director.cpp.obj
+.PHONY : src/game/director/boss_system_director.obj
+
+# target to build an object file
+src/game/director/boss_system_director.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/boss_system_director.cpp.obj
+.PHONY : src/game/director/boss_system_director.cpp.obj
+
+src/game/director/boss_system_director.i: src/game/director/boss_system_director.cpp.i
+.PHONY : src/game/director/boss_system_director.i
+
+# target to preprocess a source file
+src/game/director/boss_system_director.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/boss_system_director.cpp.i
+.PHONY : src/game/director/boss_system_director.cpp.i
+
+src/game/director/boss_system_director.s: src/game/director/boss_system_director.cpp.s
+.PHONY : src/game/director/boss_system_director.s
+
+# target to generate assembly for a file
+src/game/director/boss_system_director.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/boss_system_director.cpp.s
+.PHONY : src/game/director/boss_system_director.cpp.s
+
+src/game/director/game_flow_director.obj: src/game/director/game_flow_director.cpp.obj
+.PHONY : src/game/director/game_flow_director.obj
+
+# target to build an object file
+src/game/director/game_flow_director.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/game_flow_director.cpp.obj
+.PHONY : src/game/director/game_flow_director.cpp.obj
+
+src/game/director/game_flow_director.i: src/game/director/game_flow_director.cpp.i
+.PHONY : src/game/director/game_flow_director.i
+
+# target to preprocess a source file
+src/game/director/game_flow_director.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/game_flow_director.cpp.i
+.PHONY : src/game/director/game_flow_director.cpp.i
+
+src/game/director/game_flow_director.s: src/game/director/game_flow_director.cpp.s
+.PHONY : src/game/director/game_flow_director.s
+
+# target to generate assembly for a file
+src/game/director/game_flow_director.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/game_flow_director.cpp.s
+.PHONY : src/game/director/game_flow_director.cpp.s
+
+src/game/director/gameplay_system_director.obj: src/game/director/gameplay_system_director.cpp.obj
+.PHONY : src/game/director/gameplay_system_director.obj
+
+# target to build an object file
+src/game/director/gameplay_system_director.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/gameplay_system_director.cpp.obj
+.PHONY : src/game/director/gameplay_system_director.cpp.obj
+
+src/game/director/gameplay_system_director.i: src/game/director/gameplay_system_director.cpp.i
+.PHONY : src/game/director/gameplay_system_director.i
+
+# target to preprocess a source file
+src/game/director/gameplay_system_director.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/gameplay_system_director.cpp.i
+.PHONY : src/game/director/gameplay_system_director.cpp.i
+
+src/game/director/gameplay_system_director.s: src/game/director/gameplay_system_director.cpp.s
+.PHONY : src/game/director/gameplay_system_director.s
+
+# target to generate assembly for a file
+src/game/director/gameplay_system_director.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/gameplay_system_director.cpp.s
+.PHONY : src/game/director/gameplay_system_director.cpp.s
+
+src/game/director/presentation_system_director.obj: src/game/director/presentation_system_director.cpp.obj
+.PHONY : src/game/director/presentation_system_director.obj
+
+# target to build an object file
+src/game/director/presentation_system_director.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/presentation_system_director.cpp.obj
+.PHONY : src/game/director/presentation_system_director.cpp.obj
+
+src/game/director/presentation_system_director.i: src/game/director/presentation_system_director.cpp.i
+.PHONY : src/game/director/presentation_system_director.i
+
+# target to preprocess a source file
+src/game/director/presentation_system_director.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/presentation_system_director.cpp.i
+.PHONY : src/game/director/presentation_system_director.cpp.i
+
+src/game/director/presentation_system_director.s: src/game/director/presentation_system_director.cpp.s
+.PHONY : src/game/director/presentation_system_director.s
+
+# target to generate assembly for a file
+src/game/director/presentation_system_director.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/director/presentation_system_director.cpp.s
+.PHONY : src/game/director/presentation_system_director.cpp.s
+
+src/game/ending_director.obj: src/game/ending_director.cpp.obj
+.PHONY : src/game/ending_director.obj
+
+# target to build an object file
+src/game/ending_director.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/ending_director.cpp.obj
+.PHONY : src/game/ending_director.cpp.obj
+
+src/game/ending_director.i: src/game/ending_director.cpp.i
+.PHONY : src/game/ending_director.i
+
+# target to preprocess a source file
+src/game/ending_director.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/ending_director.cpp.i
+.PHONY : src/game/ending_director.cpp.i
+
+src/game/ending_director.s: src/game/ending_director.cpp.s
+.PHONY : src/game/ending_director.s
+
+# target to generate assembly for a file
+src/game/ending_director.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/ending_director.cpp.s
+.PHONY : src/game/ending_director.cpp.s
+
 src/game/entities/ai.obj: src/game/entities/ai.cpp.obj
 .PHONY : src/game/entities/ai.obj
 
@@ -343,6 +799,54 @@ src/game/entities/boss.s: src/game/entities/boss.cpp.s
 src/game/entities/boss.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/entities/boss.cpp.s
 .PHONY : src/game/entities/boss.cpp.s
+
+src/game/entities/combat_stats.obj: src/game/entities/combat_stats.cpp.obj
+.PHONY : src/game/entities/combat_stats.obj
+
+# target to build an object file
+src/game/entities/combat_stats.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/entities/combat_stats.cpp.obj
+.PHONY : src/game/entities/combat_stats.cpp.obj
+
+src/game/entities/combat_stats.i: src/game/entities/combat_stats.cpp.i
+.PHONY : src/game/entities/combat_stats.i
+
+# target to preprocess a source file
+src/game/entities/combat_stats.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/entities/combat_stats.cpp.i
+.PHONY : src/game/entities/combat_stats.cpp.i
+
+src/game/entities/combat_stats.s: src/game/entities/combat_stats.cpp.s
+.PHONY : src/game/entities/combat_stats.s
+
+# target to generate assembly for a file
+src/game/entities/combat_stats.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/entities/combat_stats.cpp.s
+.PHONY : src/game/entities/combat_stats.cpp.s
+
+src/game/entities/entity.obj: src/game/entities/entity.cpp.obj
+.PHONY : src/game/entities/entity.obj
+
+# target to build an object file
+src/game/entities/entity.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/entities/entity.cpp.obj
+.PHONY : src/game/entities/entity.cpp.obj
+
+src/game/entities/entity.i: src/game/entities/entity.cpp.i
+.PHONY : src/game/entities/entity.i
+
+# target to preprocess a source file
+src/game/entities/entity.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/entities/entity.cpp.i
+.PHONY : src/game/entities/entity.cpp.i
+
+src/game/entities/entity.s: src/game/entities/entity.cpp.s
+.PHONY : src/game/entities/entity.s
+
+# target to generate assembly for a file
+src/game/entities/entity.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/entities/entity.cpp.s
+.PHONY : src/game/entities/entity.cpp.s
 
 src/game/entities/inventory.obj: src/game/entities/inventory.cpp.obj
 .PHONY : src/game/entities/inventory.obj
@@ -464,6 +968,102 @@ src/game/entities/skill.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/entities/skill.cpp.s
 .PHONY : src/game/entities/skill.cpp.s
 
+src/game/meta_progression.obj: src/game/meta_progression.cpp.obj
+.PHONY : src/game/meta_progression.obj
+
+# target to build an object file
+src/game/meta_progression.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/meta_progression.cpp.obj
+.PHONY : src/game/meta_progression.cpp.obj
+
+src/game/meta_progression.i: src/game/meta_progression.cpp.i
+.PHONY : src/game/meta_progression.i
+
+# target to preprocess a source file
+src/game/meta_progression.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/meta_progression.cpp.i
+.PHONY : src/game/meta_progression.cpp.i
+
+src/game/meta_progression.s: src/game/meta_progression.cpp.s
+.PHONY : src/game/meta_progression.s
+
+# target to generate assembly for a file
+src/game/meta_progression.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/meta_progression.cpp.s
+.PHONY : src/game/meta_progression.cpp.s
+
+src/game/player_controller.obj: src/game/player_controller.cpp.obj
+.PHONY : src/game/player_controller.obj
+
+# target to build an object file
+src/game/player_controller.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/player_controller.cpp.obj
+.PHONY : src/game/player_controller.cpp.obj
+
+src/game/player_controller.i: src/game/player_controller.cpp.i
+.PHONY : src/game/player_controller.i
+
+# target to preprocess a source file
+src/game/player_controller.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/player_controller.cpp.i
+.PHONY : src/game/player_controller.cpp.i
+
+src/game/player_controller.s: src/game/player_controller.cpp.s
+.PHONY : src/game/player_controller.s
+
+# target to generate assembly for a file
+src/game/player_controller.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/player_controller.cpp.s
+.PHONY : src/game/player_controller.cpp.s
+
+src/game/relic_progression.obj: src/game/relic_progression.cpp.obj
+.PHONY : src/game/relic_progression.obj
+
+# target to build an object file
+src/game/relic_progression.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/relic_progression.cpp.obj
+.PHONY : src/game/relic_progression.cpp.obj
+
+src/game/relic_progression.i: src/game/relic_progression.cpp.i
+.PHONY : src/game/relic_progression.i
+
+# target to preprocess a source file
+src/game/relic_progression.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/relic_progression.cpp.i
+.PHONY : src/game/relic_progression.cpp.i
+
+src/game/relic_progression.s: src/game/relic_progression.cpp.s
+.PHONY : src/game/relic_progression.s
+
+# target to generate assembly for a file
+src/game/relic_progression.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/relic_progression.cpp.s
+.PHONY : src/game/relic_progression.cpp.s
+
+src/game/resources/resource_manager.obj: src/game/resources/resource_manager.cpp.obj
+.PHONY : src/game/resources/resource_manager.obj
+
+# target to build an object file
+src/game/resources/resource_manager.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/resources/resource_manager.cpp.obj
+.PHONY : src/game/resources/resource_manager.cpp.obj
+
+src/game/resources/resource_manager.i: src/game/resources/resource_manager.cpp.i
+.PHONY : src/game/resources/resource_manager.i
+
+# target to preprocess a source file
+src/game/resources/resource_manager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/resources/resource_manager.cpp.i
+.PHONY : src/game/resources/resource_manager.cpp.i
+
+src/game/resources/resource_manager.s: src/game/resources/resource_manager.cpp.s
+.PHONY : src/game/resources/resource_manager.s
+
+# target to generate assembly for a file
+src/game/resources/resource_manager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/resources/resource_manager.cpp.s
+.PHONY : src/game/resources/resource_manager.cpp.s
+
 src/game/save/save_manager.obj: src/game/save/save_manager.cpp.obj
 .PHONY : src/game/save/save_manager.obj
 
@@ -487,6 +1087,102 @@ src/game/save/save_manager.s: src/game/save/save_manager.cpp.s
 src/game/save/save_manager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/save/save_manager.cpp.s
 .PHONY : src/game/save/save_manager.cpp.s
+
+src/game/scene/game_scene_combat.obj: src/game/scene/game_scene_combat.cpp.obj
+.PHONY : src/game/scene/game_scene_combat.obj
+
+# target to build an object file
+src/game/scene/game_scene_combat.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_combat.cpp.obj
+.PHONY : src/game/scene/game_scene_combat.cpp.obj
+
+src/game/scene/game_scene_combat.i: src/game/scene/game_scene_combat.cpp.i
+.PHONY : src/game/scene/game_scene_combat.i
+
+# target to preprocess a source file
+src/game/scene/game_scene_combat.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_combat.cpp.i
+.PHONY : src/game/scene/game_scene_combat.cpp.i
+
+src/game/scene/game_scene_combat.s: src/game/scene/game_scene_combat.cpp.s
+.PHONY : src/game/scene/game_scene_combat.s
+
+# target to generate assembly for a file
+src/game/scene/game_scene_combat.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_combat.cpp.s
+.PHONY : src/game/scene/game_scene_combat.cpp.s
+
+src/game/scene/game_scene_input.obj: src/game/scene/game_scene_input.cpp.obj
+.PHONY : src/game/scene/game_scene_input.obj
+
+# target to build an object file
+src/game/scene/game_scene_input.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_input.cpp.obj
+.PHONY : src/game/scene/game_scene_input.cpp.obj
+
+src/game/scene/game_scene_input.i: src/game/scene/game_scene_input.cpp.i
+.PHONY : src/game/scene/game_scene_input.i
+
+# target to preprocess a source file
+src/game/scene/game_scene_input.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_input.cpp.i
+.PHONY : src/game/scene/game_scene_input.cpp.i
+
+src/game/scene/game_scene_input.s: src/game/scene/game_scene_input.cpp.s
+.PHONY : src/game/scene/game_scene_input.s
+
+# target to generate assembly for a file
+src/game/scene/game_scene_input.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_input.cpp.s
+.PHONY : src/game/scene/game_scene_input.cpp.s
+
+src/game/scene/game_scene_interaction.obj: src/game/scene/game_scene_interaction.cpp.obj
+.PHONY : src/game/scene/game_scene_interaction.obj
+
+# target to build an object file
+src/game/scene/game_scene_interaction.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_interaction.cpp.obj
+.PHONY : src/game/scene/game_scene_interaction.cpp.obj
+
+src/game/scene/game_scene_interaction.i: src/game/scene/game_scene_interaction.cpp.i
+.PHONY : src/game/scene/game_scene_interaction.i
+
+# target to preprocess a source file
+src/game/scene/game_scene_interaction.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_interaction.cpp.i
+.PHONY : src/game/scene/game_scene_interaction.cpp.i
+
+src/game/scene/game_scene_interaction.s: src/game/scene/game_scene_interaction.cpp.s
+.PHONY : src/game/scene/game_scene_interaction.s
+
+# target to generate assembly for a file
+src/game/scene/game_scene_interaction.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scene/game_scene_interaction.cpp.s
+.PHONY : src/game/scene/game_scene_interaction.cpp.s
+
+src/game/scenes/credits_scene.obj: src/game/scenes/credits_scene.cpp.obj
+.PHONY : src/game/scenes/credits_scene.obj
+
+# target to build an object file
+src/game/scenes/credits_scene.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scenes/credits_scene.cpp.obj
+.PHONY : src/game/scenes/credits_scene.cpp.obj
+
+src/game/scenes/credits_scene.i: src/game/scenes/credits_scene.cpp.i
+.PHONY : src/game/scenes/credits_scene.i
+
+# target to preprocess a source file
+src/game/scenes/credits_scene.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scenes/credits_scene.cpp.i
+.PHONY : src/game/scenes/credits_scene.cpp.i
+
+src/game/scenes/credits_scene.s: src/game/scenes/credits_scene.cpp.s
+.PHONY : src/game/scenes/credits_scene.s
+
+# target to generate assembly for a file
+src/game/scenes/credits_scene.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scenes/credits_scene.cpp.s
+.PHONY : src/game/scenes/credits_scene.cpp.s
 
 src/game/scenes/death_scene.obj: src/game/scenes/death_scene.cpp.obj
 .PHONY : src/game/scenes/death_scene.obj
@@ -632,6 +1328,54 @@ src/game/scenes/victory_scene.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/scenes/victory_scene.cpp.s
 .PHONY : src/game/scenes/victory_scene.cpp.s
 
+src/game/systems/attack_evolution.obj: src/game/systems/attack_evolution.cpp.obj
+.PHONY : src/game/systems/attack_evolution.obj
+
+# target to build an object file
+src/game/systems/attack_evolution.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/attack_evolution.cpp.obj
+.PHONY : src/game/systems/attack_evolution.cpp.obj
+
+src/game/systems/attack_evolution.i: src/game/systems/attack_evolution.cpp.i
+.PHONY : src/game/systems/attack_evolution.i
+
+# target to preprocess a source file
+src/game/systems/attack_evolution.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/attack_evolution.cpp.i
+.PHONY : src/game/systems/attack_evolution.cpp.i
+
+src/game/systems/attack_evolution.s: src/game/systems/attack_evolution.cpp.s
+.PHONY : src/game/systems/attack_evolution.s
+
+# target to generate assembly for a file
+src/game/systems/attack_evolution.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/attack_evolution.cpp.s
+.PHONY : src/game/systems/attack_evolution.cpp.s
+
+src/game/systems/combat_coordinator.obj: src/game/systems/combat_coordinator.cpp.obj
+.PHONY : src/game/systems/combat_coordinator.obj
+
+# target to build an object file
+src/game/systems/combat_coordinator.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/combat_coordinator.cpp.obj
+.PHONY : src/game/systems/combat_coordinator.cpp.obj
+
+src/game/systems/combat_coordinator.i: src/game/systems/combat_coordinator.cpp.i
+.PHONY : src/game/systems/combat_coordinator.i
+
+# target to preprocess a source file
+src/game/systems/combat_coordinator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/combat_coordinator.cpp.i
+.PHONY : src/game/systems/combat_coordinator.cpp.i
+
+src/game/systems/combat_coordinator.s: src/game/systems/combat_coordinator.cpp.s
+.PHONY : src/game/systems/combat_coordinator.s
+
+# target to generate assembly for a file
+src/game/systems/combat_coordinator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/combat_coordinator.cpp.s
+.PHONY : src/game/systems/combat_coordinator.cpp.s
+
 src/game/systems/combat_system.obj: src/game/systems/combat_system.cpp.obj
 .PHONY : src/game/systems/combat_system.obj
 
@@ -655,6 +1399,102 @@ src/game/systems/combat_system.s: src/game/systems/combat_system.cpp.s
 src/game/systems/combat_system.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/combat_system.cpp.s
 .PHONY : src/game/systems/combat_system.cpp.s
+
+src/game/systems/floor_manager.obj: src/game/systems/floor_manager.cpp.obj
+.PHONY : src/game/systems/floor_manager.obj
+
+# target to build an object file
+src/game/systems/floor_manager.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/floor_manager.cpp.obj
+.PHONY : src/game/systems/floor_manager.cpp.obj
+
+src/game/systems/floor_manager.i: src/game/systems/floor_manager.cpp.i
+.PHONY : src/game/systems/floor_manager.i
+
+# target to preprocess a source file
+src/game/systems/floor_manager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/floor_manager.cpp.i
+.PHONY : src/game/systems/floor_manager.cpp.i
+
+src/game/systems/floor_manager.s: src/game/systems/floor_manager.cpp.s
+.PHONY : src/game/systems/floor_manager.s
+
+# target to generate assembly for a file
+src/game/systems/floor_manager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/floor_manager.cpp.s
+.PHONY : src/game/systems/floor_manager.cpp.s
+
+src/game/systems/game_renderer.obj: src/game/systems/game_renderer.cpp.obj
+.PHONY : src/game/systems/game_renderer.obj
+
+# target to build an object file
+src/game/systems/game_renderer.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/game_renderer.cpp.obj
+.PHONY : src/game/systems/game_renderer.cpp.obj
+
+src/game/systems/game_renderer.i: src/game/systems/game_renderer.cpp.i
+.PHONY : src/game/systems/game_renderer.i
+
+# target to preprocess a source file
+src/game/systems/game_renderer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/game_renderer.cpp.i
+.PHONY : src/game/systems/game_renderer.cpp.i
+
+src/game/systems/game_renderer.s: src/game/systems/game_renderer.cpp.s
+.PHONY : src/game/systems/game_renderer.s
+
+# target to generate assembly for a file
+src/game/systems/game_renderer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/game_renderer.cpp.s
+.PHONY : src/game/systems/game_renderer.cpp.s
+
+src/game/systems/interaction_handler.obj: src/game/systems/interaction_handler.cpp.obj
+.PHONY : src/game/systems/interaction_handler.obj
+
+# target to build an object file
+src/game/systems/interaction_handler.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/interaction_handler.cpp.obj
+.PHONY : src/game/systems/interaction_handler.cpp.obj
+
+src/game/systems/interaction_handler.i: src/game/systems/interaction_handler.cpp.i
+.PHONY : src/game/systems/interaction_handler.i
+
+# target to preprocess a source file
+src/game/systems/interaction_handler.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/interaction_handler.cpp.i
+.PHONY : src/game/systems/interaction_handler.cpp.i
+
+src/game/systems/interaction_handler.s: src/game/systems/interaction_handler.cpp.s
+.PHONY : src/game/systems/interaction_handler.s
+
+# target to generate assembly for a file
+src/game/systems/interaction_handler.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/interaction_handler.cpp.s
+.PHONY : src/game/systems/interaction_handler.cpp.s
+
+src/game/systems/skill_evolution.obj: src/game/systems/skill_evolution.cpp.obj
+.PHONY : src/game/systems/skill_evolution.obj
+
+# target to build an object file
+src/game/systems/skill_evolution.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/skill_evolution.cpp.obj
+.PHONY : src/game/systems/skill_evolution.cpp.obj
+
+src/game/systems/skill_evolution.i: src/game/systems/skill_evolution.cpp.i
+.PHONY : src/game/systems/skill_evolution.i
+
+# target to preprocess a source file
+src/game/systems/skill_evolution.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/skill_evolution.cpp.i
+.PHONY : src/game/systems/skill_evolution.cpp.i
+
+src/game/systems/skill_evolution.s: src/game/systems/skill_evolution.cpp.s
+.PHONY : src/game/systems/skill_evolution.s
+
+# target to generate assembly for a file
+src/game/systems/skill_evolution.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/systems/skill_evolution.cpp.s
+.PHONY : src/game/systems/skill_evolution.cpp.s
 
 src/game/systems/vfx_server.obj: src/game/systems/vfx_server.cpp.obj
 .PHONY : src/game/systems/vfx_server.obj
@@ -728,6 +1568,102 @@ src/game/world/dungeon_generator.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/dungeon_generator.cpp.s
 .PHONY : src/game/world/dungeon_generator.cpp.s
 
+src/game/world/event_system.obj: src/game/world/event_system.cpp.obj
+.PHONY : src/game/world/event_system.obj
+
+# target to build an object file
+src/game/world/event_system.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/event_system.cpp.obj
+.PHONY : src/game/world/event_system.cpp.obj
+
+src/game/world/event_system.i: src/game/world/event_system.cpp.i
+.PHONY : src/game/world/event_system.i
+
+# target to preprocess a source file
+src/game/world/event_system.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/event_system.cpp.i
+.PHONY : src/game/world/event_system.cpp.i
+
+src/game/world/event_system.s: src/game/world/event_system.cpp.s
+.PHONY : src/game/world/event_system.s
+
+# target to generate assembly for a file
+src/game/world/event_system.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/event_system.cpp.s
+.PHONY : src/game/world/event_system.cpp.s
+
+src/game/world/floor_config.obj: src/game/world/floor_config.cpp.obj
+.PHONY : src/game/world/floor_config.obj
+
+# target to build an object file
+src/game/world/floor_config.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/floor_config.cpp.obj
+.PHONY : src/game/world/floor_config.cpp.obj
+
+src/game/world/floor_config.i: src/game/world/floor_config.cpp.i
+.PHONY : src/game/world/floor_config.i
+
+# target to preprocess a source file
+src/game/world/floor_config.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/floor_config.cpp.i
+.PHONY : src/game/world/floor_config.cpp.i
+
+src/game/world/floor_config.s: src/game/world/floor_config.cpp.s
+.PHONY : src/game/world/floor_config.s
+
+# target to generate assembly for a file
+src/game/world/floor_config.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/floor_config.cpp.s
+.PHONY : src/game/world/floor_config.cpp.s
+
+src/game/world/floor_narrative.obj: src/game/world/floor_narrative.cpp.obj
+.PHONY : src/game/world/floor_narrative.obj
+
+# target to build an object file
+src/game/world/floor_narrative.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/floor_narrative.cpp.obj
+.PHONY : src/game/world/floor_narrative.cpp.obj
+
+src/game/world/floor_narrative.i: src/game/world/floor_narrative.cpp.i
+.PHONY : src/game/world/floor_narrative.i
+
+# target to preprocess a source file
+src/game/world/floor_narrative.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/floor_narrative.cpp.i
+.PHONY : src/game/world/floor_narrative.cpp.i
+
+src/game/world/floor_narrative.s: src/game/world/floor_narrative.cpp.s
+.PHONY : src/game/world/floor_narrative.s
+
+# target to generate assembly for a file
+src/game/world/floor_narrative.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/floor_narrative.cpp.s
+.PHONY : src/game/world/floor_narrative.cpp.s
+
+src/game/world/flow_director.obj: src/game/world/flow_director.cpp.obj
+.PHONY : src/game/world/flow_director.obj
+
+# target to build an object file
+src/game/world/flow_director.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/flow_director.cpp.obj
+.PHONY : src/game/world/flow_director.cpp.obj
+
+src/game/world/flow_director.i: src/game/world/flow_director.cpp.i
+.PHONY : src/game/world/flow_director.i
+
+# target to preprocess a source file
+src/game/world/flow_director.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/flow_director.cpp.i
+.PHONY : src/game/world/flow_director.cpp.i
+
+src/game/world/flow_director.s: src/game/world/flow_director.cpp.s
+.PHONY : src/game/world/flow_director.s
+
+# target to generate assembly for a file
+src/game/world/flow_director.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/flow_director.cpp.s
+.PHONY : src/game/world/flow_director.cpp.s
+
 src/game/world/game_map.obj: src/game/world/game_map.cpp.obj
 .PHONY : src/game/world/game_map.obj
 
@@ -751,6 +1687,174 @@ src/game/world/game_map.s: src/game/world/game_map.cpp.s
 src/game/world/game_map.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/game_map.cpp.s
 .PHONY : src/game/world/game_map.cpp.s
+
+src/game/world/growth_curve.obj: src/game/world/growth_curve.cpp.obj
+.PHONY : src/game/world/growth_curve.obj
+
+# target to build an object file
+src/game/world/growth_curve.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/growth_curve.cpp.obj
+.PHONY : src/game/world/growth_curve.cpp.obj
+
+src/game/world/growth_curve.i: src/game/world/growth_curve.cpp.i
+.PHONY : src/game/world/growth_curve.i
+
+# target to preprocess a source file
+src/game/world/growth_curve.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/growth_curve.cpp.i
+.PHONY : src/game/world/growth_curve.cpp.i
+
+src/game/world/growth_curve.s: src/game/world/growth_curve.cpp.s
+.PHONY : src/game/world/growth_curve.s
+
+# target to generate assembly for a file
+src/game/world/growth_curve.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/growth_curve.cpp.s
+.PHONY : src/game/world/growth_curve.cpp.s
+
+src/game/world/npc_system.obj: src/game/world/npc_system.cpp.obj
+.PHONY : src/game/world/npc_system.obj
+
+# target to build an object file
+src/game/world/npc_system.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/npc_system.cpp.obj
+.PHONY : src/game/world/npc_system.cpp.obj
+
+src/game/world/npc_system.i: src/game/world/npc_system.cpp.i
+.PHONY : src/game/world/npc_system.i
+
+# target to preprocess a source file
+src/game/world/npc_system.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/npc_system.cpp.i
+.PHONY : src/game/world/npc_system.cpp.i
+
+src/game/world/npc_system.s: src/game/world/npc_system.cpp.s
+.PHONY : src/game/world/npc_system.s
+
+# target to generate assembly for a file
+src/game/world/npc_system.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/npc_system.cpp.s
+.PHONY : src/game/world/npc_system.cpp.s
+
+src/game/world/quest_manager.obj: src/game/world/quest_manager.cpp.obj
+.PHONY : src/game/world/quest_manager.obj
+
+# target to build an object file
+src/game/world/quest_manager.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/quest_manager.cpp.obj
+.PHONY : src/game/world/quest_manager.cpp.obj
+
+src/game/world/quest_manager.i: src/game/world/quest_manager.cpp.i
+.PHONY : src/game/world/quest_manager.i
+
+# target to preprocess a source file
+src/game/world/quest_manager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/quest_manager.cpp.i
+.PHONY : src/game/world/quest_manager.cpp.i
+
+src/game/world/quest_manager.s: src/game/world/quest_manager.cpp.s
+.PHONY : src/game/world/quest_manager.s
+
+# target to generate assembly for a file
+src/game/world/quest_manager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/quest_manager.cpp.s
+.PHONY : src/game/world/quest_manager.cpp.s
+
+src/game/world/relationship_system.obj: src/game/world/relationship_system.cpp.obj
+.PHONY : src/game/world/relationship_system.obj
+
+# target to build an object file
+src/game/world/relationship_system.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/relationship_system.cpp.obj
+.PHONY : src/game/world/relationship_system.cpp.obj
+
+src/game/world/relationship_system.i: src/game/world/relationship_system.cpp.i
+.PHONY : src/game/world/relationship_system.i
+
+# target to preprocess a source file
+src/game/world/relationship_system.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/relationship_system.cpp.i
+.PHONY : src/game/world/relationship_system.cpp.i
+
+src/game/world/relationship_system.s: src/game/world/relationship_system.cpp.s
+.PHONY : src/game/world/relationship_system.s
+
+# target to generate assembly for a file
+src/game/world/relationship_system.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/relationship_system.cpp.s
+.PHONY : src/game/world/relationship_system.cpp.s
+
+src/game/world/special_room.obj: src/game/world/special_room.cpp.obj
+.PHONY : src/game/world/special_room.obj
+
+# target to build an object file
+src/game/world/special_room.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/special_room.cpp.obj
+.PHONY : src/game/world/special_room.cpp.obj
+
+src/game/world/special_room.i: src/game/world/special_room.cpp.i
+.PHONY : src/game/world/special_room.i
+
+# target to preprocess a source file
+src/game/world/special_room.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/special_room.cpp.i
+.PHONY : src/game/world/special_room.cpp.i
+
+src/game/world/special_room.s: src/game/world/special_room.cpp.s
+.PHONY : src/game/world/special_room.s
+
+# target to generate assembly for a file
+src/game/world/special_room.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/special_room.cpp.s
+.PHONY : src/game/world/special_room.cpp.s
+
+src/game/world/world_reaction.obj: src/game/world/world_reaction.cpp.obj
+.PHONY : src/game/world/world_reaction.obj
+
+# target to build an object file
+src/game/world/world_reaction.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/world_reaction.cpp.obj
+.PHONY : src/game/world/world_reaction.cpp.obj
+
+src/game/world/world_reaction.i: src/game/world/world_reaction.cpp.i
+.PHONY : src/game/world/world_reaction.i
+
+# target to preprocess a source file
+src/game/world/world_reaction.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/world_reaction.cpp.i
+.PHONY : src/game/world/world_reaction.cpp.i
+
+src/game/world/world_reaction.s: src/game/world/world_reaction.cpp.s
+.PHONY : src/game/world/world_reaction.s
+
+# target to generate assembly for a file
+src/game/world/world_reaction.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/world_reaction.cpp.s
+.PHONY : src/game/world/world_reaction.cpp.s
+
+src/game/world/world_state.obj: src/game/world/world_state.cpp.obj
+.PHONY : src/game/world/world_state.obj
+
+# target to build an object file
+src/game/world/world_state.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/world_state.cpp.obj
+.PHONY : src/game/world/world_state.cpp.obj
+
+src/game/world/world_state.i: src/game/world/world_state.cpp.i
+.PHONY : src/game/world/world_state.i
+
+# target to preprocess a source file
+src/game/world/world_state.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/world_state.cpp.i
+.PHONY : src/game/world/world_state.cpp.i
+
+src/game/world/world_state.s: src/game/world/world_state.cpp.s
+.PHONY : src/game/world/world_state.s
+
+# target to generate assembly for a file
+src/game/world/world_state.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\roguelike_cpp.dir\build.make CMakeFiles/roguelike_cpp.dir/src/game/world/world_state.cpp.s
+.PHONY : src/game/world/world_state.cpp.s
 
 src/main.obj: src/main.cpp.obj
 .PHONY : src/main.obj
@@ -785,6 +1889,12 @@ help:
 	@echo ... edit_cache
 	@echo ... rebuild_cache
 	@echo ... roguelike_cpp
+	@echo ... src/core/input_map.obj
+	@echo ... src/core/input_map.i
+	@echo ... src/core/input_map.s
+	@echo ... src/core/logger.obj
+	@echo ... src/core/logger.i
+	@echo ... src/core/logger.s
 	@echo ... src/core/node.obj
 	@echo ... src/core/node.i
 	@echo ... src/core/node.s
@@ -806,12 +1916,69 @@ help:
 	@echo ... src/game/audio/wave_synth.obj
 	@echo ... src/game/audio/wave_synth.i
 	@echo ... src/game/audio/wave_synth.s
+	@echo ... src/game/boss/arena_manager.obj
+	@echo ... src/game/boss/arena_manager.i
+	@echo ... src/game/boss/arena_manager.s
+	@echo ... src/game/boss/boss_behavior.obj
+	@echo ... src/game/boss/boss_behavior.i
+	@echo ... src/game/boss/boss_behavior.s
+	@echo ... src/game/boss/boss_cinematic.obj
+	@echo ... src/game/boss/boss_cinematic.i
+	@echo ... src/game/boss/boss_cinematic.s
+	@echo ... src/game/boss/boss_command.obj
+	@echo ... src/game/boss/boss_command.i
+	@echo ... src/game/boss/boss_command.s
+	@echo ... src/game/boss/boss_encounter.obj
+	@echo ... src/game/boss/boss_encounter.i
+	@echo ... src/game/boss/boss_encounter.s
+	@echo ... src/game/boss/boss_evolution.obj
+	@echo ... src/game/boss/boss_evolution.i
+	@echo ... src/game/boss/boss_evolution.s
+	@echo ... src/game/boss/boss_narrative.obj
+	@echo ... src/game/boss/boss_narrative.i
+	@echo ... src/game/boss/boss_narrative.s
+	@echo ... src/game/boss/boss_replay.obj
+	@echo ... src/game/boss/boss_replay.i
+	@echo ... src/game/boss/boss_replay.s
+	@echo ... src/game/boss/boss_timeline.obj
+	@echo ... src/game/boss/boss_timeline.i
+	@echo ... src/game/boss/boss_timeline.s
+	@echo ... src/game/build_score.obj
+	@echo ... src/game/build_score.i
+	@echo ... src/game/build_score.s
+	@echo ... src/game/config.obj
+	@echo ... src/game/config.i
+	@echo ... src/game/config.s
+	@echo ... src/game/core/event_bus.obj
+	@echo ... src/game/core/event_bus.i
+	@echo ... src/game/core/event_bus.s
+	@echo ... src/game/director/boss_system_director.obj
+	@echo ... src/game/director/boss_system_director.i
+	@echo ... src/game/director/boss_system_director.s
+	@echo ... src/game/director/game_flow_director.obj
+	@echo ... src/game/director/game_flow_director.i
+	@echo ... src/game/director/game_flow_director.s
+	@echo ... src/game/director/gameplay_system_director.obj
+	@echo ... src/game/director/gameplay_system_director.i
+	@echo ... src/game/director/gameplay_system_director.s
+	@echo ... src/game/director/presentation_system_director.obj
+	@echo ... src/game/director/presentation_system_director.i
+	@echo ... src/game/director/presentation_system_director.s
+	@echo ... src/game/ending_director.obj
+	@echo ... src/game/ending_director.i
+	@echo ... src/game/ending_director.s
 	@echo ... src/game/entities/ai.obj
 	@echo ... src/game/entities/ai.i
 	@echo ... src/game/entities/ai.s
 	@echo ... src/game/entities/boss.obj
 	@echo ... src/game/entities/boss.i
 	@echo ... src/game/entities/boss.s
+	@echo ... src/game/entities/combat_stats.obj
+	@echo ... src/game/entities/combat_stats.i
+	@echo ... src/game/entities/combat_stats.s
+	@echo ... src/game/entities/entity.obj
+	@echo ... src/game/entities/entity.i
+	@echo ... src/game/entities/entity.s
 	@echo ... src/game/entities/inventory.obj
 	@echo ... src/game/entities/inventory.i
 	@echo ... src/game/entities/inventory.s
@@ -827,9 +1994,33 @@ help:
 	@echo ... src/game/entities/skill.obj
 	@echo ... src/game/entities/skill.i
 	@echo ... src/game/entities/skill.s
+	@echo ... src/game/meta_progression.obj
+	@echo ... src/game/meta_progression.i
+	@echo ... src/game/meta_progression.s
+	@echo ... src/game/player_controller.obj
+	@echo ... src/game/player_controller.i
+	@echo ... src/game/player_controller.s
+	@echo ... src/game/relic_progression.obj
+	@echo ... src/game/relic_progression.i
+	@echo ... src/game/relic_progression.s
+	@echo ... src/game/resources/resource_manager.obj
+	@echo ... src/game/resources/resource_manager.i
+	@echo ... src/game/resources/resource_manager.s
 	@echo ... src/game/save/save_manager.obj
 	@echo ... src/game/save/save_manager.i
 	@echo ... src/game/save/save_manager.s
+	@echo ... src/game/scene/game_scene_combat.obj
+	@echo ... src/game/scene/game_scene_combat.i
+	@echo ... src/game/scene/game_scene_combat.s
+	@echo ... src/game/scene/game_scene_input.obj
+	@echo ... src/game/scene/game_scene_input.i
+	@echo ... src/game/scene/game_scene_input.s
+	@echo ... src/game/scene/game_scene_interaction.obj
+	@echo ... src/game/scene/game_scene_interaction.i
+	@echo ... src/game/scene/game_scene_interaction.s
+	@echo ... src/game/scenes/credits_scene.obj
+	@echo ... src/game/scenes/credits_scene.i
+	@echo ... src/game/scenes/credits_scene.s
 	@echo ... src/game/scenes/death_scene.obj
 	@echo ... src/game/scenes/death_scene.i
 	@echo ... src/game/scenes/death_scene.s
@@ -848,9 +2039,27 @@ help:
 	@echo ... src/game/scenes/victory_scene.obj
 	@echo ... src/game/scenes/victory_scene.i
 	@echo ... src/game/scenes/victory_scene.s
+	@echo ... src/game/systems/attack_evolution.obj
+	@echo ... src/game/systems/attack_evolution.i
+	@echo ... src/game/systems/attack_evolution.s
+	@echo ... src/game/systems/combat_coordinator.obj
+	@echo ... src/game/systems/combat_coordinator.i
+	@echo ... src/game/systems/combat_coordinator.s
 	@echo ... src/game/systems/combat_system.obj
 	@echo ... src/game/systems/combat_system.i
 	@echo ... src/game/systems/combat_system.s
+	@echo ... src/game/systems/floor_manager.obj
+	@echo ... src/game/systems/floor_manager.i
+	@echo ... src/game/systems/floor_manager.s
+	@echo ... src/game/systems/game_renderer.obj
+	@echo ... src/game/systems/game_renderer.i
+	@echo ... src/game/systems/game_renderer.s
+	@echo ... src/game/systems/interaction_handler.obj
+	@echo ... src/game/systems/interaction_handler.i
+	@echo ... src/game/systems/interaction_handler.s
+	@echo ... src/game/systems/skill_evolution.obj
+	@echo ... src/game/systems/skill_evolution.i
+	@echo ... src/game/systems/skill_evolution.s
 	@echo ... src/game/systems/vfx_server.obj
 	@echo ... src/game/systems/vfx_server.i
 	@echo ... src/game/systems/vfx_server.s
@@ -860,9 +2069,42 @@ help:
 	@echo ... src/game/world/dungeon_generator.obj
 	@echo ... src/game/world/dungeon_generator.i
 	@echo ... src/game/world/dungeon_generator.s
+	@echo ... src/game/world/event_system.obj
+	@echo ... src/game/world/event_system.i
+	@echo ... src/game/world/event_system.s
+	@echo ... src/game/world/floor_config.obj
+	@echo ... src/game/world/floor_config.i
+	@echo ... src/game/world/floor_config.s
+	@echo ... src/game/world/floor_narrative.obj
+	@echo ... src/game/world/floor_narrative.i
+	@echo ... src/game/world/floor_narrative.s
+	@echo ... src/game/world/flow_director.obj
+	@echo ... src/game/world/flow_director.i
+	@echo ... src/game/world/flow_director.s
 	@echo ... src/game/world/game_map.obj
 	@echo ... src/game/world/game_map.i
 	@echo ... src/game/world/game_map.s
+	@echo ... src/game/world/growth_curve.obj
+	@echo ... src/game/world/growth_curve.i
+	@echo ... src/game/world/growth_curve.s
+	@echo ... src/game/world/npc_system.obj
+	@echo ... src/game/world/npc_system.i
+	@echo ... src/game/world/npc_system.s
+	@echo ... src/game/world/quest_manager.obj
+	@echo ... src/game/world/quest_manager.i
+	@echo ... src/game/world/quest_manager.s
+	@echo ... src/game/world/relationship_system.obj
+	@echo ... src/game/world/relationship_system.i
+	@echo ... src/game/world/relationship_system.s
+	@echo ... src/game/world/special_room.obj
+	@echo ... src/game/world/special_room.i
+	@echo ... src/game/world/special_room.s
+	@echo ... src/game/world/world_reaction.obj
+	@echo ... src/game/world/world_reaction.i
+	@echo ... src/game/world/world_reaction.s
+	@echo ... src/game/world/world_state.obj
+	@echo ... src/game/world/world_state.i
+	@echo ... src/game/world/world_state.s
 	@echo ... src/main.obj
 	@echo ... src/main.i
 	@echo ... src/main.s

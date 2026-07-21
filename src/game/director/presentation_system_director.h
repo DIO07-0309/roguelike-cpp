@@ -3,6 +3,63 @@
 #include <vector>
 #include "raylib.h"
 
+enum class BuildType : int;
+class VFXServer;
+
+// ═══════════════════════════════════════════════════════════════
+// G5.8.2: BuildTheme — per-Build Presentation identity
+// Single Source of Truth for all Camera/Audio/VFX/UI styling
+// ═══════════════════════════════════════════════════════════════
+
+// ── VFX Modifier (theme-driven primitive scaling) ──
+struct VFXModifier {
+    float particle_speed  = 1.0f;   // 1.0=normal, 0.7=slow(ice), 1.4=fast(lightning)
+    float explosion_scale = 1.0f;   // radius multiplier
+    float beam_width      = 1.0f;   // beam/bolt thickness
+    float ring_speed      = 1.0f;   // ring expansion rate
+    float spark_scale     = 1.0f;   // spark size multiplier
+    float lifetime_scale  = 1.0f;   // effect duration multiplier
+};
+
+// ── Camera Modifier (theme-driven camera behavior) ──
+struct CameraModifier {
+    float shake_scale   = 1.0f;   // 1.0=normal, 1.3=fire, 0.8=ice
+    float freeze_bonus  = 0.0f;   // extra freeze duration (seconds)
+    float zoom_offset   = 0.0f;   // -0.05=zoom out(shadow), +0.03=zoom in(berserker)
+    float dash_offset   = 0.0f;   // camera pull during player dash
+};
+
+// ── ScreenFX Modifier (post-process / overlay hints) ──
+struct ScreenFXModifier {
+    Color edge_tint{0, 0, 0, 0};     // screen edge color overlay (0 alpha = off)
+    Color hit_flash_tint{255, 255, 255, 200}; // hit flash color
+    float vignette_strength = 0.0f;  // 0=none, 0.3=shadow, 0.15=ice
+};
+
+// ── Audio Modifier (theme-driven audio hints) ──
+struct AudioModifier {
+    const char* hit_sfx    = "melee";    // "melee"|"slash"|"bolt"
+    const char* skill_sfx  = "bolt";     // skill cast sound
+    float pitch_shift = 0.0f;            // -0.1=deeper(fire), +0.05=higher(ice)
+    float reverb_mix  = 0.0f;            // 0=dry, 0.3=shadow
+};
+
+// ── Full Theme ──
+struct BuildTheme {
+    Color primary   {255, 200, 50, 255};
+    Color secondary {255, 180, 40, 220};
+    Color accent    {240, 140, 30, 200};
+    const char* name       = "neutral";
+    const char* vfx_preset = "";
+
+    VFXModifier    vfx;
+    CameraModifier camera;
+    ScreenFXModifier screen;
+    AudioModifier  audio;
+
+    static BuildTheme from_build_type(BuildType bt);
+};
+
 // ============================================================
 // D6 Step5: PresentationSystemDirector — 统一表现层状态管理
 // 组合模式: 持有 Shake/Freeze/DamageFloat/RoomMsg/Intro 所有状态
@@ -29,6 +86,22 @@ public:
     std::string room_msg;
     float room_msg_timer = 0.0f;
     void  show_message(const char* text, float duration = 2.5f);
+
+    // ── G5.8.2: Build Theme ──
+    void  set_build_theme(BuildType bt);
+    const BuildTheme& get_theme() const { return _theme; }
+    Color get_build_color() const { return _theme.primary; }  // backward compat
+    BuildTheme _theme;
+
+    // ── G5.8: Unified Presentation Framework ──
+    // 通过 VFXServer 生成特效, 调用方将 vfx.effects 复制到 active_effects
+    // 不修改 Skill::execute() / MonsterAI / BossAI
+    void emit_skill_vfx(VFXServer& vfx, const char* skill_id, float cx, float cy,
+                        int level, Direction dir, float tx = 0, float ty = 0, int extra = 0);
+    void emit_archetype_vfx(VFXServer& vfx, const char* archetype, float cx, float cy,
+                            float tx, float ty);
+    void emit_boss_phase2_vfx(VFXServer& vfx, const char* boss_id, float bx, float by,
+                               Color tint, float px = 0, float py = 0);
 
     // ── Boss Intro Text ──
     std::string boss_intro_text;

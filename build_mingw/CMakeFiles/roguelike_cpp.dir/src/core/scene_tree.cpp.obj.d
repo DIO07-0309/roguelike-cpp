@@ -199,6 +199,9 @@ CMakeFiles/roguelike_cpp.dir/src/core/scene_tree.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/pstl/glue_numeric_defs.h \
  C:/Demo/roguelike_cpp/src/game/systems/combat_system.h \
  C:/Demo/roguelike_cpp/src/game/entities/combat_stats.h \
+ C:/Demo/roguelike_cpp/src/game/types/combat_types.h \
+ C:/Demo/roguelike_cpp/src/game/build_tag.h \
+ C:/Demo/roguelike_cpp/src/game/systems/attack_evolution_state.h \
  C:\Demo\roguelike_cpp\src\core\logger.h \
  C:/mingw64/include/c++/15.2.0/ctime \
  C:/mingw64/include/c++/15.2.0/cstdarg \
@@ -211,4 +214,7 @@ CMakeFiles/roguelike_cpp.dir/src/core/scene_tree.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/error_constants.h \
  C:\Demo\roguelike_cpp\src\core\win_center.h \
  C:/Demo/roguelike_cpp/src/game/audio/audio_server.h \
- C:/Demo/roguelike_cpp/src/game/audio/bgm_engine.h
+ C:/Demo/roguelike_cpp/src/game/audio/bgm_engine.h \
+ C:/mingw64/include/c++/15.2.0/cstring \
+ C:/mingw64/x86_64-w64-mingw32/include/string.h \
+ C:/mingw64/x86_64-w64-mingw32/include/sec_api/string_s.h

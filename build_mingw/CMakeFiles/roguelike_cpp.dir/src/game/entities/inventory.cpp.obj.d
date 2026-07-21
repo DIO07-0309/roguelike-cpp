@@ -189,6 +189,9 @@ CMakeFiles/roguelike_cpp.dir/src/game/entities/inventory.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/bits/algorithmfwd.h \
  C:/mingw64/include/c++/15.2.0/bits/stl_heap.h \
  C:/mingw64/include/c++/15.2.0/pstl/glue_algorithm_defs.h \
+ C:/Demo/roguelike_cpp/src/game/types/combat_types.h \
+ C:/Demo/roguelike_cpp/src/game/build_tag.h \
  C:\Demo\roguelike_cpp\src\game\entities\player.h \
  C:\Demo\roguelike_cpp\src\game\entities\skill.h \
- C:/Demo/roguelike_cpp/src/core/input_map.h
+ C:/Demo/roguelike_cpp/src/core/input_map.h \
+ C:/Demo/roguelike_cpp/src/game/systems/attack_evolution_state.h

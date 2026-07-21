@@ -131,25 +131,19 @@ std::string CombatCoordinator::use_skill(int index, Player* player,
         if (is_heavy) audio->play_sfx("melee");
     }
 
-    // 技能 VFX (G3.2: _skill_id 替代 dynamic_cast)
+    // ── G5.8.5: Recipe-based VFX dispatch ──
     VFXServer vfx;
     float cx = player->entity.rect.x + player->entity.rect.width / 2;
     float cy = player->entity.rect.y + player->entity.rect.height / 2;
-    const std::string& sid_v = sk->_skill_id;
-    if (sid_v == "slash" || sid_v == "shadow_strike" || sid_v == "blood_frenzy") {
-        int lvl = is_heavy ? sk->level + 1 : sk->level;
-        vfx.slash_skill(cx, cy, player->direction, lvl);
-    } else if (sid_v == "fireball" || sid_v == "ice_nova" || sid_v == "chain_lightning") {
-        auto t = find_attack_target(player->entity.rect,
-            reinterpret_cast<const std::vector<Monster*>&>(monsters), 10.0f);
-        float tx = t ? t->entity.rect.x + t->entity.rect.width / 2 : cx + 100;
-        float ty = t ? t->entity.rect.y + t->entity.rect.height / 2 : cy;
-        vfx.fireball(cx, cy, tx, ty, is_heavy ? sk->level + 1 : sk->level);
-    } else if (sid_v == "self_heal") {
-        vfx.heal(cx, cy, sk->level);
-    } else if (sid_v == "summon_spirit") {
-        vfx.heal(cx, cy, 1);  // summon VFX — reuse heal ring
-    }
+
+    auto t = find_attack_target(player->entity.rect,
+        reinterpret_cast<const std::vector<Monster*>&>(monsters), 10.0f);
+    float tx = t ? t->entity.rect.x + t->entity.rect.width / 2 : cx + 100;
+    float ty = t ? t->entity.rect.y + t->entity.rect.height / 2 : cy;
+    int lvl = is_heavy ? sk->level + 1 : sk->level;
+
+    // G5.8.5: Route through recipe dispatcher — no per-skill if-else needed
+    vfx.play_recipe(sk->_skill_id.c_str(), cx, cy, player->direction, tx, ty, lvl);
     // D2: Heavy 额外特效环
     if (is_heavy) skill_heavy_vfx(player, sk->name, effects);
     for (auto& e : vfx.effects) effects.push_back(e);

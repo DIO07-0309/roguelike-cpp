@@ -153,6 +153,8 @@ CMakeFiles/roguelike_cpp.dir/src/game/systems/combat_system.cpp.obj: \
  C:/mingw64/include/c++/15.2.0/bits/stl_heap.h \
  C:/mingw64/include/c++/15.2.0/bits/stl_tempbuf.h \
  C:/mingw64/include/c++/15.2.0/pstl/glue_algorithm_defs.h \
+ C:/Demo/roguelike_cpp/src/game/types/combat_types.h \
+ C:/Demo/roguelike_cpp/src/game/build_tag.h \
  C:/Demo/roguelike_cpp/src/game/entities/player.h \
  C:/mingw64/include/c++/15.2.0/memory \
  C:/mingw64/include/c++/15.2.0/bits/stl_raw_storage_iter.h \
@@ -194,6 +196,7 @@ CMakeFiles/roguelike_cpp.dir/src/game/systems/combat_system.cpp.obj: \
  C:/Demo/roguelike_cpp/src/game/entities/item.h \
  C:/Demo/roguelike_cpp/src/game/entities/skill.h \
  C:/Demo/roguelike_cpp/src/core/input_map.h \
+ C:/Demo/roguelike_cpp/src/game/systems/attack_evolution_state.h \
  C:/Demo/roguelike_cpp/src/game/entities/monster.h \
  C:/Demo/roguelike_cpp/src/game/entities/ai.h \
  C:/Demo/roguelike_cpp/src/core/logger.h \
