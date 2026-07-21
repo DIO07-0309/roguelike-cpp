@@ -866,10 +866,72 @@ rlc:blood_charm,war_drum,plague_mask
 | G5.8.6 | Timeline: delay/duration/callback sequenced events + include() | ✅ |
 | G5.8.7 | Presentation Integration: PresentationEvent + dispatch() unified pipeline | ✅ |
 | G5.8.8 | Timeline Presentation: 12 recipes with staged delays → dramatic sequencing | ✅ |
+| G6.1 | Biome System: 3 biomes (Prison/Volcano/Abyss) + TilePalette + enemy_pool/boss_id + biome BGM routing | ✅ |
+| G6.2 | Landmark System: 9 biome landmarks (3 per biome) + SpecialRoomType.LANDMARK + DungeonGenerator landmark placement + per-biome JSON world files | ✅ |
+| G6.3 | Biome Hazards: 6 environmental hazards on landmark rooms (slow_zone/burn_tick/confuse/deflect) | ✅ |
+| G6.4 | Biome Events: 6 risk/reward events (25% floor trigger) + floor_config BGM biome routing | ✅ |
+| G6.5 | Encounter Framework: EncounterDef/Node/Choice + multi-round dialogue engine + trade nodes + 9 encounters (NPC/event) | ✅ |
+| G6.6 | Exploration: wall_interact secrets + SpecialRoomType.SECRET 30% placement + 3 secret encounters | ✅ |
+| G6.7 | Meta Progression: EncounterDef.conditions[] + pick_encounter_by_trigger() + biome-aware dungeon generation | ✅ |
 
 ---
 
-## G5 最终数据一览
+## G6 World Expansion (2026-07-21)
+
+### G6.1 Biome System
+
+15 层划分为 3 个主题 Biome，每个拥有独立瓦片色板、敌人池、Boss、BGM：
+
+| 楼层 | Biome | 瓦片色 | 敌人池 | Boss | BGM |
+|:---|:---|:---|:---|:---|:---|
+| 1–5 | Forgotten Prison | 暗紫灰石墙 | skeleton_archer/bone_soldier/slime/shadow_stalker | shadow_knight | prison |
+| 6–10 | Ash Volcano | 暗红暖色墙 | fire_imp/elite_orc/orc/charger | fire_demon | volcano |
+| 11–15 | Void Abyss | 深紫黑墙 | shadow_stalker/dark_mage/shadow_assassin/void_walker | demon_lord | abyss |
+
+**新增模块**：`biome.h/cpp` — `BiomeDef`/`TilePalette` + `load_biome_defs()` + `get_biome_for_floor()`
+**资源**：`resources/biomes.json` + `resources/world/{prison,volcano,abyss}.json`
+
+### G6.2 Landmark System
+
+每个 Biome 有 3 个地标房间，提供环境叙事。`SpecialRoomType.LANDMARK` — 复用现有房间系统，零继承。
+
+| Biome | Landmark | 图标 |
+|:---|:---|:---|
+| Prison | broken_cell / torture_chamber / collapsed_tunnel | ⚒ / † / ▼ |
+| Volcano | lava_rift / forge_ruins / fire_pillar | ≈ / ⚔ / ☀ |
+| Abyss | floating_altar / void_crack / ancient_gate | ◎ / ◆ / ☗ |
+
+**新增模块**：`landmark.h/cpp` — `LandmarkDef` + `get_landmarks_for_biome()`
+**修改**：`special_room.h` +`landmark_id`/`biome_id`；`dungeon_generator.cpp` 50% landmark placement
+
+### G6.3 Biome Hazards
+
+6 个环境机制挂载在 landmark 房间上：
+
+| Biome | Landmark | Hazard | 效果 |
+|:---|:---|:---|:---|
+| Prison | broken_cell | swinging_chains | slow_zone (每 2s) |
+| Prison | collapsed_tunnel | rockfall | burn_tick (每 4s, 3 dmg) |
+| Volcano | lava_rift | eruption | burn_tick (每 3s, 5 dmg) |
+| Volcano | fire_pillar | heat_wave | slow_zone (每 1.5s) |
+| Abyss | void_crack | space_warp | confuse (每 5s) |
+| Abyss | floating_altar | gravity_flux | deflect (每 2s) |
+
+**新增模块**：`hazard.h/cpp` — `HazardDef` + `get_hazards_for_landmark()`
+
+### G6.4–G6.5 Encounter Framework
+
+统一 NPC/事件/交易/对话为 `EncounterDef` 数据模型：
+
+**新增模块**：`encounter.h/cpp` — `EncounterDef`/`EncounterNode`/`EncounterChoice` + `pick_encounter_for_biome()` + `pick_encounter_by_trigger()`
+**数据**：`resources/encounters.json` — 9 encounters (6 NPCs + 3 secrets)
+**触发类型**：`floor_enter` | `room_enter` | `wall_interact` | `entity_interact` | `boss_dead` | `item_use`
+
+### G6.6–G6.7 Exploration + Progression
+
+- **G6.6**: `walls_interact` 秘密 Encounter → `DungeonGenerator` 30% 概率将普通房间转为 `SpecialRoomType.SECRET`
+- **G6.7**: `EncounterDef.conditions[]` 字段 + `pick_encounter_by_trigger()` — 为未来条件过滤做准备
+- **FloorConfig BGM**: F1-5→`"prison"`, F6-10→`"volcano"`, F11-15→`"abyss"` (boss 层保留 `"boss"`)
 
 | 系统 | 数量 | 驱动方式 |
 |------|:----:|------|
