@@ -94,4 +94,20 @@ target_link_libraries(mcts_search_test PRIVATE gtest_main gtest)
 target_include_directories(mcts_search_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME mcts_search_test COMMAND mcts_search_test)
 
+# G8.4: RL tests (pure C++, no game deps)
+add_executable(env_test rl/environment_test.cpp)
+target_link_libraries(env_test PRIVATE gtest_main gtest)
+target_include_directories(env_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME env_test COMMAND env_test)
+
+add_executable(obs_test rl/observation_test.cpp)
+target_link_libraries(obs_test PRIVATE gtest_main gtest)
+target_include_directories(obs_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME obs_test COMMAND obs_test)
+
+add_executable(q_test rl/q_agent_test.cpp)
+target_link_libraries(q_test PRIVATE gtest_main gtest)
+target_include_directories(q_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME q_test COMMAND q_test)
+
 add_roguelike_test(boot_test        integration/boot_test.cpp)

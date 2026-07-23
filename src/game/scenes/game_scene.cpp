@@ -44,6 +44,8 @@ int  GameScene::g_sim_runs = 100;
 bool GameScene::g_sim_all_builds = false;
 int  GameScene::g_sim_build_type = 0;
 std::string GameScene::g_sim_ai_type = "decision";
+int  GameScene::g_rl_test_episodes = 0;
+int  GameScene::g_rl_train_episodes = 0;
 
 // ============================================================
 // C1: 体验打磨 — 伤害数字/震动/冻结 辅助函数

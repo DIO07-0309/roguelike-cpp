@@ -156,6 +156,8 @@ public:
     static bool g_sim_all_builds;       // G7.4: --sim-all-builds mode
     static int  g_sim_build_type;       // G7.4: current build in all-builds rotation
     static std::string g_sim_ai_type;   // G8.1: "decision" or "bt"
+    static int  g_rl_test_episodes;     // G8.4: --rl-test N
+    static int  g_rl_train_episodes;    // G8.4: --rl-train N
 
 private:
     // 战斗

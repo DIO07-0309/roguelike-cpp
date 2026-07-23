@@ -36,6 +36,10 @@
 #include "data/item_defs.h"
 #include "data/vfx_recipe.h"      // G5.8.5
 #include "systems/combat_system.h"
+#include "ai/rl/environment.h"         // G8.4
+#include "ai/rl/random_agent.h"        // G8.4
+#include "ai/rl/q_agent.h"             // G8.4
+#include "ai/mcts/simulation_state.h"   // G8.3
 #include <cstdio>
 #include <memory>
 #include <exception>
@@ -45,6 +49,9 @@
 Font g_font = {0};
 Font g_font_small = {0};
 bool g_font_loaded = false;
+
+// ── G8.4: RL standalone mode ─────────────────────────────────
+static void run_rl_mode(int test_episodes, int train_episodes);
 
 static void load_fonts() {
     ResourceManager::inst().load_all();
@@ -103,6 +110,10 @@ int main() {
             GameScene::g_sim_all_builds = true;
         } else if (arg == "--sim-ai" && i + 1 < __argc) {
             GameScene::g_sim_ai_type = __argv[++i];
+        } else if (arg == "--rl-test" && i + 1 < __argc) {
+            GameScene::g_rl_test_episodes = atoi(__argv[++i]);
+        } else if (arg == "--rl-train" && i + 1 < __argc) {
+            GameScene::g_rl_train_episodes = atoi(__argv[++i]);
         }
     }
 #endif
@@ -224,6 +235,13 @@ int main() {
     ServiceLocator::provide(&ResourceManager::inst());
     ServiceLocator::provide(&EventBus::inst());
     LOG_INFO("ServiceLocator: 全局服务已注册");
+
+    // G8.4: RL test/train mode (standalone, before engine)
+    if (GameScene::g_rl_test_episodes > 0 || GameScene::g_rl_train_episodes > 0) {
+        run_rl_mode(GameScene::g_rl_test_episodes, GameScene::g_rl_train_episodes);
+        printf("[RL] Done. Exiting.\n");
+        return 0;
+    }
 
     bool has_save = SaveManager::save_exists();
     if (has_save) { auto* d = SaveManager::load_save(); delete d; }
