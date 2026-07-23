@@ -1,0 +1,43 @@
+name: G7.2 Test Suite
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev libx11-dev libxrandr-dev \
+          libxi-dev libgl1-mesa-dev libglu1-mesa-dev libxcursor-dev \
+          libxinerama-dev libwayland-dev libxkbcommon-dev
+
+    - name: Build raylib (vendor)
+      run: |
+        cd vendor/raylib
+        mkdir -p build && cd build
+        cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
+        cmake --build . --config Release -j$(nproc)
+        # Create expected lib structure
+        mkdir -p ../lib
+        cp src/libraylib.so* ../lib/ 2>/dev/null || cp src/libraylib.* ../lib/ 2>/dev/null || true
+
+    - name: Configure
+      run: cmake -B build -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build -j$(nproc)
+
+    - name: Run Tests
+      working-directory: build
+      run: ctest --output-on-failure
+
+    - name: Run World Validator
+      run: python tools/world_validator.py resources
