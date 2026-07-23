@@ -11,3 +11,4 @@ crash.log
 game.log
 saves/save.json
 build_mingw/
+build_test/
