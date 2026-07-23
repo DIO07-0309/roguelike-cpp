@@ -547,6 +547,7 @@ bool load_relic_defs(const std::string& path) {
     fclose(f);
     return load_relic_defs_from_json(buf.c_str(), MergeMode::Skip) > 0;
 }
+#if 0
     p = _skip_ws(p);
     if (*p != '[') {
         LOG_ERROR("[RELIC] JSON root must be array");
@@ -607,6 +608,7 @@ bool load_relic_defs(const std::string& path) {
     if (dups > 0) LOG_INFO("[RELIC]   (skipped %d duplicates)", dups);
     return loaded > 0;
 }
+#endif
 
 int load_relic_defs_from_json(const char* json_text, MergeMode mode,
                                 const char* id_namespace) {

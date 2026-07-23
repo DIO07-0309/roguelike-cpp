@@ -37,6 +37,7 @@ include_directories("${CMAKE_SOURCE_DIR}/src/game/director")
 include_directories("${CMAKE_SOURCE_DIR}/src/data")       # G1 Step5
 include_directories("${CMAKE_SOURCE_DIR}/src/core/replay") # G4.5
 include_directories("${CMAKE_SOURCE_DIR}/src/core/sim")    # G5.6
+include_directories("${CMAKE_SOURCE_DIR}/src/ai")          # G8.1
 
 # ---- Sources ----
 file(GLOB_RECURSE SOURCES src/*.cpp)

@@ -1,7 +1,9 @@
 #pragma once
 #include <cstdint>
 #include <vector>
+#include <memory>
 
+// Forward declare — full definition included in .cpp
 class Player;
 class Monster;
 

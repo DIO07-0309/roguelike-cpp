@@ -136,7 +136,7 @@ void PresentationSystemDirector::set_build_theme(BuildType bt) {
     _theme = BuildTheme::from_build_type(bt);
 }
 
-Color PresentationSystemDirector::get_build_color() const { return _theme.primary; }
+// get_build_color() is defined inline in the header
 
 // ═══════════════════════════════════════════════════════════════
 // G5.8: Unified VFX dispatch — Gameplay never touches VFXServer directly
@@ -178,7 +178,7 @@ void PresentationSystemDirector::emit_archetype_vfx(VFXServer& vfx, const char* 
     else if (a == "ambush")
         vfx.ambush_smoke(cx, cy);
     else if (a == "guardian")
-        vfx.guardian_aura(cx, cy, 80.0f);
+        vfx.guardian_aura_enemy(cx, cy, 80.0f);
 }
 
 void PresentationSystemDirector::emit_boss_phase2_vfx(VFXServer& vfx, const char* boss_id,

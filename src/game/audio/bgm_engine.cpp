@@ -89,6 +89,14 @@ Sound BGMEngine::_compile_bgm(const std::string& name) {
         melody = {{"C4",0.12f},{"Eb4",0.12f},{"G4",0.12f},{"C5",0.2f},{"B4",0.12f},{"G4",0.12f},{"F4",0.15f},{"Eb4",0.1f},{0,0.05f}};
         bass  = {{"C2",0.25f},{"C2",0.25f},{"Ab1",0.25f},{"Ab1",0.25f},{"Bb1",0.25f},{"Bb1",0.25f},{"G1",0.25f},{"G1",0.25f}};
         mw = "saw"; bw = "square";
+    } else {
+        // G6.1: Biome BGM variants (reuse dungeon chords, vary BPM+waveform)
+        chords = {{"C3",3.0f},{"Db3",3.0f},{"Eb3",3.0f},{"C3",3.0f}};
+        melody = {{"C4",0.5f},{0,1.0f},{"Db4",0.4f},{0,0.8f},{"Eb4",0.4f},{0,1.2f},{"C4",0.6f},{0,0.6f}};
+        if (name == "prison")       { bpm = 72; mw = "square";   }
+        else if (name == "volcano") { bpm = 90; mw = "saw";      bw = "triangle"; }
+        else if (name == "abyss")   { bpm = 62; mw = "triangle"; }
+        beat = 60.0f / bpm;
     }
 
     // 计算总时长 (重复3遍确保~30秒)
@@ -197,6 +205,12 @@ void BGMEngine::init() {
 void BGMEngine::close() { for (auto& [_, s] : _cache) UnloadSound(s); _cache.clear(); }
 void BGMEngine::play(const std::string& name, float vol) {
     stop();
+    // G6.1/G8.1: lazy-compile biome BGM variants on first use
+    if (_cache.find(name) == _cache.end()) {
+        // Reuse dungeon chords/melody, vary by BPM+waveform+drums
+        if (name == "prison" || name == "volcano" || name == "abyss")
+            _cache[name] = _compile_bgm(name);
+    }
     auto it = _cache.find(name);
     if (it != _cache.end()) { SetSoundVolume(it->second, vol); PlaySound(it->second); _playing = true; }
 }

@@ -47,6 +47,11 @@ std::string GameScene::g_sim_ai_type = "decision";
 int  GameScene::g_rl_test_episodes = 0;
 int  GameScene::g_rl_train_episodes = 0;
 
+// G8.1: defined here so unique_ptr<DecisionAgent/BTAgent> can be destroyed
+// (complete type available via includes in this .cpp)
+GameScene::GameScene() = default;
+GameScene::~GameScene() = default;
+
 // ============================================================
 // C1: 体验打磨 — 伤害数字/震动/冻结 辅助函数
 // ============================================================
@@ -317,9 +322,7 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     }
 
     if (fcfg->is_boss) {
-        LOG_INFO("进入第%d层 (Boss: %s) - HP:%d ATK:%d PD:%d MD:%d",
-            floor, btmpl->name, btmpl->max_hp, btmpl->attack,
-            btmpl->pdef, btmpl->mdef);
+        LOG_INFO("进入第%d层 (Boss floor)", floor);
     } else {
         LOG_INFO("进入第%d层 [%s] - %d只怪物, HPx%.2f ATKx%.2f",
             floor, fcfg->chapter_label, (int)monsters.size(),

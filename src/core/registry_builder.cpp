@@ -1,6 +1,7 @@
 #include "registry_builder.h"
 #include "core/logger.h"
 #include <algorithm>
+#include <cstring>
 
 // ── G4.1.5: 引用验证需要读取 loaded registries ──
 #include "data/skill_defs.h"

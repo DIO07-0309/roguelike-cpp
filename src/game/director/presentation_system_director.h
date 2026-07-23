@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include "raylib.h"
+#include "entities/entity.h"  // Direction enum
 
 enum class BuildType : int;
 class VFXServer;

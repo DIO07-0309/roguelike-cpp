@@ -545,11 +545,11 @@ void IceNovaSkill::_on_level_up() { if(level==2)base_cooldown=5.0f;else if(level
 std::string IceNovaSkill::execute(Player* caster,std::vector<Monster*>& targets,GameMap*,bool is_heavy){
     float pcx=caster->entity.rect.x+caster->entity.rect.width/2;
     float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
-    float rng=_radius*32.0f; if(evolution_level>=1)rng*=1.3f; if(is_heavy)rng*=1.5f;
+    float radius_px=_radius*32.0f; if(evolution_level>=1)radius_px*=1.3f; if(is_heavy)radius_px*=1.5f;
     int total=0; std::string extra; float base=get_effective_attack(caster)*2.0f*get_power_multiplier();
     for(auto* t:targets){if(!t||!t->combat.is_alive)continue;
         float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);
-        if(d>rng)continue;
+        if(d>radius_px)continue;
         int dmg=calculate_damage((int)base,t->combat.get_effective_defense(AttackType::MAGICAL),AttackType::MAGICAL);
         // G5.2: 碎冰 — 对已冻结目标追加伤害
         for(auto& b:t->active_buffs){if(b.id=="freeze"){dmg=dmg*(100+_shatter_bonus)/100;extra=" 碎冰!";break;}}
@@ -560,7 +560,7 @@ std::string IceNovaSkill::execute(Player* caster,std::vector<Monster*>& targets,
     if(evolution_level>=3&&is_heavy){ // 暴风雪: 2nd wave
         for(auto* t:targets){if(!t||!t->combat.is_alive)continue;
             float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);
-            if(d>rng*1.3f)continue;
+            if(d>radius_px*1.3f)continue;
             int dmg2=calculate_damage((int)(base*0.5f),t->combat.get_effective_defense(AttackType::MAGICAL),AttackType::MAGICAL);
             t->combat.take_damage(dmg2);total+=dmg2;}}
     return "冰爆Lv"+std::to_string(level)+" 造成"+std::to_string(total)+"伤害"+extra;}
@@ -656,11 +656,11 @@ std::string BloodFrenzySkill::execute(Player* caster,std::vector<Monster*>& targ
     caster->combat.current_hp=std::max(1,caster->combat.current_hp-hp_cost);
     // AOE: all nearby enemies
     float pcx=caster->entity.rect.x+caster->entity.rect.width/2;float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
-    float rng=4.0f*32.0f;if(is_heavy)rng*=1.4f;
+    float radius_px=4.0f*32.0f;if(is_heavy)radius_px*=1.4f;
     int total=0,hit_count=0;float base=get_effective_attack(caster)*1.5f*get_power_multiplier();
     for(auto* t:targets){if(!t||!t->combat.is_alive)continue;
         float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);
-        if(d>rng)continue;
+        if(d>radius_px)continue;
         int dmg=calculate_damage((int)base,t->combat.get_effective_defense(AttackType::PHYSICAL));
         t->combat.take_damage(dmg);total+=dmg;hit_count++;
         int stacks=1;if(evolution_level>=1)stacks=2;if(is_heavy)stacks++;

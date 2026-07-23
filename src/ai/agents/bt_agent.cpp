@@ -53,7 +53,7 @@ void BTAgent::_sync_state(const Player* player,
     // Skills
     bool any_ready = false;
     for (int i = 0; i < 4; i++)
-        if (player->skills.active_skills[i].can_use(0)) { any_ready = true; break; }
+        if (i < (int)player->skills.active_skills.size() && player->skills.active_skills[i]->can_use(0)) { any_ready = true; break; }
     _board.set("skill_ready", any_ready);
 
     // Heal slot available

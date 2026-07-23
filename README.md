@@ -873,6 +873,14 @@ rlc:blood_charm,war_drum,plague_mask
 | G6.5 | Encounter Framework: EncounterDef/Node/Choice + multi-round dialogue engine + trade nodes + 9 encounters (NPC/event) | ✅ |
 | G6.6 | Exploration: wall_interact secrets + SpecialRoomType.SECRET 30% placement + 3 secret encounters | ✅ |
 | G6.7 | Meta Progression: EncounterDef.conditions[] + pick_encounter_by_trigger() + biome-aware dungeon generation | ✅ |
+| G7.1 | World Validator: tools/world_validator.py — 20+ JSON cross-ref checker, 0 errors 0 warnings | ✅ |
+| G7.2 | Automated Test Framework: GoogleTest + 9 suites/43 tests + CI workflow (ENABLE_TESTS=ON) | ✅ |
+| G7.3 | Simulation & Balance: SimulationConfig + RunResult + JSON report + per-build/relic/enemy stats | ✅ |
+| G7.4 | DecisionAgent Upgrade: BuildType-aware behavioral profiles + action evaluator + event decider + --sim-all-builds | ✅ |
+| G8.1 | Behavior Tree: BTNode/Selector/Sequence/Condition/Action/Blackboard + BTAgent + 16 tests | ✅ |
+| G8.2 | Navigation: A* pathfinder + MoveToTarget BT node + 7 astar tests | ✅ |
+| G8.3 | Combat MCTS: MCTSNode + UCT search + SimulationState clone + 16 tests + --sim-ai mcts | ✅ |
+| G8.4 | RL Environment: Gym-like API + Observation + RandomAgent + QAgent + 17 tests + --rl-test/train | ✅ |
 
 ---
 
@@ -948,5 +956,41 @@ rlc:blood_charm,war_drum,plague_mask
 | 对话 | 34 | DialogueDef JSON |
 | Meta 节点 | 10 | MetaNodeDef JSON |
 | 结局 | 5 | EndingDef JSON |
+| Biomes | 3 | BiomeDef JSON + tile_palette/enemy_pool/boss/bgm |
+| Landmarks | 9 | LandmarkDef JSON |
+| Hazards | 6 | HazardDef JSON |
+| Encounters | 9 | EncounterDef JSON (NPC/event/trade/secret) |
 
-**Source files**: ~200+ (h/cpp/json) **· CLI flags**: --record / --replay / --sim N **· Mod support**: mods/ with mod.json
+**Source files**: ~240+ (h/cpp/json) **· CLI flags**: --record / --replay / --sim N / --sim-ai decision│bt│mcts / --rl-test N / --rl-train N **· Mod support**: mods/ with mod.json **· Tests**: 10 suites / 80+ test cases (ENABLE_TESTS=ON) **· AI modules**: 30 files across behavior_tree/navigation/mcts/rl
+
+---
+
+## G7 Developer Experience (2026-07-23)
+
+### G7.1 World Validator
+`tools/world_validator.py` — 自动化 JSON 交叉引用检查器。验证 20+ JSON 文件中的 biome→enemy、landmark→biome、encounter 对话 `next` 引用、effect/risk 冒号 DSL 合法性。0 errors / 0 warnings。
+
+### G7.2 Automated Test Framework
+GoogleTest + 9 suites / 43 tests。覆盖 Registry 加载、Combat 伤害/Buff、Biome 隔离、Encounter 对话、Condition/Action 解析、Save 往返、Integration boot。`cmake -DENABLE_TESTS=ON` 开启。
+
+### G7.3 Simulation & Balance
+SimRunner 增强：`SimulationConfig` + `RunResult`（victory/turns/damage/relics）+ `BalanceReport` → `reports/balance_report.json`。Per-build win_rate、per-relic pick_rate、per-enemy threat 排名。CLI: `--sim-seed` / `--sim-build`。
+
+### G7.4 DecisionAgent Upgrade
+BuildType-aware 行为档案：ICE_MAGE 远程放风筝、BERSERKER 冲脸、SUMMON_LORD 躲召唤物。Action evaluator 评分函数。Event decider：HP 低时拒绝高风险事件。`--sim-all-builds` 循环 12 构建。
+
+---
+
+## G8 Intelligent Roguelike (2026-07-23)
+
+### G8.1 Behavior Tree Framework
+纯 C++ BehaviorTree 引擎（7 文件，零游戏依赖）：Node/Selector/Sequence/Condition/Action/Blackboard。BTAgent 8 节点优先级树。CLI: `--sim-ai bt`。16 tests。
+
+### G8.2 Navigation System
+A* grid pathfinder 使用 priority_queue + Manhattan 启发式。MoveToTarget BT 节点读取 Blackboard 并写入移动方向。7 astar tests。
+
+### G8.3 Combat MCTS
+MCTSNode + UCT 搜索。SimulationState 战斗快照。Select→Expand→Simulate→Backpropagate。`_evaluate_attack()` 替换为 `MCTS.search(state, 100)`。16 tests。CLI: `--sim-ai mcts`。
+
+### G8.4 RL Environment
+Gym-like API：`CombatEnvironment.reset()` / `.step()`。Observation 7 维固定特征向量。RandomAgent 基线 + QAgent 表格 Q-learning。17 tests。CLI: `--rl-test N` / `--rl-train N`。

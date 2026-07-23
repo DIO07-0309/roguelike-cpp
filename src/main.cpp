@@ -50,8 +50,8 @@ Font g_font = {0};
 Font g_font_small = {0};
 bool g_font_loaded = false;
 
-// ── G8.4: RL standalone mode ─────────────────────────────────
-static void run_rl_mode(int test_episodes, int train_episodes);
+// ── G8.4: RL standalone runner (defined in ai/rl/rl_runner.cpp) ──
+extern void run_rl_mode(int test_episodes, int train_episodes);
 
 static void load_fonts() {
     ResourceManager::inst().load_all();

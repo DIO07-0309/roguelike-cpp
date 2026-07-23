@@ -1,6 +1,6 @@
 #include "state_hash.h"
-#include "player.h"
-#include "monster.h"
+#include "entities/player.h"
+#include "entities/monster.h"
 #include <cstdint>
 #include <algorithm>
 

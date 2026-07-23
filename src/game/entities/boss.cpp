@@ -8,6 +8,7 @@
 #include "core/logger.h"
 #include "data/boss_defs.h"      // G1 Step6
 #include <cmath>
+#include <cstring>
 
 // ---- BossSkill 基类 ----
 BossSkill::BossSkill(const std::string& n, float cd) : name(n), cooldown(cd) {}
@@ -247,6 +248,7 @@ static void _spawn_boss_vfx(Monster* self, const std::string& kind,
 void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
                                double dt, double gt,
                                std::vector<Monster*>* all, std::vector<Effect>* effects) {
+    static std::vector<Monster*> _empty_monsters;
     switch (boss_state) {
     case BossState::IDLE: {
         // 基础 AI (追逐/巡逻)
@@ -463,7 +465,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             break;
         }
         _whirlwind->spin_duration -= (float)dt;
-        _whirlwind->execute(self, player, {}, map, gt);
+        _whirlwind->execute(self, player, _empty_monsters, map, gt);
         // boss slowly moves toward player while spinning
         float dx = player->entity.rect.x + player->entity.rect.width/2
                  - self->entity.rect.x - self->entity.rect.width/2;
@@ -481,7 +483,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             _laser->windup_left -= (float)dt;
             _spawn_boss_vfx(self, "shockwave", effects); // 蓄力预警
             if (_laser->windup_left <= 0) {
-                _laser->execute(self, player, {}, map, gt);
+                _laser->execute(self, player, _empty_monsters, map, gt);
                 _spawn_boss_vfx(self, "shockwave", effects);
                 boss_state = BossState::ATTACK; normal_attack_count = 0;
             }
@@ -509,7 +511,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         if (_grav_timer > 0.8f) {
             _grav_timer = 0;
             _shockwave->fx_radius *= 1.5f;
-            _shockwave->execute(self, player, {}, map, gt);
+            _shockwave->execute(self, player, _empty_monsters, map, gt);
             _shockwave->fx_radius /= 1.5f;
             _shockwave->mark_used(gt);
             _spawn_boss_vfx(self, "shockwave", effects);

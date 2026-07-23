@@ -7,6 +7,12 @@
 #include "systems/team_coordinator.h"   // G2.2
 #include <cmath>
 
+// Forward declarations for functions defined later in this file
+static void _exec_snipe(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk);
+static void _exec_ambush(Monster* self, Player* player, GameMap* map, std::vector<Effect>* effects, MonsterSkillState& sk);
+static void _exec_scatter(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk);
+static void _exec_guard_aura(Monster* self, std::vector<Monster*>* all, std::vector<Effect>* effects, MonsterSkillState& sk);
+
 MonsterAI::MonsterAI(float sight, float speed, float patrol, float attack)
     : sight_range(sight), move_speed(speed), patrol_interval(patrol),
       attack_range(attack) {
@@ -54,7 +60,7 @@ void MonsterAI::update(Monster* self, Player* player, GameMap* map,
         if(all){self->support_cooldown-=(float)dt;
             if(self->support_cooldown<=0){Monster* ally=nullptr;float bd=5.0f*32.0f;
                 for(auto*o:*all){if(!o||o==self||!o->combat.is_alive)continue;
-                    if(o->archetype==AIArchetype::BOMBER)continue;
+                    if(o->ai && o->ai->archetype==AIArchetype::BOMBER)continue;
                     float d=hypotf(o->entity.rect.x-self->entity.rect.x,o->entity.rect.y-self->entity.rect.y);
                     if(d<bd){bd=d;ally=o;}}
                 if(ally){if(rng()%2==0)apply_buff(ally,"attack_up",1);else ally->combat.heal((int)(ally->combat.max_hp*0.15f));

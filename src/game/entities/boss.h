@@ -85,6 +85,7 @@ public:
     std::string execute(Monster* boss, Player* player,
                         std::vector<Monster*>& monsters,
                         GameMap* map, double game_time) override;
+    float windup_left = 0.0f;
     float spin_duration = 0.0f;
     int   spin_hit_count = 0;
 };

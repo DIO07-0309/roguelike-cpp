@@ -211,9 +211,9 @@ std::string DecisionAgent::best_action(const Player* player,
     if (g_use_mcts && !monsters.empty()) {
         auto sim = build_sim_state(player, monsters);
         if (sim.alive_monsters() > 0) {
-            MCTS mcts(g_mcts_iters);
-            CombatAction ca = mcts.search(sim);
-            return action_name(ca);
+            mcts::MCTS mcts(g_mcts_iters);
+            mcts::CombatAction ca = mcts.search(sim);
+            return mcts::action_name(ca);
         }
     }
 

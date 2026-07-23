@@ -6,6 +6,10 @@
 #include "node.h"
 #include "player.h"
 #include "monster.h"
+
+// G8.1: AI agent forward declarations (global scope)
+class DecisionAgent;
+class BTAgent;
 #include "item.h"
 #include "game_map.h"
 #include "vfx_server.h"
@@ -82,6 +86,8 @@ class GameScene : public Node {
     friend class GameSceneCombat;
     friend class GameSceneInteraction;
 public:
+    GameScene();
+    ~GameScene();  // G8.1: defined in .cpp (needed for unique_ptr<DecisionAgent/BTAgent>)
     GameState state = GameState::TITLE;
 
     // 核心数据
@@ -248,8 +254,6 @@ private:
     void _tick_replay_hash();
 
     // ── G5.6/G7.4/G8.1: Sim AI (dual-agent support) ──
-    class DecisionAgent;
-    class BTAgent;
     std::unique_ptr<DecisionAgent> _sim_ai;
     std::unique_ptr<BTAgent> _sim_bt;
     bool _sim_mode = false;
