@@ -77,4 +77,10 @@ target_link_libraries(behavior_tree_test PRIVATE gtest_main gtest)
 target_include_directories(behavior_tree_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME behavior_tree_test COMMAND behavior_tree_test)
 
+# G8.2: A* Pathfinder test (pure C++, no game deps)
+add_executable(astar_test ai/astar_test.cpp)
+target_link_libraries(astar_test PRIVATE gtest_main gtest)
+target_include_directories(astar_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME astar_test COMMAND astar_test)
+
 add_roguelike_test(boot_test        integration/boot_test.cpp)
