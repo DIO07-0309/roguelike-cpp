@@ -1,4 +1,5 @@
 #include "sim_runner.h"
+#include "build_score.h"  // G7.4: BuildType enum
 #include <cstdio>
 #include <fstream>
 #include <algorithm>
@@ -55,6 +56,17 @@ void SimRunner::record_run(const RunResult& s) {
         ? (float)_report.total_wins / _report.total_runs : 0;
 
     _current_run++;
+    // G7.4: all-builds rotation — when `_cfg.runs` done for current build, advance
+    if (_all_builds && _current_run >= _cfg.runs && _all_builds_next < 12) {
+        _all_builds_next++;
+        _current_run = 0;
+        static const char* bnames[] = {"NONE","Berserker","FireMage","Poison","TimeM","Support",
+            "Projectile","IceMage","Lightning","Bleed","Shadow","Juggernaut","Summon"};
+        if (_all_builds_next < 12)
+            printf("[SIM] Switching to build %d/%d: %s\n",
+                   _all_builds_next+1, 12, bnames[_all_builds_next+1]);
+    }
+
     int pct = (_current_run * 100) / _cfg.runs;
     int prev_pct = ((_current_run - 1) * 100) / _cfg.runs;
     if (pct != prev_pct)
@@ -63,7 +75,17 @@ void SimRunner::record_run(const RunResult& s) {
 }
 
 bool SimRunner::should_restart() const {
-    return _active && _current_run < _cfg.runs;
+    if (!_active) return false;
+    if (_all_builds) {
+        // In all-builds mode, restart means move to next build
+        return _all_builds_next < 12;
+    }
+    return _current_run < _cfg.runs;
+}
+
+int SimRunner::next_build_type() const {
+    if (!_all_builds || _all_builds_next >= 12) return 0; // NONE = random
+    return _all_builds_next + 1; // BuildType 1-12
 }
 
 uint32_t SimRunner::next_seed() const {

@@ -153,6 +153,8 @@ public:
     static bool g_replay_mode;
     static bool g_sim_mode;             // G5.6: --sim mode
     static int  g_sim_runs;             // G5.6: number of sim runs
+    static bool g_sim_all_builds;       // G7.4: --sim-all-builds mode
+    static int  g_sim_build_type;       // G7.4: current build in all-builds rotation
 
 private:
     // 战斗
@@ -242,9 +244,9 @@ private:
     bool _is_action_just_pressed(const InputMap& input, const char* name);
     void _tick_replay_hash();
 
-    // ── G5.6: Sim ──
-    class SimAI;
-    std::unique_ptr<SimAI> _sim_ai;
+    // ── G5.6/G7.4: Sim AI ──
+    class DecisionAgent;
+    std::unique_ptr<DecisionAgent> _sim_ai;
     bool _sim_mode = false;
     void _collect_sim_stats();
 };

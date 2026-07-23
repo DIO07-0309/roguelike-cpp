@@ -40,6 +40,8 @@ bool GameScene::g_record_mode = false;
 bool GameScene::g_replay_mode = false;
 bool GameScene::g_sim_mode = false;
 int  GameScene::g_sim_runs = 100;
+bool GameScene::g_sim_all_builds = false;
+int  GameScene::g_sim_build_type = 0;     // G7.4: 0=random, 1-12=fixed build
 
 // ============================================================
 // C1: 体验打磨 — 伤害数字/震动/冻结 辅助函数
@@ -113,8 +115,8 @@ void GameScene::new_game() {
     // ── G5.6: Sim mode init ──
     if (g_sim_mode) {
         _sim_mode = true;
-        _sim_ai = std::make_unique<SimAI>();
-        _sim_ai->start();
+        _sim_ai = std::make_unique<DecisionAgent>();
+        _sim_ai->start(player.get());
         seed_rng(_dungeon_seed ? _dungeon_seed : (uint32_t)(SimRunner::inst().current_run() * 1234567));
     }
 }
@@ -753,6 +755,10 @@ void GameScene::_collect_sim_stats() {
     sim.record_run(s);
 
     if (sim.should_restart()) {
+        // G7.4: all-builds rotation
+        if (sim.all_builds()) {
+            g_sim_build_type = sim.next_build_type();
+        }
         uint32_t next_seed = sim.next_seed();
         _dungeon_seed = next_seed;
         seed_rng(next_seed);

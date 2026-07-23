@@ -98,6 +98,10 @@ public:
     int  total_runs() const { return _cfg.runs; }
     bool should_restart() const;
     uint32_t next_seed() const;
+    // G7.4: all-builds rotation
+    bool all_builds() const { return _all_builds; }
+    void set_all_builds(bool v) { _all_builds = v; }
+    int  next_build_type() const;
 
     const BalanceReport& report() const { return _report; }
     void finalize();
@@ -105,6 +109,8 @@ public:
 private:
     bool _active = false;
     int _current_run = 0;
+    bool _all_builds = false;
+    int _all_builds_next = 0;
     SimulationConfig _cfg;
     BalanceReport _report;
 };

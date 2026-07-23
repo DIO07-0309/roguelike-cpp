@@ -98,6 +98,9 @@ int main() {
             sim_seed_start = (uint32_t)atoi(__argv[++i]);
         } else if (arg == "--sim-build" && i + 1 < __argc) {
             sim_build = __argv[++i];
+        } else if (arg == "--sim-all-builds") {
+            sim_mode = true;
+            GameScene::g_sim_all_builds = true;
         }
     }
 #endif
@@ -120,7 +123,9 @@ int main() {
             sim_cfg.fixed_build = true;
             sim_cfg.fixed_build_id = sim_build;
         }
-        SimRunner::inst().begin(sim_cfg);
+        auto& sr = SimRunner::inst();
+        if (GameScene::g_sim_all_builds) sr.set_all_builds(true);
+        sr.begin(sim_cfg);
         LOG_INFO("Sim: %d runs", sim_runs);
     }
 
