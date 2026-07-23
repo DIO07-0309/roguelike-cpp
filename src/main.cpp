@@ -101,6 +101,8 @@ int main() {
         } else if (arg == "--sim-all-builds") {
             sim_mode = true;
             GameScene::g_sim_all_builds = true;
+        } else if (arg == "--sim-ai" && i + 1 < __argc) {
+            GameScene::g_sim_ai_type = __argv[++i];
         }
     }
 #endif

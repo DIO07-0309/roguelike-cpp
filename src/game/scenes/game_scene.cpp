@@ -20,6 +20,7 @@
 #include "core/replay/state_hash.h"  // G4.5
 #include "core/sim/sim_ai.h"         // G5.6
 #include "core/sim/sim_runner.h"     // G5.6
+#include "ai/agents/bt_agent.h"      // G8.1
 #include "event_system.h"
 #include "event_bus.h"
 #include "service_locator.h"
@@ -41,7 +42,8 @@ bool GameScene::g_replay_mode = false;
 bool GameScene::g_sim_mode = false;
 int  GameScene::g_sim_runs = 100;
 bool GameScene::g_sim_all_builds = false;
-int  GameScene::g_sim_build_type = 0;     // G7.4: 0=random, 1-12=fixed build
+int  GameScene::g_sim_build_type = 0;
+std::string GameScene::g_sim_ai_type = "decision";
 
 // ============================================================
 // C1: 体验打磨 — 伤害数字/震动/冻结 辅助函数
@@ -115,8 +117,17 @@ void GameScene::new_game() {
     // ── G5.6: Sim mode init ──
     if (g_sim_mode) {
         _sim_mode = true;
-        _sim_ai = std::make_unique<DecisionAgent>();
-        _sim_ai->start(player.get());
+        // G8.1: choose AI agent type
+        if (g_sim_ai_type == "bt") {
+            _sim_bt = std::make_unique<BTAgent>();
+            _sim_bt->build_tree();
+            _sim_bt->start(player.get());
+            _use_bt_agent = true;
+        } else {
+            _sim_ai = std::make_unique<DecisionAgent>();
+            _sim_ai->start(player.get());
+            _use_bt_agent = false;
+        }
         seed_rng(_dungeon_seed ? _dungeon_seed : (uint32_t)(SimRunner::inst().current_run() * 1234567));
     }
 }
@@ -695,13 +706,17 @@ void GameScene::start_replay(const std::string& path) {
 }
 
 bool GameScene::_is_action_just_pressed(const InputMap& input, const char* name) {
-    // G5.6: SimAI drives the player
-    if (_sim_mode && _sim_ai) {
+    // G5.6/G8.1: SimAI / BTAgent drives the player
+    if (_sim_mode) {
         std::vector<Monster*> mlist;
         for (auto& m : monsters) mlist.push_back(m.get());
         bool boss_intro = (state == GameState::BOSS_INTRO);
-        return _sim_ai->is_action_just_pressed(name, player.get(), mlist,
-            game_map.get(), stairs_active, boss_intro);
+        if (_use_bt_agent && _sim_bt)
+            return _sim_bt->is_action_just_pressed(name, player.get(), mlist,
+                game_map.get(), stairs_active, boss_intro);
+        else if (_sim_ai)
+            return _sim_ai->is_action_just_pressed(name, player.get(), mlist,
+                game_map.get(), stairs_active, boss_intro);
     }
     if (_replay_player.is_active())
         return _replay_player.is_action_just_pressed(name);
@@ -725,8 +740,11 @@ void GameScene::_input(const InputMap& input) {
     // G4.5: frame tick
     if (_recorder.is_active()) _recorder.tick();
     if (_replay_player.is_active()) _replay_player.tick();
-    // G5.6: SimAI tick
-    if (_sim_mode && _sim_ai) _sim_ai->tick();
+    // G5.6/G8.1: SimAI / BTAgent tick
+    if (_sim_mode) {
+        if (_use_bt_agent && _sim_bt) _sim_bt->tick();
+        else if (_sim_ai) _sim_ai->tick();
+    }
 
     _input_handler.handle_input(input);
 

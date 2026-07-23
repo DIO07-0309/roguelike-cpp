@@ -71,4 +71,10 @@ target_link_libraries(simulation_test PRIVATE gtest_main gtest)
 target_include_directories(simulation_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME simulation_test COMMAND simulation_test)
 
+# G8.1: Behavior Tree test (pure C++, no game deps)
+add_executable(behavior_tree_test ai/behavior_tree_test.cpp)
+target_link_libraries(behavior_tree_test PRIVATE gtest_main gtest)
+target_include_directories(behavior_tree_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME behavior_tree_test COMMAND behavior_tree_test)
+
 add_roguelike_test(boot_test        integration/boot_test.cpp)

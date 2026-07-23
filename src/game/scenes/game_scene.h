@@ -155,6 +155,7 @@ public:
     static int  g_sim_runs;             // G5.6: number of sim runs
     static bool g_sim_all_builds;       // G7.4: --sim-all-builds mode
     static int  g_sim_build_type;       // G7.4: current build in all-builds rotation
+    static std::string g_sim_ai_type;   // G8.1: "decision" or "bt"
 
 private:
     // 战斗
@@ -244,9 +245,12 @@ private:
     bool _is_action_just_pressed(const InputMap& input, const char* name);
     void _tick_replay_hash();
 
-    // ── G5.6/G7.4: Sim AI ──
+    // ── G5.6/G7.4/G8.1: Sim AI (dual-agent support) ──
     class DecisionAgent;
+    class BTAgent;
     std::unique_ptr<DecisionAgent> _sim_ai;
+    std::unique_ptr<BTAgent> _sim_bt;
     bool _sim_mode = false;
+    bool _use_bt_agent = false;        // G8.1: true = BT, false = DecisionAgent
     void _collect_sim_stats();
 };
