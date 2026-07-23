@@ -4,9 +4,57 @@
 #include "game_map.h"
 #include "combat_system.h"  // rng
 #include "build_score.h"    // BuildType, calculate_build
+#include "ai/mcts/mcts_search.h"
+#include "ai/mcts/action.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+
+bool DecisionAgent::g_use_mcts = false;
+int  DecisionAgent::g_mcts_iters = 100;
+
+// G8.3: Build SimulationState snapshot from live game state
+mcts::SimulationState DecisionAgent::build_sim_state(
+    const Player* player, const std::vector<Monster*>& monsters) {
+    mcts::SimulationState s;
+    if (!player) return s;
+    auto& p = s.player;
+    p.hp = (float)player->combat.current_hp;
+    p.max_hp = (float)player->combat.max_hp;
+    p.x = player->entity.rect.x / 32.0f;
+    p.y = player->entity.rect.y / 32.0f;
+    p.attack = player->combat.attack;
+    p.pdef = player->combat.physical_defense;
+    p.mdef = player->combat.magical_defense;
+    p.alive = player->combat.is_alive;
+    // Cooldowns from player's last_attack_time vs game_time
+    float gt = 0; // MCTS operates in abstract time
+    p.attack_cooldown = std::max(0.0f, 0.5f);
+    for (int i = 0; i < 4; i++)
+        p.skill_cooldowns[i] = (i < (int)player->skills.active_skills.size()) ? 0.0f : 99.0f;
+    // Buffs
+    for (auto& b : player->active_buffs)
+        if (b.stacks > 0)
+            p.buffs.push_back({b.id, b.stacks, b.remaining});
+
+    for (auto* m : monsters) {
+        if (!m || !m->combat.is_alive) continue;
+        mcts::MonsterSnapshot ms;
+        ms.type = m->name;
+        ms.hp = (float)m->combat.current_hp;
+        ms.max_hp = (float)m->combat.max_hp;
+        ms.x = m->entity.rect.x / 32.0f;
+        ms.y = m->entity.rect.y / 32.0f;
+        ms.attack = m->combat.attack;
+        ms.pdef = m->combat.physical_defense;
+        ms.mdef = m->combat.magical_defense;
+        ms.alive = true;
+        ms.is_boss = m->is_boss;
+        s.monsters.push_back(ms);
+    }
+    s.rng.seed = (uint32_t)(int)(player->entity.rect.x * 1000 + player->entity.rect.y);
+    return s;
+}
 
 // ═══════════════════════════════════════════════════════════
 //  G7.4: Build-aware behavioral profiles
@@ -158,6 +206,16 @@ std::string DecisionAgent::best_action(const Player* player,
 
     if (boss_intro_active) return "confirm";
     if (stairs_active)      return "descend";
+
+    // ── G8.3: MCTS path (combat-only, enemies present) ──
+    if (g_use_mcts && !monsters.empty()) {
+        auto sim = build_sim_state(player, monsters);
+        if (sim.alive_monsters() > 0) {
+            MCTS mcts(g_mcts_iters);
+            CombatAction ca = mcts.search(sim);
+            return action_name(ca);
+        }
+    }
 
     float best_score = 0;
     std::string best = "";

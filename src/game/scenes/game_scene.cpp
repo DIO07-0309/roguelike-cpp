@@ -124,6 +124,8 @@ void GameScene::new_game() {
             _sim_bt->start(player.get());
             _use_bt_agent = true;
         } else {
+            // G8.3: MCTS flag on DecisionAgent
+            DecisionAgent::g_use_mcts = (g_sim_ai_type == "mcts");
             _sim_ai = std::make_unique<DecisionAgent>();
             _sim_ai->start(player.get());
             _use_bt_agent = false;

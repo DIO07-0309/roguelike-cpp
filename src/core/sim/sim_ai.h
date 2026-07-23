@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include "ai/mcts/simulation_state.h"
 
 class Player;
 class Monster;
@@ -75,6 +76,14 @@ private:
                          const std::vector<Monster*>& monsters);
     void _resolve_profile(const Player* player);
 };
+
+    // ── G8.3: MCTS integration ──
+    static bool g_use_mcts;       // --sim-ai mcts flag
+    static int  g_mcts_iters;    // iterations per search (default 100)
+
+    // ── G8.3: Build SimulationState from game state ──
+    static mcts::SimulationState build_sim_state(
+        const Player* player, const std::vector<Monster*>& monsters);
 
 // ── Backward compat alias ──
 using SimAI = DecisionAgent;

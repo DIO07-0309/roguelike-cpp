@@ -83,4 +83,15 @@ target_link_libraries(astar_test PRIVATE gtest_main gtest)
 target_include_directories(astar_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME astar_test COMMAND astar_test)
 
+# G8.3: MCTS tests (pure C++, no game deps)
+add_executable(sim_state_test mcts/simulation_state_test.cpp)
+target_link_libraries(sim_state_test PRIVATE gtest_main gtest)
+target_include_directories(sim_state_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME sim_state_test COMMAND sim_state_test)
+
+add_executable(mcts_search_test mcts/mcts_search_test.cpp)
+target_link_libraries(mcts_search_test PRIVATE gtest_main gtest)
+target_include_directories(mcts_search_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_test(NAME mcts_search_test COMMAND mcts_search_test)
+
 add_roguelike_test(boot_test        integration/boot_test.cpp)
