@@ -734,23 +734,26 @@ void GameScene::_input(const InputMap& input) {
 
 // ── G5.6: Simulation stats collection ──
 void GameScene::_collect_sim_stats() {
-    RunStats s;
+    RunResult s;
     s.seed = _dungeon_seed;
+    s.victory = (current_floor >= MAX_FLOORS);
     s.floor_reached = current_floor;
-    s.total_kills = _gameplay.run_stats.total_kills;
+    s.turns = (int)(game_time * 60); // approximate frames → turns
+    s.damage_dealt = _gameplay.run_stats.total_kills * 10; // rough estimate
+    s.damage_taken = 0; // tracked per-hit, simplified for now
+    s.enemies_killed = _gameplay.run_stats.total_kills;
     s.elite_kills = _gameplay.run_stats.elite_kills;
     s.bosses_killed = _gameplay.run_stats.bosses_killed;
     s.relics_collected = (int)player->relics.size();
     s.build_type = (int)calculate_build(player.get()).identify();
     s.build_name = calculate_build(player.get()).build_name();
+    for (auto& r : player->relics) s.relics_picked.push_back(r.id);
 
     auto& sim = SimRunner::inst();
     sim.record_run(s);
 
     if (sim.should_restart()) {
-        // Prepare next seed
-        uint32_t next_seed = s.seed ? s.seed + sim.current_run() : (uint32_t)(sim.current_run() * 1234567);
-        // Restart run
+        uint32_t next_seed = sim.next_seed();
         _dungeon_seed = next_seed;
         seed_rng(next_seed);
         new_game();

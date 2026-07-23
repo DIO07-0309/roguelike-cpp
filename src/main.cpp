@@ -76,10 +76,12 @@ int main() {
     LOG_INFO("Roguelike C++ Edition 启动 %s %s", __DATE__, __TIME__);
     SetTraceLogLevel(LOG_WARNING);
 
-    // ── G4.5: CLI replay/record/sim flags ──
+    // ── G4.5/G7.3: CLI replay/record/sim flags ──
     bool replay_mode = false, record_mode = false, sim_mode = false;
     std::string replay_path, record_path;
     int sim_runs = 100;
+    uint32_t sim_seed_start = 0;
+    std::string sim_build;
 #ifdef _WIN32
     for (int i = 1; i < __argc; i++) {
         std::string arg = __argv[i];
@@ -92,13 +94,15 @@ int main() {
         } else if (arg == "--sim" && i + 1 < __argc) {
             sim_mode = true;
             sim_runs = atoi(__argv[++i]);
+        } else if (arg == "--sim-seed" && i + 1 < __argc) {
+            sim_seed_start = (uint32_t)atoi(__argv[++i]);
+        } else if (arg == "--sim-build" && i + 1 < __argc) {
+            sim_build = __argv[++i];
         }
     }
-#else
-    // POSIX: use argc/argv via wrapper (not implemented)
 #endif
 
-    // ── G4.5: Set replay/record/sim config ──
+    // ── G4.5/G7.3: Set replay/record/sim config ──
     GameScene::g_record_mode = record_mode;
     GameScene::g_replay_mode = replay_mode;
     GameScene::g_record_path = record_path;
@@ -108,7 +112,15 @@ int main() {
     if (record_mode) LOG_INFO("Replay: recording to %s", record_path.c_str());
     if (replay_mode) LOG_INFO("Replay: playing from %s", replay_path.c_str());
     if (sim_mode) {
-        SimRunner::inst().begin(sim_runs);
+        SimulationConfig sim_cfg;
+        sim_cfg.runs = sim_runs;
+        sim_cfg.seed_start = sim_seed_start;
+        if (!sim_build.empty()) {
+            sim_cfg.random_build = false;
+            sim_cfg.fixed_build = true;
+            sim_cfg.fixed_build_id = sim_build;
+        }
+        SimRunner::inst().begin(sim_cfg);
         LOG_INFO("Sim: %d runs", sim_runs);
     }
 
