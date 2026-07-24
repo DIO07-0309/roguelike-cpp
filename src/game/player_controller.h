@@ -2,12 +2,17 @@
 
 class GameScene;
 class InputMap;
+class Player;
+class Monster;
+struct WeaponAttackResult;  // G9: defined in weapon_types.h
 
 // ============================================================
 // D6 Step7: PlayerController — 玩家输入/攻击/技能/移动/交互
 // 组合模式: 持有 GameScene 引用, 所有 player 行为集中于此
 // GameScene 不再直接处理 WASD/攻击/技能/交互
 // ============================================================
+class Monster;
+
 class PlayerController {
 public:
     void bind(GameScene* gs) { _scene = gs; }
@@ -24,4 +29,12 @@ public:
 
 private:
     GameScene* _scene = nullptr;
+
+    // G9: weapon-driven attack helpers
+    void _weapon_attack(GameScene& gs, Player& p);
+    void _apply_attack_feedback(GameScene& gs, Player& p,
+                                Monster* target, bool is_crit, bool is_heavy);
+    void _kill_target(GameScene& gs, Monster* target);
+    void _process_weapon_result(GameScene& gs, Player& p,
+                                const WeaponAttackResult& r);
 };

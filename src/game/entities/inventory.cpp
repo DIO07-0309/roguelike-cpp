@@ -35,6 +35,9 @@ std::string Inventory::equip(int index, Player* player) {
     slot = item;
     items.erase(items.begin() + index);
     item->apply(player);
+    // G9: sync WeaponComponent on weapon equip
+    if (item->slot == "weapon" && !item->weapon_def_id.empty())
+        player->weapon.equip(item->weapon_def_id);
     return "装备了 " + item->get_description();
 }
 
@@ -45,6 +48,9 @@ std::string Inventory::unequip(const std::string& slot, Player* player) {
     item->remove(player);
     items.push_back(item);
     equipped[slot] = nullptr;
+    // G9: reset to fist on weapon unequip
+    if (slot == "weapon")
+        player->weapon.unequip();
     return "卸下了 " + item->get_description();
 }
 

@@ -9,6 +9,7 @@
 #include "item.h"
 #include "vfx_server.h"
 #include "combat_feel.h"
+#include "weapon_executor.h"   // G9
 #include "skill_evolution.h"   // G1
 #include "flow_director.h"
 #include "input_map.h"
@@ -150,6 +151,14 @@ void PlayerController::player_attack() {
     auto& p = *gs.player;
 
     if (!p.combat.is_alive) return;
+
+    // ── G9: Weapon-driven attack via WeaponExecutor ──
+    if (p.weapon.current_def() && p.weapon.current_def()->type != WeaponType::FIST) {
+        _weapon_attack(gs, p);
+        return;
+    }
+
+    // ── Legacy fallback: fist / no weapon (keeps existing behavior) ──
     if (!p.can_attack(gs.game_time)) return;
 
     auto* target = find_attack_target(p.entity.rect,
@@ -170,8 +179,7 @@ void PlayerController::player_attack() {
 
     bool is_crit = false;
     if (gs._presentation.combat_juice_on) {
-        float crit_roll = (float)(rng() % 1000) / 1000.0f;
-        if (crit_roll < CombatFeelSystem::crit_chance(p.combo.count)) {
+        if ((rng() % 1000) / 1000.0f < CombatFeelSystem::crit_chance(p.combo.count)) {
             dmg *= CombatFeelSystem::crit_multiplier();
             is_crit = true;
         }
@@ -181,7 +189,6 @@ void PlayerController::player_attack() {
         gs._presentation.room_msg = cb_msg;
         gs._presentation.room_msg_timer = 1.0f;
         gs._presentation.last_combo_announced = p.combo.count;
-        // G5.7: combo milestone shake + freeze
         gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_COMBO);
         gs._presentation.trigger_freeze(CombatFeelSystem::LIGHT_HIT);
         if (p.combo.count > gs._gameplay.run_stats.combo_max)
@@ -195,7 +202,8 @@ void PlayerController::player_attack() {
     if (gs.time_stop_remaining > 0) {
         gs.pending_damage.emplace_back(target, dmg);
     } else {
-        CombatCoordinator::apply_attack_damage(target, dmg, gs.active_effects, gs.get_tree()->get_audio());
+        CombatCoordinator::apply_attack_damage(target, dmg,
+            gs.active_effects, gs.get_tree()->get_audio());
         Color dc = is_crit ? Color{255, 220, 30, 255}
                  : is_heavy ? Color{255, 220, 30, 255}
                  : dmg_color_for(dmg, false, false);
@@ -204,44 +212,113 @@ void PlayerController::player_attack() {
             target->entity.rect.y,
             (is_crit || is_heavy) ? 0.85f : 0.6f, dmg, dc
         });
-        if (is_heavy && target->combat.is_alive) {
-            float dx = target->entity.rect.x - p.entity.rect.x;
-            float dy = target->entity.rect.y - p.entity.rect.y;
-            float len = sqrtf(dx*dx + dy*dy);
-            if (len > 0) {
-                float knock = is_crit ? 36.0f : 24.0f;
-                target->entity.position.x += dx / len * knock;
-                target->entity.position.y += dy / len * knock;
-                target->entity.sync_rect();
-            }
-            gs._presentation.trigger_shake(is_crit ? 16.0f : CombatFeelSystem::SHAKE_HEAVY);
-            gs._presentation.trigger_freeze(is_crit ? CombatFeelSystem::CRITICAL_HIT : CombatFeelSystem::HEAVY_HIT);
-        } else if (is_crit && gs._presentation.combat_juice_on) {
-            gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_MEDIUM);
-            gs._presentation.trigger_freeze(CombatFeelSystem::LIGHT_HIT);
-        }
-        if (!target->combat.is_alive && gs._presentation.combat_juice_on) {
-            Effect flash;
-            flash.kind = "flash"; flash.world_x = target->entity.rect.x; flash.world_y = target->entity.rect.y;
-            flash.radius = target->entity.rect.width * 1.5f; flash.duration = CombatFeelSystem::KILL_SLOWMO;
-            flash.elapsed = 0; flash.color = {255, 255, 255, 180};
-            gs.active_effects.push_back(flash);
-            gs._presentation.trigger_freeze(CombatFeelSystem::KILL_SLOWMO);
-        }
-        if (!target->combat.is_alive) {
-            gs._on_monster_killed(target);
-            auto it = std::find_if(gs.monsters.begin(), gs.monsters.end(),
-                [&](auto& m) { return m.get() == target; });
-            if (it != gs.monsters.end()) gs.monsters.erase(it);
-        }
+        _apply_attack_feedback(gs, p, target, is_crit, is_heavy);
+        if (!target->combat.is_alive) _kill_target(gs, target);
     }
 
     VFXServer vfx;
     float range = is_heavy ? PLAYER_ATTACK_RANGE * 1.5f : PLAYER_ATTACK_RANGE;
     vfx.player_attack(p.entity.rect.x + p.entity.rect.width/2,
                       p.entity.rect.y + p.entity.rect.height/2, range * TILE_SIZE,
-                      p.attack_evo);  // G1: 按进化等级差异化视觉
+                      p.attack_evo);
     for (auto& e : vfx.effects) gs.active_effects.push_back(e);
+}
+
+// ── G9: process one attack result (damage float + feedback + kill) ──
+void PlayerController::_process_weapon_result(GameScene& gs, Player& p,
+    const WeaponAttackResult& r)
+{
+    if (gs.time_stop_remaining > 0) {
+        gs.pending_damage.emplace_back(r.target, r.damage);
+        return;
+    }
+    CombatCoordinator::apply_attack_damage(r.target, r.damage,
+        gs.active_effects, gs.get_tree()->get_audio());
+    Color dc = r.is_crit ? Color{255, 220, 30, 255}
+             : dmg_color_for(r.damage, false, false);
+    gs._presentation.damage_floats.push_back({
+        r.hit_point.x, r.hit_point.y,
+        r.is_crit ? 0.85f : 0.6f, r.damage, dc
+    });
+    (void)p;
+    if (r.is_killing_blow) _kill_target(gs, r.target);
+}
+
+// ── G9: Weapon-driven attack (new path) ──
+void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
+    std::vector<Monster*> mlist;
+    for (auto& m : gs.monsters) mlist.push_back(m.get());
+    auto results = WeaponExecutor::execute(
+        &p, mlist, gs.game_time, gs.get_tree()->get_audio(),
+        &gs.weapon_projectiles);
+    if (results.empty()) return;
+
+    gs._gameplay.flow.mark_combat();
+    gs._boss.behavior.memory.record_attack();
+    gs._boss.replay_mem.melee_hits++;
+    p.combo.hit(gs.game_time);
+    p._last_attack_time = gs.game_time;
+
+    int stage = p.weapon.combo_index();
+    if (stage > gs._presentation.last_combo_announced) {
+        gs._presentation.last_combo_announced = stage;
+        if (stage >= 2) {
+            gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_COMBO);
+            gs._presentation.trigger_freeze(CombatFeelSystem::LIGHT_HIT);
+        }
+    }
+
+    for (auto& r : results) {
+        gs._boss.dmg_done += r.damage;
+        _process_weapon_result(gs, p, r);
+    }
+
+    float shake = p.weapon.current_shake();
+    if (shake > 2.0f) gs._presentation.trigger_shake(shake);
+}
+
+// ── Helper: apply hit feedback (shake, freeze, knockback, kill flash) ──
+void PlayerController::_apply_attack_feedback(GameScene& gs, Player& p,
+    Monster* target, bool is_crit, bool is_heavy)
+{
+    if (is_heavy && target->combat.is_alive) {
+        float dx = target->entity.rect.x - p.entity.rect.x;
+        float dy = target->entity.rect.y - p.entity.rect.y;
+        float len = sqrtf(dx*dx + dy*dy);
+        if (len > 0) {
+            float knock = is_crit ? 36.0f : 24.0f;
+            target->entity.position.x += dx / len * knock;
+            target->entity.position.y += dy / len * knock;
+            target->entity.sync_rect();
+        }
+        gs._presentation.trigger_shake(is_crit ? 16.0f : CombatFeelSystem::SHAKE_HEAVY);
+        gs._presentation.trigger_freeze(is_crit ? CombatFeelSystem::CRITICAL_HIT
+                                                : CombatFeelSystem::HEAVY_HIT);
+    } else if (is_crit && gs._presentation.combat_juice_on) {
+        gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_MEDIUM);
+        gs._presentation.trigger_freeze(CombatFeelSystem::LIGHT_HIT);
+    }
+    // Kill flash
+    if (!target->combat.is_alive && gs._presentation.combat_juice_on) {
+        Effect flash;
+        flash.kind = "flash";
+        flash.world_x = target->entity.rect.x;
+        flash.world_y = target->entity.rect.y;
+        flash.radius = target->entity.rect.width * 1.5f;
+        flash.duration = CombatFeelSystem::KILL_SLOWMO;
+        flash.elapsed = 0;
+        flash.color = {255, 255, 255, 180};
+        gs.active_effects.push_back(flash);
+        gs._presentation.trigger_freeze(CombatFeelSystem::KILL_SLOWMO);
+    }
+}
+
+// ── Helper: kill a target and remove from monster list ──
+void PlayerController::_kill_target(GameScene& gs, Monster* target) {
+    gs._on_monster_killed(target);
+    auto it = std::find_if(gs.monsters.begin(), gs.monsters.end(),
+        [target](auto& m) { return m.get() == target; });
+    if (it != gs.monsters.end()) gs.monsters.erase(it);
 }
 
 void PlayerController::use_skill(int index) {

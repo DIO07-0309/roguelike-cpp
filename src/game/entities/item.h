@@ -39,6 +39,7 @@ class Player;
 struct EquipmentItem : Item {
     std::string slot;  // "weapon", "armor", "charm"
     int atk_bonus = 0, pdef_bonus = 0, mdef_bonus = 0;
+    std::string weapon_def_id; // G9: links to WeaponDef in weapons.json
 
     EquipmentItem(const std::string& name, Rarity r, const std::string& sl,
                   int atk = 0, int pdef = 0, int mdef = 0);

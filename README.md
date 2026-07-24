@@ -881,6 +881,78 @@ rlc:blood_charm,war_drum,plague_mask
 | G8.2 | Navigation: A* pathfinder + MoveToTarget BT node + 7 astar tests | ✅ |
 | G8.3 | Combat MCTS: MCTSNode + UCT search + SimulationState clone + 16 tests + --sim-ai mcts | ✅ |
 | G8.4 | RL Environment: Gym-like API + Observation + RandomAgent + QAgent + 17 tests + --rl-test/train | ✅ |
+| G9.0 | Weapon Framework: WeaponType(6)/HitShape(5) enums + WeaponDef registry + weapons.json (24 entries) | ✅ |
+| G9.1 | Weapon Specials: Nunchaku 5-hit auto-track / Spear 10-hit rapid / Crossbow real projectile system | ✅ |
+| G9.2 | Equipment Identity: 命名池(稀有/史诗/传奇) + Affix系统(5种) + 传奇特殊效果(5把) | ✅ |
+| G9.3 | Weapon Synergy: AttackTag→技能联动 (Sword→Ice/Dagger→Shadow/Nunchaku→Lightning/Crossbow→Fire/Spear→Blood) | ✅ |
+
+---
+
+## G9 Weapon System (2026-07-25)
+
+### G9.0 Weapon Framework
+
+6 种武器 × 4 品质 = 24 个 WeaponDef 数据驱动，5 种命中判定形状，3 段连击引擎。
+
+| 武器 | 类型 | 攻击距离 | Stage 1 | Stage 2 | Stage 3 |
+|------|------|----------|---------|---------|---------|
+| **拳头** (Fist) | 近战 | 1.0× | 直拳 100% | — | — |
+| **匕首** (Dagger) | 近战 | 1.0× | 横斩 100% | 竖劈 100% | 突刺 1.5× 115% |
+| **长剑** (Sword) | 近战 | 2.0× | 跳斩 120% | 横扫 100% | 震地 80%+stun |
+| **双截棍** (Nunchaku) | 中距 | 3-5× | 鞭击 100% | 反身抽 100% | 5-hit 自动追踪 80→166% |
+| **连弩** (Crossbow) | 远程 | 10× | 单箭 100% | 三连箭 3×100% | 蓄力箭 200% 穿墙 |
+| **长矛** (Spear) | 远程 | 6× | 突刺 100% | 挑击 120%+knockback | 传锋 10-hit 110% |
+
+**命中形状**: Circle / Sector / Rectangle / Capsule / Projectile
+
+### G9.1 Weapon Specials
+
+- **Nunchaku Stage-3**: 武器脱手 5-hit 自动追踪，倍率递增 ×1.2/击，计时器驱动
+- **Spear Stage-3**: 1 秒内 10-hit 扇形连续刺击，30° 覆盖
+- **Crossbow**: 真实弹道系统 (Projectile: pos/vel/lifetime/piercing/collision)
+  - Stage 1: 单箭
+  - Stage 2: 三箭扇形 (-15°/0°/+15°)
+  - Stage 3: 蓄力箭 200% 穿墙 + 玩家后坐
+- **Combo UI**: 屏幕底部显示 1/2/3 连击阶段
+
+### G9.2 Equipment Identity
+
+**命名池** (品质驱动):
+
+| 武器 | Rare | Epic | Legendary |
+|------|------|------|-----------|
+| Dagger | 暗影猎手/血牙 | 夜魔之刃/深渊獠牙 | **恶魔之爪** |
+| Sword | 破军剑/苍炎剑 | 天罡剑/赤霄 | **倚天剑** |
+| Nunchaku | 铁流双节/玄木双棍 | 雷鸣双节/破风棍 | **李小龙** |
+| Crossbow | 迅影弩/寒星弩 | 天机弩/破晓弩 | **东风破** |
+| Spear | 追风枪/烈阳枪 | 苍龙枪/破军长矛 | **惊破天** |
+
+**Affix 系统**:
+
+| 武器 | Affix | 效果 |
+|------|-------|------|
+| Dagger | `bleed` 15-25% | Stage-3 突刺概率上毒 |
+| Sword | `range_boost` +50% | Stage-3 震地范围扩大 |
+| Nunchaku | `damage_ramp` 8-12% | 连击伤害递增加成 |
+| Crossbow | `cd_reduce` 20-30% | Stage-3 疲劳时间缩短 |
+| Spear | `pierce_bonus` 15-25% | 传锋每击额外倍率 |
+
+**传奇效果**: 倚天剑(剑气范围×1.3) / 恶魔之爪(100%上毒) / 李小龙(+2 hits) / 东风破(蓄力×1.5) / 惊破天(+2 hits)
+
+### G9.3 Weapon-Skill Synergy
+
+武器 Stage-3 产生 AttackTag → 技能读取 → 协同效果:
+
+| Weapon | Tag | Skill | Synergy |
+|--------|-----|-------|---------|
+| Sword | BLUNT | IceNova | 冻结概率 100% (from 30%) |
+| Dagger | PIERCE | ShadowStrike | 背刺伤害 +30% |
+| Nunchaku | KNOCKBACK | ChainLightning | 弹射 +2 跳 |
+| Crossbow | MARKED | Fireball | 伤害 ×1.35 |
+| Spear | PIERCE_STACK | BloodFrenzy | AOE 半径 ×1.5 |
+
+**新增模块**: `weapon_types.h` / `weapon_defs.h/cpp` / `weapon_component.h/cpp` / `hit_detection.h/cpp` / `weapon_executor.h/cpp` / `weapons.json`
+**测试**: 71 个武器系统测试 (weapon_test / weapon_special_test / equipment_test / synergy_test)
 
 ---
 

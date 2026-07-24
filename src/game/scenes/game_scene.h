@@ -123,6 +123,9 @@ public:
     // VFX
     std::vector<Effect> active_effects;
 
+    // G9.1: weapon projectiles (crossbow bolts)
+    std::vector<Projectile> weapon_projectiles;
+
     // 信号
     Object::Signal<> on_floor_cleared;
     Object::Signal<int> on_player_leveled;

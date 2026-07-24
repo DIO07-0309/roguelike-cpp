@@ -18,6 +18,7 @@ BuiltinProvider::BuiltinProvider() {
         {"meta",     "resources/meta_nodes.json"},
         {"skill",    "resources/skills.json"},
         {"item",     "resources/items.json"},
+        {"weapon",   "resources/weapons.json"},
     };
 }
 

@@ -58,6 +58,14 @@ enum class GameEventType {
     FLOOR_ENTER,
     FLOOR_CLEAR,
 
+    // ── G9: Weapon combo events ──
+    WEAPON_STAGE_1,
+    WEAPON_STAGE_2,
+    WEAPON_SPECIAL,
+
+    // ── G9.3: Weapon-skill synergy ──
+    WEAPON_ATTACK_COMPLETE,
+
     // ── 游戏 ──
     GAME_CLEAR,
     GAME_OVER,

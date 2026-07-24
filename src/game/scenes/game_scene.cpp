@@ -18,6 +18,7 @@
 #include "rule_chain.h"         // G1 Step4
 #include "data/boss_defs.h"     // G1 Step6
 #include "core/replay/state_hash.h"  // G4.5
+#include "systems/weapon_executor.h"  // G9.1
 #include "core/sim/sim_ai.h"         // G5.6
 #include "core/sim/sim_runner.h"     // G5.6
 #include "ai/agents/bt_agent.h"      // G8.1
@@ -597,6 +598,27 @@ void GameScene::_process(double delta) {
     active_effects.erase(std::remove_if(active_effects.begin(), active_effects.end(),
         [](auto& fx) { return fx.elapsed >= fx.duration; }), active_effects.end());
 
+    // G9.1: weapon tick + specials + projectiles
+    player->weapon.tick(dt);
+    {
+        std::vector<Monster*> mlist;
+        for (auto& m : monsters) mlist.push_back(m.get());
+        auto spec_results = WeaponExecutor::tick_specials(player.get(), mlist, dt);
+        auto proj_results = WeaponExecutor::tick_projectiles(weapon_projectiles, mlist, dt);
+        for (auto& r : spec_results) {
+            _boss.dmg_done += r.damage;
+            _presentation.spawn_damage(r.hit_point.x, r.hit_point.y, r.damage,
+                r.is_crit ? Color{255,220,30,255} : Color{255,200,100,255}, 0.5f);
+            if (r.is_killing_blow) _combat.on_monster_killed(r.target);
+        }
+        for (auto& r : proj_results) {
+            _boss.dmg_done += r.damage;
+            _presentation.spawn_damage(r.hit_point.x, r.hit_point.y, r.damage,
+                Color{255,180,50,255}, 0.5f);
+            if (r.is_killing_blow) _combat.on_monster_killed(r.target);
+        }
+    }
+
     // D4.6 Step3: FlowDirector tick
     _gameplay.flow.tick(dt);
 
@@ -942,6 +964,15 @@ void GameScene::_render() {
     // D5 Step4: Boss战场绘制
     _boss.arena.draw(_cam_x, _cam_y);
 
+    // G9.1: draw weapon projectiles
+    for (auto& p : weapon_projectiles) {
+        if (!p.alive) continue;
+        float sx = p.pos.x - _cam_x, sy = p.pos.y - _cam_y;
+        Color pc = p.piercing ? Color{255,180,40,255} : Color{200,160,100,255};
+        DrawCircle(sx, sy, p.piercing ? 6.0f : 4.0f, pc);
+        DrawCircle(sx, sy, 2.0f, {255,255,220,180});
+    }
+
     // C1: 伤害数字 (世界坐标→屏幕)
     for (auto& df : _presentation.damage_floats) {
         float sx = df.x - _cam_x, sy = df.y - _cam_y - (0.6f - df.lifetime) * 30;
@@ -958,6 +989,16 @@ void GameScene::_render() {
                         _get_boss(), _show_relic_panel,
                         inventory_open, inventory_cursor,
                         _presentation.room_msg, _presentation.room_msg_timer, sw, sh);
+
+    // G9.1: Combo stage UI (bottom center of screen)
+    if (player->weapon.weapon_type() != WeaponType::FIST && player->weapon.combo_index() > 0) {
+        int stage = player->weapon.combo_index() + 1; // 1-indexed display
+        char mark[4];
+        snprintf(mark, sizeof(mark), "%d", stage);
+        Color sc = stage >= 3 ? Color{255,200,40,220} : Color{200,200,200,180};
+        int fs = stage >= 3 ? 28 : 22;
+        DrawText(mark, sw/2 - 10, sh - 60, fs, sc);
+    }
 
 #ifdef _DEBUG
     // D9: Debug overlay (右上角, fps/floor/seed/build/monsters)

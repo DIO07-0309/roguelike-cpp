@@ -1,0 +1,259 @@
+{
+  "weapons": [
+    {
+      "id": "fist_basic", "type": "FIST", "name": "拳头", "rarity": "common",
+      "base_damage": 0, "base_range": 1.0, "combo_timeout": 0.80,
+      "stages": [
+        {"mult":1.0,"shape":"CIRCLE","range":1.0,"recovery":0.15,"windup":0.03,"hit_frame":0.08,"cancel_window":0.7,"vfx_recipe":"melee_hit","camera_shake":1.5,"sfx":"melee"}
+      ],
+      "rare_names":["拳头","拳头"], "epic_names":["拳头","拳头"], "legendary_name":"拳头",
+      "affix":{"type":"","value":0}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[180,180,180,255],[180,180,180,255],[180,180,180,255]]
+    },
+
+    {
+      "id": "dagger_common", "type": "DAGGER", "name": "匕首", "rarity": "common",
+      "base_damage": 5, "base_range": 1.0, "combo_timeout": 0.80,
+      "stages": [
+        {"mult":1.00,"shape":"SECTOR","range":1.0,"width":90,"recovery":0.20,"windup":0.03,"hit_frame":0.10,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":2.0,"sfx":"slash"},
+        {"mult":1.00,"shape":"SECTOR","range":1.0,"width":60,"recovery":0.25,"windup":0.03,"hit_frame":0.10,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":2.5,"sfx":"slash"},
+        {"mult":1.15,"shape":"CAPSULE","range":1.5,"width":0.4,"recovery":0.35,"windup":0.05,"hit_frame":0.15,"cancel_window":0.3,"vfx_recipe":"skill_slash","camera_shake":4.0,"sfx":"melee"}
+      ],
+      "rare_names":["暗影猎手","血牙"], "epic_names":["夜魔之刃","深渊獠牙"], "legendary_name":"恶魔之爪",
+      "affix":{"type":"bleed","value":15}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[100,180,220,255],[160,100,220,255],[255,100,30,255]]
+    },
+    {
+      "id": "dagger_rare", "type": "DAGGER", "name": "匕首", "rarity": "rare",
+      "base_damage": 8, "base_range": 1.0, "combo_timeout": 0.80,
+      "stages": [
+        {"mult":1.05,"shape":"SECTOR","range":1.0,"width":95,"recovery":0.18,"windup":0.03,"hit_frame":0.09,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":2.5,"sfx":"slash"},
+        {"mult":1.05,"shape":"SECTOR","range":1.0,"width":65,"recovery":0.22,"windup":0.03,"hit_frame":0.09,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":3.0,"sfx":"slash"},
+        {"mult":1.25,"shape":"CAPSULE","range":1.6,"width":0.5,"recovery":0.32,"windup":0.05,"hit_frame":0.14,"cancel_window":0.3,"vfx_recipe":"skill_slash","camera_shake":5.0,"sfx":"melee"}
+      ],
+      "rare_names":["暗影猎手","血牙"], "epic_names":["夜魔之刃","深渊獠牙"], "legendary_name":"恶魔之爪",
+      "affix":{"type":"bleed","value":15}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[100,180,220,255],[160,100,220,255],[255,100,30,255]]
+    },
+    {
+      "id": "dagger_epic", "type": "DAGGER", "name": "匕首", "rarity": "epic",
+      "base_damage": 12, "base_range": 1.1, "combo_timeout": 0.85,
+      "stages": [
+        {"mult":1.10,"shape":"SECTOR","range":1.1,"width":100,"recovery":0.16,"windup":0.02,"hit_frame":0.08,"cancel_window":0.7,"vfx_recipe":"melee_hit","camera_shake":3.0,"sfx":"slash"},
+        {"mult":1.10,"shape":"SECTOR","range":1.1,"width":70,"recovery":0.20,"windup":0.02,"hit_frame":0.08,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":3.5,"sfx":"slash"},
+        {"mult":1.40,"shape":"CAPSULE","range":1.8,"width":0.5,"recovery":0.28,"windup":0.04,"hit_frame":0.12,"cancel_window":0.4,"vfx_recipe":"skill_slash","camera_shake":6.0,"sfx":"melee"}
+      ],
+      "rare_names":["暗影猎手","血牙"], "epic_names":["夜魔之刃","深渊獠牙"], "legendary_name":"恶魔之爪",
+      "affix":{"type":"bleed","value":20}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[100,180,220,255],[160,100,220,255],[255,100,30,255]]
+    },
+    {
+      "id": "dagger_legendary", "type": "DAGGER", "name": "匕首", "rarity": "legendary",
+      "base_damage": 18, "base_range": 1.2, "combo_timeout": 0.90,
+      "stages": [
+        {"mult":1.15,"shape":"SECTOR","range":1.2,"width":105,"recovery":0.14,"windup":0.02,"hit_frame":0.07,"cancel_window":0.7,"vfx_recipe":"melee_hit","camera_shake":4.0,"sfx":"slash"},
+        {"mult":1.15,"shape":"SECTOR","range":1.2,"width":75,"recovery":0.18,"windup":0.02,"hit_frame":0.07,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":4.5,"sfx":"slash"},
+        {"mult":1.60,"shape":"CAPSULE","range":2.0,"width":0.6,"recovery":0.25,"windup":0.03,"hit_frame":0.10,"cancel_window":0.4,"vfx_recipe":"skill_slash","camera_shake":8.0,"sfx":"melee"}
+      ],
+      "rare_names":["暗影猎手","血牙"], "epic_names":["夜魔之刃","深渊獠牙"], "legendary_name":"恶魔之爪",
+      "affix":{"type":"bleed","value":25}, "legendary_effect":"dagger_bleed",
+      "quality_colors": [[180,180,180,255],[100,180,220,255],[160,100,220,255],[255,100,30,255]]
+    },
+
+    {
+      "id": "sword_common", "type": "SWORD", "name": "长剑", "rarity": "common",
+      "base_damage": 6, "base_range": 2.0, "combo_timeout": 0.85,
+      "stages": [
+        {"mult":1.20,"shape":"RECTANGLE","range":2.0,"width":0.8,"recovery":0.35,"windup":0.15,"hit_frame":0.22,"cancel_window":0.3,"vfx_recipe":"skill_slash","camera_shake":6.0,"sfx":"melee"},
+        {"mult":1.00,"shape":"SECTOR","range":2.0,"width":120,"recovery":0.25,"windup":0.05,"hit_frame":0.12,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":3.0,"sfx":"slash"},
+        {"mult":0.80,"shape":"CAPSULE","range":2.0,"width":1.5,"recovery":0.45,"windup":0.20,"hit_frame":0.30,"cancel_window":0.2,"vfx_recipe":"boss_cone_attack","camera_shake":14.0,"sfx":"melee"}
+      ],
+      "rare_names":["破军剑","苍炎剑"], "epic_names":["天罡剑","赤霄"], "legendary_name":"倚天剑",
+      "affix":{"type":"range_boost","value":0.5}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[140,200,220,255],[100,160,220,255],[255,180,30,255]]
+    },
+    {
+      "id": "sword_rare", "type": "SWORD", "name": "长剑", "rarity": "rare",
+      "base_damage": 9, "base_range": 2.1, "combo_timeout": 0.85,
+      "stages": [
+        {"mult":1.30,"shape":"RECTANGLE","range":2.1,"width":0.9,"recovery":0.32,"windup":0.13,"hit_frame":0.20,"cancel_window":0.3,"vfx_recipe":"skill_slash","camera_shake":7.0,"sfx":"melee"},
+        {"mult":1.05,"shape":"SECTOR","range":2.1,"width":125,"recovery":0.22,"windup":0.04,"hit_frame":0.11,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":3.5,"sfx":"slash"},
+        {"mult":0.85,"shape":"CAPSULE","range":2.1,"width":1.6,"recovery":0.42,"windup":0.18,"hit_frame":0.28,"cancel_window":0.2,"vfx_recipe":"boss_cone_attack","camera_shake":16.0,"sfx":"melee"}
+      ],
+      "rare_names":["破军剑","苍炎剑"], "epic_names":["天罡剑","赤霄"], "legendary_name":"倚天剑",
+      "affix":{"type":"range_boost","value":0.5}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[140,200,220,255],[100,160,220,255],[255,180,30,255]]
+    },
+    {
+      "id": "sword_epic", "type": "SWORD", "name": "长剑", "rarity": "epic",
+      "base_damage": 14, "base_range": 2.2, "combo_timeout": 0.90,
+      "stages": [
+        {"mult":1.40,"shape":"RECTANGLE","range":2.2,"width":1.0,"recovery":0.30,"windup":0.12,"hit_frame":0.18,"cancel_window":0.4,"vfx_recipe":"skill_slash","camera_shake":8.0,"sfx":"melee"},
+        {"mult":1.10,"shape":"SECTOR","range":2.2,"width":130,"recovery":0.20,"windup":0.04,"hit_frame":0.10,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":4.0,"sfx":"slash"},
+        {"mult":0.90,"shape":"CAPSULE","range":2.3,"width":1.8,"recovery":0.38,"windup":0.16,"hit_frame":0.26,"cancel_window":0.3,"vfx_recipe":"boss_cone_attack","camera_shake":18.0,"sfx":"melee"}
+      ],
+      "rare_names":["破军剑","苍炎剑"], "epic_names":["天罡剑","赤霄"], "legendary_name":"倚天剑",
+      "affix":{"type":"range_boost","value":0.5}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[140,200,220,255],[100,160,220,255],[255,180,30,255]]
+    },
+    {
+      "id": "sword_legendary", "type": "SWORD", "name": "长剑", "rarity": "legendary",
+      "base_damage": 22, "base_range": 2.5, "combo_timeout": 0.95,
+      "stages": [
+        {"mult":1.55,"shape":"RECTANGLE","range":2.5,"width":1.2,"recovery":0.27,"windup":0.10,"hit_frame":0.16,"cancel_window":0.4,"vfx_recipe":"skill_slash","camera_shake":10.0,"sfx":"melee"},
+        {"mult":1.15,"shape":"SECTOR","range":2.5,"width":140,"recovery":0.18,"windup":0.03,"hit_frame":0.09,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":5.0,"sfx":"slash"},
+        {"mult":1.00,"shape":"CAPSULE","range":2.5,"width":2.0,"recovery":0.35,"windup":0.14,"hit_frame":0.24,"cancel_window":0.3,"vfx_recipe":"boss_cone_attack","camera_shake":22.0,"sfx":"melee"}
+      ],
+      "rare_names":["破军剑","苍炎剑"], "epic_names":["天罡剑","赤霄"], "legendary_name":"倚天剑",
+      "affix":{"type":"range_boost","value":0.5}, "legendary_effect":"sword_wave",
+      "quality_colors": [[180,180,180,255],[140,200,220,255],[100,160,220,255],[255,180,30,255]]
+    },
+
+    {
+      "id": "nunchaku_common", "type": "NUNCHAKU", "name": "双截棍", "rarity": "common",
+      "base_damage": 5, "base_range": 3.0, "min_range": 2.0, "max_range": 5.0, "combo_timeout": 0.85,
+      "stages": [
+        {"mult":1.00,"shape":"CAPSULE","range":3.0,"width":1.2,"recovery":0.22,"windup":0.05,"hit_frame":0.12,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":3.0,"sfx":"slash"},
+        {"mult":1.00,"shape":"CAPSULE","range":3.5,"width":1.0,"recovery":0.25,"windup":0.04,"hit_frame":0.10,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":3.5,"sfx":"slash"},
+        {"mult":0.80,"shape":"CIRCLE","range":4.0,"width":0,"recovery":0.40,"windup":0.10,"hit_frame":0.20,"cancel_window":0.2,"vfx_recipe":"skill_chain_lightning","camera_shake":5.0,"sfx":"melee"}
+      ],
+      "rare_names":["铁流双节","玄木双棍"], "epic_names":["雷鸣双节","破风棍"], "legendary_name":"李小龙",
+      "affix":{"type":"damage_ramp","value":0.08}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[180,160,100,255],[220,80,60,255],[255,220,40,255]]
+    },
+    {
+      "id": "nunchaku_rare", "type": "NUNCHAKU", "name": "双截棍", "rarity": "rare",
+      "base_damage": 8, "base_range": 3.2, "min_range": 2.0, "max_range": 5.5, "combo_timeout": 0.88,
+      "stages": [
+        {"mult":1.05,"shape":"CAPSULE","range":3.2,"width":1.3,"recovery":0.20,"windup":0.04,"hit_frame":0.11,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":3.5,"sfx":"slash"},
+        {"mult":1.05,"shape":"CAPSULE","range":3.7,"width":1.1,"recovery":0.23,"windup":0.04,"hit_frame":0.09,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":4.0,"sfx":"slash"},
+        {"mult":0.85,"shape":"CIRCLE","range":4.2,"width":0,"recovery":0.37,"windup":0.09,"hit_frame":0.18,"cancel_window":0.2,"vfx_recipe":"skill_chain_lightning","camera_shake":6.0,"sfx":"melee"}
+      ],
+      "rare_names":["铁流双节","玄木双棍"], "epic_names":["雷鸣双节","破风棍"], "legendary_name":"李小龙",
+      "affix":{"type":"damage_ramp","value":0.08}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[180,160,100,255],[220,80,60,255],[255,220,40,255]]
+    },
+    {
+      "id": "nunchaku_epic", "type": "NUNCHAKU", "name": "双截棍", "rarity": "epic",
+      "base_damage": 12, "base_range": 3.5, "min_range": 2.0, "max_range": 6.0, "combo_timeout": 0.92,
+      "stages": [
+        {"mult":1.10,"shape":"CAPSULE","range":3.5,"width":1.4,"recovery":0.18,"windup":0.04,"hit_frame":0.10,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":4.0,"sfx":"slash"},
+        {"mult":1.10,"shape":"CAPSULE","range":4.0,"width":1.2,"recovery":0.20,"windup":0.03,"hit_frame":0.08,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":4.5,"sfx":"slash"},
+        {"mult":0.92,"shape":"CIRCLE","range":4.5,"width":0,"recovery":0.34,"windup":0.08,"hit_frame":0.16,"cancel_window":0.3,"vfx_recipe":"skill_chain_lightning","camera_shake":7.0,"sfx":"melee"}
+      ],
+      "rare_names":["铁流双节","玄木双棍"], "epic_names":["雷鸣双节","破风棍"], "legendary_name":"李小龙",
+      "affix":{"type":"damage_ramp","value":0.10}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[180,160,100,255],[220,80,60,255],[255,220,40,255]]
+    },
+    {
+      "id": "nunchaku_legendary", "type": "NUNCHAKU", "name": "双截棍", "rarity": "legendary",
+      "base_damage": 18, "base_range": 4.0, "min_range": 2.0, "max_range": 6.5, "combo_timeout": 0.95,
+      "stages": [
+        {"mult":1.15,"shape":"CAPSULE","range":4.0,"width":1.5,"recovery":0.16,"windup":0.03,"hit_frame":0.09,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":5.0,"sfx":"slash"},
+        {"mult":1.15,"shape":"CAPSULE","range":4.5,"width":1.3,"recovery":0.18,"windup":0.03,"hit_frame":0.07,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":5.5,"sfx":"slash"},
+        {"mult":1.00,"shape":"CIRCLE","range":5.0,"width":0,"recovery":0.30,"windup":0.07,"hit_frame":0.14,"cancel_window":0.3,"vfx_recipe":"skill_chain_lightning","camera_shake":9.0,"sfx":"melee"}
+      ],
+      "rare_names":["铁流双节","玄木双棍"], "epic_names":["雷鸣双节","破风棍"], "legendary_name":"李小龙",
+      "affix":{"type":"damage_ramp","value":0.12}, "legendary_effect":"nunchaku_hits",
+      "quality_colors": [[180,180,180,255],[180,160,100,255],[220,80,60,255],[255,220,40,255]]
+    },
+
+    {
+      "id": "crossbow_common", "type": "CROSSBOW", "name": "连弩", "rarity": "common",
+      "base_damage": 6, "base_range": 10.0, "combo_timeout": 0.85,
+      "stages": [
+        {"mult":1.00,"shape":"PROJECTILE","range":10.0,"width":0.3,"recovery":0.30,"windup":0.05,"hit_frame":0.15,"cancel_window":0.5,"vfx_recipe":"skill_fireball","camera_shake":2.0,"sfx":"bolt"},
+        {"mult":1.00,"shape":"PROJECTILE","range":10.0,"width":15,"recovery":0.35,"windup":0.05,"hit_frame":0.15,"cancel_window":0.4,"vfx_recipe":"skill_fireball","camera_shake":3.0,"sfx":"bolt"},
+        {"mult":2.00,"shape":"PROJECTILE","range":12.0,"width":0.5,"recovery":0.50,"windup":0.25,"hit_frame":0.30,"cancel_window":0.1,"vfx_recipe":"skill_fireball","camera_shake":10.0,"sfx":"bolt"}
+      ],
+      "rare_names":["迅影弩","寒星弩"], "epic_names":["天机弩","破晓弩"], "legendary_name":"东风破",
+      "affix":{"type":"cd_reduce","value":0.2}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[140,200,160,255],[200,140,60,255],[255,200,50,255]]
+    },
+    {
+      "id": "crossbow_rare", "type": "CROSSBOW", "name": "连弩", "rarity": "rare",
+      "base_damage": 9, "base_range": 10.5, "combo_timeout": 0.85,
+      "stages": [
+        {"mult":1.05,"shape":"PROJECTILE","range":10.5,"width":0.35,"recovery":0.28,"windup":0.04,"hit_frame":0.14,"cancel_window":0.5,"vfx_recipe":"skill_fireball","camera_shake":2.5,"sfx":"bolt"},
+        {"mult":1.05,"shape":"PROJECTILE","range":10.5,"width":16,"recovery":0.33,"windup":0.04,"hit_frame":0.14,"cancel_window":0.4,"vfx_recipe":"skill_fireball","camera_shake":3.5,"sfx":"bolt"},
+        {"mult":2.20,"shape":"PROJECTILE","range":13.0,"width":0.55,"recovery":0.48,"windup":0.22,"hit_frame":0.28,"cancel_window":0.1,"vfx_recipe":"skill_fireball","camera_shake":12.0,"sfx":"bolt"}
+      ],
+      "rare_names":["迅影弩","寒星弩"], "epic_names":["天机弩","破晓弩"], "legendary_name":"东风破",
+      "affix":{"type":"cd_reduce","value":0.2}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[140,200,160,255],[200,140,60,255],[255,200,50,255]]
+    },
+    {
+      "id": "crossbow_epic", "type": "CROSSBOW", "name": "连弩", "rarity": "epic",
+      "base_damage": 14, "base_range": 11.0, "combo_timeout": 0.90,
+      "stages": [
+        {"mult":1.10,"shape":"PROJECTILE","range":11.0,"width":0.4,"recovery":0.25,"windup":0.04,"hit_frame":0.13,"cancel_window":0.6,"vfx_recipe":"skill_fireball","camera_shake":3.0,"sfx":"bolt"},
+        {"mult":1.10,"shape":"PROJECTILE","range":11.0,"width":17,"recovery":0.30,"windup":0.04,"hit_frame":0.13,"cancel_window":0.5,"vfx_recipe":"skill_fireball","camera_shake":4.0,"sfx":"bolt"},
+        {"mult":2.50,"shape":"PROJECTILE","range":14.0,"width":0.6,"recovery":0.45,"windup":0.20,"hit_frame":0.26,"cancel_window":0.1,"vfx_recipe":"skill_fireball","camera_shake":14.0,"sfx":"bolt"}
+      ],
+      "rare_names":["迅影弩","寒星弩"], "epic_names":["天机弩","破晓弩"], "legendary_name":"东风破",
+      "affix":{"type":"cd_reduce","value":0.25}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[140,200,160,255],[200,140,60,255],[255,200,50,255]]
+    },
+    {
+      "id": "crossbow_legendary", "type": "CROSSBOW", "name": "连弩", "rarity": "legendary",
+      "base_damage": 22, "base_range": 12.0, "combo_timeout": 0.95,
+      "stages": [
+        {"mult":1.15,"shape":"PROJECTILE","range":12.0,"width":0.45,"recovery":0.22,"windup":0.03,"hit_frame":0.12,"cancel_window":0.6,"vfx_recipe":"skill_fireball","camera_shake":4.0,"sfx":"bolt"},
+        {"mult":1.15,"shape":"PROJECTILE","range":12.0,"width":18,"recovery":0.28,"windup":0.03,"hit_frame":0.12,"cancel_window":0.5,"vfx_recipe":"skill_fireball","camera_shake":5.0,"sfx":"bolt"},
+        {"mult":2.80,"shape":"PROJECTILE","range":15.0,"width":0.7,"recovery":0.42,"windup":0.18,"hit_frame":0.24,"cancel_window":0.1,"vfx_recipe":"skill_fireball","camera_shake":18.0,"sfx":"bolt"}
+      ],
+      "rare_names":["迅影弩","寒星弩"], "epic_names":["天机弩","破晓弩"], "legendary_name":"东风破",
+      "affix":{"type":"cd_reduce","value":0.30}, "legendary_effect":"crossbow_power",
+      "quality_colors": [[180,180,180,255],[140,200,160,255],[200,140,60,255],[255,200,50,255]]
+    },
+
+    {
+      "id": "spear_common", "type": "SPEAR", "name": "长矛", "rarity": "common",
+      "base_damage": 5, "base_range": 6.0, "combo_timeout": 0.85,
+      "stages": [
+        {"mult":1.00,"shape":"RECTANGLE","range":6.0,"width":0.5,"recovery":0.28,"windup":0.06,"hit_frame":0.14,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":2.5,"sfx":"slash"},
+        {"mult":1.20,"shape":"RECTANGLE","range":6.0,"width":0.6,"recovery":0.32,"windup":0.08,"hit_frame":0.16,"cancel_window":0.4,"vfx_recipe":"skill_slash","camera_shake":5.0,"sfx":"slash"},
+        {"mult":1.10,"shape":"SECTOR","range":6.0,"width":30,"recovery":0.45,"windup":0.12,"hit_frame":0.22,"cancel_window":0.2,"vfx_recipe":"boss_circle_aoe","camera_shake":7.0,"sfx":"melee"}
+      ],
+      "rare_names":["追风枪","烈阳枪"], "epic_names":["苍龙枪","破军长矛"], "legendary_name":"惊破天",
+      "affix":{"type":"pierce_bonus","value":0.15}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[180,140,100,255],[100,180,140,255],[255,200,60,255]]
+    },
+    {
+      "id": "spear_rare", "type": "SPEAR", "name": "长矛", "rarity": "rare",
+      "base_damage": 8, "base_range": 6.3, "combo_timeout": 0.88,
+      "stages": [
+        {"mult":1.05,"shape":"RECTANGLE","range":6.3,"width":0.55,"recovery":0.26,"windup":0.05,"hit_frame":0.13,"cancel_window":0.5,"vfx_recipe":"melee_hit","camera_shake":3.0,"sfx":"slash"},
+        {"mult":1.30,"shape":"RECTANGLE","range":6.3,"width":0.65,"recovery":0.30,"windup":0.07,"hit_frame":0.15,"cancel_window":0.4,"vfx_recipe":"skill_slash","camera_shake":6.0,"sfx":"slash"},
+        {"mult":1.15,"shape":"SECTOR","range":6.3,"width":32,"recovery":0.42,"windup":0.11,"hit_frame":0.20,"cancel_window":0.2,"vfx_recipe":"boss_circle_aoe","camera_shake":8.0,"sfx":"melee"}
+      ],
+      "rare_names":["追风枪","烈阳枪"], "epic_names":["苍龙枪","破军长矛"], "legendary_name":"惊破天",
+      "affix":{"type":"pierce_bonus","value":0.15}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[180,140,100,255],[100,180,140,255],[255,200,60,255]]
+    },
+    {
+      "id": "spear_epic", "type": "SPEAR", "name": "长矛", "rarity": "epic",
+      "base_damage": 13, "base_range": 6.5, "combo_timeout": 0.90,
+      "stages": [
+        {"mult":1.10,"shape":"RECTANGLE","range":6.5,"width":0.6,"recovery":0.24,"windup":0.05,"hit_frame":0.12,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":3.5,"sfx":"slash"},
+        {"mult":1.40,"shape":"RECTANGLE","range":6.5,"width":0.7,"recovery":0.28,"windup":0.07,"hit_frame":0.14,"cancel_window":0.5,"vfx_recipe":"skill_slash","camera_shake":7.0,"sfx":"slash"},
+        {"mult":1.25,"shape":"SECTOR","range":6.8,"width":35,"recovery":0.38,"windup":0.10,"hit_frame":0.18,"cancel_window":0.3,"vfx_recipe":"boss_circle_aoe","camera_shake":10.0,"sfx":"melee"}
+      ],
+      "rare_names":["追风枪","烈阳枪"], "epic_names":["苍龙枪","破军长矛"], "legendary_name":"惊破天",
+      "affix":{"type":"pierce_bonus","value":0.20}, "legendary_effect":"",
+      "quality_colors": [[180,180,180,255],[180,140,100,255],[100,180,140,255],[255,200,60,255]]
+    },
+    {
+      "id": "spear_legendary", "type": "SPEAR", "name": "长矛", "rarity": "legendary",
+      "base_damage": 20, "base_range": 7.0, "combo_timeout": 0.95,
+      "stages": [
+        {"mult":1.15,"shape":"RECTANGLE","range":7.0,"width":0.7,"recovery":0.22,"windup":0.04,"hit_frame":0.11,"cancel_window":0.6,"vfx_recipe":"melee_hit","camera_shake":4.0,"sfx":"slash"},
+        {"mult":1.55,"shape":"RECTANGLE","range":7.0,"width":0.8,"recovery":0.25,"windup":0.06,"hit_frame":0.13,"cancel_window":0.5,"vfx_recipe":"skill_slash","camera_shake":9.0,"sfx":"slash"},
+        {"mult":1.35,"shape":"SECTOR","range":7.0,"width":38,"recovery":0.35,"windup":0.09,"hit_frame":0.16,"cancel_window":0.3,"vfx_recipe":"boss_circle_aoe","camera_shake":12.0,"sfx":"melee"}
+      ],
+      "rare_names":["追风枪","烈阳枪"], "epic_names":["苍龙枪","破军长矛"], "legendary_name":"惊破天",
+      "affix":{"type":"pierce_bonus","value":0.25}, "legendary_effect":"spear_count",
+      "quality_colors": [[180,180,180,255],[180,140,100,255],[100,180,140,255],[255,200,60,255]]
+    }
+  ]
+}

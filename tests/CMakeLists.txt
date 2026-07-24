@@ -111,3 +111,9 @@ target_include_directories(q_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_test(NAME q_test COMMAND q_test)
 
 add_roguelike_test(boot_test        integration/boot_test.cpp)
+
+# G9: Weapon system tests
+add_roguelike_test(weapon_test      weapon/weapon_test.cpp)
+add_roguelike_test(weapon_special_test weapon/weapon_special_test.cpp)
+add_roguelike_test(equipment_test   weapon/equipment_test.cpp)
+add_roguelike_test(synergy_test     weapon/synergy_test.cpp)

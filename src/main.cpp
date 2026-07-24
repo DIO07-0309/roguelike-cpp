@@ -34,6 +34,7 @@
 #include "data/meta_node_defs.h"
 #include "data/skill_defs.h"
 #include "data/item_defs.h"
+#include "data/weapon_defs.h"     // G9
 #include "data/vfx_recipe.h"      // G5.8.5
 #include "systems/combat_system.h"
 #include "ai/rl/environment.h"         // G8.4
@@ -163,6 +164,7 @@ int main() {
     builder.register_module("meta",     load_meta_node_defs_from_json);
     builder.register_module("skill",    load_skill_defs_from_json);
     builder.register_module("item",     load_item_defs_from_json);
+    builder.register_module("weapon",   load_weapon_defs_from_json);
 
     // ── G4.4: ModManager 驱动 + 依赖解析 ──
     {
