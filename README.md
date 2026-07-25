@@ -186,14 +186,90 @@ python tools/extract_chars.py      # 提取 CJK 字符
 
 ---
 
-## 开发记录
+## 开发进度
 
-| Milestone | 状态 |
-|-----------|------|
-| M1–M30 | 游戏全部系统（Boss/Buff/房间/圣物/NPC/任务/事件/结局） | ✅ |
-| G1–G4 | 数据驱动重构、Mod 系统、存档升级、Replay | ✅ |
-| G5 | 技能扩展 (20 skill)、表现层 (VFX/Audio/Camera) | ✅ |
-| G6 | 世界层 (Biome/Landmark/Hazard/Encounter) | ✅ |
-| G7 | 工程质量 (Validator/Test/Simulation/ModSDK) | ✅ |
-| G8 | 智能 AI (BT/Navigation/MCTS/RL) | ✅ |
-| **G9** | **武器系统重写 (6武器×3段连击/命中判定/弹道/协同)** | ✅ |
+| Milestone | 内容 | 状态 |
+|-----------|------|------|
+| M1 | CMake + Raylib 窗口 + 核心框架 | ✅ |
+| M2 | 标题画面（粒子背景 + 光晕文字 + 菜单） | ✅ |
+| M3 | BSP 随机地图 + 瓦片绘制 + 摄像机 | ✅ |
+| M4 | 玩家 + 怪物 + AI + 战斗 | ✅ |
+| M5 | 装备系统（4稀有度/武器/护甲/药水/护符） | ✅ |
+| M6 | 技能系统（4主动+2被动+冷却+3级升级+时停） | ✅ |
+| M7 | Boss（3种 + BossAI + 3技能 + 狂暴 + 奖励） | ✅ |
+| M8 | 15层关卡 + 难度曲线 + Boss介绍 | ✅ |
+| M9 | 教程（7阶段 + P跳过）+ 选关 | ✅ |
+| M10 | 音频（8SFX + 4BGM 程序化合成） | ✅ |
+| M11 | 存档系统（JSON 完整序列化） | ✅ |
+| M12 | 日志系统（game.log + crash.log） | ✅ |
+| M13 | Buff 系统（配置化/存档/HUD/玩法接入/触发统一） | ✅ |
+| M14 | 特殊房间系统（祭坛/宝箱/泉水 + 发现提示 + 消息条 + Seed驱动存档恢复） | ✅ |
+| M15 | 特殊房间内容深化（祭坛4结果池 / 宝箱品质分层 / 泉水净化） | ✅ |
+| M16 | 特殊房间体验增强（discovered/triggered 分离 + spd存档 + 屏幕消息显示） | ✅ |
+| M17 | 圣物系统 MVP（5 relic / 宝箱掉落 / 局内效果 / HUD / rlc 存档） | ✅ |
+| M18 | 圣物内容扩展（11 relic + rarity + 宝箱权重掉落 + R 面板） | ✅ |
+| M19 | UI 引导 + 字体覆盖稳定化（操作说明 / 快捷键提示 / 首次 relic 提示 / 混合码位） | ✅ |
+| M20 | 中文显示修复：精确码位扫描替代全量CJK，字体图集从溢出变为1446码点 | ✅ |
+| D1 | FloorConfig 统一配置 + FloorNarrative 15层叙事 + 章节/楼层入场演出 + 随机旁白 | ✅ |
+| D2 | CombatCoordinator 连击系统 + MonsterType 6种 + ArenaObject 战场元素 | ✅ |
+| D3 | BuildTag 19标签 + BuildScore 评分 + BuildType 六流派判定 + 时停E2/E3进化 | ✅ |
+| D4 | EventSystem 10事件 + WorldState 标志位 + NPC/6NPC + QuestManager 7任务 + RelationshipSystem好感度 + FlowDirector动态内容 + GrowthCurve难度曲线 + RelicArchive跨局收集 + BossNarrative自适应对话 | ✅ |
+| D5 | BossEvolution 技能变体/LastStand + BossBehavior 决策/人格/记忆 + BossCommand 执行层 + BossEncounter 阶段控制 + BossReplay 学习/评估 + BossTimeline 时间线 + BossCinematic 演出/Phase2 | ✅ |
+| D6 | BossSystemDirector 统一编排 + GameplaySystemDirector 世界/叙事/结局 + PresentationSystemDirector 视觉表现 + GameFlowDirector 场景流程 + MetaProgression 局外永久成长 + EndingDirector 五结局 + CreditsScene 片尾 + PlayerController 输入分离 + CombatFeel 打击感 | ✅ |
+| G1.1 | AttackEvolutionState + AttackEvolutionManager (普攻进化 Lv1→Lv3) | ✅ |
+| G1.2 | Attack Evolution Visual Layer (剑气/旋风斩 VFX, 无Gameplay修改) | ✅ |
+| G1.3 | SkillEvolutionManager (技能使用次数驱动进化) + has_confirmed_build() | ✅ |
+| G1.4 | RuleChainManager (Boss死亡→规则激活→WorldState→后续楼层影响) | ✅ |
+| G1.5 | EnemyDef 数据模块 + enemies.json (10 enemies 全数据驱动) + spawn_monster 通用工厂 | ✅ |
+| G1.6 | BossDef 数据模块 + bosses.json (6 bosses 数据驱动) + Phase2 参数化 + Vampire 新Boss | ✅ |
+| G1.7 | Save v2: atl + skill evo/use + rule_counters 序列化 + 向后兼容旧存档 | ✅ |
+| G2.0 | Infrastructure Polish: 4 Def 统一接口 (get_all + is_loaded) + 重复 ID 检测 + 加载日志标准化 | ✅ |
+| G2.1 | Dialogue Data Driven: dialogues.json + DialogueDef + BossNarrative 重构 | ✅ |
+| G2.2 | TeamAI: TeamCoordinator + TeamDecision + MonsterAI 重构 (143→55 行) | ✅ |
+| G2.3 | Boss Arena v2: BossArenaDef + ArenaEvent + execute_event() | ✅ |
+| G2.4 | QuestDef + quests.json (12 quests) + EventBus quest events + Save v3 qst: | ✅ |
+| G2.5 | EndingDef + endings.json + Save v3 end: + ENDING_REACHED emit | ✅ |
+| G3.1 | MetaNodeDef + meta_nodes.json + MetaProgression::load_from_defs() (10 nodes) | ✅ |
+| G3.2 | SkillDef + skills.json (6 skills) + SkillFactory + _skill_id 替代 dynamic_cast | ✅ |
+| G3.3 | ItemDef + items.json (20 templates) + ItemFactory 替代硬编码数组 | ✅ |
+| G3.4 | Architecture Freeze: 命名统一 + 12 模块 API 审计 | ✅ |
+| G3.5 | Meta Reward Integration: reward_from_ending() + MetaRewardRecord 审计日志 | ✅ |
+| G4.1 | Mod Loader: IRegistryProvider + RegistryBuilder + BuiltinProvider + ModProvider + 12×_from_json | ✅ |
+| G4.1.5 | Registry Validator: cross-ref checks (Skill→Buff, Item→Skill, Enemy→Buff) + required fields | ✅ |
+| G4.2 | Namespace ID (mod_id:entry_id) + DependencyResolver + Merge v2 (topological sort) | ✅ |
+| G4.3 | Advanced Merge: MergePatch (__patch field merge) + merge_patch.h helper + BuildRecord patch | ✅ |
+| G4.4 | ModManager: scan/enable/disable/list + mods/config.json + startup summary | ✅ |
+| G4.5 | Replay Regression: ReplayFile + Recorder + Player + _is_action + state_hash + seed_rng + CLI | ✅ |
+| G5.1 | Build Diversity: BuildType 6→12 + skills 6→20 + relics 33→63 + buffs 20→25 + items 20→36 + enemies 10→23 | ✅ |
+| G5.2 | Signature Skills: IceNova/ChainLightning/ShadowStrike/BloodFrenzy/SummonSpirit | ✅ |
+| G5.3 | Enemy Archetypes: AIArchetype + SNIPER/CONTROLLER/AMBUSH/GUARDIAN + enemies 23→31 | ✅ |
+| G5.4 | Boss Rework: Whirlwind/LaserBarrage/GravityPull + per-boss Phase2 identity (6 unique) | ✅ |
+| G5.5 | Run Events: spawn rate 25→40% + ch2+双事件 + special rooms 2-3→3-5 + NOTHING权重↓ | ✅ |
+| G5.6 | Balance Pass: SimAI + SimRunner + --sim N CLI + automated 100-run balance report | ✅ |
+| G5.7 | Game Feel: hit-stop + shake + freeze boost + crit scale + combo milestone juice | ✅ |
+| G5.8.2 | BuildTheme: 7-field struct + 12 presets + dmg_color_for() 3-tier damage colors | ✅ |
+| G5.8.3 | Camera: shake/dash offset/boss landing zoom integrated | ✅ |
+| G5.8.4 | Audio Director: crossfade + boss Phase2 cue + BGM ducking | ✅ |
+| G5.8.5 | VFX Recipes: vfx_recipes.json (12 recipes/11 presets) + play_recipe() | ✅ |
+| G5.8.6 | Timeline: delay/duration/callback sequenced events + include() | ✅ |
+| G5.8.7–8 | Presentation Integration: PresentationEvent + dispatch() + Timeline sequencing | ✅ |
+| G6.1 | Biome System: 3 biomes (Prison/Volcano/Abyss) + TilePalette + enemy_pool/boss_id + biome BGM | ✅ |
+| G6.2 | Landmark System: 9 biome landmarks + SpecialRoomType.LANDMARK + DungeonGenerator placement | ✅ |
+| G6.3 | Biome Hazards: 6 environmental hazards on landmark rooms (slow/burn/confuse/deflect) | ✅ |
+| G6.4 | Biome Events: 6 risk/reward events (25% floor trigger) + floor_config BGM biome routing | ✅ |
+| G6.5 | Encounter Framework: EncounterDef/Node/Choice + multi-round dialogue + trade + 9 encounters | ✅ |
+| G6.6 | Exploration: wall_interact secrets + SpecialRoomType.SECRET 30% placement + 3 secret encounters | ✅ |
+| G6.7 | Meta Progression: EncounterDef.conditions[] + pick_encounter_by_trigger() | ✅ |
+| G7.1 | World Validator: tools/world_validator.py — 20+ JSON cross-ref checker, 0 errors 0 warnings | ✅ |
+| G7.2 | Automated Test Framework: GoogleTest + 9 suites/43 tests + CI workflow | ✅ |
+| G7.3 | Simulation & Balance: SimulationConfig + RunResult + JSON report + per-build/relic/enemy stats | ✅ |
+| G7.4 | DecisionAgent Upgrade: BuildType-aware behavioral profiles + action evaluator + --sim-all-builds | ✅ |
+| G8.1 | Behavior Tree: BTNode/Selector/Sequence/Condition/Action/Blackboard + BTAgent + 16 tests | ✅ |
+| G8.2 | Navigation: A* pathfinder + MoveToTarget BT node + 7 astar tests | ✅ |
+| G8.3 | Combat MCTS: MCTSNode + UCT search + SimulationState clone + 16 tests + --sim-ai mcts | ✅ |
+| G8.4 | RL Environment: Gym-like API + Observation + RandomAgent + QAgent + 17 tests + --rl-test/train | ✅ |
+| G9.0 | Weapon Framework: WeaponType(6)/HitShape(5) + WeaponDef registry + weapons.json (24 entries) | ✅ |
+| G9.1 | Weapon Specials: Nunchaku 5-hit auto-track / Spear 10-hit rapid / Crossbow real projectile system | ✅ |
+| G9.2 | Equipment Identity: 命名池(稀有/史诗/传奇) + Affix系统(5种) + 传奇特殊效果(5把) | ✅ |
+| G9.3 | Weapon Synergy: AttackTag→技能联动 (Sword→Ice/Dagger→Shadow/Nunchaku→Lightning/Crossbow→Fire/Spear→Blood) | ✅ |
+| G9.4 | VFX Overhaul: 近战全武器分阶段特效 + 远程光束/闪电 + 实体名称标签 + 品质命名重写 | ✅ |
