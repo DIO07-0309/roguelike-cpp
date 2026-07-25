@@ -45,7 +45,7 @@ file(GLOB_RECURSE SOURCES src/*.cpp)
 # ---- Executable ----
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# MSVC: 使用 raylibdll.lib (导入库) + 复制 raylib.dll
+# MSVC: vendored raylib dll/lib
 if(MSVC)
     set(RAYLIB_IMPLIB "${RAYLIB_DIR}/lib/raylibdll.lib")
     set(RAYLIB_DLL    "${RAYLIB_DIR}/lib/raylib.dll")
@@ -58,8 +58,8 @@ if(MSVC)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
     )
-else()
-    # MinGW / Linux / macOS — 强制 UTF-8 源文件 + 运行期字面量
+elseif(MINGW)
+    # MinGW: vendored raylib .a + .dll
     add_compile_options(-finput-charset=UTF-8 -fexec-charset=UTF-8)
     set(RAYLIB_LIB "${RAYLIB_DIR}/lib/libraylibdll.a")
     set(RAYLIB_DLL "${RAYLIB_DIR}/lib/raylib.dll")
@@ -69,6 +69,16 @@ else()
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${RAYLIB_DLL}"
                 "$<TARGET_FILE_DIR:${PROJECT_NAME}>/raylib.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
+    )
+else()
+    # Linux / macOS: system-installed raylib (from CI: cmake --install)
+    add_compile_options(-finput-charset=UTF-8 -fexec-charset=UTF-8)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        raylib m pthread dl
+    )
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_SOURCE_DIR}/assets" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
     )
