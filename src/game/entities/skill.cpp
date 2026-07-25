@@ -343,16 +343,17 @@ std::string FireballSkill::execute(Player* caster, std::vector<Monster*>& target
     if (chosen.empty()) return is_heavy ? "重·神罚没有击中任何目标" : "神罚没有击中任何目标";
 
     // G9.3: Crossbow MARKED synergy → +35% damage
-    bool crossbow_synergy = caster->last_attack.primary_tag == AttackTag::MARKED;
+    float synergy_mul = (caster->last_attack.primary_tag == AttackTag::MARKED) ? 1.35f : 1.0f;
     int total = 0;
     float base = get_effective_attack(caster) * 2.5f;
-    float power = get_power_multiplier() * (crossbow_synergy ? 1.35f : 1.0f);
+    float power = get_power_multiplier() * synergy_mul;
     for (auto* t : chosen) {
         int dmg = calculate_damage((int)(base * power),
             t->combat.get_effective_defense(AttackType::MAGICAL), AttackType::MAGICAL);
         t->combat.take_damage(dmg);
         total += dmg;
         if (is_heavy) apply_buff(t, "poison", 2);
+        // D3 Step3 E2: 燃烧地面 → 命中目标+poison
         if (evolution_level >= 2) apply_buff(t, "poison", 1);
     }
 
@@ -388,9 +389,8 @@ std::string FireballSkill::execute(Player* caster, std::vector<Monster*>& target
             }
         }
     }
-    std::string sn = crossbow_synergy ? " 协同:标记!" : "";
     std::string label = (is_heavy ? "重·" : "") + std::string("神罚Lv") + std::to_string(level);
-    return label + sn + " 命中 " + std::to_string(chosen.size())
+    return label + " 命中 " + std::to_string(chosen.size())
            + " 目标，造成 " + std::to_string(total) + " 伤害" + extra
            + (is_heavy ? " +燃烧!" : "");
 }
@@ -548,17 +548,17 @@ std::string IceNovaSkill::execute(Player* caster,std::vector<Monster*>& targets,
     float pcx=caster->entity.rect.x+caster->entity.rect.width/2;
     float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
     float radius_px=_radius*32.0f; if(evolution_level>=1)radius_px*=1.3f; if(is_heavy)radius_px*=1.5f;
-    // G9.3: Sword BLUNT synergy → bonus freeze on stun
-    bool sword_synergy = caster->last_attack.primary_tag == AttackTag::BLUNT;
     int total=0; std::string extra; float base=get_effective_attack(caster)*2.0f*get_power_multiplier();
     for(auto* t:targets){if(!t||!t->combat.is_alive)continue;
         float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);
         if(d>radius_px)continue;
         int dmg=calculate_damage((int)base,t->combat.get_effective_defense(AttackType::MAGICAL),AttackType::MAGICAL);
+        // G5.2: 碎冰 — 对已冻结目标追加伤害
         for(auto& b:t->active_buffs){if(b.id=="freeze"){dmg=dmg*(100+_shatter_bonus)/100;extra=" 碎冰!";break;}}
         t->combat.take_damage(dmg); total+=dmg;
-        if((rng()%1000)/1000.0f<0.30f || sword_synergy) apply_buff(t,"freeze",1);
-        if(sword_synergy) extra=" 协同:冻结!";
+        // G9.3: Sword BLUNT synergy → freeze guarantee
+        bool sword_syn = caster->last_attack.primary_tag == AttackTag::BLUNT;
+        if((rng()%1000)/1000.0f<0.30f || sword_syn) apply_buff(t,"freeze",1);
         if(is_heavy) apply_buff(t,"frostbite",1);
     }
     if(evolution_level>=3&&is_heavy){ // 暴风雪: 2nd wave
@@ -589,11 +589,10 @@ std::string ChainLightningSkill::execute(Player* caster,std::vector<Monster*>& t
     Monster* closest=nullptr; float best_d=99999;
     for(auto* t:alive){float d=hypotf(t->entity.rect.x+t->entity.rect.width/2-pcx,t->entity.rect.y+t->entity.rect.height/2-pcy);if(d<best_d){best_d=d;closest=t;}}
     if(!closest)return"";
-    // G9.3: Nunchaku KNOCKBACK synergy → +2 bounces + AOE shock
-    bool nunchaku_synergy = caster->last_attack.primary_tag == AttackTag::KNOCKBACK;
     int total=0,bounces=_bounces;if(evolution_level>=1)bounces+=2;if(is_heavy)bounces+=1;
-    if(nunchaku_synergy) bounces+=2;
-    if(evolution_level>=3)bounces=(int)alive.size();
+    // G9.3: Nunchaku KNOCKBACK synergy → +2 bounces
+    if(caster->last_attack.primary_tag == AttackTag::KNOCKBACK) bounces+=2;
+    if(evolution_level>=3)bounces=(int)alive.size(); // 雷暴: all
     float mult=1.0f; Monster* prev=closest;
     float base=get_effective_attack(caster)*1.8f*get_power_multiplier();
     for(int i=0;i<=bounces&&prev&&prev->combat.is_alive;i++){
@@ -604,9 +603,7 @@ std::string ChainLightningSkill::execute(Player* caster,std::vector<Monster*>& t
         mult*=(1.0f-_decay); // find next closest to prev
         Monster* next=nullptr; float nd=99999;
         for(auto* t:alive){if(t==prev)continue; float d=hypotf(t->entity.rect.x-prev->entity.rect.x,t->entity.rect.y-prev->entity.rect.y);if(d<nd){nd=d;next=t;}}
-        prev=next;}
-    std::string syn = nunchaku_synergy ? " 协同:范围电击!" : "";
-    return"连锁闪电Lv"+std::to_string(level)+" "+std::to_string(bounces)+"跳"+syn+" 造成"+std::to_string(total)+"伤害";}
+        prev=next;}return"连锁闪电Lv"+std::to_string(level)+" "+std::to_string(bounces)+"跳 造成"+std::to_string(total)+"伤害";}
 std::string ChainLightningSkill::get_level_text() const { return "Lv"+std::to_string(level)+" B"+std::to_string(_bounces)+" "+std::to_string(cooldown).substr(0,3)+"s"; }
 
 // ── ShadowStrikeSkill: 瞬移+背刺 ──
@@ -640,16 +637,14 @@ std::string ShadowStrikeSkill::execute(Player* caster,std::vector<Monster*>& tar
     // backstab check: is player behind target relative to target's "facing"?
     // Simplified: always backstab if teleport succeeded (we teleported behind)
     // G9.3: Dagger PIERCE synergy → +30% backstab damage
-    bool dagger_synergy = caster->last_attack.primary_tag == AttackTag::PIERCE;
-    float mult=_backstab_mult; if(evolution_level>=2)mult*=1.5f; if(is_heavy)mult*=1.3f;
-    if(dagger_synergy) mult*=1.3f;
+    float mult=_backstab_mult;if(evolution_level>=2)mult*=1.5f;if(is_heavy)mult*=1.3f;
+    if(caster->last_attack.primary_tag == AttackTag::PIERCE) mult*=1.3f;
     float base=get_effective_attack(caster)*1.8f*get_power_multiplier();
     int dmg=calculate_damage((int)(base*mult),t->combat.get_effective_defense(AttackType::PHYSICAL));
     t->combat.take_damage(dmg);
     if((rng()%1000)/1000.0f<0.20f)apply_buff(t,"fear",1);
     if(evolution_level>=1)apply_buff(caster,"shadow_veil",1);
-    std::string sy = dagger_synergy ? " 协同:流血暴击!" : "";
-    return"暗影突刺Lv"+std::to_string(level)+" 背刺!"+sy+" 造成"+std::to_string(dmg)+"伤害";}
+    return"暗影突刺Lv"+std::to_string(level)+" 背刺! 造成"+std::to_string(dmg)+"伤害";}
 std::string ShadowStrikeSkill::get_level_text() const { return "Lv"+std::to_string(level)+" x"+std::to_string((int)_backstab_mult)+" "+std::to_string(cooldown).substr(0,3)+"s"; }
 
 // ── BloodFrenzySkill: 自伤→AOE流血→回血 ──
@@ -669,8 +664,8 @@ std::string BloodFrenzySkill::execute(Player* caster,std::vector<Monster*>& targ
     caster->combat.current_hp=std::max(1,caster->combat.current_hp-hp_cost);
     // AOE: all nearby enemies
     float pcx=caster->entity.rect.x+caster->entity.rect.width/2;float pcy=caster->entity.rect.y+caster->entity.rect.height/2;
-    float radius_px=4.0f*32.0f; if(is_heavy)radius_px*=1.4f;
     // G9.3: Spear PIERCE_STACK synergy → +50% AOE radius
+    float radius_px=4.0f*32.0f; if(is_heavy)radius_px*=1.4f;
     if(caster->last_attack.primary_tag == AttackTag::PIERCE_STACK) radius_px*=1.5f;
     int total=0,hit_count=0;float base=get_effective_attack(caster)*1.5f*get_power_multiplier();
     for(auto* t:targets){if(!t||!t->combat.is_alive)continue;
@@ -685,9 +680,7 @@ std::string BloodFrenzySkill::execute(Player* caster,std::vector<Monster*>& targ
     // heal per hit
     int heal_per=(int)(caster->combat.max_hp*_heal_per_hit);if(evolution_level>=2)heal_per*=2;
     int healed=caster->combat.heal(hp_cost+heal_per*hit_count);
-    bool spear_syn = caster->last_attack.primary_tag == AttackTag::PIERCE_STACK;
-    std::string syn = spear_syn ? " 协同:穿刺扩大!" : "";
-    return"血怒Lv"+std::to_string(level)+" 消耗"+std::to_string(hp_cost)+"HP 命中"+std::to_string(hit_count)+"目标"+syn+" 造成"+std::to_string(total)+"伤害 回复"+std::to_string(healed)+"HP";}
+    return"血怒Lv"+std::to_string(level)+" 消耗"+std::to_string(hp_cost)+"HP 命中"+std::to_string(hit_count)+"目标 造成"+std::to_string(total)+"伤害 回复"+std::to_string(healed)+"HP";}
 std::string BloodFrenzySkill::get_level_text() const { return "Lv"+std::to_string(level)+" -"+std::to_string((int)(_hp_cost_pct*100))+"%HP "+std::to_string(cooldown).substr(0,3)+"s"; }
 
 // ── SummonSpiritSkill: 召唤友军 ──
@@ -753,8 +746,10 @@ std::unique_ptr<Skill> skill_factory_create(const std::string& skill_id) {
 }
 
 // G3.2: random_active_skill — 从 registry 随机
-std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>& exclude) {
+std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>& exclude,
+                                                  bool base_only) {
     std::vector<const SkillDef*> pool;
+    static const char* base_ids[] = {"slash","fireball","self_heal","the_world"};
     for (auto& kv : get_all_skill_defs()) {
         auto& d = kv.second;
         // 只选主动技能
@@ -763,6 +758,13 @@ std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>&
             d.class_type == "ice_nova" || d.class_type == "chain_lightning" ||
             d.class_type == "shadow_strike" || d.class_type == "blood_frenzy" ||
             d.class_type == "summon_spirit") {
+            // G9: base_only mode restricts to original 4 skills
+            if (base_only) {
+                bool is_base = false;
+                for (auto* bid : base_ids)
+                    if (d.id == std::string(bid)) { is_base = true; break; }
+                if (!is_base) continue;
+            }
             bool ex = false;
             for (auto& e : exclude) if (e == d.id || e == d.class_type) { ex = true; break; }
             if (!ex) pool.push_back(&d);
@@ -786,7 +788,7 @@ std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>&
 
 std::unique_ptr<Skill> random_skill(const std::vector<std::string>& exclude) {
     if ((rng() % 100) < 70)
-        return random_active_skill(exclude);
+        return random_active_skill(exclude, false);
     // 30%: 被动技能
     if ((rng() % 2) == 0) {
         const SkillDef* def = get_skill_def("iron_skin");

@@ -147,6 +147,11 @@ Color VFXServer::preset_color(const std::string& name) {
 void VFXServer::play_recipe(const char* recipe_id, float cx, float cy,
                              Direction dir, float tx, float ty, int level) {
     const VFXRecipe* recipe = get_vfx_recipe(recipe_id);
+    // G9.3: if direct lookup fails, try "skill_" prefix for skill recipes
+    if (!recipe) {
+        std::string prefixed = "skill_" + std::string(recipe_id);
+        recipe = get_vfx_recipe(prefixed.c_str());
+    }
     if (!recipe) {
         // fallback: generic slash + spark
         slash_arc(cx, cy, dir, 56.0f, {255, 80, 80, 200});

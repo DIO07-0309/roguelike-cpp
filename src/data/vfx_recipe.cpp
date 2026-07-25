@@ -14,7 +14,9 @@ static bool g_vfx_loaded = false;
 
 static VFXStep _parse_step(const json& j) {
     VFXStep s;
-    s.type          = j.value("type", "ring");
+    // G9-fix: recipes use "kind", loader used "type" → defaulted to "ring"
+    s.type = j.value("type", "");
+    if (s.type.empty()) s.type = j.value("kind", "ring");
     s.radius        = j.value("radius", 32.0f);
     s.count         = j.value("count", 1);
     s.duration      = j.value("duration", 0.40f);

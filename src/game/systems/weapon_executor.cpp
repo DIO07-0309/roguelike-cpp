@@ -168,6 +168,12 @@ std::vector<WeaponAttackResult> WeaponExecutor::execute(
             is_special = _try_crossbow_power(player, stage, origin, projectiles);
     }
 
+    // ── G9.3: range indicator for ranged weapons ──
+    if (def->type == WeaponType::SPEAR || def->type == WeaponType::CROSSBOW) {
+        w.range_indicator_timer = 0.25f;
+        w.range_indicator_px = rpx;
+    }
+
     // ── Normal resolution ──
     if (!is_special) {
         if (def->type == WeaponType::CROSSBOW && projectiles)

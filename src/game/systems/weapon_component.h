@@ -73,6 +73,10 @@ public:
     WeaponRuntime& runtime() { return _runtime; }
     const WeaponRuntime& runtime() const { return _runtime; }
 
+    // ── G9.3: range indicator timer (visible briefly after attack) ──
+    float range_indicator_timer = 0.0f;
+    float range_indicator_px = 0.0f;
+
 private:
     WeaponRuntime _runtime;
     const WeaponDef* _def = nullptr; // points to loaded registry entry

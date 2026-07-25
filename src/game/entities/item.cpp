@@ -3,6 +3,7 @@
 #include "skill.h"
 #include "combat_system.h"
 #include "data/item_defs.h"    // G3.3
+#include "data/weapon_defs.h"  // G9
 #include <vector>
 
 // ---- 从 item.h 移出的实现 ----
@@ -147,6 +148,21 @@ std::string ConsumableItem::use(Player* player) {
     return "使用了 " + get_description();
 }
 
+// ---- G9: pick random WeaponDef by rarity ──
+static const WeaponDef* _random_weapon_def(Rarity r, int roll) {
+    static const char* names[] = {
+        "dagger", "sword", "nunchaku", "crossbow", "spear"
+    };
+    int idx = roll % 5;
+    const char* tier = (r == Rarity::LEGENDARY) ? "legendary"
+                     : (r == Rarity::EPIC) ? "epic"
+                     : (r == Rarity::RARE) ? "rare" : "common";
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%s_%s", names[idx], tier);
+    const WeaponDef* def = get_weapon_def(buf);
+    return def ? def : get_weapon_def("fist_basic");
+}
+
 // ---- G3.3: ItemFactory — 从 registry 随机生成 ----
 std::shared_ptr<Item> generate_random_item() {
     Rarity r = random_rarity();
@@ -169,10 +185,17 @@ std::shared_ptr<Item> generate_random_item() {
     int cat = cats[rng() % cats.size()];
 
     if (cat == 0) {
-        auto& t = weapons[rng() % weapons.size()];
-        int atk = t->atk_min + (int)(rng() % (t->atk_max - t->atk_min + 1));
-        int pd = t->pdef_min + (int)(rng() % (t->pdef_max - t->pdef_min + 1));
-        return std::make_shared<EquipmentItem>(t->name, r, "weapon", atk, pd);
+        // G9: generate weapon from WeaponDef registry
+        int wroll = rng() % 100;
+        const WeaponDef* wdef = _random_weapon_def(r, wroll);
+        int tier_idx = (int)r; // 0=common, 1=rare, 2=epic, 3=legendary
+        const char* display_name = pick_weapon_name(wdef, tier_idx);
+        int atk = (int)(wdef->base_damage * rarity_mult(r));
+        if (atk < 1) atk = 1;
+        auto item = std::make_shared<EquipmentItem>(
+            display_name, r, "weapon", atk);
+        item->weapon_def_id = wdef->id;
+        return item;
     }
     if (cat == 1) {
         auto& t = armors[rng() % armors.size()];

@@ -251,7 +251,8 @@ public:
 };
 
 // 工厂
-std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>& exclude = {});
+std::unique_ptr<ActiveSkill> random_active_skill(const std::vector<std::string>& exclude = {},
+                                                  bool base_only = false);
 std::unique_ptr<Skill> random_skill(const std::vector<std::string>& exclude = {});
 std::vector<std::string> get_learned_names(const SkillManager& mgr);
 

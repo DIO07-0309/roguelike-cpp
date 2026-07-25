@@ -74,15 +74,18 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     }
     fprintf(f, "\n");
 
-    // 背包物品: name,RARITY,type,val1,val2,val3;...
+    // 背包物品: name,RARITY,type,val1,val2,val3;... G9: ,wpn_id appended for weapons
     fprintf(f, "inv:");
     for (auto& item : inv.items) {
         auto* eq = dynamic_cast<EquipmentItem*>(item.get());
         auto* cn = dynamic_cast<ConsumableItem*>(item.get());
         if (eq && eq->slot != "charm") {
-            fprintf(f, "%s,%d,%s,%d,%d,%d;",
+            fprintf(f, "%s,%d,%s,%d,%d,%d",
                 eq->base_name.c_str(), (int)eq->rarity, eq->slot.c_str(),
                 eq->atk_bonus, eq->pdef_bonus, eq->mdef_bonus);
+            if (!eq->weapon_def_id.empty())
+                fprintf(f, ",%s", eq->weapon_def_id.c_str());
+            fprintf(f, ";");
         } else if (eq) { // charm
             fprintf(f, "%s,%d,charm,0,0,0;", eq->base_name.c_str(), (int)eq->rarity);
         } else if (cn) {
@@ -101,6 +104,11 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
                 eq->slot.c_str(), eq->atk_bonus, eq->pdef_bonus, eq->mdef_bonus);
     }
     fprintf(f, "\n");
+
+    // G9: weapon_def_id for equipped weapon
+    fprintf(f, "wpn:%s\n",
+        inv.equipped["weapon"] && !inv.equipped["weapon"]->weapon_def_id.empty()
+            ? inv.equipped["weapon"]->weapon_def_id.c_str() : "");
 
     fprintf(f, "eqa:");
     if (inv.equipped["armor"]) {
@@ -337,8 +345,11 @@ SaveData* SaveManager::load_save() {
                 int a = atoi(parts[3].c_str());
                 int pd2 = atoi(parts[4].c_str());
                 int md2 = atoi(parts[5].c_str());
-                p->inventory.items.push_back(
-                    std::make_shared<EquipmentItem>(nm, rar, typ, a, pd2, md2));
+                auto ei = std::make_shared<EquipmentItem>(nm, rar, typ, a, pd2, md2);
+                // G9: restore weapon_def_id if present (7th field)
+                if (parts.size() >= 7 && !parts[6].empty())
+                    ei->weapon_def_id = parts[6];
+                p->inventory.items.push_back(ei);
             }
         }
     }
@@ -365,6 +376,13 @@ SaveData* SaveManager::load_save() {
     if (eqw) { eqw->apply(p.get()); p->inventory.equipped["weapon"] = eqw; }
     auto eqa = parseEquip("eqa");
     if (eqa) { eqa->apply(p.get()); p->inventory.equipped["armor"] = eqa; }
+
+    // G9: restore weapon_def_id for equipped weapon
+    std::string wpn_id = getS("wpn");
+    if (!wpn_id.empty()) {
+        if (eqw) eqw->weapon_def_id = wpn_id;
+        p->weapon.equip(wpn_id);
+    }
 
     // 恢复 Buff (buf:poison,2,3.50,0.20;attack_up,1,5.80,0.00;)
     std::string buf_line = getS("buf");

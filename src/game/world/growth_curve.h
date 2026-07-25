@@ -8,7 +8,7 @@
 struct GrowthCurve {
     float monster_hp;     // 怪物 HP 倍率
     float monster_atk;    // 怪物 ATK 倍率
-    float boss_hp;        // Boss HP 倍率 (叠加于 monster_hp)
+    float boss_hp;        // Boss HP 倍率
     float boss_atk;       // Boss ATK 倍率
     float elite_scale;    // Elite 乘数
     float exp_scale;      // 经验倍率

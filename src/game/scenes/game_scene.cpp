@@ -19,6 +19,8 @@
 #include "data/boss_defs.h"     // G1 Step6
 #include "core/replay/state_hash.h"  // G4.5
 #include "systems/weapon_executor.h"  // G9.1
+#include "vfx_server.h"              // G9: spear lightning VFX
+#include "data/weapon_defs.h"        // G9: Boss drop
 #include "core/sim/sim_ai.h"         // G5.6
 #include "core/sim/sim_runner.h"     // G5.6
 #include "ai/agents/bt_agent.h"      // G8.1
@@ -104,7 +106,7 @@ void GameScene::_ready() {
 void GameScene::new_game() {
     player = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
         PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
-    auto sk = random_active_skill();
+    auto sk = random_active_skill({}, true);  // G9: first skill always base 4
     player->skills.learn(std::move(sk));
 
     // D4.6 Step5: 加载Meta存档 + 重置本局统计
@@ -600,15 +602,33 @@ void GameScene::_process(double delta) {
 
     // G9.1: weapon tick + specials + projectiles
     player->weapon.tick(dt);
+    if (player->weapon.range_indicator_timer > 0.0f)
+        player->weapon.range_indicator_timer -= dt;
     {
         std::vector<Monster*> mlist;
         for (auto& m : monsters) mlist.push_back(m.get());
         auto spec_results = WeaponExecutor::tick_specials(player.get(), mlist, dt);
         auto proj_results = WeaponExecutor::tick_projectiles(weapon_projectiles, mlist, dt);
+
+        // G9: spear stage-3 lightning VFX on each rapid hit
+        if (player->weapon.runtime().special.active
+            && player->weapon.weapon_type() == WeaponType::SPEAR) {
+            float px = player->entity.rect.x + player->entity.rect.width/2;
+            float py = player->entity.rect.y + player->entity.rect.height/2;
+            VFXServer svfx;
+            for (auto& r : spec_results) {
+                svfx.lightning(px, py, r.hit_point.x, r.hit_point.y, 3,
+                    {100,180,255,240}, 0.22f);
+                svfx.ring(r.hit_point.x, r.hit_point.y, 14.0f,
+                    {100,200,255,200}, 1, 0.20f);
+            }
+            for (auto& e : svfx.effects) active_effects.push_back(e);
+        }
+
         for (auto& r : spec_results) {
             _boss.dmg_done += r.damage;
             _presentation.spawn_damage(r.hit_point.x, r.hit_point.y, r.damage,
-                r.is_crit ? Color{255,220,30,255} : Color{255,200,100,255}, 0.5f);
+                r.is_crit ? Color{255,220,30,255} : Color{100,200,255,255}, 0.5f);
             if (r.is_killing_blow) _combat.on_monster_killed(r.target);
         }
         for (auto& r : proj_results) {
@@ -689,6 +709,7 @@ void GameScene::_process(double delta) {
                     auto* m = spawn_monster(px, py, (rng()%3==0)?"orc":"slime");
                     m->combat.max_hp = (int)(m->combat.max_hp * g_growth.hp_scale(current_floor));
                     m->combat.current_hp = m->combat.max_hp;
+                    m->combat.attack = (int)(m->combat.attack * g_growth.atk_scale(current_floor));
                     monsters.emplace_back(m);
                     _gameplay.flow.mark_combat();
                 }
@@ -904,7 +925,19 @@ Monster* GameScene::_get_boss() const {
 
 void GameScene::_drop_boss_reward(Monster* boss) {
     auto [tx, ty] = game_map->pixel_to_tile(boss->entity.position.x, boss->entity.position.y);
-    auto weapon = std::make_shared<EquipmentItem>("魔渊之刃", Rarity::LEGENDARY, "weapon", 18, 3, 0);
+    // G9: Each Boss drops a different legendary weapon
+    static const char* boss_weapons[] = {
+        "spear_legendary",   // F5 暗影骑士 → 惊破天
+        "crossbow_legendary",// F10 地狱火魔 → 东风破
+        "sword_legendary",   // F15 深渊之主 → 倚天剑
+    };
+    int bf_idx = (current_floor == 5) ? 0 : (current_floor == 10) ? 1 : 2;
+    const WeaponDef* wdef = get_weapon_def(boss_weapons[bf_idx]);
+    const char* wname = wdef ? pick_weapon_name(wdef, 3) : "魔渊之刃";
+    float atk = wdef ? wdef->base_damage * rarity_mult(Rarity::LEGENDARY) : 18.0f;
+    auto weapon = std::make_shared<EquipmentItem>(wname, Rarity::LEGENDARY, "weapon",
+        (int)atk, 3, 0);
+    weapon->weapon_def_id = boss_weapons[bf_idx];
     ground_items.push_back({weapon, tx, ty});
     auto potion = std::make_shared<ConsumableItem>("神谕药剂", Rarity::LEGENDARY, "heal", 80);
     ground_items.push_back({potion, tx + 2, ty});
@@ -968,9 +1001,37 @@ void GameScene::_render() {
     for (auto& p : weapon_projectiles) {
         if (!p.alive) continue;
         float sx = p.pos.x - _cam_x, sy = p.pos.y - _cam_y;
-        Color pc = p.piercing ? Color{255,180,40,255} : Color{200,160,100,255};
-        DrawCircle(sx, sy, p.piercing ? 6.0f : 4.0f, pc);
-        DrawCircle(sx, sy, 2.0f, {255,255,220,180});
+        if (p.piercing) {
+            // Power shot: big glowing projectile + trail
+            DrawCircle(sx, sy, 10.0f, {255,200,40,100});
+            DrawCircle(sx, sy, 7.0f, {255,180,40,220});
+            DrawCircle(sx, sy, 3.0f, {255,255,220,255});
+            // Trail tail
+            Vector2 back = { sx - p.vel.x * 0.03f, sy - p.vel.y * 0.03f };
+            DrawLineEx({sx, sy}, back, 3.0f, {255,180,40,180});
+        } else {
+            Color pc = Color{200,160,100,255};
+            DrawCircle(sx, sy, 4.0f, pc);
+            DrawCircle(sx, sy, 2.0f, {255,255,220,180});
+        }
+    }
+
+    // G9: ranged weapon range indicator — distinct colors per weapon
+    if (player->weapon.range_indicator_timer > 0.0f && player->weapon.current_def()
+        && (player->weapon.weapon_type() == WeaponType::SPEAR
+         || player->weapon.weapon_type() == WeaponType::CROSSBOW)) {
+        float rpx = player->weapon.range_indicator_px;
+        float sx = player->entity.rect.x + player->entity.rect.width/2 - _cam_x;
+        float sy = player->entity.rect.y + player->entity.rect.height/2 - _cam_y;
+        float fade = player->weapon.range_indicator_timer / 0.25f;
+        bool is_cb = player->weapon.weapon_type() == WeaponType::CROSSBOW;
+        Color oc = is_cb ? Color{255,160,40,(unsigned char)(90.0f*fade)}
+                         : Color{120,180,255,(unsigned char)(90.0f*fade)};
+        Color ic = is_cb ? Color{255,120,20,(unsigned char)(35.0f*fade)}
+                         : Color{80,140,220,(unsigned char)(35.0f*fade)};
+        DrawCircleLines(sx, sy, rpx, oc);
+        DrawCircleLines(sx, sy, rpx - 1.0f, oc);
+        DrawCircle(sx, sy, rpx, ic);
     }
 
     // C1: 伤害数字 (世界坐标→屏幕)
@@ -990,14 +1051,16 @@ void GameScene::_render() {
                         inventory_open, inventory_cursor,
                         _presentation.room_msg, _presentation.room_msg_timer, sw, sh);
 
-    // G9.1: Combo stage UI (bottom center of screen)
+    // G9.1: Combo stage UI (bottom center)
     if (player->weapon.weapon_type() != WeaponType::FIST && player->weapon.combo_index() > 0) {
-        int stage = player->weapon.combo_index() + 1; // 1-indexed display
-        char mark[4];
-        snprintf(mark, sizeof(mark), "%d", stage);
-        Color sc = stage >= 3 ? Color{255,200,40,220} : Color{200,200,200,180};
-        int fs = stage >= 3 ? 28 : 22;
-        DrawText(mark, sw/2 - 10, sh - 60, fs, sc);
+        int stage = player->weapon.combo_index() + 1;
+        char mark[4]; snprintf(mark, sizeof(mark), "%d", stage);
+        Color sc = stage >= 3 ? Color{255,200,40,240} : Color{220,220,220,200};
+        int fs = stage >= 3 ? 32 : 24;
+        if (g_font_loaded)
+            DrawTextEx(g_font_small, mark, {(float)(sw/2 - 8), (float)(sh - 65)}, (float)fs, 1, sc);
+        else
+            DrawText(mark, sw/2 - 10, sh - 60, fs, sc);
     }
 
 #ifdef _DEBUG
@@ -1238,6 +1301,17 @@ void GameScene::_draw_map() {
 void GameScene::_draw_entities() {
     for (auto& m : monsters) {
         m->draw(_cam_x, _cam_y);
+        float mx = m->entity.rect.x + m->entity.rect.width/2 - _cam_x;
+        float my = m->entity.rect.y - 14 - _cam_y;
+        // G9: name label above monster (small, tinted by type)
+        Color nc = m->is_boss ? Color{255,80,40,200}
+                 : m->is_elite ? Color{255,180,60,180}
+                 : Color{200,200,200,140};
+        if (g_font_loaded && !m->name.empty()) {
+            float tw = MeasureTextEx(g_font_small, m->name.c_str(), 10, 1).x;
+            DrawTextEx(g_font_small, m->name.c_str(),
+                {mx - tw/2, my - 4}, 10, 1, nc);
+        }
         _renderer.draw_monster_buffs(*m,
             m->entity.position.x - _cam_x,
             m->entity.position.y - _cam_y);
@@ -1253,15 +1327,27 @@ void GameScene::_draw_entities() {
     }
     if (player) player->draw_no_cam(_cam_x, _cam_y);
 
-    // D4 Step4: NPC 标记
+    // D4 Step4: NPC — name label (floor-based lookup) + green dot
+    static const struct { int floor; const char* name; } _npc_lookup[] = {
+        {2,"埃德加"},{3,"瑞卡"},{4,"卡利安"},{6,"卡兹"},{7,"泰伦斯"},
+        {8,"维拉"},{9,"索拉斯"},{11,"迷失灵魂"},{12,"眠者"},{14,"守望者"}
+    };
     for (int i = 0; i < _npc_count; i++) {
         if (_npc_state[i].finished) continue;
         float nx = _npc_tile_x[i] * TILE_SIZE + TILE_SIZE/2 - _cam_x;
         float ny = _npc_tile_y[i] * TILE_SIZE + TILE_SIZE/2 - _cam_y;
-        // 绿色圆点标记
         float pulse = 4 + sinf((float)GetTime() * 4) * 2;
         DrawCircle(nx, ny - 10, pulse, {100, 220, 140, 180});
         DrawCircle(nx, ny - 10, 3, {60, 180, 80, 255});
+        // G9: NPC name label
+        if (g_font_loaded) {
+            const char* nn = "NPC";
+            for (auto& lk : _npc_lookup) {
+                if (lk.floor == current_floor) { nn = lk.name; break; }
+            }
+            float tw = MeasureTextEx(g_font_small, nn, 10, 1).x;
+            DrawTextEx(g_font_small, nn, {nx - tw/2, ny - 26}, 10, 1, {180,240,180,200});
+        }
     }
 }
 

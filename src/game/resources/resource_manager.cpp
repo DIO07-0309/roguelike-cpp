@@ -119,6 +119,10 @@ static int _build_font_cp(std::vector<int>& out) {
     _feed("冲锋兽人哥布林召唤师弓箭手萨满爆炸史莱姆重甲兽人精英史莱姆精英兽人");
     _feed("狂战士再生灼烧冻结眩晕恐惧致盲石肤祝福诅咒吸血肾上腺素顺势成长防御提升");
     _feed("操作说明移动攻击技能交互背包查看圣物保存返回标题WASD方向键");
+    // G9: weapon quality names (all tiers, all types)
+    _feed("暗影猎手血牙夜魔之刃深渊獠牙恶魔之爪破军剑苍炎剑天罡剑赤霄倚天剑");
+    _feed("铁流双节玄木双棍雷鸣双节破风棍李小龙迅影弩寒星弩天机弩破晓弩东风破");
+    _feed("追风枪烈阳枪苍龙枪破军长矛惊破天匕首长剑双截棍连弩长矛拳头");
 
     std::sort(out.begin(), out.end());
     out.erase(std::unique(out.begin(), out.end()), out.end());

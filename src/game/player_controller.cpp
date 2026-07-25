@@ -246,35 +246,134 @@ void PlayerController::_process_weapon_result(GameScene& gs, Player& p,
 
 // ── G9: Weapon-driven attack (new path) ──
 void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
+    // Read stage BEFORE execute advances the combo
+    int stage = p.weapon.combo_index();
+
     std::vector<Monster*> mlist;
     for (auto& m : gs.monsters) mlist.push_back(m.get());
     auto results = WeaponExecutor::execute(
         &p, mlist, gs.game_time, gs.get_tree()->get_audio(),
         &gs.weapon_projectiles);
-    if (results.empty()) return;
+
+    // Feedback always, even on whiff
+    p.combo.hit(gs.game_time);
+    p._last_attack_time = gs.game_time;
+
+    // Stage-specific shake: stage0=light, stage1=medium, stage2=heavy
+    static const float stage_shake[] = {3.0f, 6.0f, 14.0f};
+    float s = (stage >= 0 && stage < 3) ? stage_shake[stage] : 3.0f;
+    gs._presentation.trigger_shake(s);
+
+    // ══════════════════════════════════════════════════════
+    // G9: Per-weapon per-stage VFX (comprehensive)
+    // ══════════════════════════════════════════════════════
+    VFXServer vfx;
+    float px = p.entity.rect.x + p.entity.rect.width/2;
+    float py = p.entity.rect.y + p.entity.rect.height/2;
+    const WeaponDef* def = p.weapon.current_def();
+    WeaponType wt = def ? def->type : WeaponType::FIST;
+
+    switch (wt) {
+    case WeaponType::FIST: {
+        vfx.ring(px, py, 28.0f, {200,200,200,180}, 2, 0.25f);
+        vfx.spark_burst(px, py, 5, {220,220,200,180}, 0.22f);
+        break;
+    }
+    case WeaponType::DAGGER: {
+        Color dc = {220,180,80,230};
+        vfx.slash_arc(px, py, p.direction, 50.0f, dc, 0.30f);
+        vfx.spark_burst(px, py, 4, dc, 0.25f);
+        if (stage >= 1) {
+            vfx.slash_arc(px, py, p.direction, 55.0f, {240,200,60,220}, 0.32f);
+            vfx.spark_burst(px + 20, py - 10, 5, {240,200,80,200}, 0.28f);
+        }
+        if (stage >= 2) {
+            float tx = px + (p.direction == Direction::RIGHT ? 60 : p.direction == Direction::LEFT ? -60 : 0);
+            float ty = py + (p.direction == Direction::DOWN ? 60 : p.direction == Direction::UP ? -60 : 0);
+            vfx.beam(px, py, tx, ty, {255,150,40,230}, 0.30f);
+            for (auto& r : results) {
+                vfx.ring(r.hit_point.x, r.hit_point.y, 22.0f, {255,140,30,220}, 2, 0.35f);
+                vfx.explosion(r.hit_point.x, r.hit_point.y, 24.0f, {255,160,40,200}, 8, 0.32f);
+            }
+        }
+        break;
+    }
+    case WeaponType::SWORD: {
+        if (stage == 0) {
+            float fx = px + (p.direction == Direction::RIGHT ? 32 : p.direction == Direction::LEFT ? -32 : 0);
+            float fy = py + (p.direction == Direction::DOWN ? 32 : p.direction == Direction::UP ? -32 : 0);
+            vfx.shockwave(px, py, 30.0f, {180,180,140,180}, 2, 0.30f);
+            vfx.slash_arc(fx, fy, p.direction, 60.0f, {200,200,100,230}, 0.35f);
+            vfx.smoke_puff(px, py, 16.0f, {140,130,100,120}, 4, 0.40f);
+        } else if (stage == 1) {
+            vfx.slash_arc(px, py, p.direction, 70.0f, {220,220,120,220}, 0.38f);
+            vfx.slash_arc(px + 15, py - 10, p.direction, 55.0f, {200,200,80,200}, 0.32f);
+            vfx.spark_burst(px, py, 10, {200,200,100,220}, 0.35f);
+        } else {
+            vfx.shockwave(px, py, 80.0f, {220,200,80,200}, 4, 0.55f);
+            vfx.explosion(px, py, 36.0f, {240,220,100,220}, 14, 0.45f);
+            vfx.smoke_puff(px, py, 24.0f, {160,140,100,140}, 6, 0.50f);
+            vfx.flash(px, py, 20.0f, {255,240,200,200}, 0.12f);
+            for (auto& r : results) {
+                vfx.ring(r.hit_point.x, r.hit_point.y, 28.0f, {240,200,60,200}, 3, 0.40f);
+            }
+        }
+        break;
+    }
+    case WeaponType::NUNCHAKU: {
+        Color nc = {220,160,80,220};
+        if (stage == 0) {
+            vfx.slash_arc(px, py, p.direction, 90.0f, nc, 0.30f);
+            vfx.spark_burst(px, py, 6, nc, 0.28f);
+        } else if (stage == 1) {
+            vfx.slash_arc(px, py, p.direction, 95.0f, {240,180,60,220}, 0.33f);
+            vfx.slash_arc(px - 20, py + 10, (Direction)(((int)p.direction + 2) % 4),
+                70.0f, {200,140,50,180}, 0.28f);
+            vfx.ring(px, py, 40.0f, nc, 1, 0.30f);
+        } else {
+            vfx.play_recipe("skill_chain_lightning", px, py, p.direction, 0, 0, 3);
+            for (auto& r : results) {
+                vfx.ring(r.hit_point.x, r.hit_point.y, 20.0f, {240,160,40,200}, 2, 0.30f);
+            }
+        }
+        break;
+    }
+    case WeaponType::SPEAR: {
+        vfx.play_recipe("skill_slash", px, py, p.direction, 0, 0, stage + 1);
+        Color sc = {100,180,255,240};
+        for (auto& r : results) {
+            vfx.beam(px, py, r.hit_point.x, r.hit_point.y, sc, 0.35f);
+            vfx.ring(r.hit_point.x, r.hit_point.y, 18.0f, sc, 2, 0.30f);
+            if (stage >= 1)
+                vfx.explosion(r.hit_point.x, r.hit_point.y, 20.0f, {100,160,255,180}, 6, 0.30f);
+        }
+        break;
+    }
+    case WeaponType::CROSSBOW: {
+        if (stage == 2) {
+            vfx.play_recipe("boss_cone_attack", px, py, p.direction, 0, 0, 3);
+            vfx.ring(px, py, 24.0f, {255,180,50,200}, 2, 0.35f);
+            vfx.shockwave(px, py, 60.0f, {255,140,30,150}, 2, 0.40f);
+        } else {
+            vfx.play_recipe("skill_chain_lightning", px, py, p.direction, 0, 0, stage + 1);
+        }
+        break;
+    }
+    default: break;
+    }
+    for (auto& e : vfx.effects) gs.active_effects.push_back(e);
+    vfx.effects.clear();
+
+    if (results.empty()) return; // whiff: VFX + shake played
 
     gs._gameplay.flow.mark_combat();
     gs._boss.behavior.memory.record_attack();
     gs._boss.replay_mem.melee_hits++;
-    p.combo.hit(gs.game_time);
-    p._last_attack_time = gs.game_time;
-
-    int stage = p.weapon.combo_index();
-    if (stage > gs._presentation.last_combo_announced) {
-        gs._presentation.last_combo_announced = stage;
-        if (stage >= 2) {
-            gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_COMBO);
-            gs._presentation.trigger_freeze(CombatFeelSystem::LIGHT_HIT);
-        }
-    }
 
     for (auto& r : results) {
         gs._boss.dmg_done += r.damage;
         _process_weapon_result(gs, p, r);
     }
-
-    float shake = p.weapon.current_shake();
-    if (shake > 2.0f) gs._presentation.trigger_shake(shake);
 }
 
 // ── Helper: apply hit feedback (shake, freeze, knockback, kill flash) ──
