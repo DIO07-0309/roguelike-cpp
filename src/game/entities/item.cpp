@@ -185,15 +185,14 @@ std::shared_ptr<Item> generate_random_item() {
     int cat = cats[rng() % cats.size()];
 
     if (cat == 0) {
-        // G9: generate weapon from WeaponDef registry
+        // G9: WeaponDef base_damage already encodes tier scaling — no rarity_mult double-dip
         int wroll = rng() % 100;
         const WeaponDef* wdef = _random_weapon_def(r, wroll);
-        int tier_idx = (int)r; // 0=common, 1=rare, 2=epic, 3=legendary
+        int tier_idx = (int)r;
         const char* display_name = pick_weapon_name(wdef, tier_idx);
-        int atk = (int)(wdef->base_damage * rarity_mult(r));
+        int atk = (int)(wdef->base_damage);
         if (atk < 1) atk = 1;
-        auto item = std::make_shared<EquipmentItem>(
-            display_name, r, "weapon", atk);
+        auto item = std::make_shared<EquipmentItem>(display_name, r, "weapon", atk);
         item->weapon_def_id = wdef->id;
         return item;
     }

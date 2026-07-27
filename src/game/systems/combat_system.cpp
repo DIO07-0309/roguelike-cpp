@@ -363,25 +363,27 @@ void tick_buffs(Monster* m, float dt, std::vector<BuffEvent>* events,
 int get_effective_attack(const Player* p) {
     if (!p) return 1;
     int base = p->combat.get_effective_attack();
-    float atk = (float)base * (1.0f + 0.3f * _count_stacks(p->active_buffs, "attack_up")
-                              + 0.25f * _count_stacks(p->active_buffs, "berserk")
-                              + 0.10f * _count_stacks(p->active_buffs, "blessing")
-                              + 0.08f * _count_stacks(p->active_buffs, "momentum")
-                              + 0.15f * _count_stacks(p->active_buffs, "adrenaline")
-                              - 0.15f * _count_stacks(p->active_buffs, "blind"));
-    // B12: war_drum — 攻击力 +15%
-    if (player_has_relic(p, "war_drum")) atk *= 1.15f;
-    // D8: hunter_gloves +10%, ancient_crown +8%, dragon_heart +15%
-    if (player_has_relic(p, "hunter_gloves")) atk *= 1.10f;
-    if (player_has_relic(p, "ancient_crown")) atk *= 1.08f;
-    if (player_has_relic(p, "dragon_heart"))  atk *= 1.15f;
-    if (player_has_relic(p, "infinity_orb"))  atk *= 1.20f;  // D8: legendary
-    // D8: blood_chalice — HP越低攻越高 (最高+30%)
+    // G9.4: buffs additive to base, relics multiply only base (not buff-inflated value)
+    float buff_sum = 1.0f
+        + 0.20f * _count_stacks(p->active_buffs, "attack_up")   // was 0.30
+        + 0.15f * _count_stacks(p->active_buffs, "berserk")     // was 0.25
+        + 0.08f * _count_stacks(p->active_buffs, "blessing")    // was 0.10
+        + 0.06f * _count_stacks(p->active_buffs, "momentum")    // was 0.08
+        + 0.10f * _count_stacks(p->active_buffs, "adrenaline")  // was 0.15
+        - 0.12f * _count_stacks(p->active_buffs, "blind");      // was 0.15
+    float atk = (float)base * buff_sum;
+    // Relic multipliers (additive factor, applied to base)
+    float relic_sum = 1.0f;
+    if (player_has_relic(p, "war_drum"))    relic_sum += 0.10f; // was +15% multiplicative
+    if (player_has_relic(p, "hunter_gloves")) relic_sum += 0.08f;
+    if (player_has_relic(p, "ancient_crown")) relic_sum += 0.06f;
+    if (player_has_relic(p, "dragon_heart"))  relic_sum += 0.10f;
+    if (player_has_relic(p, "infinity_orb"))  relic_sum += 0.12f;
     if (player_has_relic(p, "blood_chalice")) {
         float hp_r = (float)p->combat.current_hp / get_effective_max_hp(p);
-        float bonus = (1.0f - hp_r) * 0.30f;
-        if (bonus > 0) atk *= (1.0f + bonus);
+        relic_sum += (1.0f - hp_r) * 0.20f; // was 0.30
     }
+    atk *= relic_sum;
     return std::max(1, (int)atk);
 }
 int get_effective_attack(const Monster* m) {

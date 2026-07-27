@@ -934,7 +934,7 @@ void GameScene::_drop_boss_reward(Monster* boss) {
     int bf_idx = (current_floor == 5) ? 0 : (current_floor == 10) ? 1 : 2;
     const WeaponDef* wdef = get_weapon_def(boss_weapons[bf_idx]);
     const char* wname = wdef ? pick_weapon_name(wdef, 3) : "魔渊之刃";
-    float atk = wdef ? wdef->base_damage * rarity_mult(Rarity::LEGENDARY) : 18.0f;
+    float atk = wdef ? (float)wdef->base_damage : 18.0f;
     auto weapon = std::make_shared<EquipmentItem>(wname, Rarity::LEGENDARY, "weapon",
         (int)atk, 3, 0);
     weapon->weapon_def_id = boss_weapons[bf_idx];

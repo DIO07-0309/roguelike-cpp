@@ -6,22 +6,20 @@
 #include <algorithm>
 #include <vector>
 #include <set>
-#include <dirent.h>
-#include <sys/stat.h>
+#ifdef FONT_USE_RUNTIME_SCAN
+#  include <dirent.h>
+#  include <sys/stat.h>
+#endif
 
 // ═══════════════════════════════════════════════════════════════
-// G9.4-fix: 运行时字库自动扫描
-//   不再手工维护 FONT_CP 数组
-//   启动时自动扫描 src/ + resources/ 所有 .cpp/.h/.json
-//   提取每一个 CJK 字符的码位 → 零遗漏
+// 字体码位: 优先编译期生成的头文件 (release 模式)
+// 回退到运行时扫描 (dev 模式, 定义 FONT_USE_RUNTIME_SCAN)
 // ═══════════════════════════════════════════════════════════════
 
-// ── 判断是否为 CJK / 全角符号 ──
-static inline bool _is_wide_codepoint(int cp) {
-    return (cp >= 0x2000);
-}
-
-// ── 从 UTF-8 字符串中提取所有宽字符码位 ──
+#if !defined(FONT_USE_RUNTIME_SCAN)
+#  include "core/font_codepoints.h"
+#else
+// ── 运行时扫描 (仅 dev 模式, 新增中文后重新生成头文件) ──
 static void _extract_codepoints(const char* s, std::set<int>& out) {
     while (*s) {
         unsigned char b = (unsigned char)*s;
@@ -30,11 +28,10 @@ static void _extract_codepoints(const char* s, std::set<int>& out) {
         else if ((b & 0xE0) == 0xC0) { cp = (b&0x1F)<<6|(s[1]&0x3F); s+=2; }
         else if ((b & 0xF0) == 0xE0) { cp = (b&0x0F)<<12|(s[1]&0x3F)<<6|(s[2]&0x3F); s+=3; }
         else { s++; continue; }
-        if (_is_wide_codepoint(cp)) out.insert(cp);
+        if (cp >= 0x2000) out.insert(cp);
     }
 }
 
-// ── 扫描一个文本文件，提取宽字符码位 ──
 static void _scan_file(const char* path, std::set<int>& out) {
     FILE* f = fopen(path, "rb");
     if (!f) return;
@@ -49,7 +46,6 @@ static void _scan_file(const char* path, std::set<int>& out) {
     _extract_codepoints(buf.data(), out);
 }
 
-// ── 递归扫描目录 (POSIX dirent, MinGW 可用) ──
 static void _scan_dir(const char* dir, const char* ext, std::set<int>& out) {
     DIR* d = opendir(dir);
     if (!d) return;
@@ -71,31 +67,25 @@ static void _scan_dir(const char* dir, const char* ext, std::set<int>& out) {
 }
 
 static int _build_font_cp(std::vector<int>& out) {
-    // ── (a) ASCII + 基础符号 (永远不会变) ──
     for (int i = 0x20; i <= 0x7E; i++) out.push_back(i);
     static int _extras[] = {
         0x00B7, 0x2014, 0x2018, 0x2019, 0x201C, 0x201D, 0x2026,
-        0x2190, 0x2191, 0x2192, 0x2193, 0x2208, 0x2260, 0x2265,
-        0x2500, 0x25A0, 0x25B2, 0x25B6, 0x25CB, 0x2605,
+        0x2190, 0x2191, 0x2192, 0x2193, 0x2194, 0x2208, 0x2260, 0x2265,
+        0x2500, 0x2550, 0x25A0, 0x25B2, 0x25B6, 0x25CB, 0x2605, 0x2620,
         0x2713, 0x2717, 0x2744, 0x3001, 0x3002, 0x3010, 0x3011,
-        0xFF01, 0xFF08, 0xFF09, 0xFF0C, 0xFF1A, 0xFF1F, 0xFEFF,
-        0x2014, 0x2550, 0x2194, 0x2620,
+        0xFEFF, 0xFF01, 0xFF08, 0xFF09, 0xFF0C, 0xFF1A, 0xFF1F,
     };
     for (int cp : _extras) out.push_back(cp);
-
-    // ── (b) 运行时扫描全部源文件 + JSON，自动收集 CJK 字符 ──
     std::set<int> cjk;
     _scan_dir("src", ".cpp", cjk);
     _scan_dir("src", ".h", cjk);
     _scan_dir("resources", ".json", cjk);
-
     for (int cp : cjk) out.push_back(cp);
-
-    // ── (c) 排序 + 去重 ──
     std::sort(out.begin(), out.end());
     out.erase(std::unique(out.begin(), out.end()), out.end());
     return (int)out.size();
 }
+#endif
 
 // ═══════════════════════════════════════════════════════════════
 // 单例
@@ -133,20 +123,28 @@ void ResourceManager::_init_font() {
         nullptr
     };
 
+#ifdef FONT_USE_RUNTIME_SCAN
     static std::vector<int> cp_vec;
     static int cp_count = 0;
     static bool cp_built = false;
     if (!cp_built) {
         cp_count = _build_font_cp(cp_vec);
         cp_built = true;
-        LOG_INFO("ResourceManager: 扫描 %d 个码位 (src/ + resources/)", cp_count);
+        LOG_INFO("ResourceManager: 运行时扫描 %d 个码位", cp_count);
     }
+    int* cp_data = cp_vec.data();
+    int  cp_count_val = cp_count;
+#else
+    int* cp_data = const_cast<int*>(FONT_CP_DATA);
+    const int  cp_count_val = FONT_CP_COUNT;
+    LOG_INFO("ResourceManager: 编译期 %d 个码位", cp_count_val);
+#endif
 
     for (int i = 0; font_paths[i]; i++) {
         if (!FileExists(font_paths[i])) { LOG_INFO("  跳过: %s", font_paths[i]); continue; }
-        _font = LoadFontEx(font_paths[i], 32, cp_vec.data(), cp_count);
-        _font_small_ = LoadFontEx(font_paths[i], 18, cp_vec.data(), cp_count);
-        LOG_INFO("  尝试: %s -> 字形:%d/%d", font_paths[i], _font.glyphCount, cp_count);
+        _font = LoadFontEx(font_paths[i], 32, cp_data, cp_count_val);
+        _font_small_ = LoadFontEx(font_paths[i], 18, cp_data, cp_count_val);
+        LOG_INFO("  尝试: %s -> 字形:%d/%d", font_paths[i], _font.glyphCount, cp_count_val);
         if (_font.texture.id > 0 && _font.glyphCount > 200) {
             _font_ok = true;
             SetTextureFilter(_font.texture, TEXTURE_FILTER_BILINEAR);
