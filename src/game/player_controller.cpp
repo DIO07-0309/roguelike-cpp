@@ -339,13 +339,28 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
         break;
     }
     case WeaponType::SPEAR: {
+        // Stage1: thick blue beam + ring at hit
+        // Stage2: beam + explosion + double ring
+        // Stage3: shockwave at origin (rapid hits handled by tick_specials)
         vfx.play_recipe("skill_slash", px, py, p.direction, 0, 0, stage + 1);
-        Color sc = {100,180,255,240};
+        Color sc = {80,170,255,255};
         for (auto& r : results) {
-            vfx.beam(px, py, r.hit_point.x, r.hit_point.y, sc, 0.35f);
-            vfx.ring(r.hit_point.x, r.hit_point.y, 18.0f, sc, 2, 0.30f);
-            if (stage >= 1)
-                vfx.explosion(r.hit_point.x, r.hit_point.y, 20.0f, {100,160,255,180}, 6, 0.30f);
+            // Double beam for thickness visibility
+            vfx.beam(px, py, r.hit_point.x, r.hit_point.y, sc, 0.40f);
+            vfx.beam(px - 2, py - 2, r.hit_point.x - 2, r.hit_point.y - 2,
+                {60,150,240,200}, 0.38f);
+            vfx.ring(r.hit_point.x, r.hit_point.y, 20.0f, sc, 2, 0.32f);
+            vfx.spark_burst(r.hit_point.x, r.hit_point.y, 4, {80,170,255,230}, 0.28f);
+            if (stage >= 1) {
+                vfx.explosion(r.hit_point.x, r.hit_point.y, 22.0f, {80,150,255,200}, 8, 0.32f);
+                vfx.lightning(px, py, r.hit_point.x, r.hit_point.y, 3,
+                    {80,160,255,220}, 0.25f);
+            }
+            if (stage >= 2) {
+                // Stage-3 initiation: shockwave + flash at origin
+                vfx.shockwave(px, py, 50.0f, {80,160,255,180}, 3, 0.40f);
+                vfx.flash(px, py, 16.0f, {100,180,255,180}, 0.10f);
+            }
         }
         break;
     }

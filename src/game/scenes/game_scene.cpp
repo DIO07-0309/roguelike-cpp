@@ -617,10 +617,16 @@ void GameScene::_process(double delta) {
             float py = player->entity.rect.y + player->entity.rect.height/2;
             VFXServer svfx;
             for (auto& r : spec_results) {
-                svfx.lightning(px, py, r.hit_point.x, r.hit_point.y, 3,
-                    {100,180,255,240}, 0.22f);
-                svfx.ring(r.hit_point.x, r.hit_point.y, 14.0f,
-                    {100,200,255,200}, 1, 0.20f);
+                // Heavy zigzag lightning (5 branches, thicker, brighter)
+                svfx.lightning(px, py, r.hit_point.x, r.hit_point.y, 5,
+                    {80,160,255,255}, 0.30f);
+                svfx.beam(px, py, r.hit_point.x, r.hit_point.y, {100,180,255,200}, 0.28f);
+                svfx.ring(r.hit_point.x, r.hit_point.y, 20.0f,
+                    {80,180,255,220}, 2, 0.25f);
+                svfx.spark_burst(r.hit_point.x, r.hit_point.y, 5,
+                    {100,200,255,220}, 0.22f);
+                // G9: electrified debuff on spear rapid hits
+                apply_buff(r.target, "electrified", 1);
             }
             for (auto& e : svfx.effects) active_effects.push_back(e);
         }
@@ -1016,22 +1022,36 @@ void GameScene::_render() {
         }
     }
 
-    // G9: ranged weapon range indicator — distinct colors per weapon
-    if (player->weapon.range_indicator_timer > 0.0f && player->weapon.current_def()
-        && (player->weapon.weapon_type() == WeaponType::SPEAR
-         || player->weapon.weapon_type() == WeaponType::CROSSBOW)) {
-        float rpx = player->weapon.range_indicator_px;
-        float sx = player->entity.rect.x + player->entity.rect.width/2 - _cam_x;
-        float sy = player->entity.rect.y + player->entity.rect.height/2 - _cam_y;
-        float fade = player->weapon.range_indicator_timer / 0.25f;
-        bool is_cb = player->weapon.weapon_type() == WeaponType::CROSSBOW;
-        Color oc = is_cb ? Color{255,160,40,(unsigned char)(90.0f*fade)}
-                         : Color{120,180,255,(unsigned char)(90.0f*fade)};
-        Color ic = is_cb ? Color{255,120,20,(unsigned char)(35.0f*fade)}
-                         : Color{80,140,220,(unsigned char)(35.0f*fade)};
-        DrawCircleLines(sx, sy, rpx, oc);
-        DrawCircleLines(sx, sy, rpx - 1.0f, oc);
-        DrawCircle(sx, sy, rpx, ic);
+    // G9: ranged weapon range indicator
+    if (player->weapon.range_indicator_timer > 0.0f && player->weapon.current_def()) {
+        WeaponType wt = player->weapon.weapon_type();
+        if (wt == WeaponType::SPEAR || wt == WeaponType::CROSSBOW
+            || wt == WeaponType::NUNCHAKU) {
+            float sx = player->entity.rect.x + player->entity.rect.width/2 - _cam_x;
+            float sy = player->entity.rect.y + player->entity.rect.height/2 - _cam_y;
+            float fade = player->weapon.range_indicator_timer / 0.25f;
+            float rpx = player->weapon.range_indicator_px;
+
+            if (wt == WeaponType::NUNCHAKU) {
+                const WeaponDef* ndef = player->weapon.current_def();
+                float inner_r = (ndef ? ndef->min_range : 2.0f) * TILE_SIZE;
+                float outer_r = (ndef ? ndef->max_range : 5.0f) * TILE_SIZE;
+                Color nc  = {220,160,80,(unsigned char)(90.0f*fade)};
+                Color fill = {220,160,60,(unsigned char)(25.0f*fade)};
+                DrawRing({sx, sy}, inner_r, outer_r, 0, 360, 64, fill);
+                DrawCircleLines(sx, sy, inner_r, nc);
+                DrawCircleLines(sx, sy, outer_r, nc);
+            } else {
+                bool is_cb = (wt == WeaponType::CROSSBOW);
+                Color oc = is_cb ? Color{255,160,40,(unsigned char)(90.0f*fade)}
+                                 : Color{120,180,255,(unsigned char)(90.0f*fade)};
+                Color ic = is_cb ? Color{255,120,20,(unsigned char)(35.0f*fade)}
+                                 : Color{80,140,220,(unsigned char)(35.0f*fade)};
+                DrawCircleLines(sx, sy, rpx, oc);
+                DrawCircleLines(sx, sy, rpx - 1.0f, oc);
+                DrawCircle(sx, sy, rpx, ic);
+            }
+        }
     }
 
     // C1: 伤害数字 (世界坐标→屏幕)
