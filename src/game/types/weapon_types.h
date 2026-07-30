@@ -66,6 +66,7 @@ inline HitShape hit_shape_from_string(const char* s) {
 struct AttackStageDef {
     float damage_multiplier = 1.0f;
     HitShape hit_shape = HitShape::CIRCLE;
+    int damage_type = 0;          // G10.2: AttackType (0=PHYSICAL, 1=MAGICAL, 2=TRUE)
     float range = 1.0f;          // in tiles (range * TILE_SIZE = pixels)
     float width = 0.5f;          // secondary dimension (sector angle/rect width/capsule radius)
     float recovery = 0.2f;       // after-attack delay (seconds)

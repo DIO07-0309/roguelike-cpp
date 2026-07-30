@@ -49,11 +49,12 @@ static void _set_attack_context(Player* p, float dmg, Monster* target,
 
 // ── Helper: compute damage for a single hit ──
 static int _calc_weapon_dmg(const Player* p, const Monster* target,
-                             float stage_mult, bool& is_crit)
+                             float stage_mult, bool& is_crit,
+                             AttackType atype = AttackType::PHYSICAL)
 {
     int atk = get_effective_attack(p);
-    int def = target ? target->combat.get_effective_defense(p->attack_type) : 0;
-    int base = calculate_damage(atk, def);
+    int def = target ? target->combat.get_effective_defense(atype) : 0;
+    int base = calculate_damage(atk, def, atype);
     int dmg = (int)(base * stage_mult);
     int combo_idx = p->weapon.combo_index();
     float crit_chance = combo_idx >= 2 ? 0.30f : combo_idx == 1 ? 0.15f : 0.05f;
@@ -78,11 +79,11 @@ static Vector2 _player_origin(const Player* p) {
 
 // ── Resolve one hit into a result (damage + kill check) ──
 static WeaponAttackResult _resolve_one(Player* p, Monster* m,
-    const Vector2& hp, float mult)
+    const Vector2& hp, float mult, AttackType atype = AttackType::PHYSICAL)
 {
     WeaponAttackResult ar;
     ar.target = m; ar.hit_point = hp; ar.is_crit = false;
-    ar.damage = _calc_weapon_dmg(p, m, mult, ar.is_crit);
+    ar.damage = _calc_weapon_dmg(p, m, mult, ar.is_crit, atype);
     int hp_before = m->combat.current_hp;
     m->combat.take_damage(ar.damage);
     ar.is_killing_blow = (!m->combat.is_alive && hp_before > 0);
@@ -336,7 +337,8 @@ static std::vector<WeaponAttackResult> _melee_normal(
         if (apply_bleed && h.target && h.target->combat.is_alive)
             apply_buff(h.target, "poison", 3);
 
-        results.push_back(_resolve_one(p, h.target, h.hit_point, mult));
+        results.push_back(_resolve_one(p, h.target, h.hit_point, mult,
+            (AttackType)st.damage_type));
     }
     // Sword stage-3 stun
     if (is_stage3 && def->type == WeaponType::SWORD)
@@ -389,11 +391,12 @@ std::vector<WeaponAttackResult> WeaponExecutor::tick_specials(
         }
     }
     else if (wt == WeaponType::SPEAR) {
-        // Sector rapid hits: detect all targets in 30° cone each tick
+        // Sector rapid hits: magic-typed lightning-enhanced strikes
         auto hits = hit_detect_sector(origin, sp.direction,
             sp.range_px, sp.width_param, rt);
         for (auto& h : hits) {
-            auto ar = _resolve_one(player, h.target, h.hit_point, mult);
+            auto ar = _resolve_one(player, h.target, h.hit_point, mult,
+                AttackType::MAGICAL);
             ar.from_special = true;
             results.push_back(ar);
         }

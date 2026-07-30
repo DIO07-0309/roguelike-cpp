@@ -59,6 +59,7 @@ endfunction()
 
 add_roguelike_test(registry_test    registry/registry_test.cpp)
 add_roguelike_test(damage_test      combat/damage_test.cpp)
+add_roguelike_test(damage_type_test combat/damage_type_test.cpp)
 add_roguelike_test(buff_test        combat/buff_test.cpp)
 add_roguelike_test(biome_test       world/biome_test.cpp)
 add_roguelike_test(encounter_test   world/encounter_test.cpp)

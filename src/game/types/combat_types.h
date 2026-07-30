@@ -34,6 +34,14 @@ struct BuffTrigger {
     BuffTarget target = BuffTarget::ENEMY;
 };
 
+// ── G10.2: DamageResult (type-aware, consistent pipeline) ──
+struct DamageResult {
+    int raw_damage = 0;
+    int final_damage = 0;
+    int damage_type = 0;  // AttackType as int (PHYSICAL=0, MAGICAL=1, TRUE=2)
+    bool critical = false;
+};
+
 // ── VFX ──
 struct Effect {
     std::string kind;

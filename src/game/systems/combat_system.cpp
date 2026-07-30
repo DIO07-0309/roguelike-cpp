@@ -22,8 +22,11 @@ void seed_rng(uint32_t seed) { rng.seed(seed); }
 
 // ---- 伤害公式 ----
 int calculate_damage(int atk, int def, AttackType type) {
-    (void)type;  // reserved for future type-specific logic
-    float base = std::max(1.0f, atk - def * 0.5f);
+    // G10.2: type-aware resistance
+    float def_factor = 0.5f;
+    if (type == AttackType::MAGICAL) def_factor = 0.6f;  // magic pierces slightly more
+    if (type == AttackType::TRUE)   def_factor = 0.0f;  // true damage ignores defense
+    float base = std::max(1.0f, atk - def * def_factor);
     float variance = 0.8f + (float)(rng() % 401) / 1000.0f;
     return std::max(1, (int)(base * variance));
 }

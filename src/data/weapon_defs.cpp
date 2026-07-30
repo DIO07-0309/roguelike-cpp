@@ -18,6 +18,8 @@ static AttackStageDef _parse_stage(const json& j) {
     AttackStageDef s;
     s.damage_multiplier = j.value("mult", 1.0f);
     s.hit_shape = hit_shape_from_string(j.value("shape", "CIRCLE").c_str());
+    // G10.2: damage_type (0=PHYSICAL, 1=MAGICAL, 2=TRUE)
+    s.damage_type = j.value("damage_type", 0);
     s.range     = j.value("range", 1.0f);
     s.width     = j.value("width", 0.5f);
     s.recovery  = j.value("recovery", 0.2f);
