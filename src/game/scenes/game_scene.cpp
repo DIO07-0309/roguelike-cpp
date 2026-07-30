@@ -21,6 +21,7 @@
 #include "systems/weapon_executor.h"  // G9.1
 #include "vfx_server.h"              // G9: spear lightning VFX
 #include "data/weapon_defs.h"        // G9: Boss drop
+#include "data/element_defs.h"       // G10: element select screen
 #include "core/sim/sim_ai.h"         // G5.6
 #include "core/sim/sim_runner.h"     // G5.6
 #include "ai/agents/bt_agent.h"      // G8.1
@@ -106,6 +107,15 @@ void GameScene::_ready() {
 void GameScene::new_game() {
     player = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
         PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
+
+    // G10.1: Element select on first-ever game
+    if (!player->element.initialized) {
+        element_select_active = true;
+        element_select_cursor = 0;
+        state = GameState::TITLE;
+        return;
+    }
+
     auto sk = random_active_skill({}, true);  // G9: first skill always base 4
     player->skills.learn(std::move(sk));
 
@@ -793,6 +803,23 @@ void GameScene::_tick_replay_hash() {
 
 // _input / debug / event / dialogue — delegated to GameSceneInput
 void GameScene::_input(const InputMap& input) {
+    // G10.1: Element select input
+    if (element_select_active) {
+        if (input.is_action_just_pressed("move_up"))
+            element_select_cursor = (element_select_cursor + 2) % 3;
+        if (input.is_action_just_pressed("move_down"))
+            element_select_cursor = (element_select_cursor + 1) % 3;
+        if (input.is_action_just_pressed("attack") || input.is_action_just_pressed("pickup")) {
+            static const ElementType choices[] = {
+                ElementType::FIRE, ElementType::ICE, ElementType::POISON
+            };
+            player->element.select(choices[element_select_cursor]);
+            element_select_active = false;
+            state = GameState::TITLE;
+            return;
+        }
+    }
+
     // G4.5: frame tick
     if (_recorder.is_active()) _recorder.tick();
     if (_replay_player.is_active()) _replay_player.tick();
@@ -802,7 +829,7 @@ void GameScene::_input(const InputMap& input) {
         else if (_sim_ai) _sim_ai->tick();
     }
 
-    _input_handler.handle_input(input);
+    if (!element_select_active) _input_handler.handle_input(input);
 
     // G4.5: hash computation
     _tick_replay_hash();
@@ -954,6 +981,61 @@ void GameScene::_drop_boss_reward(Monster* boss) {
 // ============================================================
 void GameScene::_render() {
     int sw = get_tree()->get_width(), sh = get_tree()->get_height();
+
+    // G10.1: Element Select Screen
+    if (element_select_active) {
+        ClearBackground({20, 15, 30, 255});
+        // Loading hint: draw element defs inline if available
+        const ElementDef* defs[3] = {
+            get_element_def("fire"), get_element_def("ice"), get_element_def("poison")
+        };
+        const char* icons[] = {
+            "🔥 火焰核心", "❄ 冰霜核心", "☠ 剧毒核心"
+        };
+        const Color colors[] = {
+            {255,120,30,255}, {100,200,255,255}, {80,220,80,255}
+        };
+        // Title
+        const char* title = "选择你的元素核心";
+        float tw = MeasureTextEx(g_font_small, title, 28, 1).x;
+        DrawTextEx(g_font_small, title, {sw/2.0f - tw/2, 60}, 28, 1, {255,220,180,255});
+
+        // Three option cards
+        float card_w = 260, card_h = 220, gap = 30;
+        float start_x = sw/2.0f - (card_w * 3 + gap * 2)/2.0f;
+        for (int i = 0; i < 3; i++) {
+            float cx = start_x + i * (card_w + gap);
+            float cy = (sh - card_h)/2.0f;
+            bool selected = (i == element_select_cursor);
+            Color bg = selected ? Color{50,50,80,255} : Color{30,30,50,255};
+            Color border = selected ? colors[i] : Color{60,60,80,220};
+
+            DrawRectangleRounded({cx, cy, card_w, card_h}, 0.1f, 8, bg);
+            DrawRectangleRoundedLines({cx-1, cy-1, card_w+2, card_h+2}, 0.1f, 8, 2.0f, border);
+
+            // Icon
+            float iw = MeasureTextEx(g_font_small, icons[i], 36, 1).x;
+            DrawTextEx(g_font_small, icons[i], {cx + card_w/2 - iw/2, cy + 30}, 36, 1, colors[i]);
+
+            // Description
+            if (defs[i] && g_font_loaded) {
+                float dw = MeasureTextEx(g_font_small, defs[i]->description.c_str(), 14, 1).x;
+                DrawTextEx(g_font_small, defs[i]->description.c_str(),
+                    {cx + card_w/2 - dw/2, cy + 90}, 14, 1, {200,200,200,220});
+            }
+            // Select prompt
+            if (selected) {
+                DrawTextEx(g_font_small, "[空格/E 确认]",
+                    {cx + 60, cy + 180}, 14, 1, {255,255,200,200});
+            }
+        }
+        // Footer
+        const char* ft = "选择后永久绑定，不可更改";
+        float fw = MeasureTextEx(g_font_small, ft, 14, 1).x;
+        DrawTextEx(g_font_small, ft, {sw/2.0f - fw/2, (float)(sh - 40)}, 14, 1, {150,150,150,180});
+        return;
+    }
+
     if (state == GameState::BOSS_INTRO) {
         _renderer.draw_boss_intro(sw, sh, boss_intro_title, boss_intro_lore,
                                    boss_intro_skills, boss_intro_color, boss_floor);

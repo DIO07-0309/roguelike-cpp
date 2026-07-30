@@ -22,6 +22,11 @@ struct SaveData {
     std::unordered_map<int, int> quest_states;   // quest_id → QuestState
     // ── G2.5: Save v3 新增 ──
     std::vector<int> unlocked_endings;           // 已解锁 EndingType 列表
+    // ── G10.1: Element Core ──
+    int element_level = 1;
+    int element_exp = 0;
+    int element_type = 0;  // 0=NONE, 1=FIRE, 2=ICE, 3=POISON
+    bool element_initialized = false;
 };
 
 class SaveManager {

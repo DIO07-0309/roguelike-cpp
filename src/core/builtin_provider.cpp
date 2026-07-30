@@ -19,6 +19,7 @@ BuiltinProvider::BuiltinProvider() {
         {"skill",    "resources/skills.json"},
         {"item",     "resources/items.json"},
         {"weapon",   "resources/weapons.json"},
+        {"element",  "resources/elements.json"},
     };
 }
 

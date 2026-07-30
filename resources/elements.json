@@ -1,0 +1,22 @@
+{
+  "elements": [
+    {
+      "id": "fire",
+      "name": "火焰核心",
+      "description": "攻击有概率造成火焰暴击",
+      "base_value": 15
+    },
+    {
+      "id": "ice",
+      "name": "冰霜核心",
+      "description": "攻击附带减速效果",
+      "base_value": 3
+    },
+    {
+      "id": "poison",
+      "name": "剧毒核心",
+      "description": "攻击附加持续毒伤",
+      "base_value": 5
+    }
+  ]
+}

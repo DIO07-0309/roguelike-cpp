@@ -157,6 +157,13 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     }
     fprintf(f, "\n");
 
+    // ── G10.1: Element Core ──
+    fprintf(f, "elem:%s,%d,%d,%d\n",
+        element_type_name(player->element.type),
+        player->element.level,
+        player->element.experience,
+        player->element.initialized ? 1 : 0);
+
     // ── G2.5: 已解锁结局 ──
     fprintf(f, "end:");
     for (size_t i = 0; i < unlocked_endings.size(); i++) {
@@ -458,6 +465,33 @@ SaveData* SaveManager::load_save() {
             std::string tok = ends.substr(pos, (semi != std::string::npos ? semi - pos : std::string::npos));
             pos = (semi != std::string::npos ? semi + 1 : ends.size());
             if (!tok.empty()) d->unlocked_endings.push_back(atoi(tok.c_str()));
+        }
+    }
+
+    // ── G10.1: Element Core ──
+    {
+        std::string elem = getS("elem");
+        if (!elem.empty()) {
+            int parts[4] = {0, 1, 0, 0}; // type, level, exp, init
+            for (int i = 0, pi = 0; i < (int)elem.size() && pi < 4; ) {
+                int comma = (int)elem.find(',', i);
+                std::string tok = elem.substr(i, (comma < 0 ? (int)elem.size() : comma) - i);
+                if (!tok.empty()) parts[pi] = atoi(tok.c_str());
+                i = (comma < 0 ? (int)elem.size() : comma + 1);
+                pi++;
+            }
+            static const ElementType map[] = {
+                ElementType::NONE, ElementType::FIRE, ElementType::ICE, ElementType::POISON
+            };
+            int et = (parts[0] >= 0 && parts[0] < 4) ? parts[0] : 0;
+            p->element.type    = map[et];
+            p->element.level   = std::max(1, parts[1]);
+            p->element.experience = std::max(0, parts[2]);
+            p->element.initialized = (parts[3] != 0);
+            d->element_type  = parts[0];
+            d->element_level = parts[1];
+            d->element_exp   = parts[2];
+            d->element_initialized = (parts[3] != 0);
         }
     }
 

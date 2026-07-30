@@ -100,6 +100,10 @@ public:
     int max_unlocked_floor = 1;
     uint32_t _dungeon_seed = 0;   // B8: 当前楼层地牢种子
 
+    // G10.1: Element select overlay
+    bool element_select_active = false;
+    int  element_select_cursor = 0;
+
     // 游戏状态
     bool inventory_open = false;
     int inventory_cursor = 0;

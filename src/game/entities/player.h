@@ -11,6 +11,7 @@
 #include "input_map.h"
 #include "attack_evolution_state.h"   // G1: 普攻进化
 #include "systems/weapon_component.h"  // G9: weapon system
+#include "components/element_component.h" // G10: element core
 
 // ============================================================
 // D2: ComboState — 四段连击状态 (挂在 Player 上)
@@ -83,6 +84,9 @@ public:
 
     // G9.3: last weapon attack context (read by skills for synergy)
     AttackContext last_attack;
+
+    // G10.1: element core (permanent, cross-save)
+    ElementComponent element;
 
     // D2 Step2: 消耗重击标记 (技能/Relic/Boss 统一调用此接口)
     bool consume_heavy_combo();
