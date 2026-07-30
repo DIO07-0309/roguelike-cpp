@@ -38,9 +38,20 @@ struct ElementComponent {
     int experience = 0;
     bool initialized = false; // true after first element selection
 
+    // ── Ice: freeze counter (stack per slow proc, reset on freeze) ──
+    int freeze_counter = 0;
+
     void select(ElementType element);
     void add_exp(int amount);
     int  xp_to_next() const;
+
+    // ── G10.3: Query element combat stats from ElementDef ──
+    float fire_crit_chance() const;
+    float fire_crit_mult() const;
+    float ice_freeze_chance() const;
+    int   ice_freeze_counter_max() const;
+    float poison_dot_scale() const;
+    float poison_dot_duration() const;
 
     static constexpr int BASE_XP = 100;
 };

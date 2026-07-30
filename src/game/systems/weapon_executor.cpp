@@ -7,8 +7,9 @@
 #include "systems/vfx_server.h"
 #include "combat_feel.h"
 #include "config.h"
-#include "audio_server.h"       // G9.3: play_sfx
-#include "core/event_bus.h"     // G9.1: weapon stage events
+#include "audio_server.h"
+#include "core/event_bus.h"
+#include "combat/element_resolver.h"  // G10.3
 #include <algorithm>
 #include <cmath>
 
@@ -84,9 +85,22 @@ static WeaponAttackResult _resolve_one(Player* p, Monster* m,
     WeaponAttackResult ar;
     ar.target = m; ar.hit_point = hp; ar.is_crit = false;
     ar.damage = _calc_weapon_dmg(p, m, mult, ar.is_crit, atype);
+
+    // G10.3: Element combat effects (fire crit / ice slow+freeze / poison DOT)
+    bool did_freeze = false;
+    ElementResolver::resolve(p, m, ar.damage, ar.is_crit, did_freeze);
+    // Fire crit may increase damage + set is_crit → re-check if weapon crit was already set
+    // ElementResolver already merged is_crit correctly
+
     int hp_before = m->combat.current_hp;
     m->combat.take_damage(ar.damage);
     ar.is_killing_blow = (!m->combat.is_alive && hp_before > 0);
+
+    // G10.3: Element EXP
+    if (ar.damage > 0) {
+        ElementResolver::on_hit(p, m);
+        if (ar.is_killing_blow) ElementResolver::on_kill(p, m);
+    }
     return ar;
 }
 

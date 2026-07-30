@@ -121,3 +121,4 @@ add_roguelike_test(synergy_test     weapon/synergy_test.cpp)
 
 # G10.1: Element Core tests
 add_roguelike_test(element_test      element/element_test.cpp)
+add_roguelike_test(element_combat    element/element_combat_test.cpp)

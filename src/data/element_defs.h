@@ -9,10 +9,25 @@
 // ============================================================
 
 struct ElementDef {
-    std::string id;          // "fire" | "ice" | "poison"
-    std::string name;        // "火焰核心" | "冰霜核心" | "剧毒核心"
-    std::string description; // one-line effect description
-    int base_value = 0;      // effect magnitude
+    std::string id;
+    std::string name;
+    std::string description;
+
+    // ── Fire ──
+    float crit_base = 15.0f;    // Lv1 crit chance (%)
+    float crit_growth = 0.75f;  // +% per level
+    float crit_multiplier = 1.5f;
+
+    // ── Ice ──
+    int   freeze_counter_max = 3;    // slow stacks needed for freeze
+    float freeze_stage3 = 100.0f;    // Lv20 freeze chance
+    float freeze_stage2 = 50.0f;
+    float freeze_stage1 = 10.0f;
+
+    // ── Poison ──
+    float dot_scale_base = 0.05f;    // Lv1 = 5% of damage as DOT
+    float dot_scale_growth = 0.005f; // +0.5% per level
+    float dot_duration = 3.0f;
 };
 
 bool load_element_defs(const std::string& json_path);

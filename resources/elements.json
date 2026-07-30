@@ -4,19 +4,26 @@
       "id": "fire",
       "name": "火焰核心",
       "description": "攻击有概率造成火焰暴击",
-      "base_value": 15
+      "crit_base": 15,
+      "crit_growth": 0.75,
+      "crit_multiplier": 1.5
     },
     {
       "id": "ice",
       "name": "冰霜核心",
       "description": "攻击附带减速效果",
-      "base_value": 3
+      "freeze_counter_max": 3,
+      "freeze_stage3": 100,
+      "freeze_stage2": 50,
+      "freeze_stage1": 10
     },
     {
       "id": "poison",
       "name": "剧毒核心",
       "description": "攻击附加持续毒伤",
-      "base_value": 5
+      "dot_scale_base": 0.05,
+      "dot_scale_growth": 0.005,
+      "dot_duration": 3
     }
   ]
 }

@@ -8,6 +8,22 @@ using json = nlohmann::json;
 static std::unordered_map<std::string, ElementDef> g_element_defs;
 static bool g_loaded = false;
 
+static void _parse_fields(ElementDef& d, const json& e) {
+    d.id          = e.value("id", "");
+    d.name        = e.value("name", "");
+    d.description = e.value("description", "");
+    d.crit_base      = e.value("crit_base", 15.0f);
+    d.crit_growth    = e.value("crit_growth", 0.75f);
+    d.crit_multiplier = e.value("crit_multiplier", 1.5f);
+    d.freeze_counter_max = e.value("freeze_counter_max", 3);
+    d.freeze_stage3 = e.value("freeze_stage3", 100.0f);
+    d.freeze_stage2 = e.value("freeze_stage2", 50.0f);
+    d.freeze_stage1 = e.value("freeze_stage1", 10.0f);
+    d.dot_scale_base  = e.value("dot_scale_base", 0.05f);
+    d.dot_scale_growth = e.value("dot_scale_growth", 0.005f);
+    d.dot_duration    = e.value("dot_duration", 3.0f);
+}
+
 bool load_element_defs(const std::string& json_path) {
     std::ifstream f(json_path);
     if (!f.is_open()) {
@@ -15,18 +31,15 @@ bool load_element_defs(const std::string& json_path) {
         return false;
     }
     json j;
-    try { f >> j; } catch (const std::exception& e) {
-        printf("[ELEMENT_DEF] JSON error: %s\n", e.what());
+    try { f >> j; } catch (const std::exception& ex) {
+        printf("[ELEMENT_DEF] JSON error: %s\n", ex.what());
         return false;
     }
     if (!j.contains("elements") || !j["elements"].is_array()) return false;
     int count = 0;
     for (auto& e : j["elements"]) {
         ElementDef d;
-        d.id          = e.value("id", "");
-        d.name        = e.value("name", "");
-        d.description = e.value("description", "");
-        d.base_value  = e.value("base_value", 0);
+        _parse_fields(d, e);
         if (d.id.empty()) continue;
         g_element_defs[d.id] = d;
         count++;
@@ -54,10 +67,7 @@ int load_element_defs_from_json(const char* json_text, MergeMode mode,
         if (!j.contains("elements") || !j["elements"].is_array()) return 0;
         for (auto& e : j["elements"]) {
             ElementDef d;
-            d.id          = e.value("id", "");
-            d.name        = e.value("name", "");
-            d.description = e.value("description", "");
-            d.base_value  = e.value("base_value", 0);
+            _parse_fields(d, e);
             if (d.id.empty()) continue;
             std::string key = id_namespace
                 ? std::string(id_namespace) + ":" + d.id : d.id;
