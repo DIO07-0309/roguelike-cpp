@@ -214,10 +214,17 @@ void GameRenderer::draw_skill_bar(const Player* player, float game_time) {
 
 // C1: Buff icon mapping
 static const char* _buff_icon(const std::string& id) {
-    if (id == "attack_up") return "▲";
-    if (id == "poison")    return "☠";
-    if (id == "slow")      return "❄";
-    return "■";
+    if (id == "attack_up") return "攻";
+    if (id == "poison")    return "毒";
+    if (id == "slow")      return "缓";
+    if (id == "freeze")    return "冻";
+    if (id == "bleed")     return "血";
+    if (id == "burn")      return "燃";
+    if (id == "stun")      return "晕";
+    if (id == "fear")      return "惧";
+    if (id == "electrified") return "雷";
+    if (id == "defense_up")  return "防";
+    return "?";
 }
 
 void GameRenderer::draw_player_buffs(const Player* player) {
@@ -333,17 +340,25 @@ void GameRenderer::draw_monster_buffs(const Monster& m, float draw_x, float draw
     std::string label;
     int shown = 0;
     for (auto& b : m.active_buffs) {
-        if (shown >= 3) break; // C1: 最多显示3个
+        if (shown >= 4) break;
         if (!label.empty()) label += " ";
-        label += std::string(_buff_icon(b.id)) + "x" + std::to_string(b.stacks);
+        // G10: show stacks for all buffs, bold prefix
+        if (b.stacks > 1)
+            label += std::string(_buff_icon(b.id)) + std::to_string(b.stacks);
+        else
+            label += std::string(_buff_icon(b.id));
         shown++;
     }
-    float tw = MeasureTextEx(g_font_small, label.c_str(), 12, 1).x;
+    float tw = MeasureTextEx(g_font_small, label.c_str(), 14, 1).x;
     float px = draw_x + (m.entity.size.x - tw) / 2;
-    float py = draw_y - 16;
+    float py = draw_y - 26; // above name label
+    // Shadow for readability
+    DrawTextEx(g_font_small, label.c_str(), {px + 1, py + 1}, 14, 1, {0, 0, 0, 220});
+    DrawTextEx(g_font_small, label.c_str(), {px - 1, py - 1}, 14, 1, {0, 0, 0, 220});
+    // Colored label with bright tone
     Color c = get_buff_hud_color(m.active_buffs[0].id);
-    DrawTextEx(g_font_small, label.c_str(), {px + 1, py + 1}, 12, 1, {0, 0, 0, 180});
-    DrawTextEx(g_font_small, label.c_str(), {px, py}, 12, 1, c);
+    c.a = 240;
+    DrawTextEx(g_font_small, label.c_str(), {px, py}, 14, 1, c);
 }
 
 void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw, int sh) {

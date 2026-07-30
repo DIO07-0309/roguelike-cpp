@@ -88,11 +88,17 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
     if (_rooms.size() < 4) return;
 
     std::vector<int> candidates;
-    for (int i = 1; i < (int)_rooms.size() - 1; i++)
+    // G10: prioritize rooms near player spawn (room 0) for first few relics
+    // Put room 1 first to guarantee at least one relic room is close
+    if ((int)_rooms.size() >= 3) candidates.push_back(1);
+    if ((int)_rooms.size() >= 4) candidates.push_back(2);
+    for (int i = 3; i < (int)_rooms.size() - 1; i++)
         candidates.push_back(i);
 
     for (int i = (int)candidates.size() - 1; i > 0; i--) {
         int j = _rand_int(i + 1);
+        // Don't shuffle room 1 away from first position
+        if (candidates[i] == 1 || candidates[j] == 1) continue;
         std::swap(candidates[i], candidates[j]);
     }
 

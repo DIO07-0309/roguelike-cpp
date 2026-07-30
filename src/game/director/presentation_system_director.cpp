@@ -40,6 +40,13 @@ void PresentationSystemDirector::spawn_damage(float wx, float wy, int dmg, Color
     damage_floats.push_back({wx, wy, lt, dmg, c});
 }
 
+void PresentationSystemDirector::spawn_label(float wx, float wy, const char* text, Color c, float lt) {
+    DamageFloat df;
+    df.x = wx; df.y = wy; df.lifetime = lt; df.value = 0;
+    df.color = c; df.label = text;
+    damage_floats.push_back(df);
+}
+
 void PresentationSystemDirector::trigger_shake(float intensity) {
     if (intensity > shake_intensity) shake_intensity = intensity;
     shake_timer = 0.12f;

@@ -182,7 +182,7 @@ void CombatCoordinator::on_monster_killed(Monster* m, Player* player,
 
         if (player->skills.can_learn()) {
             auto names = get_learned_names(player->skills);
-            auto sk = random_active_skill(names);
+            auto sk = random_active_skill(names, true);
             std::string skill_name = sk->name;
             player->skills.learn(std::move(sk));
             player->skills.apply_all_passives(player);

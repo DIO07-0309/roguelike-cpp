@@ -70,9 +70,10 @@ struct BuildTheme {
 class PresentationSystemDirector {
 public:
     // ── Damage Float ──
-    struct DamageFloat { float x, y; float lifetime; int value; Color color; };
+    struct DamageFloat { float x, y; float lifetime; int value; Color color; const char* label = nullptr; };
     std::vector<DamageFloat> damage_floats;
     void  spawn_damage(float wx, float wy, int dmg, Color c, float lifetime = 0.6f);
+    void  spawn_label(float wx, float wy, const char* text, Color c, float lifetime = 0.8f);
 
     // ── Camera Shake ──
     float shake_timer = 0.0f;

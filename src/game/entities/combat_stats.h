@@ -24,7 +24,8 @@ struct BuffInstance {
 // B11: RelicInstance — 局内圣物 (挂在 Player 上, 跨楼层持续)
 // ============================================================
 struct RelicInstance {
-    std::string id;   // "blood_charm" | "venom_fang" | ...
+    std::string id;       // "blood_charm" | "venom_fang" | ...
+    bool from_boss = false; // G10: boss relic persists across floors
 };
 
 struct CombatStats {

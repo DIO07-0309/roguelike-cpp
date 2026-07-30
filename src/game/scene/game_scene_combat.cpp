@@ -65,7 +65,7 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
             _s.player->combat.max_hp, _s.player->combat.get_effective_attack());
         if (_s.player->skills.can_learn()) {
             auto names = get_learned_names(_s.player->skills);
-            auto sk = random_active_skill(names, false);
+            auto sk = random_active_skill(names, true);  // G10: level-up only base 4 skills
             _s.player->skills.learn(std::move(sk));
             _s.player->skills.apply_all_passives(_s.player.get());
         }
@@ -135,7 +135,7 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
                 candidates.push_back(id);
         if (!candidates.empty()) {
             std::string chosen = candidates[rng() % candidates.size()];
-            _s.player->relics.push_back({chosen});
+            _s.player->relics.push_back({chosen, true});  // G10: boss relic persists
             const RelicDef* def = get_relic_def(chosen);
             if (def) {
                 _s._presentation.room_msg = "RELIC:" + def->name;

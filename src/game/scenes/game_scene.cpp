@@ -210,8 +210,11 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     _presentation.room_msg.clear();
     _presentation.room_msg_timer = 0.0f;
 
-    // B13: Relic 每层重建 — 新楼层清空旧圣物
-    player->relics.clear();
+    // G10: Boss relics persist across floors (from_boss=true)
+    std::vector<RelicInstance> keep;
+    for (auto& r : player->relics)
+        if (r.from_boss) keep.push_back(r);
+    player->relics = keep;
 
     // D4 Step1: 重置事件状态
     if (game_map) {
@@ -544,42 +547,60 @@ void GameScene::_process(double delta) {
             switch (ev.type) {
             case GameEventType::ELEMENT_FIRE_HIT:
                 if (target) {
-                    vfx.explosion(tx, ty, 12.0f, {255,140,30,200}, 5, 0.25f);
-                    vfx.ring(tx, ty, 16.0f, {255,100,20,180}, 1, 0.22f);
+                    vfx.beam(px, py, tx, ty, {255,140,30,200}, 0.28f);
+                    vfx.explosion(tx, ty, 16.0f, {255,150,40,230}, 8, 0.32f);
+                    vfx.ring(tx, ty, 20.0f, {255,120,20,220}, 2, 0.28f);
+                    vfx.spark_burst(tx, ty + 10, 6, {255,160,50,200}, 0.25f);
+                    _presentation.spawn_label(tx, ty - 18, "[火]", {255,140,40,255}, 0.8f);
                 }
                 break;
             case GameEventType::ELEMENT_FIRE_CRITICAL:
                 if (target) {
-                    vfx.explosion(tx, ty, 28.0f, {255,160,40,240}, 10, 0.35f);
-                    vfx.shockwave(tx, ty, 40.0f, {255,120,20,200}, 2, 0.30f);
-                    vfx.flash(tx, ty, 14.0f, {255,200,80,200}, 0.10f);
-                    _presentation.trigger_shake(6.0f);
+                    vfx.beam(px, py, tx, ty, {255,180,40,240}, 0.35f);
+                    vfx.explosion(tx, ty, 32.0f, {255,180,50,255}, 16, 0.40f);
+                    vfx.shockwave(tx, ty, 50.0f, {255,140,30,230}, 3, 0.35f);
+                    vfx.ring(tx, ty, 24.0f, {255,200,60,230}, 3, 0.45f);
+                    vfx.flash(tx, ty, 18.0f, {255,220,100,220}, 0.12f);
+                    _presentation.trigger_shake(8.0f);
+                    _presentation.trigger_freeze(0.05f);
+                    _presentation.spawn_label(tx, ty - 24, "[暴击!]", {255,220,40,255}, 1.0f);
                 }
                 break;
             case GameEventType::ELEMENT_ICE_SLOW:
                 if (target) {
-                    vfx.ring(tx, ty, 18.0f, {80,180,255,160}, 2, 0.30f);
-                    vfx.spark_burst(tx, ty + 16, 4, {100,200,255,180}, 0.25f);
+                    vfx.beam(px, py, tx, ty, {80,180,255,220}, 0.35f);
+                    vfx.ring(tx, ty, 22.0f, {80,180,255,200}, 3, 0.40f);
+                    vfx.spark_burst(tx, ty, 8, {100,200,255,200}, 0.35f);
+                    vfx.ring(tx, ty, 16.0f, {100,200,255,120}, 1, 0.50f);
+                    _presentation.spawn_label(tx, ty - 18, "[缓]", {80,180,255,255}, 0.8f);
                 }
                 break;
             case GameEventType::ELEMENT_ICE_FREEZE:
                 if (target) {
-                    vfx.flash(tx, ty, 22.0f, {120,200,255,220}, 0.15f);
-                    vfx.shockwave(tx, ty, 30.0f, {100,180,255,200}, 2, 0.35f);
-                    vfx.ring(tx, ty, 14.0f, {180,220,255,220}, 2, 0.40f);
-                    _presentation.trigger_freeze(0.06f);
+                    vfx.flash(tx, ty, 26.0f, {120,200,255,240}, 0.18f);
+                    vfx.shockwave(tx, ty, 35.0f, {100,180,255,220}, 3, 0.40f);
+                    vfx.ring(tx, ty, 18.0f, {180,220,255,230}, 3, 0.50f);
+                    vfx.explosion(tx, ty, 20.0f, {120,200,255,200}, 12, 0.35f);
+                    _presentation.trigger_freeze(0.08f);
+                    _presentation.trigger_shake(4.0f);
+                    _presentation.spawn_label(tx, ty - 24, "[冻!]", {120,200,255,255}, 1.2f);
                 }
                 break;
             case GameEventType::ELEMENT_POISON_APPLY:
                 if (target) {
-                    vfx.ring(tx, ty, 14.0f, {80,200,80,180}, 2, 0.35f);
-                    vfx.smoke_puff(tx, ty, 10.0f, {60,180,60,140}, 4, 0.40f);
+                    vfx.beam(px, py, tx, ty, {80,200,80,200}, 0.30f);
+                    vfx.ring(tx, ty, 18.0f, {80,210,80,200}, 3, 0.40f);
+                    vfx.smoke_puff(tx, ty, 14.0f, {60,190,60,160}, 6, 0.50f);
+                    vfx.spark_burst(tx, ty + 8, 5, {100,220,80,180}, 0.30f);
+                    vfx.ring(tx, ty, 22.0f, {60,180,60,100}, 1, 0.55f);
+                    _presentation.spawn_label(tx, ty - 18, "[毒]", {80,210,80,255}, 0.8f);
                 }
                 break;
             case GameEventType::ELEMENT_POISON_TICK:
                 if (target) {
-                    vfx.ring(tx, ty + 8, 8.0f, {80,200,60,160}, 1, 0.20f);
-                    vfx.spark_burst(tx, ty + 4, 2, {100,220,80,180}, 0.18f);
+                    vfx.beam(px, py, tx, ty, {100,200,60,150}, 0.15f);
+                    vfx.ring(tx, ty + 8, 12.0f, {80,210,70,180}, 2, 0.25f);
+                    vfx.spark_burst(tx, ty + 4, 4, {100,230,80,180}, 0.22f);
                 }
                 break;
             case GameEventType::ELEMENT_LEVEL_UP: {
@@ -921,7 +942,20 @@ void GameScene::_input(const InputMap& input) {
             };
             player->element.select(choices[element_select_cursor]);
             element_select_active = false;
-            state = GameState::TITLE;
+            // Continue new_game flow that was interrupted for element selection
+            auto sk = random_active_skill({}, true);
+            player->skills.learn(std::move(sk));
+            g_meta.load();
+            _gameplay.run_stats = RunSummary{};
+            player->skills.apply_all_passives(player.get());
+            current_floor = 1;
+            max_unlocked_floor = 1;
+            enter_floor(1);
+            _presentation.set_build_theme(BuildType::BERSERKER);
+            if (g_replay_mode && !g_replay_path.empty())
+                start_replay(g_replay_path);
+            else if (g_record_mode && !g_record_path.empty())
+                start_recording(_dungeon_seed);
             return;
         }
     }
@@ -1091,54 +1125,68 @@ void GameScene::_render() {
     // G10.1: Element Select Screen
     if (element_select_active) {
         ClearBackground({20, 15, 30, 255});
-        // Loading hint: draw element defs inline if available
         const ElementDef* defs[3] = {
             get_element_def("fire"), get_element_def("ice"), get_element_def("poison")
         };
         const char* icons[] = {
-            "🔥 火焰核心", "❄ 冰霜核心", "☠ 剧毒核心"
+            "[火] 火焰核心", "[冰] 冰霜核心", "[毒] 剧毒核心"
+        };
+        const char* long_desc[] = {
+            "每次攻击有概率触发火焰暴击\n暴击伤害 x1.5\nLv1 暴击率 15%，Lv20 约 30%",
+            "每击附加减速\n累计减速层数触发冻结(1秒)\nLv1 冻结率 10%，Lv20 约 100%",
+            "每击附加持续毒伤\nDOT = 本次伤害 x 比例\nLv1 毒伤 5%，Lv20 约 15%"
         };
         const Color colors[] = {
             {255,120,30,255}, {100,200,255,255}, {80,220,80,255}
         };
-        // Title
         const char* title = "选择你的元素核心";
         float tw = MeasureTextEx(g_font_small, title, 28, 1).x;
-        DrawTextEx(g_font_small, title, {sw/2.0f - tw/2, 60}, 28, 1, {255,220,180,255});
+        DrawTextEx(g_font_small, title, {sw/2.0f - tw/2, 40}, 28, 1, {255,220,180,255});
 
-        // Three option cards
-        float card_w = 260, card_h = 220, gap = 30;
+        float card_w = 280, card_h = 300, gap = 20;
         float start_x = sw/2.0f - (card_w * 3 + gap * 2)/2.0f;
         for (int i = 0; i < 3; i++) {
             float cx = start_x + i * (card_w + gap);
-            float cy = (sh - card_h)/2.0f;
+            float cy = (sh - card_h)/2.0f + 20;
             bool selected = (i == element_select_cursor);
-            Color bg = selected ? Color{50,50,80,255} : Color{30,30,50,255};
-            Color border = selected ? colors[i] : Color{60,60,80,220};
+            Color bg = selected ? Color{50,50,80,255} : Color{25,25,45,255};
+            Color border = selected ? colors[i] : Color{50,50,75,220};
 
             DrawRectangleRounded({cx, cy, card_w, card_h}, 0.1f, 8, bg);
-            DrawRectangleRoundedLines({cx-1, cy-1, card_w+2, card_h+2}, 0.1f, 8, 2.0f, border);
+            DrawRectangleRoundedLines({cx-1, cy-1, card_w+2, card_h+2}, 0.1f, 8, 2.5f, border);
 
-            // Icon
-            float iw = MeasureTextEx(g_font_small, icons[i], 36, 1).x;
-            DrawTextEx(g_font_small, icons[i], {cx + card_w/2 - iw/2, cy + 30}, 36, 1, colors[i]);
+            float iw = MeasureTextEx(g_font_small, icons[i], 32, 1).x;
+            DrawTextEx(g_font_small, icons[i], {cx + card_w/2 - iw/2, cy + 25}, 32, 1, colors[i]);
 
-            // Description
-            if (defs[i] && g_font_loaded) {
-                float dw = MeasureTextEx(g_font_small, defs[i]->description.c_str(), 14, 1).x;
-                DrawTextEx(g_font_small, defs[i]->description.c_str(),
-                    {cx + card_w/2 - dw/2, cy + 90}, 14, 1, {200,200,200,220});
+            // Multi-line description
+            float dy = cy + 80;
+            const char* desc = long_desc[i];
+            std::string line;
+            for (const char* p = desc; *p; p++) {
+                if (*p == '\n') {
+                    float lw = MeasureTextEx(g_font_small, line.c_str(), 13, 1).x;
+                    DrawTextEx(g_font_small, line.c_str(),
+                        {cx + card_w/2 - lw/2, dy}, 13, 1, {200,210,200,200});
+                    dy += 22;
+                    line.clear();
+                } else {
+                    line += *p;
+                }
             }
-            // Select prompt
+            if (!line.empty()) {
+                float lw = MeasureTextEx(g_font_small, line.c_str(), 13, 1).x;
+                DrawTextEx(g_font_small, line.c_str(),
+                    {cx + card_w/2 - lw/2, dy}, 13, 1, {200,210,200,200});
+            }
+
             if (selected) {
                 DrawTextEx(g_font_small, "[空格/E 确认]",
-                    {cx + 60, cy + 180}, 14, 1, {255,255,200,200});
+                    {cx + card_w/2 - 60, cy + card_h - 35}, 14, 1, {255,255,180,220});
             }
         }
-        // Footer
-        const char* ft = "选择后永久绑定，不可更改";
+        const char* ft = "选择后永久绑定，本局及以后所有存档不可更改";
         float fw = MeasureTextEx(g_font_small, ft, 14, 1).x;
-        DrawTextEx(g_font_small, ft, {sw/2.0f - fw/2, (float)(sh - 40)}, 14, 1, {150,150,150,180});
+        DrawTextEx(g_font_small, ft, {sw/2.0f - fw/2, (float)(sh - 30)}, 14, 1, {150,150,150,180});
         return;
     }
 
@@ -1247,8 +1295,13 @@ void GameScene::_render() {
         float sx = df.x - _cam_x, sy = df.y - _cam_y - (0.6f - df.lifetime) * 30;
         unsigned char a = (unsigned char)(df.color.a * (df.lifetime / 0.6f));
         Color c = df.color; c.a = a;
-        char buf[16]; snprintf(buf, sizeof(buf), "%d", df.value);
-        GameRenderer::draw_glow_text(buf, sx, sy, 16 + df.value / 10, c, true);
+        if (df.label) {
+            // G10: element effect label (缓/冻/毒/暴)
+            GameRenderer::draw_glow_text(df.label, sx, sy, 18, c, true);
+        } else {
+            char buf[16]; snprintf(buf, sizeof(buf), "%d", df.value);
+            GameRenderer::draw_glow_text(buf, sx, sy, 16 + df.value / 10, c, true);
+        }
     }
 
     _cam_x = saved_cx; _cam_y = saved_cy;  // 恢复
