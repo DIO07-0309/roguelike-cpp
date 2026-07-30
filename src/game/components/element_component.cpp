@@ -1,5 +1,6 @@
 #include "components/element_component.h"
 #include "data/element_defs.h"
+#include "core/event_bus.h"  // G10.3 VFX
 
 void ElementComponent::select(ElementType element) {
     type = element;
@@ -11,10 +12,15 @@ void ElementComponent::select(ElementType element) {
 
 void ElementComponent::add_exp(int amount) {
     if (!initialized || type == ElementType::NONE) return;
+    int old_level = level;
     experience += amount;
     while (experience >= xp_to_next()) {
         experience -= xp_to_next();
         level++;
+    }
+    if (level > old_level) {
+        EventBus::inst().emit(GameEventType::ELEMENT_LEVEL_UP, nullptr,
+            level, 0.0f, element_type_name(type));
     }
 }
 

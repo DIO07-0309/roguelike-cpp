@@ -66,6 +66,15 @@ enum class GameEventType {
     // ── G9.3: Weapon-skill synergy ──
     WEAPON_ATTACK_COMPLETE,
 
+    // ── G10.3: Element VFX ──
+    ELEMENT_FIRE_HIT,
+    ELEMENT_FIRE_CRITICAL,
+    ELEMENT_ICE_SLOW,
+    ELEMENT_ICE_FREEZE,
+    ELEMENT_POISON_APPLY,
+    ELEMENT_POISON_TICK,
+    ELEMENT_LEVEL_UP,
+
     // ── 游戏 ──
     GAME_CLEAR,
     GAME_OVER,

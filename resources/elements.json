@@ -6,7 +6,12 @@
       "description": "攻击有概率造成火焰暴击",
       "crit_base": 15,
       "crit_growth": 0.75,
-      "crit_multiplier": 1.5
+      "crit_multiplier": 1.5,
+      "vfx": {
+        "hit": "fire_hit",
+        "critical": "fire_critical",
+        "level_up": "fire_upgrade"
+      }
     },
     {
       "id": "ice",
@@ -15,7 +20,12 @@
       "freeze_counter_max": 3,
       "freeze_stage3": 100,
       "freeze_stage2": 50,
-      "freeze_stage1": 10
+      "freeze_stage1": 10,
+      "vfx": {
+        "slow": "ice_slow",
+        "freeze": "ice_freeze",
+        "level_up": "ice_upgrade"
+      }
     },
     {
       "id": "poison",
@@ -23,7 +33,12 @@
       "description": "攻击附加持续毒伤",
       "dot_scale_base": 0.05,
       "dot_scale_growth": 0.005,
-      "dot_duration": 3
+      "dot_duration": 3,
+      "vfx": {
+        "apply": "poison_apply",
+        "tick": "poison_tick",
+        "level_up": "poison_upgrade"
+      }
     }
   ]
 }

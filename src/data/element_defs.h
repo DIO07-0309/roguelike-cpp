@@ -28,6 +28,9 @@ struct ElementDef {
     float dot_scale_base = 0.05f;    // Lv1 = 5% of damage as DOT
     float dot_scale_growth = 0.005f; // +0.5% per level
     float dot_duration = 3.0f;
+
+    // ── G10.3 VFX recipe IDs ──
+    struct { std::string hit, critical, slow, freeze, apply, tick, level_up; } vfx;
 };
 
 bool load_element_defs(const std::string& json_path);

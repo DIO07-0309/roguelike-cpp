@@ -22,6 +22,16 @@ static void _parse_fields(ElementDef& d, const json& e) {
     d.dot_scale_base  = e.value("dot_scale_base", 0.05f);
     d.dot_scale_growth = e.value("dot_scale_growth", 0.005f);
     d.dot_duration    = e.value("dot_duration", 3.0f);
+    // G10.3 VFX recipe IDs
+    if (e.contains("vfx") && e["vfx"].is_object()) {
+        d.vfx.hit       = e["vfx"].value("hit", "");
+        d.vfx.critical  = e["vfx"].value("critical", "");
+        d.vfx.slow      = e["vfx"].value("slow", "");
+        d.vfx.freeze    = e["vfx"].value("freeze", "");
+        d.vfx.apply     = e["vfx"].value("apply", "");
+        d.vfx.tick      = e["vfx"].value("tick", "");
+        d.vfx.level_up  = e["vfx"].value("level_up", "");
+    }
 }
 
 bool load_element_defs(const std::string& json_path) {
