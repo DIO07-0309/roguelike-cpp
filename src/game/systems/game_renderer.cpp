@@ -63,44 +63,73 @@ void GameRenderer::update_camera(float& cam_x, float& cam_y, const Player* playe
 // ============================================================
 // 特效
 // ============================================================
+
+// G5.8.8-fix: 方向斩弧（含刃线与散点）
+static void _draw_slash_arc(const Effect& e, float sx, float sy,
+                            float prog, Color c) {
+    float arc_r = e.radius * (0.6f + 0.4f * prog);
+    float startAngle = 0;
+    switch (e.direction) {
+        case Direction::DOWN:  startAngle = 0;   break;
+        case Direction::UP:    startAngle = 180; break;
+        case Direction::RIGHT: startAngle = 270; break;
+        case Direction::LEFT:  startAngle = 90;  break;
+    }
+    float endAngle = startAngle + 120;
+    DrawRing({sx, sy}, arc_r * 0.4f, arc_r, startAngle, endAngle, 12, c);
+    DrawLineEx({sx, sy},
+               {sx + cosf((startAngle + 60) * DEG2RAD) * arc_r,
+                sy + sinf((startAngle + 60) * DEG2RAD) * arc_r}, 3, c);
+    for (int i = 0; i < 5; i++) {
+        float a = (startAngle + (float)(rand() % 120)) * DEG2RAD;
+        float dist = arc_r * (0.5f + (float)(rand() % 50) / 100.0f);
+        DrawCircle(sx + cosf(a) * dist, sy + sinf(a) * dist, 2.5f, Fade(c, 0.5f));
+    }
+}
+
+// G5.8.8-fix: 单特效渲染 — 合并原 VFXServer::draw 全部 kind 分支
+static void _draw_effect_body(const Effect& e, float sx, float sy,
+                              float cam_x, float cam_y, float t) {
+    float alpha = 1.0f - t / e.duration;
+    if (alpha <= 0) return;
+    Color c = e.color; c.a = (unsigned char)(c.a * alpha);
+    float prog = t / e.duration;
+
+    if (e.kind == "pulse" || e.kind == "ring") {
+        float r = e.radius * (0.5f + 0.5f * prog);
+        DrawRing({sx, sy}, r * 0.6f, r, 0, 360, 24, c);
+    } else if (e.kind == "spark") {
+        DrawCircle(sx, sy, e.radius, c);
+    } else if (e.kind == "bolt") {
+        DrawLineEx({sx, sy}, {e.target_x - cam_x, e.target_y - cam_y}, 2, c);
+    } else if (e.kind == "flash") {
+        DrawCircle(sx, sy, e.radius, c);
+        DrawCircle(sx, sy, e.radius * 1.5f, Fade(c, 0.3f));
+    } else if (e.kind == "smoke") {
+        float sr = e.radius * (0.3f + 0.7f * prog);
+        DrawCircle(sx, sy, sr, Fade(c, 0.5f));
+    } else if (e.kind == "shield_ring") {
+        float pulse = 0.8f + 0.2f * sinf(t * 8.0f);
+        DrawRing({sx, sy}, e.radius * 0.7f, e.radius, 0, 360, 16,
+                 Color{(unsigned char)c.r, (unsigned char)c.g, (unsigned char)c.b,
+                       (unsigned char)(c.a * pulse)});
+    } else if (e.kind == "slash_arc") {
+        _draw_slash_arc(e, sx, sy, prog, c);
+    } else if (e.kind == "cone") {
+        DrawRectangleLines(sx - e.radius / 2, sy - e.radius / 4,
+                           e.radius, e.radius / 2, c);
+    } else {
+        float r = e.radius * (0.5f + 0.5f * prog);
+        DrawRing({sx, sy}, r * 0.6f, r, 0, 360, 12, c);
+    }
+}
+
 void GameRenderer::draw_effects(const std::vector<Effect>& effects, float cam_x, float cam_y) {
     for (auto& e : effects) {
+        float t = e.elapsed - e.start_delay;
+        if (t < 0) continue;
         float sx = e.world_x - cam_x, sy = e.world_y - cam_y;
-        float alpha = 1.0f - e.elapsed / e.duration;
-        if (alpha <= 0) continue;
-        Color c = e.color; c.a = (unsigned char)(c.a * alpha);
-
-        if (e.kind == "pulse") {
-            float r = e.radius * (0.5f + 0.5f * e.elapsed / e.duration);
-            DrawRing({sx, sy}, r * 0.6f, r, 0, 360, 24, c);
-        } else if (e.kind == "spark") {
-            DrawCircle(sx, sy, e.radius, c);
-        } else if (e.kind == "bolt") {
-            DrawLineEx({sx, sy}, {e.target_x - cam_x, e.target_y - cam_y}, 2, c);
-        } else if (e.kind == "flash") {
-            DrawCircle(sx, sy, e.radius, Fade(c, 0.3f));
-        } else if (e.kind == "slash_arc") {
-            float arc_r = e.radius * (0.6f + 0.4f * e.elapsed / e.duration);
-            float startAngle = 0;
-            switch (e.direction) {
-                case Direction::DOWN:  startAngle = 0;   break;
-                case Direction::UP:    startAngle = 180; break;
-                case Direction::RIGHT: startAngle = 270; break;
-                case Direction::LEFT:  startAngle = 90;  break;
-            }
-            float endAngle = startAngle + 120;
-            DrawRing({sx, sy}, arc_r * 0.4f, arc_r, startAngle, endAngle, 12, c);
-            DrawLineEx({sx, sy},
-                       {sx + cosf((startAngle + 60) * DEG2RAD) * arc_r,
-                        sy + sinf((startAngle + 60) * DEG2RAD) * arc_r}, 3, c);
-            for (int i = 0; i < 5; i++) {
-                float a = (startAngle + (float)(rand() % 120)) * DEG2RAD;
-                float dist = arc_r * (0.5f + (float)(rand() % 50) / 100.0f);
-                DrawCircle(sx + cosf(a) * dist, sy + sinf(a) * dist, 2.5f, Fade(c, 0.5f));
-            }
-        } else if (e.kind == "cone") {
-            DrawRectangleLines(sx - e.radius / 2, sy - e.radius / 4, e.radius, e.radius / 2, c);
-        }
+        _draw_effect_body(e, sx, sy, cam_x, cam_y, t);
     }
 }
 

@@ -52,6 +52,7 @@ struct Effect {
     Direction direction = Direction::DOWN;
     float target_x = 0, target_y = 0;
     int level = 1;
+    float start_delay = 0;  // G5.8.8: recipe 分镜延迟(秒), 渲染前等待
 };
 
 // ── Relic ── (intentionally kept in combat_system.h — field types differ from shared types)

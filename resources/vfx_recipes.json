@@ -89,9 +89,93 @@
     "time_stop": {
       "sfx": "timestop", "hit_sfx": "", "camera_shake": 0,
       "steps": [
-        { "kind": "pulse", "radius": 400, "duration": 1.00, "delay": 0.0 },
-        { "kind": "pulse", "radius": 600, "duration": 0.80, "delay": 0.20 },
-        { "kind": "pulse", "radius": 900, "duration": 0.60, "delay": 0.40 }
+        { "kind": "pulse", "radius": 400, "duration": 1.00, "delay": 0.0, "color": "time" },
+        { "kind": "pulse", "radius": 600, "duration": 0.80, "delay": 0.20, "color": "time" },
+        { "kind": "pulse", "radius": 900, "duration": 0.60, "delay": 0.40, "color": "time" }
+      ]
+    },
+    "skill_the_world": {
+      "sfx": "timestop", "hit_sfx": "", "camera_shake": 3,
+      "steps": [
+        { "kind": "flash", "radius": 140, "duration": 0.15, "delay": 0.0, "color": "time" },
+        { "kind": "pulse", "radius": 120, "duration": 0.50, "layers": 3, "layer_delay": 0.06, "delay": 0.08, "color": "time" },
+        { "kind": "pulse", "radius": 220, "duration": 0.40, "delay": 0.20, "color": "time" },
+        { "kind": "spark", "count": 18, "duration": 0.50, "delay": 0.30, "color": "time" }
+      ]
+    },
+    "skill_meteor": {
+      "sfx": "bolt", "hit_sfx": "hit", "camera_shake": 6,
+      "steps": [
+        { "kind": "bolt", "radius": 0, "duration": 0.45, "delay": 0.0, "color": "fire" },
+        { "kind": "shockwave", "radius": 90, "duration": 0.55, "layers": 3, "layer_delay": 0.08, "delay": 0.05, "color": "fire" },
+        { "kind": "pulse", "radius": 70, "duration": 0.50, "layers": 3, "layer_delay": 0.06, "delay": 0.10, "color": "fire" },
+        { "kind": "spark", "count": 16, "duration": 0.55, "delay": 0.18, "color": "fire" },
+        { "kind": "flash", "radius": 90, "duration": 0.18, "delay": 0.22, "color": "fire" }
+      ]
+    },
+    "skill_blood_slash": {
+      "sfx": "slash", "hit_sfx": "hit", "camera_shake": 2,
+      "steps": [
+        { "kind": "slash_arc", "radius": 72, "duration": 0.35, "delay": 0.0, "color": "bleed" },
+        { "kind": "spark", "count": 6, "duration": 0.30, "delay": 0.10, "color": "bleed" },
+        { "kind": "cone", "radius": 60, "duration": 0.30, "delay": 0.16, "color": "bleed" }
+      ]
+    },
+    "skill_frost_edge": {
+      "sfx": "slash", "hit_sfx": "hit", "camera_shake": 2,
+      "steps": [
+        { "kind": "slash_arc", "radius": 72, "duration": 0.35, "delay": 0.0, "color": "ice" },
+        { "kind": "spark", "count": 6, "duration": 0.30, "delay": 0.10, "color": "ice" },
+        { "kind": "cone", "radius": 60, "duration": 0.30, "delay": 0.16, "color": "ice" }
+      ]
+    },
+    "skill_shadow_slice": {
+      "sfx": "slash", "hit_sfx": "hit", "camera_shake": 3,
+      "steps": [
+        { "kind": "slash_arc", "radius": 64, "duration": 0.35, "delay": 0.0, "color": "shadow" },
+        { "kind": "smoke", "count": 5, "duration": 0.55, "delay": 0.08, "color": "shadow" },
+        { "kind": "flash", "radius": 50, "duration": 0.16, "delay": 0.18, "color": "shadow" },
+        { "kind": "spark", "count": 8, "duration": 0.35, "delay": 0.24, "color": "shadow" }
+      ]
+    },
+    "skill_self_heal": {
+      "sfx": "heal", "hit_sfx": "", "camera_shake": 0,
+      "steps": [
+        { "kind": "pulse", "radius": 48, "duration": 0.55, "delay": 0.0, "color": "heal" },
+        { "kind": "spark", "count": 10, "duration": 0.60, "delay": 0.10, "color": "heal" }
+      ]
+    },
+    "skill_blood_pact": {
+      "sfx": "heal", "hit_sfx": "", "camera_shake": 1,
+      "steps": [
+        { "kind": "pulse", "radius": 48, "duration": 0.50, "layers": 2, "layer_delay": 0.08, "delay": 0.0, "color": "bleed" },
+        { "kind": "spark", "count": 8, "duration": 0.50, "delay": 0.12, "color": "heal" },
+        { "kind": "flash", "radius": 40, "duration": 0.15, "delay": 0.20, "color": "heal" }
+      ]
+    },
+    "skill_blizzard_ward": {
+      "sfx": "heal", "hit_sfx": "", "camera_shake": 1,
+      "steps": [
+        { "kind": "pulse", "radius": 48, "duration": 0.55, "layers": 3, "layer_delay": 0.10, "delay": 0.0, "color": "ice" },
+        { "kind": "spark", "count": 10, "duration": 0.55, "delay": 0.15, "color": "ice" },
+        { "kind": "flash", "radius": 40, "duration": 0.15, "delay": 0.25, "color": "ice" }
+      ]
+    },
+    "skill_blood_frenzy": {
+      "sfx": "slash", "hit_sfx": "hit", "camera_shake": 4,
+      "steps": [
+        { "kind": "pulse", "radius": 56, "duration": 0.45, "layers": 3, "layer_delay": 0.07, "delay": 0.0, "color": "bleed" },
+        { "kind": "pulse", "radius": 90, "duration": 0.40, "delay": 0.12, "color": "bleed" },
+        { "kind": "spark", "count": 20, "duration": 0.50, "delay": 0.20, "color": "bleed" },
+        { "kind": "flash", "radius": 70, "duration": 0.16, "delay": 0.28, "color": "bleed" }
+      ]
+    },
+    "skill_summon_spirit": {
+      "sfx": "bolt", "hit_sfx": "", "camera_shake": 2,
+      "steps": [
+        { "kind": "pulse", "radius": 50, "duration": 0.60, "layers": 3, "layer_delay": 0.12, "delay": 0.0, "color": "summon" },
+        { "kind": "spark", "count": 10, "duration": 0.55, "delay": 0.20, "color": "summon" },
+        { "kind": "flash", "radius": 60, "duration": 0.18, "delay": 0.30, "color": "summon" }
       ]
     },
     "level_up": {

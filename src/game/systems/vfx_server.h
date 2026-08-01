@@ -25,15 +25,13 @@ class VFXServer {
 public:
     std::vector<Effect> effects;
 
-    void update(float dt);
-    void draw(float cam_x, float cam_y) const;
-
     // ═══════════════════════════════════════════════════════════
     // G5.8.1 — Composable VFX Primitives (9 methods)
     // ═══════════════════════════════════════════════════════════
 
     // Expanding ring(s). layers=1-4, each offset by radius*0.2
-    void ring(float cx, float cy, float radius, Color c, int layers = 1, float dur = 0.45f);
+    void ring(float cx, float cy, float radius, Color c, int layers = 1, float dur = 0.45f,
+              float layer_delay = 0.0f);
 
     // Line from (sx,sy) to (tx,ty). branches=1-5 adds offset jitter lines
     void beam(float sx, float sy, float tx, float ty, Color c, float dur = 0.30f);

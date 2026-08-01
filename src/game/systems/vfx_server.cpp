@@ -7,62 +7,19 @@ static Effect _ef(const char* k, float x, float y, float r, Color c, float d) {
     return {k, x, y, r, c, d, 0};
 }
 
-void VFXServer::update(float dt) {
-    for (auto& e : effects) e.elapsed += dt;
-    effects.erase(std::remove_if(effects.begin(), effects.end(),
-        [](auto& e) { return e.elapsed >= e.duration; }), effects.end());
-}
-
-void VFXServer::draw(float cam_x, float cam_y) const {
-    for (auto& e : effects) {
-        float sx = e.world_x - cam_x, sy = e.world_y - cam_y;
-        float alpha = 1.0f - e.elapsed / e.duration;
-        if (alpha < 0) alpha = 0;
-        Color c = e.color; c.a = (unsigned char)(c.a * alpha);
-
-        if (e.kind == "ring") {
-            float r = e.radius * e.elapsed / e.duration;
-            DrawRing({sx, sy}, r * 0.85f, r, 0, 360, 24, c);
-        } else if (e.kind == "spark") {
-            DrawCircle(sx, sy, e.radius, c);
-        } else if (e.kind == "bolt") {
-            DrawLineEx({sx, sy}, {e.target_x - cam_x, e.target_y - cam_y}, 2.0f, c);
-        } else if (e.kind == "flash") {
-            DrawCircle(sx, sy, e.radius, c);
-            DrawCircle(sx, sy, e.radius * 1.5f, Fade(c, 0.3f));
-        } else if (e.kind == "smoke") {
-            float r = e.radius * (0.3f + 0.7f * e.elapsed / e.duration);
-            DrawCircle(sx, sy, r, Fade(c, 0.5f));
-        } else if (e.kind == "shield_ring") {
-            float pulse = 0.8f + 0.2f * sinf(e.elapsed * 8.0f);
-            DrawRing({sx, sy}, e.radius * 0.7f, e.radius, 0, 360, 16,
-                     Color{(unsigned char)c.r,(unsigned char)c.g,(unsigned char)c.b,(unsigned char)(c.a * pulse)});
-        } else if (e.kind == "slash_arc") {
-            // Directional arc: half-ring in facing direction
-            float r = e.radius * (0.5f + 0.5f * e.elapsed / e.duration);
-            int segs = 8;
-            switch (e.direction) {
-                case Direction::RIGHT: DrawRing({sx, sy}, r*0.5f, r, 315, 45, segs, c); break;
-                case Direction::LEFT:  DrawRing({sx, sy}, r*0.5f, r, 135, 225, segs, c); break;
-                case Direction::DOWN:  DrawRing({sx, sy}, r*0.5f, r, 45, 135, segs, c); break;
-                case Direction::UP:    DrawRing({sx, sy}, r*0.5f, r, 225, 315, segs, c); break;
-            }
-        } else {
-            // Generic: pulse/circle — expanding ring
-            float r = e.radius * (0.5f + 0.5f * (e.elapsed / e.duration));
-            DrawRing({sx, sy}, r * 0.6f, r, 0, 360, 12, c);
-        }
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════
 // G5.8.1 — 9 Composable VFX Primitives
+// 注: Effect 生命周期/渲染由 game_scene.active_effects + GameRenderer 管理
 // ═══════════════════════════════════════════════════════════════
 
-void VFXServer::ring(float cx, float cy, float radius, Color c, int layers, float dur) {
-    for (int i = 0; i < layers; i++)
-        effects.push_back(_ef("ring", cx, cy, radius * (0.5f + i * 0.25f),
-                              Color{c.r,c.g,c.b,(unsigned char)(c.a - (unsigned char)(i*40))}, dur));
+void VFXServer::ring(float cx, float cy, float radius, Color c, int layers, float dur,
+                     float layer_delay) {
+    for (int i = 0; i < layers; i++) {
+        Effect ef = _ef("ring", cx, cy, radius * (0.5f + i * 0.25f),
+                        Color{c.r,c.g,c.b,(unsigned char)(c.a - (unsigned char)(i*40))}, dur);
+        ef.start_delay = layer_delay * i;  // G5.8.8: 层间错峰
+        effects.push_back(ef);
+    }
 }
 
 void VFXServer::beam(float sx, float sy, float tx, float ty, Color c, float dur) {
@@ -141,7 +98,55 @@ Color VFXServer::preset_color(const std::string& name) {
     if (name == "gold")       return {255, 200, 50, 200};
     if (name == "red")        return {255, 80, 80, 200};
     if (name == "white")      return {200, 200, 200, 160};
+    // G5.8.8-fix: vfx_recipes.json presets (poison/time/heal/bleed/summon)
+    if (name == "poison")     return {100, 200, 50, 220};
+    if (name == "time")       return {180, 160, 220, 220};
+    if (name == "heal")       return {80, 220, 120, 220};
+    if (name == "bleed")      return {200, 40, 40, 220};
+    if (name == "summon")     return {180, 140, 220, 220};
     return {200, 200, 200, 200};
+}
+
+// G5.8.8: 单步分发 — 由 play_recipe 调用, 支持 JSON 全部 kind
+static void _emit_step(VFXServer& vfx, const VFXStep& step, float cx, float cy,
+                       Direction dir, float tx, float ty, int level) {
+    Color c = step.color_preset.empty()
+              ? Color{255, 200, 50, 220}
+              : VFXServer::preset_color(step.color_preset);
+    int cnt = step.count + level / 2; // level scales count
+
+    if (step.type == "ring")
+        vfx.ring(cx, cy, step.radius, c, step.layers + level / 2, step.duration,
+                 step.layer_delay);
+    else if (step.type == "beam" || step.type == "bolt") {
+        float btx = tx ? tx : cx + cosf(step.direction_rad) * step.target_dist;
+        float bty = ty ? ty : cy + sinf(step.direction_rad) * step.target_dist;
+        vfx.beam(cx, cy, btx, bty, c, step.duration);
+    }
+    else if (step.type == "lightning") {
+        float ltx = tx ? tx : cx + cosf(step.direction_rad) * step.target_dist;
+        float lty = ty ? ty : cy + sinf(step.direction_rad) * step.target_dist;
+        vfx.lightning(cx, cy, ltx, lty, cnt, c, step.duration);
+    }
+    else if (step.type == "explosion")
+        vfx.explosion(cx, cy, step.radius, c, cnt, step.duration);
+    else if (step.type == "shockwave")
+        vfx.shockwave(cx, cy, step.radius, c, cnt, step.duration);
+    else if (step.type == "slash_arc")
+        vfx.slash_arc(cx, cy, dir, step.radius, c, step.duration);
+    else if (step.type == "cone") {
+        // G5.8.8-fix: cone 独立 kind, 使用 GameRenderer 的矩形锥形渲染
+        Effect ef = {"cone", cx, cy, step.radius, c, step.duration, 0, dir};
+        vfx.effects.push_back(ef);
+    }
+    else if (step.type == "smoke")
+        vfx.smoke_puff(cx, cy, step.radius, c, cnt, step.duration);
+    else if (step.type == "spark")
+        vfx.spark_burst(cx, cy, cnt, c, step.duration);
+    else if (step.type == "aura")
+        vfx.aura_ring(cx, cy, step.radius, c, step.duration);
+    else if (step.type == "flash")
+        vfx.flash(cx, cy, step.radius, c, step.duration);
 }
 
 void VFXServer::play_recipe(const char* recipe_id, float cx, float cy,
@@ -160,37 +165,12 @@ void VFXServer::play_recipe(const char* recipe_id, float cx, float cy,
     }
 
     for (auto& step : recipe->steps) {
-        Color c = step.color_preset.empty()
-                  ? Color{200, 200, 200, 200}
-                  : preset_color(step.color_preset);
-        int cnt = step.count + level / 2; // level scales count
-
-        if (step.type == "ring")
-            ring(cx, cy, step.radius, c, cnt, step.duration);
-        else if (step.type == "beam") {
-            float btx = tx ? tx : cx + cosf(step.direction_rad) * step.target_dist;
-            float bty = ty ? ty : cy + sinf(step.direction_rad) * step.target_dist;
-            beam(cx, cy, btx, bty, c, step.duration);
-        }
-        else if (step.type == "lightning") {
-            float ltx = tx ? tx : cx + cosf(step.direction_rad) * step.target_dist;
-            float lty = ty ? ty : cy + sinf(step.direction_rad) * step.target_dist;
-            lightning(cx, cy, ltx, lty, cnt, c, step.duration);
-        }
-        else if (step.type == "explosion")
-            explosion(cx, cy, step.radius, c, cnt, step.duration);
-        else if (step.type == "shockwave")
-            shockwave(cx, cy, step.radius, c, cnt, step.duration);
-        else if (step.type == "slash_arc")
-            slash_arc(cx, cy, dir, step.radius, c, step.duration);
-        else if (step.type == "smoke")
-            smoke_puff(cx, cy, step.radius, c, cnt, step.duration);
-        else if (step.type == "spark")
-            spark_burst(cx, cy, cnt, c, step.duration);
-        else if (step.type == "aura")
-            aura_ring(cx, cy, step.radius, c, step.duration);
-        else if (step.type == "flash")
-            flash(cx, cy, step.radius, c, step.duration);
+        size_t start_idx = effects.size();
+        _emit_step(*this, step, cx, cy, dir, tx, ty, level);
+        // G5.8.8: 分镜延迟 — 该步新生成的特效统一挂 start_delay
+        if (step.delay > 0)
+            for (size_t i = start_idx; i < effects.size(); i++)
+                effects[i].start_delay = step.delay;
     }
 }
 

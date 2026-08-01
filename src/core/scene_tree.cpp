@@ -1,5 +1,4 @@
 #include "scene_tree.h"
-#include "vfx_server.h"
 #include "logger.h"
 #include "win_center.h"
 #include "audio_server.h"
@@ -13,7 +12,6 @@ SceneTree::SceneTree(int w, int h, const char* title) {
     SetTargetFPS(60);
     _input.setup_defaults();
     _audio = std::make_unique<AudioServer>();
-    _vfx = std::make_unique<VFXServer>();
     _audio->init();
     _running = true;
 }
@@ -56,7 +54,6 @@ void SceneTree::process_frame(double delta) {
             [](auto& c) { return c->_queued_free; }), children.end());
     }
 
-    _vfx->update((float)delta);
     if (_root) _root->_propagate_process(delta);
     _time += delta;
 }
@@ -66,8 +63,6 @@ void SceneTree::_handle_input() {
     if (_input.is_action_just_pressed("fullscreen")) ToggleFullscreen();
     if (_current_scene) _current_scene->_input(_input);
 }
-
-void SceneTree::_render() { _vfx->draw(0, 0); }
 
 void SceneTree::run() {
     double last = GetTime();
@@ -81,7 +76,6 @@ void SceneTree::run() {
         BeginDrawing();
         ClearBackground(BLACK);
         if (_root) _root->_render();
-        _render();
         EndDrawing();
     }
 }

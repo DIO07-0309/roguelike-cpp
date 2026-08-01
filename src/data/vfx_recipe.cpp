@@ -23,7 +23,23 @@ static VFXStep _parse_step(const json& j) {
     s.color_preset  = j.value("color", "");
     s.direction_rad = j.value("direction", 0.0f);
     s.target_dist   = j.value("target_dist", 0.0f);
+    s.layers        = j.value("layers", 1);
+    s.layer_delay   = j.value("layer_delay", 0.0f);
+    s.delay         = j.value("delay", 0.0f);
     return s;
+}
+
+static VFXRecipe _parse_recipe(const json& j, const std::string& id) {
+    VFXRecipe r;
+    r.id          = id;
+    r.description = j.value("description", "");
+    r.sfx         = j.value("sfx", "");
+    r.hit_sfx     = j.value("hit_sfx", "");
+    r.camera_shake = j.value("camera_shake", 0);
+    if (j.contains("steps") && j["steps"].is_array())
+        for (auto& s : j["steps"])
+            r.steps.push_back(_parse_step(s));
+    return r;
 }
 
 bool load_vfx_recipes(const std::string& json_path) {
@@ -37,19 +53,24 @@ bool load_vfx_recipes(const std::string& json_path) {
         printf("[VFX_RECIPE] JSON error: %s\n", e.what());
         return false;
     }
-    if (!j.is_array()) { printf("[VFX_RECIPE] root must be array\n"); return false; }
 
     int count = 0;
-    for (auto& entry : j) {
-        VFXRecipe r;
-        r.id          = entry.value("id", "");
-        r.description = entry.value("description", "");
-        if (r.id.empty()) continue;
-        if (entry.contains("steps") && entry["steps"].is_array())
-            for (auto& s : entry["steps"])
-                r.steps.push_back(_parse_step(s));
-        g_vfx_recipes[r.id] = r;
-        count++;
+    // G5.8.8-fix: 支持 object 根 { "recipes": {...} } 与旧版数组根
+    if (j.is_object() && j.contains("recipes")) {
+        for (auto& [id, entry] : j["recipes"].items()) {
+            g_vfx_recipes[id] = _parse_recipe(entry, id);
+            count++;
+        }
+    } else if (j.is_array()) {
+        for (auto& entry : j) {
+            std::string id = entry.value("id", "");
+            if (id.empty()) continue;
+            g_vfx_recipes[id] = _parse_recipe(entry, id);
+            count++;
+        }
+    } else {
+        printf("[VFX_RECIPE] root must be array or {recipes:{...}}\n");
+        return false;
     }
 
     g_vfx_loaded = true;

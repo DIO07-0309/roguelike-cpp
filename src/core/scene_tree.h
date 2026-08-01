@@ -20,7 +20,6 @@ public:
 
     InputMap& get_input() { return _input; }
     AudioServer* get_audio() { return _audio.get(); }
-    VFXServer* get_vfx()   { return _vfx.get(); }
 
     // 动态尺寸 (跟随窗口缩放) — 两个名字都可用
     int width()  const { return GetScreenWidth(); }
@@ -32,7 +31,6 @@ public:
 
 private:
     void _handle_input();
-    void _render();
 
     bool _running = false;
     double _time = 0.0;
@@ -42,7 +40,6 @@ private:
     Node* _current_scene = nullptr;
 
     std::unique_ptr<AudioServer> _audio;
-    std::unique_ptr<VFXServer> _vfx;
 
     std::shared_ptr<Node> _pending_scene;
     bool _scene_changed = false;

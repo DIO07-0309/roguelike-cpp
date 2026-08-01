@@ -735,7 +735,8 @@ void GameScene::_process(double delta) {
     // VFX 更新
     for (auto& fx : active_effects) fx.elapsed += dt;
     active_effects.erase(std::remove_if(active_effects.begin(), active_effects.end(),
-        [](auto& fx) { return fx.elapsed >= fx.duration; }), active_effects.end());
+        [](auto& fx) { return fx.elapsed >= fx.duration + fx.start_delay; }),
+        active_effects.end());
 
     // G9.1: weapon tick + specials + projectiles
     player->weapon.tick(dt);
