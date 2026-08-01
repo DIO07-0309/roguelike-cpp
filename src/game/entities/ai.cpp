@@ -4,6 +4,7 @@
 #include "game_map.h"
 #include "combat_system.h"
 #include "vfx_server.h"
+#include "systems/projectile_factory.h"  // D2
 #include "systems/team_coordinator.h"   // G2.2
 #include <cmath>
 
@@ -226,18 +227,40 @@ void MonsterAI::_execute_chase(Monster* self, Player* player, GameMap* map, doub
 
 void MonsterAI::_execute_attack(Monster* self, Player* player, double gt,
                                  std::vector<Effect>* effects) {
-    if (self->can_attack(gt)) {
-        self->attack_target(player, gt);
+    if (!self->can_attack(gt)) return;
+
+    // D2: Projectile-based ranged attack
+    if (self->uses_projectile && self->_projectiles) {
+        int dmg = calculate_damage(get_effective_attack(self),
+            player->combat.get_effective_defense(self->attack_type),
+            self->attack_type);
+        auto p = ProjectileFactory::enemy_projectile(self, player, dmg,
+            220.0f, self->projectile_warning_time,
+            (WarningLevel)self->projectile_warning_level);
+        self->_projectiles->push_back(p);
+        self->last_attack_time = (float)gt;
+        // Warning VFX at firing source
         if (effects) {
             VFXServer vfx;
-            vfx.monster_attack(
-                self->entity.rect.x + self->entity.rect.width/2,
-                self->entity.rect.y + self->entity.rect.height/2,
-                player->entity.rect.x + player->entity.rect.width/2,
-                player->entity.rect.y + player->entity.rect.height/2,
-                self->color);
+            float cx = self->entity.rect.x + self->entity.rect.width/2;
+            float cy = self->entity.rect.y + self->entity.rect.height/2;
+            vfx.ring(cx, cy, 16.0f, {255,200,60,160}, 1, 0.40f);
             for (auto& e : vfx.effects) effects->push_back(e);
         }
+        return;
+    }
+
+    // Original melee instant-attack
+    self->attack_target(player, gt);
+    if (effects) {
+        VFXServer vfx;
+        vfx.monster_attack(
+            self->entity.rect.x + self->entity.rect.width/2,
+            self->entity.rect.y + self->entity.rect.height/2,
+            player->entity.rect.x + player->entity.rect.width/2,
+            player->entity.rect.y + player->entity.rect.height/2,
+            self->color);
+        for (auto& e : vfx.effects) effects->push_back(e);
     }
 }
 

@@ -127,8 +127,8 @@ public:
     // VFX
     std::vector<Effect> active_effects;
 
-    // G9.1: weapon projectiles (crossbow bolts)
-    std::vector<Projectile> weapon_projectiles;
+    // D2: Unified projectiles (PLAYER + MONSTER + ENVIRONMENT)
+    std::vector<Projectile> projectiles;
 
     // 信号
     Object::Signal<> on_floor_cleared;

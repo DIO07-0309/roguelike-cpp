@@ -282,7 +282,7 @@ static bool _try_crossbow_power(Player* p, const AttackStageDef& st,
     proj.damage = _calc_weapon_dmg(p, nullptr, st.damage_multiplier * legendary_bonus, dummy_crit);
     proj.piercing = true;
     proj.lifetime = 1.5f;
-    projs->push_back(proj);
+    proj.owner = (int)ProjectileOwner::PLAYER; projs->push_back(proj);
     p->entity.position.x -= fwd.x * TILE_SIZE;
     p->entity.position.y -= fwd.y * TILE_SIZE;
     p->entity.sync_rect();
@@ -319,7 +319,7 @@ static void _crossbow_normal(Player* p, const AttackStageDef& st,
         proj.vel = { fwd.x * 700.0f, fwd.y * 700.0f };
         proj.damage = _calc_weapon_dmg(p, nullptr, st.damage_multiplier, dc);
         proj.lifetime = 1.2f;
-        projs->push_back(proj);
+        proj.owner = (int)ProjectileOwner::PLAYER; projs->push_back(proj);
     }
 }
 
@@ -431,12 +431,13 @@ std::vector<WeaponAttackResult> WeaponExecutor::tick_projectiles(
     std::vector<WeaponAttackResult> results;
     for (auto& p : projectiles) {
         if (!p.alive) continue;
+        // D2: only tick PLAYER projectiles (MONSTER projs handled by game_scene)
+        if (p.owner != (int)ProjectileOwner::PLAYER) continue;
         p.elapsed += dt;
         if (p.elapsed >= p.lifetime) { p.alive = false; continue; }
         p.pos.x += p.vel.x * dt;
         p.pos.y += p.vel.y * dt;
 
-        // Check collision with monsters
         for (auto* m : targets) {
             if (!m || !m->combat.is_alive) continue;
             Rectangle mr = m->entity.rect;
@@ -453,8 +454,6 @@ std::vector<WeaponAttackResult> WeaponExecutor::tick_projectiles(
             }
         }
     }
-    // Remove dead projectiles
-    projectiles.erase(std::remove_if(projectiles.begin(), projectiles.end(),
-        [](const Projectile& p) { return !p.alive; }), projectiles.end());
+    // D2: cleanup handled centrally by game_scene after both PLAYER + MONSTER ticks
     return results;
 }

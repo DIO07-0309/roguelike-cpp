@@ -56,6 +56,12 @@ public:
     float explode_timer = 0.0f;      // 自爆倒计时 (Bomber)
     float support_cooldown = 0.0f;   // 辅助冷却 (Shaman)
 
+    // D2: Projectile attack config
+    bool uses_projectile = false;
+    float projectile_warning_time = 0.6f;
+    int   projectile_warning_level = 0;
+    std::vector<struct Projectile>* _projectiles = nullptr;
+
     // AI 组件 (在 ai.h 中定义)
     class MonsterAI* ai = nullptr;
 

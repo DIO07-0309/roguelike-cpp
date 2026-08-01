@@ -229,6 +229,14 @@ Monster* spawn_monster(float px, float py, const std::string& type) {
     // G5.3: AI Archetype (行为原型, 与 MonsterType 外观解耦)
     if (ai) ai->archetype = _str_to_archetype(def->ai_archetype);
 
+    // D2: Ranged monsters use projectile attacks
+    if (m->monster_type == MonsterType::ARCHER
+        || m->monster_type == MonsterType::SHAMAN) {
+        m->uses_projectile = true;
+        m->projectile_warning_time = 0.6f;
+        m->projectile_warning_level = 0; // NORMAL
+    }
+
     // on_hit 触发器 (直接拷贝)
     m->on_hit_triggers = def->on_hit;
 

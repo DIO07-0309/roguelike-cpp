@@ -131,15 +131,31 @@ inline const char* pick_weapon_name(const WeaponDef* def, int rarity_tier) {
     return def->name.c_str(); // common: base name
 }
 
-// ── G9.1: Projectile (crossbow bolts) ──
+// ── D2: Projectile owner/phase/warning enums ──
+enum class ProjectileOwner : int { PLAYER = 0, MONSTER, ENVIRONMENT };
+enum class ProjectilePhase : int { WARNING = 0, ACTIVE, FINISHED };
+enum class WarningLevel : int { NORMAL = 0, DANGEROUS, DEADLY };
+
+// ── G9.1/D2: Unified Projectile (crossbow bolts + enemy attacks + traps) ──
 struct Projectile {
     Vector2 pos{};
     Vector2 vel{};          // direction * speed, pre-computed
     int damage = 0;
     float lifetime = 2.0f;
     float elapsed = 0.0f;
-    bool piercing = false;  // crossbow power shot pierces
+    bool piercing = false;
     bool alive = true;
+
+    // D2: Owner, element, damage type
+    int owner = 0;           // ProjectileOwner as int (0=PLAYER)
+    int element = 0;         // ElementType as int (0=NONE)
+    int damage_type = 0;     // AttackType as int (0=PHYSICAL)
+
+    // D2: Warning phase — AI-readable timing
+    float warning_time = 0.0f;   // seconds in WARNING phase
+    float active_time = 0.0f;    // seconds since becoming ACTIVE (0 until WARNING ends)
+    int warning_level = 0;       // WarningLevel as int (0=NORMAL)
+    float warning_radius = 0.0f; // AOE warning circle radius (0 = point projectile)
 };
 
 // ── G9.1: Multi-hit special state (nunchaku flurry, spear rapid) ──

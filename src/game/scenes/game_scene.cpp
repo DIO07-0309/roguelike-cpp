@@ -746,7 +746,7 @@ void GameScene::_process(double delta) {
         std::vector<Monster*> mlist;
         for (auto& m : monsters) mlist.push_back(m.get());
         auto spec_results = WeaponExecutor::tick_specials(player.get(), mlist, dt);
-        auto proj_results = WeaponExecutor::tick_projectiles(weapon_projectiles, mlist, dt);
+        auto proj_results = WeaponExecutor::tick_projectiles(projectiles, mlist, dt);
 
         // G9: spear stage-3 lightning VFX on each rapid hit
         if (player->weapon.runtime().special.active
@@ -782,6 +782,40 @@ void GameScene::_process(double delta) {
             if (r.is_killing_blow) _combat.on_monster_killed(r.target);
         }
     }
+
+    // D2: tick enemy projectiles (MONSTER/ENVIRONMENT owner → hit player)
+    for (auto& p : projectiles) {
+        if (!p.alive) continue;
+        if (p.owner != (int)ProjectileOwner::MONSTER
+            && p.owner != (int)ProjectileOwner::ENVIRONMENT) continue;
+        // Warning phase countdown only
+        if (p.active_time < 0.0f) {
+            p.active_time += dt;
+            if (p.active_time >= 0.0f) p.active_time = 0.0f; // just became ACTIVE
+            continue;
+        }
+        // Active phase
+        p.active_time += dt;
+        if (p.active_time >= p.lifetime) { p.alive = false; continue; }
+        p.pos.x += p.vel.x * dt;
+        p.pos.y += p.vel.y * dt;
+        // Hit player
+        if (CheckCollisionCircleRec(p.pos, 8.0f, player->entity.rect)) {
+            int dmg = calculate_damage(p.damage,
+                player->combat.get_effective_defense((AttackType)p.damage_type),
+                (AttackType)p.damage_type);
+            player->combat.take_damage(dmg);
+            _presentation.damage_floats.push_back({
+                player->entity.rect.x + player->entity.rect.width/2,
+                player->entity.rect.y - 12, 0.6f, dmg,
+                dmg_color_for(dmg, p.damage_type != 0, false)
+            });
+            _presentation.trigger_shake(dmg > 20 ? 8.0f : 3.0f);
+            if (!p.piercing) p.alive = false;
+        }
+    }
+    projectiles.erase(std::remove_if(projectiles.begin(), projectiles.end(),
+        [](auto& p){ return !p.alive; }), projectiles.end());
 
     // D4.6 Step3: FlowDirector tick
     _gameplay.flow.tick(dt);
@@ -1022,10 +1056,10 @@ void GameScene::_update_monsters(float dt) {
     int hp_before = player->combat.current_hp;
     std::vector<Monster*> mlist;
     for (auto& m : monsters) mlist.push_back(m.get());
+    // D2: Pass projectiles vector to monsters for ranged attacks
+    for (auto& m : monsters) m->_projectiles = &projectiles;
     for (auto& m : monsters)
         m->update_ai(player.get(), game_map.get(), dt, game_time, &mlist, &active_effects);
-    // 检测玩家死亡
-    // if (player->combat.current_hp < hp_before) { /* SFX */ }
 }
 
 void GameScene::_on_monster_killed(Monster* m)  { _combat.on_monster_killed(m); }
@@ -1240,22 +1274,42 @@ void GameScene::_render() {
     // D5 Step4: Boss战场绘制
     _boss.arena.draw(_cam_x, _cam_y);
 
-    // G9.1: draw weapon projectiles
-    for (auto& p : weapon_projectiles) {
+    // D2: draw unified projectiles (PLAYER + MONSTER + ENVIRONMENT)
+    for (auto& p : projectiles) {
         if (!p.alive) continue;
         float sx = p.pos.x - _cam_x, sy = p.pos.y - _cam_y;
-        if (p.piercing) {
-            // Power shot: big glowing projectile + trail
-            DrawCircle(sx, sy, 10.0f, {255,200,40,100});
-            DrawCircle(sx, sy, 7.0f, {255,180,40,220});
-            DrawCircle(sx, sy, 3.0f, {255,255,220,255});
-            // Trail tail
-            Vector2 back = { sx - p.vel.x * 0.03f, sy - p.vel.y * 0.03f };
-            DrawLineEx({sx, sy}, back, 3.0f, {255,180,40,180});
-        } else {
-            Color pc = Color{200,160,100,255};
-            DrawCircle(sx, sy, 4.0f, pc);
-            DrawCircle(sx, sy, 2.0f, {255,255,220,180});
+        bool is_enemy = (p.owner != (int)ProjectileOwner::PLAYER);
+
+        // WARNING phase: draw warning circle
+        if (p.active_time < 0.0f && p.warning_radius > 0.0f) {
+            float fade = 1.0f - (-p.active_time / p.warning_time);
+            float pulse = 1.0f + sinf(p.active_time * 12.0f) * 0.12f;
+            float wr = p.warning_radius * pulse;
+            Color wc = (p.warning_level >= 2) ? Color{255,40,20,(unsigned char)(110*fade)}
+                     : (p.warning_level >= 1) ? Color{255,160,30,(unsigned char)(110*fade)}
+                     : Color{255,200,60,(unsigned char)(90*fade)};
+            DrawRing({sx, sy}, wr - 3, wr + 3, 0, 360, 20,
+                {wc.r, wc.g, wc.b, (unsigned char)(wc.a * 2/3)});
+            DrawCircleLines(sx, sy, wr, wc);
+        }
+        // ACTIVE phase: draw the projectile itself
+        else {
+            if (p.piercing) {
+                DrawCircle(sx, sy, 10.0f, {255,200,40,100});
+                DrawCircle(sx, sy, 7.0f, {255,180,40,220});
+                DrawCircle(sx, sy, 3.0f, {255,255,220,255});
+                Vector2 back = { sx - p.vel.x * 0.03f, sy - p.vel.y * 0.03f };
+                DrawLineEx({sx, sy}, back, 3.0f, {255,180,40,180});
+            } else if (is_enemy) {
+                Color ec = (p.element == 1) ? Color{255,80,30,255}
+                         : (p.element == 2) ? Color{80,180,255,255}
+                         : Color{255,60,40,220};
+                DrawCircle(sx, sy, 6.0f, ec);
+                DrawCircle(sx, sy, 3.0f, {255,255,200,200});
+            } else {
+                DrawCircle(sx, sy, 4.0f, {200,160,100,255});
+                DrawCircle(sx, sy, 2.0f, {255,255,220,180});
+            }
         }
     }
 
