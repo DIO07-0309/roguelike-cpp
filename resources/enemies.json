@@ -76,7 +76,13 @@
         "id": "rapid_shot",
         "max_cooldown": 4.0
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 300.0,
+      "warning_time": 0.8,
+      "warning_level": 0
+    }
   },
   {
     "id": "shaman",
@@ -96,7 +102,13 @@
         "max_cooldown": 10.0,
         "initial_cooldown": 3.0
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 260.0,
+      "warning_time": 0.9,
+      "warning_level": 0
+    }
   },
   {
     "id": "bomber",
@@ -418,7 +430,13 @@
         "id": "rapid_shot",
         "max_cooldown": 5.0
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 320.0,
+      "warning_time": 0.7,
+      "warning_level": 0
+    }
   },
   {
     "id": "bone_soldier",
@@ -469,7 +487,13 @@
         "max_cooldown": 10.0,
         "initial_cooldown": 3.0
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 270.0,
+      "warning_time": 0.8,
+      "warning_level": 0
+    }
   },
   {
     "id": "golem",
@@ -596,7 +620,13 @@
         "buff": "stone_skin",
         "stacks": 2
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 270.0,
+      "warning_time": 0.8,
+      "warning_level": 0
+    }
   },
   {
     "id": "blood_priest",
@@ -629,7 +659,13 @@
         "max_cooldown": 9.0,
         "initial_cooldown": 3.0
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 280.0,
+      "warning_time": 0.9,
+      "warning_level": 0
+    }
   },
   {
     "id": "skeleton_archer",
@@ -654,7 +690,13 @@
         "id": "snipe",
         "max_cooldown": 3.0
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 320.0,
+      "warning_time": 0.8,
+      "warning_level": 1
+    }
   },
   {
     "id": "goblin_hunter",
@@ -679,7 +721,13 @@
         "id": "snipe",
         "max_cooldown": 3.5
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 340.0,
+      "warning_time": 0.8,
+      "warning_level": 1
+    }
   },
   {
     "id": "dark_mage",
@@ -705,7 +753,13 @@
         "id": "scatter",
         "max_cooldown": 5.0
       }
-    ]
+    ],
+    "projectile": {
+      "enabled": true,
+      "speed": 280.0,
+      "warning_time": 1.0,
+      "warning_level": 1
+    }
   },
   {
     "id": "void_walker",

@@ -230,14 +230,14 @@ void MonsterAI::_execute_attack(Monster* self, Player* player, double gt,
     if (!self->can_attack(gt)) return;
 
     // D2: Projectile-based ranged attack
-    if (self->uses_projectile && self->_projectiles) {
+    if (self->uses_projectile && self->projectiles_ptr) {
         int dmg = calculate_damage(get_effective_attack(self),
             player->combat.get_effective_defense(self->attack_type),
             self->attack_type);
         auto p = ProjectileFactory::enemy_projectile(self, player, dmg,
-            220.0f, self->projectile_warning_time,
+            self->projectile_speed, self->projectile_warning_time,
             (WarningLevel)self->projectile_warning_level);
-        self->_projectiles->push_back(p);
+        self->projectiles_ptr->push_back(p);
         self->last_attack_time = (float)gt;
         // Warning VFX at firing source
         if (effects) {

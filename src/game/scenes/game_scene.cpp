@@ -67,6 +67,31 @@ static Color _olddmg_color_for(int dmg, bool is_magic, bool is_poison) {
     return {255, 255, 255, 255};
 }
 
+// D2: 弹体命中判定半径 (宽容判定, 大于玩家碰撞盒)
+constexpr float kProjectileHitRadius = 16.0f;
+
+// D2: 弹道预警预览线 — 沿飞行方向绘制, 遇墙截断
+static void _draw_projectile_preview(float sx, float sy, const Projectile& p,
+                                     Color wc, float fade, float pulse,
+                                     const GameMap* map) {
+    float speed = sqrtf(p.vel.x * p.vel.x + p.vel.y * p.vel.y);
+    if (speed < 1.0f) return;
+    float ux = p.vel.x / speed, uy = p.vel.y / speed;
+    float max_len = speed * p.lifetime;
+    float len = max_len;
+    if (map) {
+        for (float d = TILE_SIZE; d < max_len; d += TILE_SIZE) {
+            auto [tx, ty] = map->pixel_to_tile(p.pos.x + ux * d, p.pos.y + uy * d);
+            if (!map->is_walkable(tx, ty)) { len = d; break; }
+        }
+    }
+    float ex = sx + ux * len, ey = sy + uy * len;
+    unsigned char alpha = (unsigned char)((float)wc.a * fade);
+    Color lc = {wc.r, wc.g, wc.b, alpha};
+    DrawLineEx({sx, sy}, {ex, ey}, 2.0f * pulse, lc);
+    DrawCircle(ex, ey, 4.0f * pulse, lc);
+}
+
 // _trigger_shake / _trigger_freeze moved to PresentationSystemDirector
 
 // ============================================================
@@ -799,8 +824,10 @@ void GameScene::_process(double delta) {
         if (p.active_time >= p.lifetime) { p.alive = false; continue; }
         p.pos.x += p.vel.x * dt;
         p.pos.y += p.vel.y * dt;
-        // Hit player
-        if (CheckCollisionCircleRec(p.pos, 8.0f, player->entity.rect)) {
+        // D2: AOE 用 warning_radius, 点弹用宽容半径
+        float hit_radius = (p.owner == (int)ProjectileOwner::ENVIRONMENT)
+            ? p.warning_radius : kProjectileHitRadius;
+        if (CheckCollisionCircleRec(p.pos, hit_radius, player->entity.rect)) {
             int dmg = calculate_damage(p.damage,
                 player->combat.get_effective_defense((AttackType)p.damage_type),
                 (AttackType)p.damage_type);
@@ -1057,7 +1084,7 @@ void GameScene::_update_monsters(float dt) {
     std::vector<Monster*> mlist;
     for (auto& m : monsters) mlist.push_back(m.get());
     // D2: Pass projectiles vector to monsters for ranged attacks
-    for (auto& m : monsters) m->_projectiles = &projectiles;
+    for (auto& m : monsters) m->projectiles_ptr = &projectiles;
     for (auto& m : monsters)
         m->update_ai(player.get(), game_map.get(), dt, game_time, &mlist, &active_effects);
 }
@@ -1280,17 +1307,21 @@ void GameScene::_render() {
         float sx = p.pos.x - _cam_x, sy = p.pos.y - _cam_y;
         bool is_enemy = (p.owner != (int)ProjectileOwner::PLAYER);
 
-        // WARNING phase: draw warning circle
-        if (p.active_time < 0.0f && p.warning_radius > 0.0f) {
+        // WARNING phase: AOE → danger circle; point projectile → trajectory preview
+        if (p.active_time < 0.0f) {
             float fade = 1.0f - (-p.active_time / p.warning_time);
             float pulse = 1.0f + sinf(p.active_time * 12.0f) * 0.12f;
-            float wr = p.warning_radius * pulse;
-            Color wc = (p.warning_level >= 2) ? Color{255,40,20,(unsigned char)(110*fade)}
-                     : (p.warning_level >= 1) ? Color{255,160,30,(unsigned char)(110*fade)}
-                     : Color{255,200,60,(unsigned char)(90*fade)};
-            DrawRing({sx, sy}, wr - 3, wr + 3, 0, 360, 20,
-                {wc.r, wc.g, wc.b, (unsigned char)(wc.a * 2/3)});
-            DrawCircleLines(sx, sy, wr, wc);
+            Color wc = (p.warning_level >= 2) ? Color{255,40,20,120}
+                     : (p.warning_level >= 1) ? Color{255,160,30,120}
+                     : Color{255,200,60,110};
+            if (p.owner == (int)ProjectileOwner::ENVIRONMENT && p.warning_radius > 0.0f) {
+                float wr = p.warning_radius * pulse;
+                DrawRing({sx, sy}, wr - 3, wr + 3, 0, 360, 20,
+                    {wc.r, wc.g, wc.b, (unsigned char)(wc.a * 2/3)});
+                DrawCircleLines(sx, sy, wr, wc);
+            } else {
+                _draw_projectile_preview(sx, sy, p, wc, fade, pulse, game_map.get());
+            }
         }
         // ACTIVE phase: draw the projectile itself
         else {

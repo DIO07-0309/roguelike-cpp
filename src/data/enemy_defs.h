@@ -32,6 +32,14 @@ struct EliteBuffEntry {
     int stacks = 1;
 };
 
+// ── D2: 弹道攻击配置 (远程怪物普攻) ──
+struct EnemyProjectileDef {
+    bool  enabled = false;        // 是否使用弹道攻击
+    float speed = 300.0f;         // 弹速 px/s
+    float warning_time = 0.8f;    // 预警时长 s
+    int   warning_level = 0;      // 0=NORMAL 1=DANGEROUS 2=DEADLY
+};
+
 // ── 敌人模板 (一条 JSON 记录) ──
 struct EnemyDef {
     std::string id;               // "slime" | "orc" | "archer" | ...
@@ -53,6 +61,9 @@ struct EnemyDef {
     EnemyAIDef ai;
     std::vector<EnemySkillDef> skills;
     std::vector<BuffTrigger> on_hit;
+
+    // D2: 弹道攻击配置
+    EnemyProjectileDef projectile;
 
     // 精英标记
     bool is_elite = false;

@@ -264,6 +264,27 @@ for rid, recipe in (vfx.get("recipes") or {}).items():
             err(f"BAD VFX COLOR: {rid} step {i} color '{color}' (valid: {sorted(valid_vfx_colors)})")
 
 
+# ═══ D2: Enemy projectile 配置完整性 ═══
+ranged_types = {"archer", "shaman"}
+for e in enemies:
+    ctx = f"enemies.json [{e.get('id','')}]"
+    pj = e.get("projectile")
+    if e.get("type") in ranged_types and not pj:
+        warnings.append(f"{ctx}: ranged type '{e.get('type')}' has no projectile block")
+    if pj:
+        if not isinstance(pj.get("enabled", True), bool):
+            err(f"{ctx} projectile.enabled must be bool")
+        spd = pj.get("speed")
+        if spd is not None and not (100.0 <= spd <= 600.0):
+            err(f"{ctx} projectile.speed {spd} out of range [100,600]")
+        wt = pj.get("warning_time")
+        if wt is not None and not (0.2 <= wt <= 2.0):
+            err(f"{ctx} projectile.warning_time {wt} out of range [0.2,2.0]")
+        lvl = pj.get("warning_level")
+        if lvl is not None and lvl not in (0, 1, 2):
+            err(f"{ctx} projectile.warning_level {lvl} must be 0/1/2")
+
+
 # ═══ Report ═══
 print(f"\n{'='*60}")
 print(f"  WORLD VALIDATOR REPORT")

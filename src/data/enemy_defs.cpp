@@ -43,6 +43,16 @@ static BuffTrigger _parse_on_hit(const json& j) {
     return tr;
 }
 
+// ── D2: 辅助: JSON → EnemyProjectileDef ──
+static EnemyProjectileDef _parse_projectile(const json& j) {
+    EnemyProjectileDef pd;
+    pd.enabled       = j.value("enabled", true);
+    pd.speed         = j.value("speed", 300.0f);
+    pd.warning_time  = j.value("warning_time", 0.8f);
+    pd.warning_level = j.value("warning_level", 0);
+    return pd;
+}
+
 // ── 辅助: JSON → 单个 EnemyDef ──
 static EnemyDef _parse_enemy(const json& j) {
     EnemyDef def;
@@ -75,6 +85,10 @@ static EnemyDef _parse_enemy(const json& j) {
         for (auto& tr : j["on_hit"])
             def.on_hit.push_back(_parse_on_hit(tr));
     }
+
+    // D2: 弹道攻击配置
+    if (j.contains("projectile"))
+        def.projectile = _parse_projectile(j["projectile"]);
 
     // 精英
     def.is_elite = j.value("is_elite", false);
