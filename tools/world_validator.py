@@ -239,6 +239,31 @@ for bid in biome_ids:
         warnings.append(f"biome '{bid}': no encounters")
 
 
+# ═══ G5.8.8: VFX recipe 完整性 ═══
+valid_vfx_kinds = {"ring","beam","bolt","lightning","explosion","shockwave",
+                   "slash_arc","smoke","spark","aura","flash","cone","pulse"}
+valid_vfx_colors = {"default","fire","ice","lightning","poison","time","heal",
+                    "shadow","bleed","white","summon","blood","nature","holy",
+                    "void","gold","red"}
+
+elements_data = load_json("elements.json") or {}
+elements_list = elements_data.get("elements", []) if isinstance(elements_data, dict) else []
+
+for el in elements_list:
+    ctx = f"elements.json [{el.get('id','')}]"
+    for slot, ref in (el.get("vfx") or {}).items():
+        check_ref(ref, vfx_recipes, f"{ctx} vfx.{slot}", "in vfx_recipes.json")
+
+for rid, recipe in (vfx.get("recipes") or {}).items():
+    for i, step in enumerate(recipe.get("steps", [])):
+        kind = step.get("kind")
+        if kind and kind not in valid_vfx_kinds:
+            err(f"BAD VFX KIND: {rid} step {i} kind '{kind}' (valid: {sorted(valid_vfx_kinds)})")
+        color = step.get("color")
+        if color and color not in valid_vfx_colors:
+            err(f"BAD VFX COLOR: {rid} step {i} color '{color}' (valid: {sorted(valid_vfx_colors)})")
+
+
 # ═══ Report ═══
 print(f"\n{'='*60}")
 print(f"  WORLD VALIDATOR REPORT")

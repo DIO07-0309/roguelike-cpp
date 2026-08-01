@@ -195,6 +195,70 @@
         { "kind": "spark", "count": 30, "duration": 0.70, "delay": 0.40 },
         { "kind": "pulse", "radius": 350, "duration": 0.50, "delay": 0.70 }
       ]
+    },
+    "fire_hit": {
+      "sfx": "hit", "hit_sfx": "", "camera_shake": 1,
+      "steps": [
+        { "kind": "pulse", "radius": 32, "duration": 0.32, "delay": 0.0, "color": "fire" },
+        { "kind": "spark", "count": 4, "duration": 0.28, "delay": 0.05, "color": "fire" }
+      ]
+    },
+    "fire_critical": {
+      "sfx": "hit", "hit_sfx": "", "camera_shake": 5,
+      "steps": [
+        { "kind": "explosion", "radius": 34, "duration": 0.42, "count": 12, "delay": 0.0, "color": "fire" },
+        { "kind": "flash", "radius": 40, "duration": 0.16, "delay": 0.06, "color": "fire" },
+        { "kind": "spark", "count": 12, "duration": 0.45, "delay": 0.12, "color": "fire" }
+      ]
+    },
+    "fire_upgrade": {
+      "sfx": "hit", "hit_sfx": "", "camera_shake": 2,
+      "steps": [
+        { "kind": "pulse", "radius": 44, "duration": 0.55, "layers": 3, "layer_delay": 0.08, "delay": 0.0, "color": "fire" },
+        { "kind": "spark", "count": 12, "duration": 0.50, "delay": 0.15, "color": "fire" }
+      ]
+    },
+    "ice_slow": {
+      "sfx": "hit", "hit_sfx": "", "camera_shake": 0,
+      "steps": [
+        { "kind": "pulse", "radius": 30, "duration": 0.35, "delay": 0.0, "color": "ice" },
+        { "kind": "spark", "count": 4, "duration": 0.30, "delay": 0.06, "color": "ice" }
+      ]
+    },
+    "ice_freeze": {
+      "sfx": "hit", "hit_sfx": "", "camera_shake": 3,
+      "steps": [
+        { "kind": "shockwave", "radius": 44, "duration": 0.45, "layers": 2, "layer_delay": 0.06, "delay": 0.0, "color": "ice" },
+        { "kind": "flash", "radius": 36, "duration": 0.15, "delay": 0.08, "color": "ice" },
+        { "kind": "spark", "count": 10, "duration": 0.40, "delay": 0.14, "color": "ice" }
+      ]
+    },
+    "ice_upgrade": {
+      "sfx": "hit", "hit_sfx": "", "camera_shake": 2,
+      "steps": [
+        { "kind": "pulse", "radius": 44, "duration": 0.55, "layers": 3, "layer_delay": 0.08, "delay": 0.0, "color": "ice" },
+        { "kind": "spark", "count": 12, "duration": 0.50, "delay": 0.15, "color": "ice" }
+      ]
+    },
+    "poison_apply": {
+      "sfx": "hit", "hit_sfx": "", "camera_shake": 0,
+      "steps": [
+        { "kind": "pulse", "radius": 30, "duration": 0.35, "delay": 0.0, "color": "poison" },
+        { "kind": "spark", "count": 4, "duration": 0.30, "delay": 0.06, "color": "poison" }
+      ]
+    },
+    "poison_tick": {
+      "sfx": "", "hit_sfx": "", "camera_shake": 0,
+      "steps": [
+        { "kind": "pulse", "radius": 22, "duration": 0.30, "delay": 0.0, "color": "poison" }
+      ]
+    },
+    "poison_upgrade": {
+      "sfx": "hit", "hit_sfx": "", "camera_shake": 2,
+      "steps": [
+        { "kind": "pulse", "radius": 44, "duration": 0.55, "layers": 3, "layer_delay": 0.08, "delay": 0.0, "color": "poison" },
+        { "kind": "spark", "count": 12, "duration": 0.50, "delay": 0.15, "color": "poison" }
+      ]
     }
   }
 }
