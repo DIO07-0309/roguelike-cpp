@@ -1,0 +1,11 @@
+{
+  "cmake.configureOnOpen": true,
+  "cmake.defaultConfigurePreset": "release",
+  "cmake.defaultBuildPreset": "release",
+  "files.exclude": {
+    "build": true,
+    "build-debug": true,
+    "build_mingw": true,
+    "build_test": true
+  }
+}

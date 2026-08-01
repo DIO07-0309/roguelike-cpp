@@ -1,4 +1,5 @@
 ﻿build/
+build-debug/
 build_mingw/
 dist/
 vendor/
@@ -12,3 +13,4 @@ game.log
 saves/save.json
 build_mingw/
 build_test/
+
