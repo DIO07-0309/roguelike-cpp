@@ -675,11 +675,7 @@ void GameScene::_process(double delta) {
                 }
                 break;
             case ArenaObjectType::POISON_POOL:
-                if (dist < 1.2f * TILE_SIZE) apply_buff(player.get(), "poison", 1);
-                for (auto& m : monsters)
-                    if (m->combat.is_alive && hypotf(m->entity.rect.x + m->entity.rect.width/2 - ax,
-                        m->entity.rect.y + m->entity.rect.height/2 - ay) < 1.2f * TILE_SIZE)
-                        apply_buff(m.get(), "poison", 1);
+                if (dist < 1.2f * TILE_SIZE) apply_buff(player.get(), "pool_poison", 1);
                 break;
             case ArenaObjectType::SPIKE: {
                 int sd = (int)(3 * ascale), md = (int)(4 * ascale);

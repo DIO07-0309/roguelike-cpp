@@ -311,7 +311,7 @@ void tick_buffs(Player* p, float dt, std::vector<BuffEvent>* events) {
             b.tick_timer -= dt;
             while (b.tick_timer <= 0 && b.remaining > 0 && combat->is_alive) {
                 int dmg = def->tick_damage * b.stacks;
-                if (b.id == "poison") { dmg -= 1; if (dmg < 0) dmg = 0; } // B12: plague_mask
+                if (b.id == "poison" || b.id == "pool_poison") { dmg -= 1; if (dmg < 0) dmg = 0; } // B12: plague_mask
                 // D8: regen heals instead of damaging
                 if (def->tick_damage < 0) combat->heal(-dmg);
                 else combat->take_damage(dmg);
