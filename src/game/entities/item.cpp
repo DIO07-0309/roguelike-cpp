@@ -43,7 +43,10 @@ EquipmentItem::EquipmentItem(const std::string& name, Rarity r, const std::strin
     : Item(name, r, (sl == "weapon" ? "W" : sl == "armor" ? "A" : "C")),
       slot(sl) {
     float m = rarity_mult(r);
-    atk_bonus = std::max(1, (int)(atk * m));
+    // G9-fix: weapon ATK is pre-computed from WeaponDef base_damage (already tier-differentiated)
+    // Only apply rarity_mult to armor defenses, NOT to weapon atk
+    atk_bonus = (sl == "weapon") ? std::max(1, atk)
+               : std::max(1, (int)(atk * m));
     pdef_bonus = std::max(1, (int)(pdef * m));
     mdef_bonus = std::max(1, (int)(mdef * m));
 }
