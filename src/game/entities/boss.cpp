@@ -145,6 +145,7 @@ std::string WhirlwindSkill::execute(Monster* boss, Player* player,
         int dmg = calculate_damage((int)(boss->combat.get_effective_attack() * 1.6),
             player->combat.get_effective_defense(AttackType::PHYSICAL));
         player->combat.take_damage(dmg);
+        player->combat.mark_damage_logged();
         spin_hit_count++;
         LOG_INFO("[DMG] 旋风斩命中玩家 造成 %d 伤害", dmg);
     }
@@ -244,6 +245,7 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
                 (int)(boss->combat.get_effective_attack() * damage_mult),
                 player->combat.get_effective_defense(AttackType::PHYSICAL));
             player->combat.take_damage(dmg);
+            player->combat.mark_damage_logged();
             apply_buff(player, "slow", 1);
             hit_fx.push_back({it->x, it->y});   // M4a-fx: 记录命中点
             LOG_INFO("[DMG] 弹幕命中玩家 造成 %d 伤害", dmg);
@@ -299,6 +301,7 @@ std::string ConeAttackSkill::execute(Monster* boss, Player* player,
         (int)(boss->combat.get_effective_attack() * damage_mult),
         player->combat.get_effective_defense(AttackType::PHYSICAL));
     player->combat.take_damage(dmg);
+    player->combat.mark_damage_logged();
     apply_buff(player, "poison2s", 1);
     LOG_INFO("[DMG] 扇形斩命中玩家 造成 %d 伤害 (中毒)", dmg);
     return "扇形斩命中！中毒 2 秒";
@@ -432,6 +435,8 @@ void BossAI::_select_combo() {
     _combo_queue.start();
     _combo_timer = 0.0f;
     normal_attack_count = 0;
+    LOG_INFO("[COMBO] BOSS 启动连招「%s」(%d 段)", target->id.c_str(),
+             (int)target->commands.size());
 }
 
 void BossAI::_combo_advance() {
@@ -607,13 +612,9 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         if (_combos && !_combos->empty()) {
             if (_tick_combo_attack(self, player, map, dt, gt, effects)) break;
         }
-        // 先执行普攻
+        // 先执行普攻 (attack_target 内部已打 [DMG] 标签并记账)
         if (self->can_attack(gt)) {
-            int hp_before = player->combat.current_hp;
             self->attack_target(player, gt);
-            if (player->combat.current_hp < hp_before)
-                LOG_INFO("[DMG] 暗影骑士普攻 造成 %d 伤害",
-                         hp_before - player->combat.current_hp);
             _spawn_boss_vfx(self, "charge", effects); // reuse vfx for norm attack
             normal_attack_count++;
         }

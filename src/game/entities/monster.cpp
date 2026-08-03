@@ -2,6 +2,7 @@
 #include "ai.h"
 #include "player.h"
 #include "combat_system.h"
+#include "core/logger.h"
 #include "data/enemy_defs.h"   // G1 Step5
 
 Monster::Monster(float x, float y, const std::string& n, int hp, int atk,
@@ -22,6 +23,10 @@ int Monster::attack_target(Player* target, double gt) {
                                 target->combat.get_effective_defense(attack_type),
                                 attack_type);
     target->combat.take_damage(dmg);
+    if (dmg > 0) {
+        LOG_INFO("[DMG] %s普攻 造成 %d 伤害 → 玩家", name.c_str(), dmg);
+        target->combat.mark_damage_logged();
+    }
     last_attack_time = (float)gt;
     // 怪物命中附带 Buff (统一触发规则)
     for (auto& tr : on_hit_triggers) {

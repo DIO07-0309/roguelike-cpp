@@ -270,8 +270,10 @@ static void _tick_impl(std::vector<BuffInstance>& buffs,
                 else {
                     combat->take_damage(dmg);
                     // M4a-fix: 玩家 DOT 掉血日志 (定位"离老远死亡"来源)
-                    if (strcmp(target_name, "Player") == 0)
+                    if (strcmp(target_name, "Player") == 0) {
+                        combat->mark_damage_logged();
                         LOG_INFO("[DMG] %s DOT 造成 %d 伤害 → 玩家", b.id.c_str(), dmg);
+                    }
                 }
                 if (events) events->push_back({BuffEventType::TICK_DAMAGE, b.id, target_name, b.stacks, dmg});
                 b.tick_timer += def->tick_interval;

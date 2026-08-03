@@ -40,6 +40,11 @@ struct CombatStats {
     // D3 Step3 E3: 护盾 (SelfHeal Evo3 设置)
     float shield_hp = 0.0f;
 
+    // M4a-log: 已记账 HP — 有标签掉血源调用 mark_damage_logged(),
+    // 兜底日志据此跳过已上标签的掉血, 避免重复上报
+    int logged_hp = -1;
+    void mark_damage_logged() { logged_hp = current_hp; }
+
     CombatStats(int hp = 20, int atk = 5, int pdef = 0, int mdef = 0);
 
     int take_damage(int amount);

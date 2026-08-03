@@ -95,6 +95,7 @@ void ArenaManager::tick(float dt, Player* player,
                 float dy = player->entity.rect.y + player->entity.rect.height/2 - z.world_y;
                 if (sqrtf(dx*dx + dy*dy) < z.radius) {
                     player->combat.take_damage(z.damage);
+                    player->combat.mark_damage_logged();
                     LOG_INFO("[DMG] 暗影墙 zone 造成 %d 伤害 → 玩家", z.damage);
                 }
             }
