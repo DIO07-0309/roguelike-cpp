@@ -226,6 +226,7 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
                 player->combat.get_effective_defense(AttackType::PHYSICAL));
             player->combat.take_damage(dmg);
             apply_buff(player, "slow", 1);
+            hit_fx.push_back({it->x, it->y});   // M4a-fx: 记录命中点
             dead = true;
         }
         if (dead) it = shots.erase(it); else ++it;
@@ -238,6 +239,16 @@ void BarrageSkill::draw(float cam_x, float cam_y) const {
     for (auto& s : shots) {
         float sx = s.x - cam_x, sy = s.y - cam_y;
         if (sx < -40 || sx > 1400 || sy < -40 || sy > 900) continue;
+        // M4a-fx: 彗星拖尾 (沿速度方向 3 段递减半透明)
+        float vlen = sqrtf(s.vx * s.vx + s.vy * s.vy);
+        float nvx = (vlen > 1.0f) ? s.vx / vlen : 0.0f;
+        float nvy = (vlen > 1.0f) ? s.vy / vlen : 0.0f;
+        float trail[3] = {12.0f, 24.0f, 38.0f};
+        for (int i = 0; i < 3; i++) {
+            float tx = sx - nvx * trail[i], ty = sy - nvy * trail[i];
+            DrawCircle(tx, ty, 7.0f - i * 1.6f,
+                       {150, 80, 255, (unsigned char)(95 - i * 28)});
+        }
         DrawCircle(sx, sy, 7.0f, {150, 80, 255, 220});
         DrawCircle(sx, sy, 3.5f, {220, 180, 255, 255});
     }
@@ -805,7 +816,27 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             }
             break;
         }
-        _barrage->execute(self, player, _empty_monsters, map, gt);
+        std::string msg = _barrage->execute(self, player, _empty_monsters, map, gt);
+        if (!msg.empty() && effects) {
+            // M4a-fx: 发射爆点 (紫色波纹 + 火花)
+            VFXServer v;
+            float bx = self->entity.rect.x + self->entity.rect.width/2;
+            float by = self->entity.rect.y + self->entity.rect.height/2;
+            v.ring(bx, by, 42, {170, 100, 255, 255}, 2, 0.30f);
+            v.spark_burst(bx, by, 10, {220, 170, 255, 255}, 0.35f);
+            for (auto& e : v.effects) effects->push_back(e);
+        }
+        if (effects && !_barrage->hit_fx.empty()) {
+            // M4a-fx: 命中爆炸反馈 (爆炸 + 冲击波 + 闪光)
+            VFXServer v;
+            for (auto& [hx, hy] : _barrage->hit_fx) {
+                v.explosion(hx, hy, 18, {210, 130, 255, 255}, 8, 0.35f);
+                v.shockwave(hx, hy, 26, {170, 90, 255, 255}, 2, 0.40f);
+                v.flash(hx, hy, 30, {230, 190, 255, 210}, 0.12f);
+            }
+            for (auto& e : v.effects) effects->push_back(e);
+            _barrage->hit_fx.clear();
+        }
         if (_barrage->finished) {
             boss_state = BossState::ATTACK;
             _combo_on_skill_end();

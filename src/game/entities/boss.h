@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <utility>
 #include <memory>
 #include <string>
 #include "ai.h"
@@ -123,6 +124,8 @@ public:
     float speed = 220.0f;
     struct Shot { float x = 0, y = 0, vx = 0, vy = 0, life = 0; };
     std::vector<Shot> shots;
+    // M4a-fx: 本帧命中位置 (场景读取后生成爆炸特效)
+    std::vector<std::pair<float, float>> hit_fx;
     bool fired = false;
     bool finished = false;
     void draw(float cam_x, float cam_y) const;
