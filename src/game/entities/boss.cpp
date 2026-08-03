@@ -314,6 +314,131 @@ int BossAI::_next_cycle_skill() {
     return -1;                     // 普攻
 }
 
+// ============================================================
+// M4a: 连招驱动 — BossSkillQueue 执行器
+// ============================================================
+
+static void _spawn_boss_vfx(Monster* self, const std::string& kind,
+                             std::vector<Effect>* effects);  // 前向声明 (定义在下方)
+
+BossCommand BossAI::_command_from_str(const std::string& s) {
+    if (s == "normal")    return BossCommand::NORMAL;
+    if (s == "charge")    return BossCommand::CHARGE;
+    if (s == "shockwave") return BossCommand::SHOCKWAVE;
+    if (s == "summon")    return BossCommand::SUMMON;
+    if (s == "defend")    return BossCommand::DEFEND;
+    if (s == "barrage")   return BossCommand::RANGED;
+    if (s == "cone")      return BossCommand::CONE;
+    if (s == "blink")     return BossCommand::BLINK;
+    if (s == "whirlwind") return BossCommand::WHIRLWIND;
+    return BossCommand::NONE;
+}
+
+void BossAI::_select_combo() {
+    if (!_combos || _combos->empty()) return;
+    const ComboDef* target = nullptr;
+    for (auto& c : *_combos) {
+        if ((phase2 && c.id == "rage") || (!phase2 && c.id == "probe")) { target = &c; break; }
+    }
+    if (!target) target = &(*_combos)[0];
+    _combo_id = target->id;
+    _combo_current_end_delay = target->end_delay;
+    _combo_queue.clear();
+    for (auto& cmd : target->commands)
+        _combo_queue.enqueue(_command_from_str(cmd));
+    _combo_queue.start();
+    _combo_timer = 0.0f;
+    normal_attack_count = 0;
+}
+
+void BossAI::_combo_advance() {
+    _combo_queue.advance();
+    if (_combo_queue.active) {
+        _combo_timer = 0.6f;
+        if (_combos) for (auto& c : *_combos)
+            if (c.id == _combo_id) { _combo_timer = c.interval; break; }
+    } else {
+        _combo_end_delay = _combo_current_end_delay;
+    }
+    normal_attack_count = 0;
+}
+
+void BossAI::_combo_on_skill_end() {
+    if (_combo_queue.active) _combo_advance();
+    else normal_attack_count = 0;
+}
+
+bool BossAI::_tick_combo_attack(Monster* self, Player* player, GameMap* map,
+                                double dt, double gt, std::vector<Effect>* effects) {
+    (void)map;
+    if (_combo_queue.active) {
+        if (_combo_timer > 0) { _combo_timer -= (float)dt; return true; }
+        _run_combo_command(_combo_queue.current_cmd(), self, player, gt, effects);
+        return true;
+    }
+    if (_combo_end_delay > 0) { _combo_end_delay -= (float)dt; return true; }
+    if (normal_attack_count >= 2) { _select_combo(); return true; }
+    return false;
+}
+
+void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
+                                double gt, std::vector<Effect>* effects) {
+    switch (cmd) {
+    case BossCommand::NORMAL:
+        if (self->can_attack(gt)) {
+            self->attack_target(player, gt);
+            _spawn_boss_vfx(self, "charge", effects);
+        }
+        _combo_advance();
+        break;
+    case BossCommand::CHARGE:
+        boss_state = BossState::CHARGE;
+        _charge->windup_left = _charge->windup_time;
+        _charge->dash_duration = 0.0f;
+        _spawn_boss_vfx(self, "charge", effects);
+        break;
+    case BossCommand::SHOCKWAVE:
+        boss_state = BossState::SHOCKWAVE;
+        _shockwave->windup_left = _shockwave->windup_time;
+        _spawn_boss_vfx(self, "shockwave", effects);
+        break;
+    case BossCommand::SUMMON:
+        boss_state = BossState::SUMMON;
+        _spawn_boss_vfx(self, "summon", effects);
+        break;
+    case BossCommand::DEFEND:
+        boss_state = BossState::DEFEND;
+        _spawn_boss_vfx(self, "shockwave", effects);
+        break;
+    case BossCommand::RANGED:
+        boss_state = BossState::RANGED_BARRAGE;
+        _barrage->windup_left = _barrage->windup_time;
+        _barrage->shots.clear();
+        _barrage->fired = false;
+        _barrage->finished = false;
+        _spawn_boss_vfx(self, "charge", effects);
+        break;
+    case BossCommand::CONE:
+        boss_state = BossState::CONE_ATTACK;
+        _cone->windup_left = _cone->windup_time;
+        _spawn_boss_vfx(self, "shockwave", effects);
+        break;
+    case BossCommand::BLINK:
+        boss_state = BossState::BLINK;
+        _blink->blinked = false;
+        _spawn_boss_vfx(self, "summon", effects);
+        break;
+    case BossCommand::WHIRLWIND:
+        boss_state = BossState::WHIRLWIND;
+        _whirlwind->spin_duration = 0.0f;
+        _spawn_boss_vfx(self, "charge", effects);
+        break;
+    default:
+        _combo_advance();
+        break;
+    }
+}
+
 void BossAI::update(Monster* self, Player* player, GameMap* map,
                      double dt, double gt,
                      std::vector<Monster*>* all, std::vector<Effect>* effects) {
@@ -382,6 +507,10 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         if (dist > sight_range * 32.0f) {
             boss_state = BossState::IDLE;
             break;
+        }
+        // M4a: 连招驱动 (优先于普攻/旧循环; 返回 true = 连招占用本帧)
+        if (_combos && !_combos->empty()) {
+            if (_tick_combo_attack(self, player, map, dt, gt, effects)) break;
         }
         // 先执行普攻
         if (self->can_attack(gt)) {
@@ -493,18 +622,18 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             if (!result.empty() && result.find("命中") != std::string::npos) {
                 // 命中玩家, 恢复
                 boss_state = BossState::ATTACK;
-                normal_attack_count = 0;
+                _combo_on_skill_end();
             }
             if (_charge->dash_duration <= 0) {
                 self->color = Color{200, 40, 40, 255};
                 _charge->mark_used(gt);
                 boss_state = BossState::ATTACK;
-                normal_attack_count = 0;
+                _combo_on_skill_end();
             }
             break;
         }
         boss_state = BossState::ATTACK;
-        normal_attack_count = 0;
+        _combo_on_skill_end();
         break;
     }
     case BossState::SHOCKWAVE: {
@@ -529,12 +658,12 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
                 self->color = Color{200, 40, 40, 255};
                 _shockwave->mark_used(gt);
                 boss_state = BossState::ATTACK;
-                normal_attack_count = 0;
+                _combo_on_skill_end();
             }
             break;
         }
         boss_state = BossState::ATTACK;
-        normal_attack_count = 0;
+        _combo_on_skill_end();
         break;
     }
     case BossState::SUMMON: {
@@ -546,7 +675,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         }
         _spawn_boss_vfx(self, "summon", effects);
         boss_state = BossState::ATTACK;
-        normal_attack_count = 0;
+        _combo_on_skill_end();
         break;
     }
     case BossState::DEFEND: {
@@ -564,7 +693,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             effects->push_back(s);
         }
         boss_state = BossState::ATTACK;
-        normal_attack_count = 0;
+        _combo_on_skill_end();
         break;
     }
     // ── G5.4: Signature Phase2 skill states ──
@@ -589,7 +718,8 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         float len = sqrtf(dx*dx+dy*dy);
         if (len > 1) _apply_movement(self, map, dx/len, dy/len, dt * 0.6);
         if (_whirlwind->spin_duration <= 0) {
-            boss_state = BossState::ATTACK; normal_attack_count = 0;
+            boss_state = BossState::ATTACK;
+            _combo_on_skill_end();
         }
         break;
     }
@@ -600,10 +730,60 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             if (_laser->windup_left <= 0) {
                 _laser->execute(self, player, _empty_monsters, map, gt);
                 _spawn_boss_vfx(self, "shockwave", effects);
-                boss_state = BossState::ATTACK; normal_attack_count = 0;
+                boss_state = BossState::ATTACK;
+                _combo_on_skill_end();
             }
         } else {
             _laser->windup_left = 0.8f;
+        }
+        break;
+    }
+    // ── M4a: 连招技能状态 ──
+    case BossState::RANGED_BARRAGE: {
+        if (_barrage->windup_left > 0) {
+            _barrage->windup_left -= (float)dt;
+            if (effects) {
+                Effect warn;
+                warn.kind = "pulse";
+                warn.world_x = self->entity.rect.x + self->entity.rect.width/2;
+                warn.world_y = self->entity.rect.y + self->entity.rect.height/2;
+                warn.radius = 40; warn.duration = 0.12f; warn.elapsed = 0;
+                warn.color = {150, 80, 255, 160};
+                effects->push_back(warn);
+            }
+            break;
+        }
+        _barrage->execute(self, player, _empty_monsters, map, gt);
+        if (_barrage->finished) {
+            boss_state = BossState::ATTACK;
+            _combo_on_skill_end();
+        }
+        break;
+    }
+    case BossState::CONE_ATTACK: {
+        if (_cone->windup_left > 0) {
+            _cone->windup_left -= (float)dt;
+            if (effects) {
+                Effect warn;
+                warn.kind = "pulse";
+                warn.world_x = self->entity.rect.x + self->entity.rect.width/2;
+                warn.world_y = self->entity.rect.y + self->entity.rect.height/2;
+                warn.radius = _cone->reach; warn.duration = 0.14f; warn.elapsed = 0;
+                warn.color = {140, 240, 80, 140};
+                effects->push_back(warn);
+            }
+            break;
+        }
+        _cone->execute(self, player, _empty_monsters, map, gt);
+        boss_state = BossState::ATTACK;
+        _combo_on_skill_end();
+        break;
+    }
+    case BossState::BLINK: {
+        _blink->execute(self, player, _empty_monsters, map, gt);
+        if (_blink->blinked) {
+            boss_state = BossState::ATTACK;
+            _combo_on_skill_end();
         }
         break;
     }
@@ -629,7 +809,8 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             _shockwave->fx_radius /= 1.5f;
             _shockwave->mark_used(gt);
             _spawn_boss_vfx(self, "shockwave", effects);
-            boss_state = BossState::ATTACK; normal_attack_count = 0;
+            boss_state = BossState::ATTACK;
+            _combo_on_skill_end();
         }
         break;
     }
