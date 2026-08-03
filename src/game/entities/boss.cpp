@@ -146,6 +146,7 @@ std::string WhirlwindSkill::execute(Monster* boss, Player* player,
             player->combat.get_effective_defense(AttackType::PHYSICAL));
         player->combat.take_damage(dmg);
         spin_hit_count++;
+        LOG_INFO("[DMG] 旋风斩命中玩家 造成 %d 伤害", dmg);
     }
     if (spin_duration <= 0.3f) {
         mark_used(GetTime());
@@ -227,6 +228,7 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
             player->combat.take_damage(dmg);
             apply_buff(player, "slow", 1);
             hit_fx.push_back({it->x, it->y});   // M4a-fx: 记录命中点
+            LOG_INFO("[DMG] 弹幕命中玩家 造成 %d 伤害", dmg);
             dead = true;
         }
         if (dead) it = shots.erase(it); else ++it;
@@ -280,6 +282,7 @@ std::string ConeAttackSkill::execute(Monster* boss, Player* player,
         player->combat.get_effective_defense(AttackType::PHYSICAL));
     player->combat.take_damage(dmg);
     apply_buff(player, "poison2s", 1);
+    LOG_INFO("[DMG] 扇形斩命中玩家 造成 %d 伤害 (中毒)", dmg);
     return "扇形斩命中！中毒 2 秒";
 }
 

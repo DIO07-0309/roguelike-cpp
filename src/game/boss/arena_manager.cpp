@@ -2,6 +2,7 @@
 #include "player.h"
 #include "monster.h"
 #include "combat_system.h"
+#include "core/logger.h"
 #include <cmath>
 
 // ============================================================
@@ -13,13 +14,14 @@
 DangerZone ArenaManager::_create_zone(const std::string& dt, float x, float y,
                                        float dur) {
     DangerZone z;
-    z.world_x = x; z.world_y = y; z.remaining = dur; z.warn_timer = 0.5f;
+    z.world_x = x; z.world_y = y; z.remaining = dur; z.warn_timer = 0.8f;
     if (dt == "lava") {
         z.type = DangerType::LAVA; z.radius = 56; z.damage = 3;
         z.warn_color = {255,120,30,100}; z.active_color = {255,60,20,180};
     } else if (dt == "shadow_wall") {
-        z.type = DangerType::SHADOW_WALL; z.radius = 40; z.damage = 8;
-        z.warn_color = {120,60,180,100}; z.active_color = {140,70,200,180};
+        z.type = DangerType::SHADOW_WALL; z.radius = 40; z.damage = 5;
+        // M4a-fix: 红色系与 boss 紫色技能区分 (弹幕/瞬移均紫, 曾混淆)
+        z.warn_color = {255,90,50,140}; z.active_color = {235,50,20,200};
     } else if (dt == "void_crack") {
         z.type = DangerType::VOID_CRACK; z.radius = 50; z.damage = 5;
         z.warn_color = {80,40,140,100}; z.active_color = {100,50,160,200};
@@ -91,8 +93,10 @@ void ArenaManager::tick(float dt, Player* player,
             if (player) {
                 float dx = player->entity.rect.x + player->entity.rect.width/2 - z.world_x;
                 float dy = player->entity.rect.y + player->entity.rect.height/2 - z.world_y;
-                if (sqrtf(dx*dx + dy*dy) < z.radius)
+                if (sqrtf(dx*dx + dy*dy) < z.radius) {
                     player->combat.take_damage(z.damage);
+                    LOG_INFO("[DMG] 暗影墙 zone 造成 %d 伤害 → 玩家", z.damage);
+                }
             }
             for (auto& m : monsters) {
                 if (!m->combat.is_alive) continue;

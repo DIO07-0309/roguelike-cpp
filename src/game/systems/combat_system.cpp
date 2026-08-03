@@ -267,7 +267,12 @@ static void _tick_impl(std::vector<BuffInstance>& buffs,
                 int dmg = def->tick_damage * b.stacks;
                 // D8: regen heals instead of damaging
                 if (def->tick_damage < 0) combat->heal(-dmg);
-                else combat->take_damage(dmg);
+                else {
+                    combat->take_damage(dmg);
+                    // M4a-fix: 玩家 DOT 掉血日志 (定位"离老远死亡"来源)
+                    if (strcmp(target_name, "Player") == 0)
+                        LOG_INFO("[DMG] %s DOT 造成 %d 伤害 → 玩家", b.id.c_str(), dmg);
+                }
                 if (events) events->push_back({BuffEventType::TICK_DAMAGE, b.id, target_name, b.stacks, dmg});
                 b.tick_timer += def->tick_interval;
                 if (!combat->is_alive) break;
