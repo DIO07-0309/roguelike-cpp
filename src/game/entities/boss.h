@@ -94,6 +94,8 @@ public:
     std::string execute(Monster* boss, Player* player,
                         std::vector<Monster*>& monsters,
                         GameMap* map, double game_time) override;
+    // M4a-fx: 命中范围圈 (蓄力白环 / 旋转紫圈)
+    void draw(Monster* boss, float cam_x, float cam_y) const;
     float windup_left = 0.0f;
     float spin_duration = 0.0f;
     int   spin_hit_count = 0;
@@ -201,6 +203,7 @@ public:
     std::unique_ptr<SummonMinions>  _summon;
     // G5.4: Phase2 signature skill instances
     std::unique_ptr<WhirlwindSkill>   _whirlwind;
+    WhirlwindSkill* whirlwind_skill() { return _whirlwind.get(); }
     std::unique_ptr<LaserBarrageSkill> _laser;
 
     // M4a: 连招系统
@@ -221,7 +224,7 @@ public:
     float _gravity_timer = 0.0f;      // GRAVITY_PULL 拉拽计时 (成员, 原 static 跨实例共享)
 
 private:
-    void _enter_phase2(Monster* self);
+    void _enter_phase2(Monster* self, std::vector<Effect>* effects);
     void _tick_boss_state(Monster* self, Player* player, GameMap* map,
                           double dt, double gt,
                           std::vector<Monster*>* all, std::vector<Effect>* effects);

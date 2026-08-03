@@ -155,6 +155,24 @@ std::string WhirlwindSkill::execute(Monster* boss, Player* player,
     return "";
 }
 
+// M4a-fx: 旋风斩命中范围可视化 (蓄力白环 → 旋转紫圈)
+void WhirlwindSkill::draw(Monster* boss, float cam_x, float cam_y) const {
+    if (windup_left <= 0 && spin_duration <= 0) return;
+    float bx = boss->entity.rect.x + boss->entity.rect.width/2 - cam_x;
+    float by = boss->entity.rect.y + boss->entity.rect.height/2 - cam_y;
+    if (windup_left > 0) {
+        DrawRing({bx, by}, fx_radius - 6, fx_radius, 0, 360, 36,
+                 {240, 195, 255, 200});
+        DrawCircleLines(bx, by, fx_radius, {255, 230, 255, 120});
+    } else {
+        float pulse = 0.7f + 0.3f * sinf((float)GetTime() * 14.0f);
+        DrawRing({bx, by}, fx_radius - 6, fx_radius, 0, 360, 36,
+                 {190, 40, 220, (unsigned char)(120 * pulse)});
+        DrawRing({bx, by}, fx_radius - 2, fx_radius, 0, 360, 36,
+                 {230, 130, 255, (unsigned char)(90 * pulse)});
+    }
+}
+
 // G5.4: LaserBarrageSkill — 3-way 远程贯穿弹 (Fire Demon Phase2)
 LaserBarrageSkill::LaserBarrageSkill() : BossSkill("炼狱激光", 9.0f) {
     fx_kind = "cone"; fx_radius = 200; fx_color = {255, 100, 20, 255};
@@ -512,7 +530,7 @@ void BossAI::update(Monster* self, Player* player, GameMap* map,
 
     // B15: Phase 2 检测 (仅触发一次, HP < 阈值来自 BossDef)
     if (!phase2 && _hp_ratio(self) < _phase2_hp_threshold) {
-        _enter_phase2(self);
+        _enter_phase2(self, effects);
         return; // 本帧暂停
     }
 
@@ -526,7 +544,7 @@ void BossAI::update(Monster* self, Player* player, GameMap* map,
     _tick_boss_state(self, player, map, dt, gt, all, effects);
 }
 
-void BossAI::_enter_phase2(Monster* self) {
+void BossAI::_enter_phase2(Monster* self, std::vector<Effect>* effects) {
     phase2 = true;
     phase2_pause = _phase2_pause;                       // G1 Step6: from BossDef
     is_enraged = true;
@@ -537,6 +555,15 @@ void BossAI::_enter_phase2(Monster* self) {
     self->entity.sync_rect();
     LOG_INFO("[BOSS] Phase 2 触发! 攻击+%.0f%% 移速+%.0f%%",
              (_phase2_atk_mult - 1.0f) * 100, (_phase2_speed_mult - 1.0f) * 100);
+    // M4a-fx: 狂暴演出 (紫色闪光 + 扩散波纹)
+    if (effects) {
+        VFXServer v;
+        float mx = self->entity.rect.x + self->entity.rect.width/2;
+        float my = self->entity.rect.y + self->entity.rect.height/2;
+        v.boss_phase2_flash(mx, my, {180, 60, 220, 255});
+        v.ring(mx, my, 96, {170, 70, 230, 255}, 3, 0.6f);
+        for (auto& e : v.effects) effects->push_back(e);
+    }
 }
 
 static void _spawn_boss_vfx(Monster* self, const std::string& kind,
@@ -571,7 +598,8 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
     }
     case BossState::ATTACK: {
         float dist = _dist_to(self, player);
-        if (dist > sight_range * 32.0f) {
+        // M4a-fix: 脱战距离 384px (原 192px — 拉扯进出视野导致连招反复中断)
+        if (dist > sight_range * 64.0f) {
             boss_state = BossState::IDLE;
             break;
         }

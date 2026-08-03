@@ -1640,6 +1640,8 @@ void GameScene::_draw_entities() {
                     bai->cone_skill()->draw(m.get(), player.get(), _cam_x, _cam_y);
                 if (bai->blink_skill())
                     bai->blink_skill()->draw(_cam_x, _cam_y);
+                if (bai->whirlwind_skill())
+                    bai->whirlwind_skill()->draw(m.get(), _cam_x, _cam_y);
             }
         }
         // D2 Step4: Tank守护连线 (淡蓝色)
