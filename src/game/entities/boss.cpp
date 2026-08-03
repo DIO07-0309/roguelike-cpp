@@ -5,6 +5,7 @@
 #include "combat_system.h"
 #include "vfx_server.h"
 #include "config.h"
+#include "growth_curve.h"
 #include "core/logger.h"
 #include "data/boss_defs.h"      // G1 Step6
 #include <cmath>
@@ -49,7 +50,7 @@ std::string ChargeSkill::execute(Monster* boss, Player* player,
             Rectangle pr = player->entity.rect;
             if (CheckCollisionRecs(br, pr)) {
                 int dmg = calculate_damage(
-                    (int)(boss->combat.get_effective_attack() * 2.5f),
+                    (int)(boss->combat.get_effective_attack() * damage_mult),
                     player->combat.get_effective_defense(AttackType::PHYSICAL));
                 player->combat.take_damage(dmg);
                 dash_duration = 0;
@@ -86,9 +87,9 @@ std::string ShockwaveSkill::execute(Monster* boss, Player* player,
     float dist = sqrtf(dx*dx + dy*dy);
     mark_used(GetTime());
     boss->color = Color{200, 40, 40, 255};
-    if (dist > 100) return "Boss 释放冲击波，但你躲开了";
+    if (dist > fx_radius) return "Boss 释放冲击波，但你躲开了";
     int dmg = calculate_damage(
-        (int)(boss->combat.get_effective_attack() * 1.6f),
+        (int)(boss->combat.get_effective_attack() * damage_mult),
         player->combat.get_effective_defense(AttackType::MAGICAL),
         AttackType::MAGICAL);
     player->combat.take_damage(dmg);
@@ -133,10 +134,13 @@ WhirlwindSkill::WhirlwindSkill() : BossSkill("旋风斩", 10.0f) {
 std::string WhirlwindSkill::execute(Monster* boss, Player* player,
     std::vector<Monster*>&, GameMap*, double) {
     if (spin_duration > 0) {
-        int dmg = calculate_damage((int)(boss->combat.get_effective_attack() * 1.3),
-            player->combat.get_effective_defense(AttackType::PHYSICAL));
-        player->combat.take_damage(dmg);
-        spin_hit_count++;
+        if (GetTime() - last_hit_time >= 0.5) {
+            last_hit_time = GetTime();
+            int dmg = calculate_damage((int)(boss->combat.get_effective_attack() * 1.3),
+                player->combat.get_effective_defense(AttackType::PHYSICAL));
+            player->combat.take_damage(dmg);
+            spin_hit_count++;
+        }
         if (spin_duration <= 0.3f) {
             mark_used(GetTime());
             return "旋风斩结束! " + std::to_string(spin_hit_count) + " hits";
@@ -176,6 +180,114 @@ std::string LaserBarrageSkill::execute(Monster* boss, Player* player,
     return total > 0 ? "激光弹幕 造成 " + std::to_string(total) + " 伤害" : "激光未命中";
 }
 
+// ═══════════════════════════════════════════════════════════════
+// M4a: BarrageSkill — 蓄力后扇形弹幕, 命中减速
+// ═══════════════════════════════════════════════════════════════
+BarrageSkill::BarrageSkill() : BossSkill("弹幕", 7.0f) {
+    fx_kind = "cone"; fx_radius = 200; fx_color = {150, 80, 255, 255};
+}
+std::string BarrageSkill::execute(Monster* boss, Player* player,
+    std::vector<Monster*>&, GameMap*, double) {
+    if (windup_left > 0) {
+        boss->color = Color{180, 60, 60, 255};
+        return "";
+    }
+    if (!fired) {
+        float bx = boss->entity.rect.x + boss->entity.rect.width/2;
+        float by = boss->entity.rect.y + boss->entity.rect.height/2;
+        float tx = player->entity.rect.x + player->entity.rect.width/2;
+        float ty = player->entity.rect.y + player->entity.rect.height/2;
+        float base = atan2f(ty - by, tx - bx);
+        float total = spread_deg * 3.14159f / 180.0f;
+        float half = total / 2.0f;
+        float step = (shot_count > 1) ? total / (float)(shot_count - 1) : 0.0f;
+        for (int i = 0; i < shot_count; i++) {
+            float ang = base - half + step * (float)i;
+            shots.push_back({bx, by, cosf(ang) * speed, sinf(ang) * speed, 3.5f});
+        }
+        fired = true;
+        return "暗影骑士释放弹幕！";
+    }
+    for (auto& s : shots) { s.x += s.vx * 0.016f; s.y += s.vy * 0.016f; s.life -= 0.016f; }
+    for (auto it = shots.begin(); it != shots.end();) {
+        bool dead = it->life <= 0.0f;
+        if (!dead && CheckCollisionCircleRec({it->x, it->y}, 8.0f, player->entity.rect)) {
+            int dmg = calculate_damage(
+                (int)(boss->combat.get_effective_attack() * damage_mult),
+                player->combat.get_effective_defense(AttackType::PHYSICAL));
+            player->combat.take_damage(dmg);
+            apply_buff(player, "slow", 1);
+            dead = true;
+        }
+        if (dead) it = shots.erase(it); else ++it;
+    }
+    if (fired && shots.empty()) { finished = true; mark_used(GetTime()); }
+    return "";
+}
+
+// ═══════════════════════════════════════════════════════════════
+// M4a: ConeAttackSkill — 蓄力后扇形斩, 命中中毒 2s
+// ═══════════════════════════════════════════════════════════════
+ConeAttackSkill::ConeAttackSkill() : BossSkill("扇形斩", 6.0f) {
+    fx_kind = "cone"; fx_radius = 96; fx_color = {140, 240, 80, 255};
+}
+std::string ConeAttackSkill::execute(Monster* boss, Player* player,
+    std::vector<Monster*>&, GameMap*, double) {
+    if (windup_left > 0) {
+        boss->color = Color{160, 220, 90, 255};
+        return "";
+    }
+    float bx = boss->entity.rect.x + boss->entity.rect.width/2;
+    float by = boss->entity.rect.y + boss->entity.rect.height/2;
+    float px = player->entity.rect.x + player->entity.rect.width/2;
+    float py = player->entity.rect.y + player->entity.rect.height/2;
+    float dx = px - bx, dy = py - by;
+    float dist = sqrtf(dx * dx + dy * dy);
+    mark_used(GetTime());
+    boss->color = Color{200, 40, 40, 255};
+    if (dist > reach) return "扇形斩落空";
+    int dmg = calculate_damage(
+        (int)(boss->combat.get_effective_attack() * damage_mult),
+        player->combat.get_effective_defense(AttackType::PHYSICAL));
+    player->combat.take_damage(dmg);
+    apply_buff(player, "poison2s", 1);
+    return "扇形斩命中！中毒 2 秒";
+}
+
+// ═══════════════════════════════════════════════════════════════
+// M4a: BlinkSkill — 瞬移至玩家侧翼 (CD 独立计时)
+// ═══════════════════════════════════════════════════════════════
+BlinkSkill::BlinkSkill() : BossSkill("瞬移", 12.0f) {
+    fx_kind = "circle"; fx_radius = 70; fx_color = {120, 80, 255, 255};
+}
+std::string BlinkSkill::execute(Monster* boss, Player* player,
+    std::vector<Monster*>&, GameMap* map, double) {
+    if (blinked) return "";
+    float bx = boss->entity.rect.x + boss->entity.rect.width/2;
+    float by = boss->entity.rect.y + boss->entity.rect.height/2;
+    float px = player->entity.rect.x + player->entity.rect.width/2;
+    float py = player->entity.rect.y + player->entity.rect.height/2;
+    float dx = px - bx, dy = py - by;
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len > 1.0f) {
+        float nx = -dy / len, ny = dx / len;
+        for (int side = 0; side < 2 && !blinked; side++) {
+            float s = (side == 0) ? 1.0f : -1.0f;
+            float tx = px + nx * s * blink_dist;
+            float ty = py + ny * s * blink_dist;
+            auto [tile_x, tile_y] = map->pixel_to_tile(tx, ty);
+            if (map->is_walkable(tile_x, tile_y)) {
+                boss->entity.position = {tx, ty};
+                boss->entity.sync_rect();
+                blinked = true;
+            }
+        }
+    }
+    if (!blinked) blinked = true;   // 无可行点则原地 (仍结算)
+    mark_used(GetTime());
+    return "暗影骑士瞬移了！";
+}
+
 // ============================================================
 // BossAI — B15: 技能循环状态机 + Phase 2
 // ============================================================
@@ -185,6 +297,9 @@ BossAI::BossAI() : MonsterAI(10.0f, 60.0f, 3.0f, 2.0f) {
     _summon    = std::make_unique<SummonMinions>();
     _whirlwind = std::make_unique<WhirlwindSkill>();  // G5.4
     _laser     = std::make_unique<LaserBarrageSkill>();// G5.4
+    _barrage   = std::make_unique<BarrageSkill>();    // M4a
+    _cone      = std::make_unique<ConeAttackSkill>(); // M4a
+    _blink     = std::make_unique<BlinkSkill>();      // M4a
 }
 
 int BossAI::_next_cycle_skill() {
@@ -297,7 +412,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
                 }
                 // Golem: Phase2 → consecutive shockwaves (3 waves)
                 else if (strcmp(_boss_id,"golem")==0 && sk==1) {
-                    _shockwave->windup_left = 0.7f;
+                    _shockwave->windup_left = _shockwave->windup_time;
                     // spawn 2 more on next cycle via state
                 }
             }
@@ -307,12 +422,12 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             }
             if (sk == 0) {
                 boss_state = BossState::CHARGE;
-                _charge->windup_left = 0.6f;
+                _charge->windup_left = _charge->windup_time;
                 _charge->dash_duration = 0.0f;
                 _spawn_boss_vfx(self, "charge", effects);
             } else if (sk == 1) {
                 boss_state = BossState::SHOCKWAVE;
-                _shockwave->windup_left = 0.7f;
+                _shockwave->windup_left = _shockwave->windup_time;
                 _spawn_boss_vfx(self, "shockwave", effects);
             } else if (sk == 2) {
                 boss_state = BossState::SUMMON;
@@ -401,7 +516,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
                 warn.kind = "pulse";
                 warn.world_x = self->entity.rect.x + self->entity.rect.width/2;
                 warn.world_y = self->entity.rect.y + self->entity.rect.height/2;
-                warn.radius = 100; warn.duration = 0.15f; warn.elapsed = 0;
+                warn.radius = _shockwave->fx_radius; warn.duration = 0.15f; warn.elapsed = 0;
                 warn.color = {255, 200, 50, 130};
                 effects->push_back(warn);
             }
@@ -506,10 +621,9 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             player->entity.sync_rect();
         }
         // 0.8s pull → shockwave with 1.5x range
-        static float _grav_timer = 0;
-        _grav_timer += (float)dt;
-        if (_grav_timer > 0.8f) {
-            _grav_timer = 0;
+        _gravity_timer += (float)dt;
+        if (_gravity_timer > 0.8f) {
+            _gravity_timer = 0;
             _shockwave->fx_radius *= 1.5f;
             _shockwave->execute(self, player, _empty_monsters, map, gt);
             _shockwave->fx_radius /= 1.5f;
@@ -613,9 +727,11 @@ Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
     }
 
     BossAI* ai = new BossAI();
+    int scaled_hp  = (int)(def->hp  * g_growth.boss_hp_scale(floor));
+    int scaled_atk = (int)(def->atk * g_growth.boss_atk_scale(floor));
     Monster* boss = new Monster(
         (float)tile_x * TILE_SIZE, (float)tile_y * TILE_SIZE,
-        def->name, def->hp, def->atk, def->pdef, def->mdef,
+        def->name, scaled_hp, scaled_atk, def->pdef, def->mdef,
         get_boss_visual_color(def->visual_id), ai);
     boss->is_boss = true;
     boss->entity.size = {48, 48};
@@ -637,15 +753,38 @@ Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
     // ── 技能循环 bias ──
     ai->skill_cycle_bias = def->skill_cycle_bias;
 
-    // ── 技能冷却覆盖 (从 BossDef → BossSkill) ──
+    // ── 技能覆盖 (BossDef → BossSkill: 冷却/伤害倍率/蓄力/范围 全数据驱动) ──
     for (auto& sk : def->skill_overrides) {
-        if (sk.id == "charge" || sk.id == "冲锋")
-            ai->_charge->cooldown = sk.cooldown;
-        else if (sk.id == "shockwave" || sk.id == "冲击波")
-            ai->_shockwave->cooldown = sk.cooldown;
-        else if (sk.id == "summon" || sk.id == "召唤")
+        if (sk.id == "charge" || sk.id == "冲锋") {
+            ai->_charge->cooldown    = sk.cooldown;
+            ai->_charge->damage_mult = sk.damage_mult;
+            ai->_charge->windup_time = sk.windup;
+            ai->_charge->fx_radius   = sk.range;
+        } else if (sk.id == "shockwave" || sk.id == "冲击波") {
+            ai->_shockwave->cooldown    = sk.cooldown;
+            ai->_shockwave->damage_mult = sk.damage_mult;
+            ai->_shockwave->windup_time = sk.windup;
+            ai->_shockwave->fx_radius   = sk.range;
+        } else if (sk.id == "summon" || sk.id == "召唤") {
             ai->_summon->cooldown = sk.cooldown;
+        } else if (sk.id == "barrage") {
+            ai->_barrage->cooldown    = sk.cooldown;
+            ai->_barrage->damage_mult = sk.damage_mult;
+            ai->_barrage->windup_time = sk.windup;
+            ai->_barrage->spread_deg  = sk.range;
+        } else if (sk.id == "cone") {
+            ai->_cone->cooldown    = sk.cooldown;
+            ai->_cone->damage_mult = sk.damage_mult;
+            ai->_cone->windup_time = sk.windup;
+            ai->_cone->reach       = sk.range;
+        } else if (sk.id == "blink") {
+            ai->_blink->cooldown   = sk.cooldown;
+            ai->_blink->blink_dist = sk.range;
+        }
     }
+
+    // ── M4a: 连招模板 (无配置则走旧循环) ──
+    ai->_combos = &def->combos;
 
     // ── 特殊行为标志 ──
     if (def->is_summoner) {

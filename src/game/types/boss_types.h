@@ -53,7 +53,7 @@ struct BossBehaviorState {
 };
 
 // ── BossCommand ──
-enum class BossCommand { NONE, MOVE, CHARGE, SHOCKWAVE, SUMMON, DEFEND, RETREAT, CAST, PHASE, LAST_STAND };
+enum class BossCommand { NONE, NORMAL, MOVE, CHARGE, SHOCKWAVE, SUMMON, DEFEND, RETREAT, CAST, PHASE, LAST_STAND, RANGED, CONE, BLINK, WHIRLWIND };
 
 struct BossAction {
     BossCommand command = BossCommand::NONE;

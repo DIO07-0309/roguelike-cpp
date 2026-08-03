@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 #include "ai.h"
+#include "types/boss_types.h"   // M4a: BossSkillQueue / BossCommand
+#include "data/boss_defs.h"     // M4a: ComboDef
 
 // 前向声明
 class Monster;
@@ -23,6 +25,9 @@ enum class BossState {
     WHIRLWIND,   // G5.4: 旋风斩 (Shadow Knight Phase2)
     LASER_BARRAGE,// G5.4: 激光弹幕 (Fire Demon Phase2)
     GRAVITY_PULL,// G5.4: 引力拉扯 (Demon Lord Phase2)
+    RANGED_BARRAGE,// M4a: 弹幕 (蓄力→扇形弹)
+    CONE_ATTACK,   // M4a: 扇形斩 (蓄力→扇形挥击)
+    BLINK,         // M4a: 瞬移 (闪烁至侧翼)
 };
 
 // ============================================================
@@ -32,6 +37,7 @@ struct BossSkill {
     std::string name;
     float cooldown;
     float last_use_time = -999.0f;
+    float damage_mult = 1.0f;    // 数据驱动伤害倍率 (来自 bosses.json)
     std::string fx_kind = "circle";
     float fx_radius = 60.0f;
     Color fx_color{200, 40, 40, 255};
@@ -55,6 +61,7 @@ public:
                         GameMap* map, double game_time) override;
     // 蓄力/冲锋阶段变量
     float windup_left = 0.0f;
+    float windup_time = 0.6f;    // 数据驱动蓄力时长
     float dash_duration = 0.0f;
     float dash_dx = 0.0f, dash_dy = 0.0f;
 };
@@ -67,6 +74,7 @@ public:
                         std::vector<Monster*>& monsters,
                         GameMap* map, double game_time) override;
     float windup_left = 0.0f;
+    float windup_time = 0.7f;    // 数据驱动蓄力时长
 };
 
 // 召唤 (保留 B7, B15 增强为固定循环)
@@ -88,6 +96,7 @@ public:
     float windup_left = 0.0f;
     float spin_duration = 0.0f;
     int   spin_hit_count = 0;
+    double last_hit_time = -10.0;  // 命中冷却 (0.5s), 避免每帧判伤
 };
 
 // G5.4: 激光弹幕 (Fire Demon Phase2) — 扇形3方向远程贯穿弹
@@ -98,6 +107,48 @@ public:
                         std::vector<Monster*>& monsters,
                         GameMap* map, double game_time) override;
     float windup_left = 0.0f;
+};
+
+// M4a: 弹幕 — 蓄力后向玩家扇形发射多颗弹, 命中减速
+class BarrageSkill : public BossSkill {
+public:
+    BarrageSkill();
+    std::string execute(Monster* boss, Player* player,
+                        std::vector<Monster*>& monsters,
+                        GameMap* map, double game_time) override;
+    float windup_left = 0.0f;
+    float windup_time = 0.5f;
+    int   shot_count = 4;
+    float spread_deg = 40.0f;   // 扇形总角度 (度)
+    float speed = 220.0f;
+    struct Shot { float x = 0, y = 0, vx = 0, vy = 0, life = 0; };
+    std::vector<Shot> shots;
+    bool fired = false;
+    bool finished = false;
+};
+
+// M4a: 扇形斩 — 蓄力后向玩家方向扇形挥击, 命中中毒 2s
+class ConeAttackSkill : public BossSkill {
+public:
+    ConeAttackSkill();
+    std::string execute(Monster* boss, Player* player,
+                        std::vector<Monster*>& monsters,
+                        GameMap* map, double game_time) override;
+    float windup_left = 0.0f;
+    float windup_time = 0.4f;
+    float half_angle = 45.0f;  // 半角 (度)
+    float reach = 96.0f;       // 半径 (像素)
+};
+
+// M4a: 瞬移 — 闪烁至玩家侧翼, CD 独立计时
+class BlinkSkill : public BossSkill {
+public:
+    BlinkSkill();
+    std::string execute(Monster* boss, Player* player,
+                        std::vector<Monster*>& monsters,
+                        GameMap* map, double game_time) override;
+    bool blinked = false;
+    float blink_dist = 150.0f;
 };
 
 // ============================================================
@@ -142,7 +193,19 @@ public:
     std::unique_ptr<WhirlwindSkill>   _whirlwind;
     std::unique_ptr<LaserBarrageSkill> _laser;
 
+    // M4a: 连招系统
+    std::unique_ptr<BarrageSkill> _barrage;
+    std::unique_ptr<ConeAttackSkill> _cone;
+    std::unique_ptr<BlinkSkill> _blink;
+    BossSkillQueue _combo_queue;
+    float _combo_timer = 0.0f;
+    float _combo_end_delay = 0.0f;
+    float _combo_current_end_delay = 0.8f;
+    std::string _combo_id;
+    const std::vector<ComboDef>* _combos = nullptr;   // 来自 BossDef (factory 设置)
+
     const char* _boss_id = nullptr;   // G5.4: 当前 Boss ID 用于 phase2 行为分支
+    float _gravity_timer = 0.0f;      // GRAVITY_PULL 拉拽计时 (成员, 原 static 跨实例共享)
 
 private:
     void _enter_phase2(Monster* self);
@@ -151,6 +214,16 @@ private:
                           std::vector<Monster*>* all, std::vector<Effect>* effects);
     float _hp_ratio(Monster* self) const;
     int   _next_cycle_skill();  // 返回 -1=普攻, 0=Charge, 1=Shockwave, 2=Summon
+
+    // M4a: 连招驱动
+    bool _tick_combo_attack(Monster* self, Player* player, GameMap* map,
+                            double dt, double gt, std::vector<Effect>* effects);
+    void _run_combo_command(BossCommand cmd, Monster* self, Player* player,
+                            double gt, std::vector<Effect>* effects);
+    void _select_combo();
+    void _combo_advance();
+    void _combo_on_skill_end();
+    static BossCommand _command_from_str(const std::string& s);
 };
 
 // 工厂
