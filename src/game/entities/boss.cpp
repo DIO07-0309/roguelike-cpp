@@ -133,19 +133,23 @@ WhirlwindSkill::WhirlwindSkill() : BossSkill("旋风斩", 10.0f) {
 }
 std::string WhirlwindSkill::execute(Monster* boss, Player* player,
     std::vector<Monster*>&, GameMap*, double) {
-    if (spin_duration > 0) {
-        if (GetTime() - last_hit_time >= 0.5) {
-            last_hit_time = GetTime();
-            int dmg = calculate_damage((int)(boss->combat.get_effective_attack() * 1.3),
-                player->combat.get_effective_defense(AttackType::PHYSICAL));
-            player->combat.take_damage(dmg);
-            spin_hit_count++;
-        }
-        if (spin_duration <= 0.3f) {
-            mark_used(GetTime());
-            return "旋风斩结束! " + std::to_string(spin_hit_count) + " hits";
-        }
-        return "";
+    if (spin_duration <= 0) return "";
+    // M4a-fix: 旋风斩仅近身命中 (原为全图必中 — 玩家逃离仍掉血)
+    float bx = boss->entity.rect.x + boss->entity.rect.width/2;
+    float by = boss->entity.rect.y + boss->entity.rect.height/2;
+    float px = player->entity.rect.x + player->entity.rect.width/2;
+    float py = player->entity.rect.y + player->entity.rect.height/2;
+    float dist = sqrtf((px - bx) * (px - bx) + (py - by) * (py - by));
+    if (dist <= fx_radius && GetTime() - last_hit_time >= 0.5) {
+        last_hit_time = GetTime();
+        int dmg = calculate_damage((int)(boss->combat.get_effective_attack() * 1.3),
+            player->combat.get_effective_defense(AttackType::PHYSICAL));
+        player->combat.take_damage(dmg);
+        spin_hit_count++;
+    }
+    if (spin_duration <= 0.3f) {
+        mark_used(GetTime());
+        return "旋风斩结束! " + std::to_string(spin_hit_count) + " hits";
     }
     return "";
 }
