@@ -18,7 +18,7 @@ DangerZone ArenaManager::_create_zone(const std::string& dt, float x, float y,
         z.type = DangerType::LAVA; z.radius = 56; z.damage = 3;
         z.warn_color = {255,120,30,100}; z.active_color = {255,60,20,180};
     } else if (dt == "shadow_wall") {
-        z.type = DangerType::SHADOW_WALL; z.radius = 40; z.damage = 4;
+        z.type = DangerType::SHADOW_WALL; z.radius = 40; z.damage = 8;
         z.warn_color = {120,60,180,100}; z.active_color = {140,70,200,180};
     } else if (dt == "void_crack") {
         z.type = DangerType::VOID_CRACK; z.radius = 50; z.damage = 5;

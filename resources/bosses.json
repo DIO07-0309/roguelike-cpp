@@ -8,7 +8,7 @@
     "floor": 5,
     "is_summoner": false,
     "is_defender": false,
-    "hp": 250, "atk": 15, "pdef": 10, "mdef": 4,
+    "hp": 900, "atk": 15, "pdef": 10, "mdef": 4,
     "phase2_hp_threshold": 0.50,
     "phase2_pause": 0.50,
     "phase2_speed_mult": 1.50,
@@ -18,9 +18,13 @@
     "summon_speed": 1.0,
     "skill_cycle_bias": 6,
     "skills": [
-      {"id": "charge",   "cooldown": 6.0, "damage_mult": 2.5, "windup": 0.6, "range": 120},
-      {"id": "shockwave","cooldown": 8.0, "damage_mult": 1.6, "windup": 0.7, "range": 100},
-      {"id": "summon",   "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 80}
+      {"id": "barrage",  "cooldown": 7.0, "damage_mult": 0.6, "windup": 0.5, "range": 40},
+      {"id": "cone",     "cooldown": 6.0, "damage_mult": 0.9, "windup": 0.6, "range": 96},
+      {"id": "blink",    "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 180}
+    ],
+    "combos": [
+      {"id": "probe", "commands": ["barrage","cone","normal","normal"], "interval": 0.6, "end_delay": 1.0},
+      {"id": "rage",  "commands": ["blink","cone","barrage","summon","whirlwind"], "interval": 0.6, "end_delay": 1.1}
     ],
     "arena": {"danger_type": "shadow_wall", "spawn_interval": 8.0, "max_zones": 6, "zone_duration": 3.0, "spawn_radius": 120}
   },
@@ -45,14 +49,7 @@
     "skills": [
       {"id": "charge",   "cooldown": 6.0, "damage_mult": 2.5, "windup": 0.6, "range": 120},
       {"id": "shockwave","cooldown": 8.0, "damage_mult": 1.6, "windup": 0.7, "range": 100},
-      {"id": "summon",   "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 80},
-      {"id": "barrage",  "cooldown": 7.0, "damage_mult": 0.6, "windup": 0.5, "range": 40},
-      {"id": "cone",     "cooldown": 6.0, "damage_mult": 0.9, "windup": 0.6, "range": 96},
-      {"id": "blink",    "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 180}
-    ],
-    "combos": [
-      {"id": "probe", "commands": ["barrage","cone","normal","normal"], "interval": 0.6, "end_delay": 1.0},
-      {"id": "rage",  "commands": ["blink","cone","barrage","summon","whirlwind"], "interval": 0.6, "end_delay": 1.1}
+      {"id": "summon",   "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 80}
     ],
     "arena": {"danger_type": "shadow_wall", "spawn_interval": 10.0, "max_zones": 5, "zone_duration": 3.0, "spawn_radius": 120}
   },
