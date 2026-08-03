@@ -1034,7 +1034,7 @@ BossType boss_type_for_floor(int floor, uint32_t seed) {
         if (roll == 1) return BossType::NECROMANCER;
         return BossType::VAMPIRE;
     } else if (floor == 10) {
-        return (rng_local() % 2 == 0) ? BossType::FIRE_DEMON : BossType::GOLEM;
+        return BossType::FIRE_DEMON; // G10: F10 is domain boss only
     }
     return BossType::DEMON_LORD; // F15 固定
 }

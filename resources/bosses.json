@@ -125,31 +125,6 @@
     "arena": {"danger_type": "lava", "spawn_interval": 8.0, "max_zones": 6, "zone_duration": 2.5, "spawn_radius": 120}
   },
   {
-    "id": "golem",
-    "name": "远古魔像",
-    "title": "第二狱守·远古魔像",
-    "lore": "由熔岩冷却后的黑曜石组成，\n坚不可摧的魔法造物。",
-    "visual_id": "golem",
-    "floor": 10,
-    "is_summoner": false,
-    "is_defender": true,
-    "hp": 520, "atk": 23, "pdef": 18, "mdef": 13,
-    "phase2_hp_threshold": 0.50,
-    "phase2_pause": 0.50,
-    "phase2_speed_mult": 1.30,
-    "phase2_atk_mult": 1.20,
-    "phase2_cd_mult": 0.80,
-    "shield_pct": 0.60,
-    "summon_speed": 1.0,
-    "skill_cycle_bias": 6,
-    "skills": [
-      {"id": "charge",   "cooldown": 8.0, "damage_mult": 2.0, "windup": 0.8, "range": 100},
-      {"id": "shockwave","cooldown": 10.0,"damage_mult": 1.4, "windup": 0.9, "range": 120},
-      {"id": "summon",   "cooldown": 14.0,"damage_mult": 1.0, "windup": 0.0, "range": 80}
-    ],
-    "arena": {"danger_type": "none", "spawn_interval": 0.0, "max_zones": 0, "zone_duration": 0.0, "spawn_radius": 0}
-  },
-  {
     "id": "demon_lord",
     "name": "深渊之主·终焉",
     "title": "终焉·深渊之主",
