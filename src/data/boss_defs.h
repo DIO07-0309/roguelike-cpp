@@ -28,6 +28,14 @@ struct BossArenaDef {
     float spawn_radius = 120.0f;               // 生成范围(距Boss像素)
 };
 
+// ── M4a: ComboDef — 连招模板 (一条 JSON 记录) ──
+struct ComboDef {
+    std::string id;
+    std::vector<std::string> commands;  // normal|charge|shockwave|summon|defend|barrage|cone|blink|whirlwind
+    float interval = 0.6f;
+    float end_delay = 0.8f;
+};
+
 // ── Boss 模板 (一条 JSON 记录) ──
 struct BossDef {
     std::string id;             // "shadow_knight" | "necromancer" | "fire_demon" | ...
@@ -57,6 +65,9 @@ struct BossDef {
 
     // 技能冷却覆盖 (按 id 匹配，覆盖 BossSkill 默认 CD)
     std::vector<BossSkillDef> skill_overrides;
+
+    // ── M4a: 连招模板 (可选) ──
+    std::vector<ComboDef> combos;
 
     // ── G2.3: Arena 战场配置 ──
     BossArenaDef arena;

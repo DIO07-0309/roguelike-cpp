@@ -60,6 +60,20 @@ static BossDef _parse_boss(const json& j) {
             def.skill_overrides.push_back(_parse_skill(sk));
     }
 
+    // ── M4a: 连招模板 (可选) ──
+    if (j.contains("combos") && j["combos"].is_array()) {
+        for (auto& c : j["combos"]) {
+            ComboDef cd;
+            cd.id        = c.value("id", "");
+            cd.interval  = c.value("interval", 0.6f);
+            cd.end_delay = c.value("end_delay", 0.8f);
+            if (c.contains("commands") && c["commands"].is_array())
+                for (auto& cmd : c["commands"])
+                    cd.commands.push_back(cmd.get<std::string>());
+            if (!cd.id.empty()) def.combos.push_back(cd);
+        }
+    }
+
     // ── G2.3: Arena 战场配置 (可选) ──
     if (j.contains("arena") && j["arena"].is_object()) {
         auto& a = j["arena"];
