@@ -306,3 +306,4 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | G10.1 | Element Core: 永久元素选择(火/冰/毒) + 元素界面 + 存档持久化 + 成长接口 | ✅ |
 | G10.2 | Damage Type: AttackType 实装(PHYSICAL/MAGICAL/TRUE) + DamageResult 管道 | ✅ |
 | G10.3 | Element Combat: Fire暴击/Ice减速冻结/Poison毒伤 + 元素经验 + VFX浮动标签 | ✅ |
+| M4a | Boss 核心环革新样板: 暗影骑士连招机器 (弹幕/扇形斩/瞬移/旋风/召唤 combo 驱动) + 技能预警表现 + zone 伤害间隔修正 | ✅ |
