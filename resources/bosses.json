@@ -109,10 +109,6 @@
       {"id": "shockwave","cooldown": 8.0, "damage_mult": 1.6, "windup": 0.7, "range": 100},
       {"id": "summon",   "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 80}
     ],
-    "combos": [
-      {"id": "probe", "commands": ["charge","normal","shockwave","normal"], "interval": 0.7, "end_delay": 1.2},
-      {"id": "rage",  "commands": ["shockwave","charge","shockwave","summon","charge"], "interval": 0.6, "end_delay": 1.0}
-    ],
     "arena": {"danger_type": "lava", "spawn_interval": 8.0, "max_zones": 6, "zone_duration": 2.5, "spawn_radius": 120}
   },
   {
@@ -138,10 +134,6 @@
       {"id": "shockwave","cooldown": 10.0,"damage_mult": 1.4, "windup": 0.9, "range": 120},
       {"id": "summon",   "cooldown": 14.0,"damage_mult": 1.0, "windup": 0.0, "range": 80}
     ],
-    "combos": [
-      {"id": "probe", "commands": ["normal","normal","shockwave","normal","normal"], "interval": 0.8, "end_delay": 1.3},
-      {"id": "rage",  "commands": ["charge","shockwave","charge","shockwave","shockwave"], "interval": 0.7, "end_delay": 1.2}
-    ],
     "arena": {"danger_type": "none", "spawn_interval": 0.0, "max_zones": 0, "zone_duration": 0.0, "spawn_radius": 0}
   },
   {
@@ -166,10 +158,6 @@
       {"id": "charge",   "cooldown": 6.0, "damage_mult": 2.5, "windup": 0.6, "range": 120},
       {"id": "shockwave","cooldown": 8.0, "damage_mult": 1.6, "windup": 0.7, "range": 100},
       {"id": "summon",   "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 80}
-    ],
-    "combos": [
-      {"id": "probe", "commands": ["charge","normal","shockwave","normal","normal"], "interval": 0.6, "end_delay": 1.0},
-      {"id": "rage",  "commands": ["charge","shockwave","summon","charge","shockwave","normal","charge"], "interval": 0.5, "end_delay": 0.9}
     ],
     "arena": {"danger_type": "void_crack", "spawn_interval": 6.0, "max_zones": 8, "zone_duration": 3.5, "spawn_radius": 140}
   }
