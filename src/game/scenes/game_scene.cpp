@@ -29,6 +29,8 @@
 #include "event_bus.h"
 #include "service_locator.h"
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.2
+#include "ai/player_behavior/player_behavior_analyzer.h"  // F15.5 mirror UI
+#include "ai/mirror/mirror_agent.h"                       // F15.5
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -1262,8 +1264,13 @@ void GameScene::_render() {
     }
 
     if (state == GameState::BOSS_INTRO) {
-        _renderer.draw_boss_intro(sw, sh, boss_intro_title, boss_intro_lore,
-                                   boss_intro_skills, boss_intro_color, boss_floor);
+        // F15.5: Mirror analysis panel for Ending Echo
+        if (boss_floor == 15 && _boss._behavior_type == "mirror") {
+            _draw_mirror_analysis_panel(sw, sh);
+        } else {
+            _renderer.draw_boss_intro(sw, sh, boss_intro_title, boss_intro_lore,
+                                       boss_intro_skills, boss_intro_color, boss_floor);
+        }
         // D4 Step5.5: BossNarrative覆盖对话 (显示在面板下方)
         if (!_presentation.boss_intro_text.empty() && g_font_loaded) {
             float tw = MeasureTextEx(g_font_small, _presentation.boss_intro_text.c_str(), 17, 1).x;
@@ -1626,14 +1633,22 @@ void GameScene::_render() {
 
     if (time_stop_remaining > 0) _renderer.draw_time_stop_overlay(sw, sh, time_stop_remaining);
     if (state == GameState::BOSS_CINEMATIC && _boss_entrance_timer > 0) {
-        // B15: Boss登场文字
+        // B15/F15.5: Boss entrance cinematic
         DrawRectangle(0, 0, sw, sh, {0, 0, 0, 160});
-        GameRenderer::draw_glow_text("!!! BOSS 登场 !!!", sw / 2.0f, sh / 2.0f - 20,
-                                      40, {255, 60, 40, 255}, true);
+        bool is_echo = (boss_floor == 15 && _boss._behavior_type == "mirror");
+        GameRenderer::draw_glow_text(is_echo ? "终焉回响" : "!!! BOSS 登场 !!!",
+            sw / 2.0f, sh / 2.0f - 20,
+            is_echo ? 36 : 40,
+            is_echo ? Color{180, 40, 40, 255} : Color{255, 60, 40, 255}, true);
+        if (is_echo) {
+            GameRenderer::draw_glow_text("你面对的是过去的自己",
+                sw / 2.0f, sh / 2.0f + 20, 22, {200, 160, 140, 220}, true);
+        }
         auto* boss = _get_boss();
         if (boss) {
-            GameRenderer::draw_glow_text(boss->name.c_str(), sw / 2.0f, sh / 2.0f + 30,
-                                          28, boss->color, true);
+            GameRenderer::draw_glow_text(is_echo ? "ENDING ECHO" : boss->name.c_str(),
+                sw / 2.0f, sh / 2.0f + 50, 28,
+                is_echo ? Color{255, 80, 40, 255} : boss->color, true);
         }
     } else if (state == GameState::BOSS_CINEMATIC) {
         _renderer.draw_boss_cinematic_overlay(sw, sh);
@@ -1777,6 +1792,89 @@ void GameScene::_update_dialogue(float dt) { _interaction.update_dialogue(dt); }
 void GameScene::_draw_dialogue(int sw, int sh) { _interaction.draw_dialogue(sw, sh); }
 
 void GameScene::_draw_quest_log(int sw, int sh) { _interaction.draw_quest_log(sw, sh); }
+
+// ============================================================
+// F15.5: Mirror analysis panel — Ending Echo boss intro
+// ============================================================
+void GameScene::_draw_mirror_analysis_panel(int sw, int sh) {
+    // Build a profile from the recorded action stream
+    const auto& history = g_behavior.history();
+    PlayerHabitProfile profile = history.empty()
+        ? PlayerHabitProfile{}
+        : PlayerBehaviorAnalyzer::analyze(history);
+
+    // Background — dark void
+    ClearBackground({10, 8, 20, 255});
+
+    float pw = 500, ph = 380;
+    float cx = sw/2.0f, cy = sh/2.0f + 10;
+    DrawRectangleRounded({cx - pw/2, cy - ph/2, pw, ph}, 0.06f, 10, {18, 12, 28, 240});
+
+    // Title
+    const char* title = "终焉回响 · 人格解析";
+    float tw = MeasureTextEx(g_font_small, title, 24, 1).x;
+    DrawTextEx(g_font_small, title, {cx - tw/2, cy - ph/2 + 20}, 24, 1, {255, 80, 60, 255});
+
+    // Divider
+    DrawLine(cx - pw/2 + 30, cy - ph/2 + 55, cx + pw/2 - 30, cy - ph/2 + 55,
+        {80, 30, 30, 200});
+    DrawLine(cx - pw/2 + 32, cy - ph/2 + 56, cx + pw/2 - 28, cy - ph/2 + 56,
+        {120, 20, 20, 100});
+
+    // Style line
+    float ly = cy - ph/2 + 75;
+    char buf[128];
+    snprintf(buf, sizeof(buf), "Combat Style:  %s", profile.style_name());
+    DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly}, 16, 1, {220, 200, 180, 240});
+
+    // Favorite skill
+    ly += 30;
+    const char* skill_names[] = {"斩击","神罚","自愈","The World"};
+    int fav = profile.predicted_fav_skill;
+    const char* fav_name = (fav >= 0 && fav < 4) ? skill_names[fav] : "无偏好";
+    snprintf(buf, sizeof(buf), "Fav Skill:  %s (%.0f%%)",
+        fav_name, fav >= 0 ? profile.skill_preference[fav]*100 : 0);
+    DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly}, 16, 1, {220, 200, 180, 240});
+
+    // Weakness
+    ly += 30;
+    if (profile.predict_attack_heavy)
+        snprintf(buf, sizeof(buf), "Weakness: Attack Pattern Predictable");
+    else if (profile.predict_low_dodge)
+        snprintf(buf, sizeof(buf), "Weakness: Low Evasion");
+    else if (profile.predict_panic_heal)
+        snprintf(buf, sizeof(buf), "Weakness: Heal Timing Exploitable");
+    else
+        snprintf(buf, sizeof(buf), "Weakness: Balanced — No Obvious Pattern");
+    DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly}, 16, 1, {220, 200, 180, 240});
+
+    // Counter strategy
+    ly += 35;
+    DrawTextEx(g_font_small, "─ Counter Strategy ─",
+        {cx - pw/2 + 40, ly}, 14, 1, {180, 140, 60, 220});
+    ly += 25;
+    snprintf(buf, sizeof(buf), "%s", profile.counter_strategy_text());
+    DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly}, 13, 1, {200, 180, 160, 200});
+
+    // Aggression gauge
+    ly += 35;
+    int ag_bar_w = (int)(pw - 80);
+    DrawRectangle(cx - pw/2 + 40, ly, ag_bar_w, 8, {30, 30, 30, 200});
+    int fill = (int)(ag_bar_w * profile.aggression_score);
+    DrawRectangle(cx - pw/2 + 40, ly, fill, 8, {220, 60, 30, 240});
+    snprintf(buf, sizeof(buf), "Aggression: %.0f%%", profile.aggression_score * 100);
+    DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly + 12}, 12, 1, {180, 180, 180, 180});
+
+    // Floors recorded
+    ly += 35;
+    snprintf(buf, sizeof(buf), "Data: %d floors | %d actions recorded",
+        g_behavior.data().floors_recorded, profile.total_actions);
+    DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly}, 11, 1, {120, 120, 140, 180});
+
+    // Bottom message
+    DrawTextEx(g_font_small, "[Enter] 开始战斗",
+        {cx - 60, cy + ph/2 - 36}, 14, 1, {255, 200, 100, 220});
+}
 
 // _draw_player_buffs, _draw_player_relics, _draw_relic_panel,
 // _draw_monster_buffs, _draw_inventory_panel 已迁移到 GameRenderer

@@ -243,6 +243,8 @@ private:
     void  _update_dialogue(float dt);
     void  _draw_dialogue(int sw, int sh);
     void  _draw_quest_log(int sw, int sh);
+    // F15.5: Mirror analysis panel
+    void  _draw_mirror_analysis_panel(int sw, int sh);
     GameSceneInput  _input_handler{*this};
     GameSceneCombat _combat{*this};
     GameSceneInteraction _interaction{*this};
