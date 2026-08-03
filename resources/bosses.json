@@ -105,6 +105,18 @@
     "summon_speed": 1.0,
     "skill_cycle_bias": 6,
     "behavior_type": "domain",
+    "domain_config": {
+      "cycle_time": 30,
+      "vulnerable_duration": 10,
+      "damage_multiplier": 2.0,
+      "weak_points": [
+        {"id": "fire_core", "count": 1, "hp": 200,
+         "spawn_pattern": "center",
+         "break_event": "BOSS_VULNERABLE",
+         "weakness_element": "ice",
+         "weakness_bonus": 0.30}
+      ]
+    },
     "skills": [
       {"id": "charge",   "cooldown": 6.0, "damage_mult": 2.5, "windup": 0.6, "range": 120},
       {"id": "shockwave","cooldown": 8.0, "damage_mult": 1.6, "windup": 0.7, "range": 100},

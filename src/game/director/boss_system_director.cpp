@@ -9,6 +9,7 @@
 #include "data/boss_defs.h"    // F10.1: get_boss_def
 #include "combat_system.h"     // rng
 #include "config.h"            // F10.2: TILE_SIZE
+#include "components/element_component.h" // F10.3: ElementType
 
 // ============================================================
 // D6 Step3: BossSystemDirector — 组合所有Boss子系统
@@ -122,11 +123,16 @@ void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
         modifier_text = modifier_text + " [" + evolution.evolution_name + "]";
     }
 
-    // F10.1: Read behavior_type from BossDef (data-driven)
+    // F10.1: Read behavior_type + domain_config from BossDef (data-driven)
     if (auto* bai = dynamic_cast<BossAI*>(boss->ai)) {
         const BossDef* def = get_boss_def(bai->_boss_id ? bai->_boss_id : "");
-        if (def && !def->behavior_type.empty())
+        if (def && !def->behavior_type.empty()) {
             _behavior_type = def->behavior_type;
+            if (_behavior_type == "domain") {
+                domain_cycle_duration = def->domain_config.cycle_time;
+                _vulnerable_dmg_mult  = def->domain_config.damage_multiplier;
+            }
+        }
     }
 }
 
@@ -184,6 +190,8 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
     // F10.1: Domain boss arena state machine
     // ══════════════════════════════════════════════════════
     if (_behavior_type == "domain") {
+        _player_weakpoint_element = player->element.initialized
+            ? (int)player->element.type : 0;
         _tick_domain_state(dt, boss);
         boss->combat.domain_invulnerable = boss_invulnerable;
     }
@@ -286,10 +294,16 @@ void BossSystemDirector::_spawn_domain_core(Monster* boss) {
     float sx = cx + cosf(angle) * dist;
     float sy = cy + sinf(angle) * dist;
 
-    auto* core = new Monster(sx, sy, "火焰核心", 200, 0, 8, 4,
+    // F10.3: Ice element bonus — 30% more damage to fire core
+    int core_hp = 200;
+    if (_player_weakpoint_element == (int)ElementType::ICE) {
+        core_hp = 140;  // 200 * 0.7
+    }
+    auto* core = new Monster(sx, sy, "火焰核心", core_hp, 0, 8, 4,
         Color{255, 120, 30, 255});
     core->is_weak_point = true;
-    core->weak_point_state = 0;  // ACTIVE
+    core->weak_point_type = (int)WeakPointType::CORE;
+    core->weak_point_state = (int)WeakPointState::ACTIVE; // F10.3
     core->_weak_point_owner = boss;
     core->entity.size = {28, 28};
     core->entity.sync_rect();

@@ -52,8 +52,9 @@ public:
     std::string _behavior_type;             // from BossDef ("" = standard, "domain" = domain boss)
 
     // ── F10.2: Weak point tracking ──
-    Monster* _active_core = nullptr;         // currently spawned fire_core (nullptr if broken)
-    float    _vulnerable_dmg_mult = 2.0f;   // damage multiplier during VULNERABLE_PHASE
+    Monster* _active_core = nullptr;          // currently spawned fire_core (nullptr if broken)
+    float    _vulnerable_dmg_mult = 2.0f;    // damage multiplier during VULNERABLE_PHASE
+    int      _player_weakpoint_element = 0;  // F10.3: player element type for bonus (set in tick)
     std::vector<std::unique_ptr<Monster>>* _weak_point_pool = nullptr;  // set by caller
 
     std::string intro_text;

@@ -55,6 +55,20 @@ static BossDef _parse_boss(const json& j) {
     def.skill_cycle_bias = j.value("skill_cycle_bias", 6);
     def.behavior_type   = j.value("behavior_type", "");  // F10.1
 
+    // F10.3: Domain config
+    if (j.contains("domain_config") && j["domain_config"].is_object()) {
+        auto& dc = j["domain_config"];
+        def.domain_config.cycle_time = dc.value("cycle_time", 30.0f);
+        def.domain_config.vulnerable_duration = dc.value("vulnerable_duration", 10.0f);
+        def.domain_config.damage_multiplier  = dc.value("damage_multiplier", 2.0f);
+        if (dc.contains("weak_points") && dc["weak_points"].is_array()
+            && !dc["weak_points"].empty()) {
+            auto& wp = dc["weak_points"][0];
+            def.domain_config.weakness_element = wp.value("weakness_element", "");
+            def.domain_config.weakness_bonus   = wp.value("weakness_bonus", 0.0f);
+        }
+    }
+
     // 技能覆盖数组
     if (j.contains("skills") && j["skills"].is_array()) {
         for (auto& sk : j["skills"])

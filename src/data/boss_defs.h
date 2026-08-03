@@ -74,6 +74,15 @@ struct BossDef {
 
     // ── F10.1: Boss behavior type (data-driven, NOT boss_id strings) ──
     std::string behavior_type;  // "" = standard ATTACK cycle, "domain" = F10 domain boss
+
+    // ── F10.3: Domain config (fire_demon domain boss) ──
+    struct {
+        float cycle_time = 30.0f;
+        float vulnerable_duration = 10.0f;
+        float damage_multiplier = 2.0f;
+        std::string weakness_element;
+        float weakness_bonus = 0.0f;
+    } domain_config;
 };
 
 // ── G2.3: ArenaEvent — BossAI 意图 ↔ ArenaManager 执行的中间层 ──
