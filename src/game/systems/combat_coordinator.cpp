@@ -119,7 +119,11 @@ std::string CombatCoordinator::use_skill(int index, Player* player,
     // 普通/Heavy 技能
     std::string result = sk->execute(player, mlist, map, is_heavy);
     sk->mark_used(game_time);
-    g_behavior.on_skill_use(sk->_skill_id.c_str()); // F15.1
+    // F15.2: record skill usage with full context
+    g_behavior.on_skill_use(sk->_skill_id.c_str(),
+        (float)game_time, 0,  // floor set by game_scene
+        player->entity.rect.x + player->entity.rect.width/2,
+        player->entity.rect.y + player->entity.rect.height/2);
 
     // 技能 SFX (G3.2: _skill_id 替代 dynamic_cast)
     if (audio) {

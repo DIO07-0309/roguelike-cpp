@@ -28,6 +28,7 @@
 #include "event_system.h"
 #include "event_bus.h"
 #include "service_locator.h"
+#include "ai/player_behavior/player_behavior_recorder.h" // F15.2
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -323,6 +324,8 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
 
     // D4 Step5.1: StoryDirector 楼层推进
     _gameplay.story.enter_floor(floor);
+    // F15.2: record floor enter
+    g_behavior.on_floor_enter(game_time, floor);
     // D4 Step5.2: QuestManager 楼层推进
     _gameplay.quest_mgr.set_relationship_system(&_gameplay.rels);
     _gameplay.quest_mgr.update(_gameplay.world_state, _gameplay.story);
@@ -1438,6 +1441,13 @@ void GameScene::_render() {
     if (inventory_open) _renderer.draw_inventory_panel(player.get(), inventory_cursor, sw, sh);
 
     // D4.6 Step1: F8 Growth Curve debug
+    // F15.2: F9 — print player behavior stats
+    if (IsKeyPressed(KEY_F9)) {
+        char dbg[256];
+        g_behavior.print_debug(dbg, sizeof(dbg));
+        _presentation.show_message(dbg, 4.0f);
+    }
+
     if (_presentation.show_growth_debug && g_font_loaded) {
         const GrowthCurve& gc = g_growth.curve(current_floor);
         float pw = 240, ph = 260;

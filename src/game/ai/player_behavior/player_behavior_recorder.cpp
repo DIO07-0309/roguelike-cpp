@@ -1,116 +1,165 @@
 #include "ai/player_behavior/player_behavior_recorder.h"
 #include <cstdio>
 #include <cmath>
+#include <cstring>
 
-// ── Data methods ──
-void PlayerBehaviorData::record_weapon_attack(const char* wt_name) {
-    if (!wt_name) return;
-    weapon_attacks[wt_name]++;
-    weapon_attacks_total++;
-}
+// ══════════════════════════════════════════════════════
+// Action stream
+// ══════════════════════════════════════════════════════
 
-void PlayerBehaviorData::record_skill_use(const char* skill_id) {
-    if (!skill_id) return;
-    skill_uses[skill_id]++;
-    skill_uses_total++;
-}
-
-void PlayerBehaviorData::record_damage_taken(int amount, int floor) {
-    if (amount <= 0) return;
-    total_damage_taken += amount;
-    int idx = floor - 1;
-    if (idx >= 0 && idx < 15) damage_per_floor[idx] += (float)amount;
-}
-
-void PlayerBehaviorData::record_movement(float dx, float dy) {
-    if (dx < -20) move_left++;
-    else if (dx > 20) move_right++;
-    if (dy < -20) move_up++;
-    else if (dy > 20) move_down++;
-    // Dodge detection: large displacement in one tick
-    if (fabsf(dx) > 200.0f || fabsf(dy) > 200.0f) dodge_count++;
-}
-
-// ── Recorder ──
 PlayerBehaviorRecorder& PlayerBehaviorRecorder::inst() {
     static PlayerBehaviorRecorder rec;
     return rec;
 }
 
-void PlayerBehaviorRecorder::on_weapon_attack(const char* wt_name) {
-    _data.record_weapon_attack(wt_name);
+void PlayerBehaviorRecorder::record(const PlayerAction& action) {
+    if (action.type == PlayerActionType::NONE) return;
+    _history.push_back(action);
+
+    // ── Update aggregate data in real time ──
+    if (action.type == PlayerActionType::ATTACK && action.weapon_name) {
+        _data.record_weapon_attack(action.weapon_name);
+    } else if (action.type == PlayerActionType::SKILL) {
+        // skill_id: 0=slash, 1=fireball, 2=self_heal, 3=the_world
+        const char* ids[] = {"slash","fireball","self_heal","the_world"};
+        if (action.skill_id >= 0 && action.skill_id < 4)
+            _data.record_skill_use(ids[action.skill_id]);
+    } else if (action.type == PlayerActionType::TAKE_DAMAGE && action.value > 0) {
+        _data.record_damage_taken(action.value, action.floor);
+    } else if (action.type == PlayerActionType::DODGE) {
+        _data.dodge_count++;
+    } else if (action.type == PlayerActionType::MOVE) {
+        if (action.value == 0) _data.move_left++;
+        else if (action.value == 1) _data.move_right++;
+        else if (action.value == 2) _data.move_up++;
+        else if (action.value == 3) _data.move_down++;
+    }
 }
 
-void PlayerBehaviorRecorder::on_skill_use(const char* skill_id) {
-    _data.record_skill_use(skill_id);
+void PlayerBehaviorRecorder::clear() { _history.clear(); _data.reset(); }
+
+// ══════════════════════════════════════════════════════
+// Convenience hooks
+// ══════════════════════════════════════════════════════
+
+void PlayerBehaviorRecorder::on_weapon_attack(const char* wt_name, float time,
+    int floor, float px, float py) {
+    PlayerAction a;
+    a.type = PlayerActionType::ATTACK;
+    a.timestamp = time; a.floor = floor; a.pos_x = px; a.pos_y = py;
+    a.weapon_name = wt_name;
+    record(a);
 }
 
-void PlayerBehaviorRecorder::on_player_moved(float dx, float dy) {
-    _data.record_movement(dx, dy);
+void PlayerBehaviorRecorder::on_skill_use(const char* skill_id, float time,
+    int floor, float px, float py) {
+    int sid = -1;
+    if (strcmp(skill_id,"slash")==0) sid=0;
+    else if (strcmp(skill_id,"fireball")==0) sid=1;
+    else if (strcmp(skill_id,"self_heal")==0) sid=2;
+    else if (strcmp(skill_id,"the_world")==0) sid=3;
+
+    PlayerAction a;
+    a.type = PlayerActionType::SKILL;
+    a.timestamp = time; a.floor = floor; a.pos_x = px; a.pos_y = py;
+    a.skill_id = sid; a.value = 0;
+    record(a);
 }
+
+void PlayerBehaviorRecorder::on_move_state_change(float time, int floor,
+    float px, float py, int direction) {
+    PlayerAction a;
+    a.type = PlayerActionType::MOVE;
+    a.timestamp = time; a.floor = floor; a.pos_x = px; a.pos_y = py;
+    a.value = direction; // 0=left, 1=right, 2=up, 3=down
+    record(a);
+}
+
+void PlayerBehaviorRecorder::on_dodge(float time, int floor, float px, float py) {
+    PlayerAction a;
+    a.type = PlayerActionType::DODGE;
+    a.timestamp = time; a.floor = floor; a.pos_x = px; a.pos_y = py;
+    record(a);
+}
+
+void PlayerBehaviorRecorder::on_heal(float time, int floor, int amount) {
+    PlayerAction a;
+    a.type = PlayerActionType::HEAL;
+    a.timestamp = time; a.floor = floor; a.value = amount;
+    record(a);
+}
+
+void PlayerBehaviorRecorder::on_floor_enter(float time, int floor) {
+    PlayerAction a;
+    a.type = PlayerActionType::FLOOR_ENTER;
+    a.timestamp = time; a.floor = floor;
+    _data.floors_recorded++;
+    record(a);
+}
+
+// ══════════════════════════════════════════════════════
+// Debug output
+// ══════════════════════════════════════════════════════
+
+void PlayerBehaviorRecorder::print_debug(char* buf, size_t buf_size) const {
+    int atk = 0, sk = 0, mov = 0, dodge = 0, dmg = 0;
+    for (auto& a : _history) {
+        switch (a.type) {
+        case PlayerActionType::ATTACK: atk++; break;
+        case PlayerActionType::SKILL:   sk++; break;
+        case PlayerActionType::MOVE:   mov++; break;
+        case PlayerActionType::DODGE:  dodge++; break;
+        case PlayerActionType::TAKE_DAMAGE: dmg++; break;
+        default: break;
+        }
+    }
+    float avg_interval = atk > 0 ? (_history.back().timestamp - _history.front().timestamp) / (float)atk : 0;
+    snprintf(buf, buf_size,
+        "ATTACK %d | SKILL %d | MOVE %d | DODGE %d\n"
+        "DMG taken %d | avg atk interval %.2fs | floors %d",
+        atk, sk, mov, dodge, _data.total_damage_taken,
+        avg_interval, _data.floors_recorded);
+}
+
+// ══════════════════════════════════════════════════════
+// JSON save
+// ══════════════════════════════════════════════════════
 
 void PlayerBehaviorRecorder::on_player_damaged(int amount, int floor) {
     _data.record_damage_taken(amount, floor);
 }
 
-void PlayerBehaviorRecorder::reset() { _data.reset(); }
-
 void PlayerBehaviorRecorder::save_to_file(const char* path) const {
     FILE* f = fopen(path, "w");
     if (!f) return;
-    fprintf(f, "{\n");
-    // Weapon usage
-    fprintf(f, "  \"weapon_attacks\": {");
-    bool first = true;
-    for (auto& kv : _data.weapon_attacks) {
-        if (!first) fprintf(f, ",");
-        fprintf(f, "\n    \"%s\": %d", kv.first.c_str(), kv.second);
-        first = false;
+    fprintf(f, "[\n");
+    int n = (int)_history.size();
+    for (int i = 0; i < n; i++) {
+        auto& a = _history[i];
+        const char* tname = "NONE";
+        switch (a.type) {
+        case PlayerActionType::ATTACK: tname="ATTACK"; break;
+        case PlayerActionType::SKILL:  tname="SKILL"; break;
+        case PlayerActionType::MOVE:   tname="MOVE"; break;
+        case PlayerActionType::DODGE:  tname="DODGE"; break;
+        case PlayerActionType::TAKE_DAMAGE: tname="TAKE_DMG"; break;
+        case PlayerActionType::DEAL_DAMAGE: tname="DEAL_DMG"; break;
+        case PlayerActionType::HEAL:   tname="HEAL"; break;
+        case PlayerActionType::FLOOR_ENTER: tname="FLOOR"; break;
+        default: break;
+        }
+        fprintf(f, "  {\"type\":\"%s\",\"t\":%.2f,\"floor\":%d",
+            tname, a.timestamp, a.floor);
+        if (a.value) fprintf(f, ",\"val\":%d", a.value);
+        if (a.skill_id >= 0) fprintf(f, ",\"sk\":%d", a.skill_id);
+        if (a.weapon_name) fprintf(f, ",\"wp\":\"%s\"", a.weapon_name);
+        fprintf(f, "}%s\n", (i < n-1) ? "," : "");
     }
-    fprintf(f, "\n  },\n");
-    fprintf(f, "  \"weapon_attacks_total\": %d,\n", _data.weapon_attacks_total);
-    // Skill usage
-    fprintf(f, "  \"skill_uses\": {");
-    first = true;
-    for (auto& kv : _data.skill_uses) {
-        if (!first) fprintf(f, ",");
-        fprintf(f, "\n    \"%s\": %d", kv.first.c_str(), kv.second);
-        first = false;
-    }
-    fprintf(f, "\n  },\n");
-    fprintf(f, "  \"skill_uses_total\": %d,\n", _data.skill_uses_total);
-    fprintf(f, "  \"total_damage_taken\": %d,\n", _data.total_damage_taken);
-    // Movement
-    fprintf(f, "  \"move_left\": %d,\n", _data.move_left);
-    fprintf(f, "  \"move_right\": %d,\n", _data.move_right);
-    fprintf(f, "  \"move_up\": %d,\n", _data.move_up);
-    fprintf(f, "  \"move_down\": %d,\n", _data.move_down);
-    fprintf(f, "  \"dodge_count\": %d,\n", _data.dodge_count);
-    fprintf(f, "  \"floors_recorded\": %d\n", _data.floors_recorded);
-    fprintf(f, "}\n");
+    fprintf(f, "]\n");
     fclose(f);
 }
 
 void PlayerBehaviorRecorder::load_from_file(const char* path) {
-    FILE* f = fopen(path, "r");
-    if (!f) return;
-    // Simple key-value JSON parser (same style as save_manager)
-    char line[256];
-    while (fgets(line, sizeof(line), f)) {
-        char key[128] = "";
-        int val = 0;
-        if (sscanf(line, " \"%127[^\"]\": %d", key, &val) == 2) {
-            std::string ks(key);
-            if (ks == "weapon_attacks_total") _data.weapon_attacks_total = val;
-            else if (ks == "skill_uses_total")    _data.skill_uses_total = val;
-            else if (ks == "total_damage_taken")  _data.total_damage_taken = val;
-            else if (ks == "move_left")   _data.move_left = val;
-            else if (ks == "move_right")  _data.move_right = val;
-            else if (ks == "move_up")     _data.move_up = val;
-            else if (ks == "move_down")   _data.move_down = val;
-            else if (ks == "dodge_count") _data.dodge_count = val;
-            else if (ks == "floors_recorded") _data.floors_recorded = val;
-        }
-    }
-    fclose(f);
+    // deferred — not needed for F15.2 data pipeline
+    (void)path;
 }

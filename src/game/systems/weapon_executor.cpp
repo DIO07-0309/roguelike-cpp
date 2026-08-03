@@ -215,8 +215,11 @@ std::vector<WeaponAttackResult> WeaponExecutor::execute(
         def->name.c_str());
     EventBus::inst().emit(GameEventType::WEAPON_ATTACK_COMPLETE, player,
         (int)stage.damage_multiplier * 100, total_dmg, def->name.c_str());
-    // F15.1: record weapon usage
-    g_behavior.on_weapon_attack(weapon_type_name(def->type));
+    // F15.2: record weapon usage with full context
+    g_behavior.on_weapon_attack(weapon_type_name(def->type),
+        (float)game_time, 0,  // floor set by game_scene
+        player->entity.rect.x + player->entity.rect.width/2,
+        player->entity.rect.y + player->entity.rect.height/2);
     if (audio) {
         const char* sfx = stage.sfx_name.empty() ? "melee" : stage.sfx_name.c_str();
         audio->play_sfx(sfx);

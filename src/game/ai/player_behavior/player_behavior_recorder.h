@@ -1,42 +1,53 @@
 #pragma once
+#include <vector>
+#include "player_action.h"
 #include "player_behavior_data.h"
 
 // ============================================================
-// F15.1: PlayerBehaviorRecorder — global singleton recorder
-// Hooks into existing code paths at 4 minimal points.
-// Zero gameplay change. Data collected across floors 1-14.
+// F15.2: PlayerBehaviorRecorder — action stream recorder
+// Records every player action as a PlayerAction struct.
+// Debug: press F9 to print stats to game_scene message.
+// Save: logs/player_behavior.json (temporary, not hooked to SaveManager).
 // ============================================================
 
 class PlayerBehaviorRecorder {
 public:
     static PlayerBehaviorRecorder& inst();
 
-    // Data access
+    // ── Action stream ──
+    void record(const PlayerAction& action);
+    const std::vector<PlayerAction>& history() const { return _history; }
+    void clear();
+
+    // ── Convenience hooks ──
+    void on_weapon_attack(const char* wt_name, float time, int floor,
+                          float px, float py);
+    void on_skill_use(const char* skill_id, float time, int floor,
+                      float px, float py);
+    void on_move_state_change(float time, int floor, float px, float py,
+                              int direction);
+    void on_dodge(float time, int floor, float px, float py);
+    void on_heal(float time, int floor, int amount);
+    void on_floor_enter(float time, int floor);
+
+    // Hook 4: player took damage (legacy signature)
+    void on_player_damaged(int amount, int floor);
+
+    // ── Summary data (aggregated from action stream) ──
     PlayerBehaviorData& data() { return _data; }
     const PlayerBehaviorData& data() const { return _data; }
 
-    // Hook 1: WeaponExecutor calls this on every weapon attack
-    void on_weapon_attack(const char* weapon_type_name);
+    // ── Debug ──
+    void print_debug(char* buf, size_t buf_size) const;
 
-    // Hook 2: CombatCoordinator calls this on every skill use
-    void on_skill_use(const char* skill_id);
-
-    // Hook 3: PlayerController calls this each tick with movement delta
-    void on_player_moved(float dx, float dy);
-
-    // Hook 4: Called when player takes damage
-    void on_player_damaged(int amount, int floor);
-
-    // Save/Load
+    // ── Save/Load action stream ──
     void save_to_file(const char* path) const;
     void load_from_file(const char* path);
 
-    void reset();
-
 private:
     PlayerBehaviorRecorder() = default;
+    std::vector<PlayerAction> _history;
     PlayerBehaviorData _data;
 };
 
-// Global accessor
 #define g_behavior PlayerBehaviorRecorder::inst()

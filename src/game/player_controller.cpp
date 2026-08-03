@@ -17,6 +17,7 @@
 #include "config.h"
 #include "scene_tree.h"
 #include "audio_server.h"
+#include "ai/player_behavior/player_behavior_recorder.h" // F15.2
 #include <cmath>
 #include <algorithm>
 
@@ -25,9 +26,30 @@ void PlayerController::tick(float dt) {
 
     // ── 移动 ──
     auto& gs = *_scene;
+    static float _last_mx = 0, _last_my = 0;
+    static int _last_move_dir = -1;
+    // F15.2: movement state-change detection
+    auto _record_move = [&](float mx, float my) {
+        float dx = mx - _last_mx, dy = my - _last_my;
+        _last_mx = mx; _last_my = my;
+        if (fabsf(dx) > 200.0f || fabsf(dy) > 200.0f)
+            g_behavior.on_dodge((float)gs.game_time, gs.current_floor,
+                gs.player->entity.rect.x + gs.player->entity.rect.width/2,
+                gs.player->entity.rect.y + gs.player->entity.rect.height/2);
+        if (mx == 0 && my == 0) return; // idle
+        int dir = (fabsf(mx) > fabsf(my)) ? (mx > 0 ? 1 : 0) : (my > 0 ? 3 : 2);
+        if (dir != _last_move_dir) {
+            _last_move_dir = dir;
+            g_behavior.on_move_state_change((float)gs.game_time, gs.current_floor,
+                gs.player->entity.rect.x + gs.player->entity.rect.width/2,
+                gs.player->entity.rect.y + gs.player->entity.rect.height/2, dir);
+        }
+    };
+
     if (!gs.inventory_open && !gs._is_event_running() && !gs._dialogue.active && !gs._quest_log_open) {
         Vector2 move = gs.player->handle_input(gs.get_tree()->get_input());
         auto& e = gs.player->entity;
+        _record_move(move.x, move.y);
         float speed_mul = (gs._tw_speed_boost > 0) ? 1.25f : 1.0f;
         float s = get_effective_speed(gs.player.get()) * speed_mul * dt;
         e.position.x += move.x * s; e.sync_rect();
@@ -54,7 +76,19 @@ void PlayerController::tick(float dt) {
             int hp_before = gs.player->combat.current_hp;
             gs._update_monsters(dt);
             int dmg_taken = hp_before - gs.player->combat.current_hp;
-            if (dmg_taken > 0) gs._boss.dmg_taken += dmg_taken;
+            if (dmg_taken > 0) {
+                gs._boss.dmg_taken += dmg_taken;
+                // F15.2: record damage taken
+                PlayerAction a;
+                a.type = PlayerActionType::TAKE_DAMAGE;
+                a.timestamp = (float)gs.game_time; a.floor = gs.current_floor;
+                a.pos_x = gs.player->entity.rect.x + gs.player->entity.rect.width/2;
+                a.pos_y = gs.player->entity.rect.y + gs.player->entity.rect.height/2;
+                a.value = dmg_taken;
+                g_behavior.record(a);
+            } else if (int heal_amt = gs.player->combat.current_hp - hp_before; heal_amt > 0) {
+                g_behavior.on_heal((float)gs.game_time, gs.current_floor, heal_amt);
+            }
             if (dmg_taken > 0 && gs.player->combat.is_alive) {
                 gs._presentation.damage_floats.push_back({
                     gs.player->entity.rect.x + gs.player->entity.rect.width/2,

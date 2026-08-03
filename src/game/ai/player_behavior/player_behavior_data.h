@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <unordered_map>
+#include <cmath>
 
 // ============================================================
 // F15.1: PlayerBehaviorData — 14-floor combat data collection
@@ -30,8 +31,26 @@ struct PlayerBehaviorData {
     int floors_recorded = 0;
 
     void reset() { *this = PlayerBehaviorData{}; }
-    void record_weapon_attack(const char* wt_name);
-    void record_skill_use(const char* skill_id);
-    void record_damage_taken(int amount, int floor);
-    void record_movement(float dx, float dy);
+
+    void record_weapon_attack(const char* wt_name) {
+        if (!wt_name) return;
+        weapon_attacks[wt_name]++;
+        weapon_attacks_total++;
+    }
+    void record_skill_use(const char* skill_id) {
+        if (!skill_id) return;
+        skill_uses[skill_id]++;
+        skill_uses_total++;
+    }
+    void record_damage_taken(int amount, int floor) {
+        if (amount <= 0) return;
+        total_damage_taken += amount;
+        int idx = floor - 1;
+        if (idx >= 0 && idx < 15) damage_per_floor[idx] += (float)amount;
+    }
+    void record_movement(float dx, float dy) {
+        if (dx < -20) move_left++; else if (dx > 20) move_right++;
+        if (dy < -20) move_up++;   else if (dy > 20) move_down++;
+        if (fabsf(dx) > 200.0f || fabsf(dy) > 200.0f) dodge_count++;
+    }
 };
