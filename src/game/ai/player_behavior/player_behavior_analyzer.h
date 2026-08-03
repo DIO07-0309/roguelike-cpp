@@ -1,0 +1,22 @@
+#pragma once
+#include "player_action.h"
+#include "player_habit_profile.h"
+#include <vector>
+
+// ============================================================
+// F15.3: PlayerBehaviorAnalyzer — read action stream → profile
+// Pure data transformation. No state in the analyzer.
+// Call after action stream is populated (e.g. entering F15).
+// ============================================================
+
+class PlayerBehaviorAnalyzer {
+public:
+    // Analyze the full action timeline → compact habit profile
+    static PlayerHabitProfile analyze(const std::vector<PlayerAction>& history);
+
+    // Generate counter-strategy hints based on profile
+    static void generate_counter_hints(PlayerHabitProfile& profile);
+
+private:
+    static int count_type(const std::vector<PlayerAction>& h, PlayerActionType t);
+};

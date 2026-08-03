@@ -10,6 +10,9 @@
 #include "combat_system.h"     // rng
 #include "config.h"            // F10.2: TILE_SIZE
 #include "components/element_component.h" // F10.3: ElementType
+#include "ai/player_behavior/player_behavior_recorder.h" // F15.3
+#include "ai/player_behavior/player_behavior_analyzer.h"  // F15.3
+#include "ai/mirror/mirror_agent.h"                       // F15.3
 
 // ============================================================
 // D6 Step3: BossSystemDirector — 组合所有Boss子系统
@@ -131,9 +134,30 @@ void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
             if (_behavior_type == "domain") {
                 domain_cycle_duration = def->domain_config.cycle_time;
                 _vulnerable_dmg_mult  = def->domain_config.damage_multiplier;
+            } else if (_behavior_type == "mirror") {
+                _init_mirror_boss(boss);
             }
         }
     }
+}
+
+void BossSystemDirector::_init_mirror_boss(Monster* boss) {
+    if (!boss) return;
+    // Analyze player behavior from the recorded action stream
+    const auto& history = g_behavior.history();
+    if (history.empty()) return;
+
+    PlayerHabitProfile profile = PlayerBehaviorAnalyzer::analyze(history);
+    _mirror_agent = std::make_unique<MirrorAgent>();
+    _mirror_agent->init(profile);
+
+    // Copy player equipment/skills onto boss for visual mirroring
+    // (actual stats already set by factory with 1.0× — we use 1.2× manually)
+    boss->combat.max_hp   = (int)(boss->combat.max_hp * 1.2f);
+    boss->combat.current_hp = boss->combat.max_hp;
+    boss->combat.attack   = (int)(boss->combat.attack * 1.2f);
+    boss->combat.physical_defense = (int)(boss->combat.physical_defense * 1.2f);
+    boss->combat.magical_defense  = (int)(boss->combat.magical_defense * 1.2f);
 }
 
 void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
@@ -194,6 +218,10 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
             ? (int)player->element.type : 0;
         _tick_domain_state(dt, boss);
         boss->combat.domain_invulnerable = boss_invulnerable;
+    }
+    // F15.3: Mirror boss (Ending Echo)
+    else if (_behavior_type == "mirror" && _mirror_agent) {
+        _mirror_agent->tick_phase_timer(dt);
     }
 }
 

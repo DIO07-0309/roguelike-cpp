@@ -13,6 +13,9 @@
 #include "boss_timeline.h"
 #include "build_score.h"
 
+// F15.3: MirrorAgent
+#include "ai/mirror/mirror_agent.h"
+
 class Monster;
 class Player;
 class GameMap;
@@ -56,6 +59,10 @@ public:
     float    _vulnerable_dmg_mult = 2.0f;    // damage multiplier during VULNERABLE_PHASE
     int      _player_weakpoint_element = 0;  // F10.3: player element type for bonus (set in tick)
     std::vector<std::unique_ptr<Monster>>* _weak_point_pool = nullptr;  // set by caller
+
+    // ── F15.3: MirrorAgent (Ending Echo F15 boss) ──
+    std::unique_ptr<MirrorAgent> _mirror_agent;
+    void _init_mirror_boss(Monster* boss);    // called from init_on_spawn
 
     std::string intro_text;
     std::string modifier_text;

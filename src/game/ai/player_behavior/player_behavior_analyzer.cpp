@@ -1,0 +1,97 @@
+#include "ai/player_behavior/player_behavior_analyzer.h"
+#include <cmath>
+
+int PlayerBehaviorAnalyzer::count_type(const std::vector<PlayerAction>& h,
+                                         PlayerActionType t) {
+    int n = 0;
+    for (auto& a : h) if (a.type == t) n++;
+    return n;
+}
+
+PlayerHabitProfile PlayerBehaviorAnalyzer::analyze(
+    const std::vector<PlayerAction>& history) {
+    PlayerHabitProfile p;
+    if (history.empty()) return p;
+
+    float total_t = history.back().timestamp - history.front().timestamp;
+    if (total_t <= 0.1f) total_t = 1.0f;
+    p.total_actions = (int)history.size();
+
+    int atk  = count_type(history, PlayerActionType::ATTACK);
+    int sk   = count_type(history, PlayerActionType::SKILL);
+    int mov  = count_type(history, PlayerActionType::MOVE);
+    int dodge = count_type(history, PlayerActionType::DODGE);
+    int heal = count_type(history, PlayerActionType::HEAL);
+    int dmg  = count_type(history, PlayerActionType::TAKE_DAMAGE);
+
+    p.attack_frequency = (float)atk / total_t;
+    p.skill_frequency  = (float)sk / total_t;
+    p.heal_frequency   = (float)heal / total_t;
+
+    int combat_actions = atk + sk + dodge;
+    if (combat_actions > 0) {
+        p.dodge_rate = (float)dodge / (float)combat_actions;
+        p.aggression_score = (float)(atk + sk) / (float)(atk + sk + dodge);
+    }
+
+    // Skill preference
+    int sk_counts[4] = {};
+    for (auto& a : history)
+        if (a.type == PlayerActionType::SKILL && a.skill_id >= 0 && a.skill_id < 4)
+            sk_counts[a.skill_id]++;
+    for (int i = 0; i < 4; i++)
+        if (sk > 0) p.skill_preference[i] = (float)sk_counts[i] / (float)sk;
+
+    // Movement: left/right bias
+    int lr = 0, rl = 0, total_dir = 0;
+    for (auto& a : history) {
+        if (a.type != PlayerActionType::MOVE) continue;
+        total_dir++;
+        if (a.value == 0) lr++; else if (a.value == 1) rl++;
+    }
+    if (total_dir > 0) p.left_bias = (float)lr / (float)total_dir;
+
+    // Retreat rate: moves AWAY from target (moves up when player faces down = retreat)
+    int retreat = 0;
+    for (auto& a : history)
+        if (a.type == PlayerActionType::MOVE && a.value == 2) retreat++;
+    if (total_dir > 0) p.retreat_rate = (float)retreat / (float)total_dir;
+
+    // Average damage per floor
+    if (p.total_actions > 0)
+        p.avg_damage_taken = dmg > 0 ? (float)atk / (float)dmg : 0.0f; // dmg per attack ratio
+
+    // Style classification
+    if (p.attack_frequency > 0.8f && p.dodge_rate < 0.15f)
+        p.style = PlayerStyle::AGGRESSIVE;
+    else if (p.dodge_rate > 0.3f && p.attack_frequency < 0.4f)
+        p.style = PlayerStyle::DEFENSIVE;
+    else if (p.attack_frequency > 0.6f && p.retreat_rate > 0.3f)
+        p.style = PlayerStyle::SNIPER;
+    else if (p.skill_frequency > 0.15f)
+        p.style = PlayerStyle::MAGE;
+
+    generate_counter_hints(p);
+    return p;
+}
+
+void PlayerBehaviorAnalyzer::generate_counter_hints(PlayerHabitProfile& p) {
+    // Attack-heavy player → bait and punish during recovery
+    p.predict_attack_heavy = (p.attack_frequency > 0.7f);
+
+    // Finds favorite skill (highest usage among 4)
+    float best = 0.0f; int best_i = -1;
+    for (int i = 0; i < 4; i++)
+        if (p.skill_preference[i] > best) { best = p.skill_preference[i]; best_i = i; }
+    p.predict_skill_spam = (best > 0.6f);
+    p.predicted_fav_skill = best_i;
+
+    // Low dodge → pressure close, don't let them escape
+    p.predict_low_dodge = (p.dodge_rate < 0.1f);
+
+    // Panic heal: heals at high HP (>50%) = waste, punishable during healing
+    p.predict_panic_heal = (p.heal_frequency > 0.02f && p.aggression_score > 0.5f);
+
+    // Default heal threshold
+    p.hp_counter_threshold = p.predict_panic_heal ? 50.0f : 35.0f;
+}
