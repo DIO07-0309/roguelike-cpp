@@ -1625,11 +1625,15 @@ void GameScene::_draw_entities() {
         _renderer.draw_monster_buffs(*m,
             m->entity.position.x - _cam_x,
             m->entity.position.y - _cam_y);
-        // M4a: Boss 弹幕渲染 (自驱动弹, 需显式绘制)
+        // M4a: Boss 连招技能渲染 (弹幕光球 + 扇形预警 + 瞬移落点)
         if (m->is_boss && m->ai) {
             if (auto* bai = dynamic_cast<BossAI*>(m->ai)) {
                 if (bai->barrage_skill())
                     bai->barrage_skill()->draw(_cam_x, _cam_y);
+                if (bai->cone_skill() && player)
+                    bai->cone_skill()->draw(m.get(), player.get(), _cam_x, _cam_y);
+                if (bai->blink_skill())
+                    bai->blink_skill()->draw(_cam_x, _cam_y);
             }
         }
         // D2 Step4: Tank守护连线 (淡蓝色)

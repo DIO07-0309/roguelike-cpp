@@ -263,38 +263,71 @@ std::string ConeAttackSkill::execute(Monster* boss, Player* player,
     return "扇形斩命中！中毒 2 秒";
 }
 
+void ConeAttackSkill::draw(Monster* boss, Player* player,
+                           float cam_x, float cam_y) const {
+    if (windup_left <= 0) return;
+    float bx = boss->entity.rect.x + boss->entity.rect.width/2 - cam_x;
+    float by = boss->entity.rect.y + boss->entity.rect.height/2 - cam_y;
+    float px = player->entity.rect.x + player->entity.rect.width/2 - cam_x;
+    float py = player->entity.rect.y + player->entity.rect.height/2 - cam_y;
+    float angle = atan2f(py - by, px - bx);
+    float half = half_angle * 3.14159f / 180.0f;
+    DrawCircleSector({bx, by}, reach,
+        (angle - half) * 57.2958f, (angle + half) * 57.2958f, 28,
+        {140, 240, 80, 70});
+    DrawCircleSector({bx, by}, reach * 0.4f,
+        (angle - half) * 57.2958f, (angle + half) * 57.2958f, 20,
+        {255, 255, 255, 30});
+}
+
 // ═══════════════════════════════════════════════════════════════
 // M4a: BlinkSkill — 瞬移至玩家侧翼 (CD 独立计时)
 // ═══════════════════════════════════════════════════════════════
 BlinkSkill::BlinkSkill() : BossSkill("瞬移", 12.0f) {
     fx_kind = "circle"; fx_radius = 70; fx_color = {120, 80, 255, 255};
 }
-std::string BlinkSkill::execute(Monster* boss, Player* player,
-    std::vector<Monster*>&, GameMap* map, double) {
-    if (blinked) return "";
+void BlinkSkill::plan_destination(Monster* boss, Player* player, GameMap* map) {
     float bx = boss->entity.rect.x + boss->entity.rect.width/2;
     float by = boss->entity.rect.y + boss->entity.rect.height/2;
     float px = player->entity.rect.x + player->entity.rect.width/2;
     float py = player->entity.rect.y + player->entity.rect.height/2;
     float dx = px - bx, dy = py - by;
     float len = sqrtf(dx * dx + dy * dy);
+    bool placed = false;
     if (len > 1.0f) {
         float nx = -dy / len, ny = dx / len;
-        for (int side = 0; side < 2 && !blinked; side++) {
+        for (int side = 0; side < 2 && !placed; side++) {
             float s = (side == 0) ? 1.0f : -1.0f;
             float tx = px + nx * s * blink_dist;
             float ty = py + ny * s * blink_dist;
             auto [tile_x, tile_y] = map->pixel_to_tile(tx, ty);
             if (map->is_walkable(tile_x, tile_y)) {
-                boss->entity.position = {tx, ty};
-                boss->entity.sync_rect();
-                blinked = true;
+                pending_x = tx; pending_y = ty;
+                placed = true;
             }
         }
     }
-    if (!blinked) blinked = true;   // 无可行点则原地 (仍结算)
+    if (!placed) { pending_x = px; pending_y = py; }
+}
+std::string BlinkSkill::execute(Monster* boss, Player* player,
+    std::vector<Monster*>&, GameMap*, double) {
+    if (windup_left > 0) {
+        boss->color = Color{170, 110, 255, 255};
+        return "";
+    }
+    if (blinked) return "";
+    boss->entity.position = {pending_x, pending_y};
+    boss->entity.sync_rect();
+    blinked = true;
     mark_used(GetTime());
     return "暗影骑士瞬移了！";
+}
+void BlinkSkill::draw(float cam_x, float cam_y) const {
+    if (windup_left <= 0) return;
+    float sx = pending_x - cam_x, sy = pending_y - cam_y;
+    DrawRing({sx, sy}, 16, 26, 0, 360, 20, {150, 100, 255, 200});
+    DrawRing({sx, sy}, 26, 32, 0, 360, 20, {150, 100, 255, 110});
+    DrawCircle(sx, sy, 4.0f, {220, 190, 255, 255});
 }
 
 // ============================================================
@@ -379,10 +412,9 @@ void BossAI::_combo_on_skill_end() {
 
 bool BossAI::_tick_combo_attack(Monster* self, Player* player, GameMap* map,
                                 double dt, double gt, std::vector<Effect>* effects) {
-    (void)map;
     if (_combo_queue.active) {
         if (_combo_timer > 0) { _combo_timer -= (float)dt; return true; }
-        _run_combo_command(_combo_queue.current_cmd(), self, player, gt, effects);
+        _run_combo_command(_combo_queue.current_cmd(), self, player, map, gt, effects);
         return true;
     }
     if (_combo_end_delay > 0) { _combo_end_delay -= (float)dt; return true; }
@@ -391,7 +423,7 @@ bool BossAI::_tick_combo_attack(Monster* self, Player* player, GameMap* map,
 }
 
 void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
-                                double gt, std::vector<Effect>* effects) {
+                                GameMap* map, double gt, std::vector<Effect>* effects) {
     switch (cmd) {
     case BossCommand::NORMAL:
         if (self->can_attack(gt)) {
@@ -434,7 +466,9 @@ void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
         break;
     case BossCommand::BLINK:
         boss_state = BossState::BLINK;
+        _blink->windup_left = _blink->windup_time;
         _blink->blinked = false;
+        _blink->plan_destination(self, player, map);
         _spawn_boss_vfx(self, "summon", effects);
         break;
     case BossCommand::WHIRLWIND:
@@ -756,8 +790,8 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
                 warn.kind = "pulse";
                 warn.world_x = self->entity.rect.x + self->entity.rect.width/2;
                 warn.world_y = self->entity.rect.y + self->entity.rect.height/2;
-                warn.radius = 40; warn.duration = 0.12f; warn.elapsed = 0;
-                warn.color = {150, 80, 255, 160};
+                warn.radius = 70; warn.duration = 0.25f; warn.elapsed = 0;
+                warn.color = {150, 80, 255, 200};
                 effects->push_back(warn);
             }
             break;
@@ -789,6 +823,19 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         break;
     }
     case BossState::BLINK: {
+        if (_blink->windup_left > 0) {
+            _blink->windup_left -= (float)dt;
+            if (effects) {
+                Effect warn;
+                warn.kind = "pulse";
+                warn.world_x = _blink->pending_x;
+                warn.world_y = _blink->pending_y;
+                warn.radius = 26; warn.duration = 0.12f; warn.elapsed = 0;
+                warn.color = {150, 100, 255, 180};
+                effects->push_back(warn);
+            }
+            break;
+        }
         _blink->execute(self, player, _empty_monsters, map, gt);
         if (_blink->blinked) {
             boss_state = BossState::ATTACK;

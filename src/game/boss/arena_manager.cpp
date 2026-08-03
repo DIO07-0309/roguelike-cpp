@@ -84,6 +84,10 @@ void ArenaManager::tick(float dt, Player* player,
             z.warn_timer -= dt;
         } else {
             z.remaining -= dt;
+            // M4a-fix: 0.5s 间隔结算伤害 (原为每帧, zone 内 1 秒 ~240 伤害)
+            z.damage_timer -= dt;
+            if (z.damage_timer > 0) continue;
+            z.damage_timer = 0.5f;
             if (player) {
                 float dx = player->entity.rect.x + player->entity.rect.width/2 - z.world_x;
                 float dy = player->entity.rect.y + player->entity.rect.height/2 - z.world_y;

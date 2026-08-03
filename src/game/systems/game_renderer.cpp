@@ -245,6 +245,7 @@ void GameRenderer::draw_skill_bar(const Player* player, float game_time) {
 static const char* _buff_icon(const std::string& id) {
     if (id == "attack_up") return "攻";
     if (id == "poison")    return "毒";
+    if (id == "pool_poison" || id == "poison2s") return "毒";
     if (id == "slow")      return "缓";
     if (id == "freeze")    return "冻";
     if (id == "bleed")     return "血";

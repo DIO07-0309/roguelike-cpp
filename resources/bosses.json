@@ -46,13 +46,13 @@
       {"id": "charge",   "cooldown": 6.0, "damage_mult": 2.5, "windup": 0.6, "range": 120},
       {"id": "shockwave","cooldown": 8.0, "damage_mult": 1.6, "windup": 0.7, "range": 100},
       {"id": "summon",   "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 80},
-      {"id": "barrage",  "cooldown": 7.0, "damage_mult": 0.8, "windup": 0.5, "range": 40},
-      {"id": "cone",     "cooldown": 6.0, "damage_mult": 1.2, "windup": 0.4, "range": 96},
-      {"id": "blink",    "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 150}
+      {"id": "barrage",  "cooldown": 7.0, "damage_mult": 0.6, "windup": 0.5, "range": 40},
+      {"id": "cone",     "cooldown": 6.0, "damage_mult": 0.9, "windup": 0.6, "range": 96},
+      {"id": "blink",    "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 180}
     ],
     "combos": [
-      {"id": "probe", "commands": ["barrage","cone","normal","normal"], "interval": 0.6, "end_delay": 0.8},
-      {"id": "rage",  "commands": ["blink","cone","whirlwind","barrage","summon"], "interval": 0.5, "end_delay": 0.9}
+      {"id": "probe", "commands": ["barrage","cone","normal","normal"], "interval": 0.6, "end_delay": 1.0},
+      {"id": "rage",  "commands": ["blink","cone","barrage","summon","whirlwind"], "interval": 0.6, "end_delay": 1.1}
     ],
     "arena": {"danger_type": "shadow_wall", "spawn_interval": 10.0, "max_zones": 5, "zone_duration": 3.0, "spawn_radius": 120}
   },

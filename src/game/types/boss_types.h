@@ -137,6 +137,7 @@ struct DangerZone {
     DangerType type;
     float world_x, world_y;
     float radius = 48.0f, remaining = 0.0f, warn_timer = 0.0f;
+    float damage_timer = 0.0f;  // M4a-fix: 伤害结算间隔 (0.5s), 避免每帧秒杀
     int   damage = 0;
     Color warn_color{255,80,40,100}, active_color{255,40,20,180};
     bool is_warning() const { return warn_timer > 0; }

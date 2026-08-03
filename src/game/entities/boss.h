@@ -135,21 +135,27 @@ public:
     std::string execute(Monster* boss, Player* player,
                         std::vector<Monster*>& monsters,
                         GameMap* map, double game_time) override;
+    void draw(Monster* boss, Player* player, float cam_x, float cam_y) const;
     float windup_left = 0.0f;
     float windup_time = 0.4f;
     float half_angle = 45.0f;  // 半角 (度)
     float reach = 96.0f;       // 半径 (像素)
 };
 
-// M4a: 瞬移 — 闪烁至玩家侧翼, CD 独立计时
+// M4a: 瞬移 — 蓄力闪烁后瞬移至玩家侧翼, CD 独立计时
 class BlinkSkill : public BossSkill {
 public:
     BlinkSkill();
     std::string execute(Monster* boss, Player* player,
                         std::vector<Monster*>& monsters,
                         GameMap* map, double game_time) override;
+    void draw(float cam_x, float cam_y) const;
+    void plan_destination(Monster* boss, Player* player, GameMap* map);
+    float windup_left = 0.0f;
+    float windup_time = 0.35f;
     bool blinked = false;
     float blink_dist = 150.0f;
+    float pending_x = 0, pending_y = 0;  // 蓄力期预判落点 (draw 显示)
 };
 
 // ============================================================
@@ -199,6 +205,8 @@ public:
     std::unique_ptr<ConeAttackSkill> _cone;
     std::unique_ptr<BlinkSkill> _blink;
     BarrageSkill* barrage_skill() { return _barrage.get(); }
+    ConeAttackSkill* cone_skill() { return _cone.get(); }
+    BlinkSkill* blink_skill() { return _blink.get(); }
     BossSkillQueue _combo_queue;
     float _combo_timer = 0.0f;
     float _combo_end_delay = 0.0f;
@@ -221,7 +229,7 @@ private:
     bool _tick_combo_attack(Monster* self, Player* player, GameMap* map,
                             double dt, double gt, std::vector<Effect>* effects);
     void _run_combo_command(BossCommand cmd, Monster* self, Player* player,
-                            double gt, std::vector<Effect>* effects);
+                            GameMap* map, double gt, std::vector<Effect>* effects);
     void _select_combo();
     void _combo_advance();
     void _combo_on_skill_end();
