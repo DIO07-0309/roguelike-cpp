@@ -225,6 +225,15 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
     return "";
 }
 
+void BarrageSkill::draw(float cam_x, float cam_y) const {
+    for (auto& s : shots) {
+        float sx = s.x - cam_x, sy = s.y - cam_y;
+        if (sx < -40 || sx > 1400 || sy < -40 || sy > 900) continue;
+        DrawCircle(sx, sy, 7.0f, {150, 80, 255, 220});
+        DrawCircle(sx, sy, 3.5f, {220, 180, 255, 255});
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // M4a: ConeAttackSkill — 蓄力后扇形斩, 命中中毒 2s
 // ═══════════════════════════════════════════════════════════════

@@ -1625,6 +1625,13 @@ void GameScene::_draw_entities() {
         _renderer.draw_monster_buffs(*m,
             m->entity.position.x - _cam_x,
             m->entity.position.y - _cam_y);
+        // M4a: Boss 弹幕渲染 (自驱动弹, 需显式绘制)
+        if (m->is_boss && m->ai) {
+            if (auto* bai = dynamic_cast<BossAI*>(m->ai)) {
+                if (bai->barrage_skill())
+                    bai->barrage_skill()->draw(_cam_x, _cam_y);
+            }
+        }
         // D2 Step4: Tank守护连线 (淡蓝色)
         if (m->ai && m->team_role == TeamRole::FRONTLINE && m->ai->_protect_target) {
             float x1 = m->entity.rect.x + m->entity.rect.width/2 - _cam_x;

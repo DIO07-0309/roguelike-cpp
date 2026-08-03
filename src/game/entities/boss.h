@@ -125,6 +125,7 @@ public:
     std::vector<Shot> shots;
     bool fired = false;
     bool finished = false;
+    void draw(float cam_x, float cam_y) const;
 };
 
 // M4a: 扇形斩 — 蓄力后向玩家方向扇形挥击, 命中中毒 2s
@@ -197,6 +198,7 @@ public:
     std::unique_ptr<BarrageSkill> _barrage;
     std::unique_ptr<ConeAttackSkill> _cone;
     std::unique_ptr<BlinkSkill> _blink;
+    BarrageSkill* barrage_skill() { return _barrage.get(); }
     BossSkillQueue _combo_queue;
     float _combo_timer = 0.0f;
     float _combo_end_delay = 0.0f;
