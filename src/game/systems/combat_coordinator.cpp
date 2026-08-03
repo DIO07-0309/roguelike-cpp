@@ -9,6 +9,7 @@
 #include "audio_server.h"
 #include "config.h"
 #include "core/logger.h"
+#include "ai/player_behavior/player_behavior_recorder.h" // F15.1
 #include <cmath>
 
 void CombatCoordinator::player_attack(Player* player,
@@ -118,6 +119,7 @@ std::string CombatCoordinator::use_skill(int index, Player* player,
     // 普通/Heavy 技能
     std::string result = sk->execute(player, mlist, map, is_heavy);
     sk->mark_used(game_time);
+    g_behavior.on_skill_use(sk->_skill_id.c_str()); // F15.1
 
     // 技能 SFX (G3.2: _skill_id 替代 dynamic_cast)
     if (audio) {

@@ -10,6 +10,7 @@
 #include "audio_server.h"
 #include "core/event_bus.h"
 #include "combat/element_resolver.h"  // G10.3
+#include "ai/player_behavior/player_behavior_recorder.h" // F15.1
 #include <algorithm>
 #include <cmath>
 
@@ -214,6 +215,8 @@ std::vector<WeaponAttackResult> WeaponExecutor::execute(
         def->name.c_str());
     EventBus::inst().emit(GameEventType::WEAPON_ATTACK_COMPLETE, player,
         (int)stage.damage_multiplier * 100, total_dmg, def->name.c_str());
+    // F15.1: record weapon usage
+    g_behavior.on_weapon_attack(weapon_type_name(def->type));
     if (audio) {
         const char* sfx = stage.sfx_name.empty() ? "melee" : stage.sfx_name.c_str();
         audio->play_sfx(sfx);
