@@ -208,6 +208,7 @@ private:
     float _boss_entrance_timer = 0.0f;
     bool  _boss_phase2_shown = false;
     bool  _boss_entered = false;
+    BossArenaState _boss_last_arena_state = BossArenaState::INTRO;  // F10.1
 
     // C1: 伤害数字 / 震屏 / 冻结 (moved to PresentationSystemDirector)
 

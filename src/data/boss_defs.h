@@ -71,6 +71,9 @@ struct BossDef {
 
     // ── G2.3: Arena 战场配置 ──
     BossArenaDef arena;
+
+    // ── F10.1: Boss behavior type (data-driven, NOT boss_id strings) ──
+    std::string behavior_type;  // "" = standard ATTACK cycle, "domain" = F10 domain boss
 };
 
 // ── G2.3: ArenaEvent — BossAI 意图 ↔ ArenaManager 执行的中间层 ──

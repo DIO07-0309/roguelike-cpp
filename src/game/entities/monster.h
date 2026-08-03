@@ -57,6 +57,9 @@ public:
     float support_cooldown = 0.0f;   // 辅助冷却 (Shaman)
 
     // D2: Projectile attack config (data-driven from enemies.json)
+    // F10.1: Domain boss invulnerability (set by BossSystemDirector)
+    bool domain_invulnerable = false;
+
     bool uses_projectile = false;
     float projectile_speed = 300.0f;
     float projectile_warning_time = 0.8f;

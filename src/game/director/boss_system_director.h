@@ -43,6 +43,14 @@ public:
     BossCommand           current_cmd = BossCommand::NONE;
     BossModifierHook      modifier_hook;
 
+    // ── F10.1: Arena state machine (domain boss) ──
+    BossArenaState arena_state = BossArenaState::INTRO;
+    float  domain_timer = 0.0f;
+    float  domain_cycle_duration = 30.0f;  // seconds per full domain→mechanic→vulnerable cycle
+    bool   boss_invulnerable = false;       // set true during DOMAIN/MECHANIC phases
+    int    domain_cycle_count = 0;          // how many cycles completed
+    std::string _behavior_type;             // from BossDef ("" = standard, "domain" = domain boss)
+
     std::string intro_text;
     std::string modifier_text;
     int  dmg_done = 0, dmg_taken = 0;
@@ -63,6 +71,7 @@ public:
 
 private:
     void notify_death_ev(const struct GameEvent&);
+    void _tick_domain_state(float dt, Monster* boss);  // F10.1
 
 public:
     // ── 查询接口 ──

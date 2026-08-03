@@ -75,6 +75,10 @@ enum class GameEventType {
     ELEMENT_POISON_TICK,
     ELEMENT_LEVEL_UP,
 
+    // ── F10.1: Boss arena domain events ──
+    BOSS_DOMAIN_ENTER,
+    BOSS_VULNERABLE_ENTER,
+
     // ── 游戏 ──
     GAME_CLEAR,
     GAME_OVER,

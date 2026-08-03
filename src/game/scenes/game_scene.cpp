@@ -450,6 +450,24 @@ void GameScene::_process(double delta) {
         if (boss && boss->is_boss) {
             _boss.tick(dt, boss, player.get(), current_floor, _gameplay.world_state,
                        _gameplay.rels, _gameplay.story.stage(), monsters);
+
+            // F10.1: Domain state change VFX
+            if (_boss._behavior_type == "domain"
+                && _boss.arena_state != _boss_last_arena_state) {
+                _boss_last_arena_state = _boss.arena_state;
+                switch (_boss.arena_state) {
+                case BossArenaState::DOMAIN_PHASE:
+                    _presentation.show_message("【领域展开】Boss受到保护 — 寻找破绽!", 2.5f);
+                    _presentation.trigger_shake(6.0f);
+                    break;
+                case BossArenaState::VULNERABLE_PHASE:
+                    _presentation.show_message("【弱点暴露】全力输出!", 2.0f);
+                    _presentation.trigger_shake(10.0f);
+                    _presentation.trigger_freeze(0.08f);
+                    break;
+                default: break;
+                }
+            }
         }
     }
 

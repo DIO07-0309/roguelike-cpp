@@ -53,6 +53,7 @@ static BossDef _parse_boss(const json& j) {
     def.shield_pct      = j.value("shield_pct", 0.0f);
     def.summon_speed    = j.value("summon_speed", 1.0f);
     def.skill_cycle_bias = j.value("skill_cycle_bias", 6);
+    def.behavior_type   = j.value("behavior_type", "");  // F10.1
 
     // 技能覆盖数组
     if (j.contains("skills") && j["skills"].is_array()) {

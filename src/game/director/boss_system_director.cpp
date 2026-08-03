@@ -6,6 +6,7 @@
 #include "world_state.h"
 #include "relationship_system.h"
 #include "boss.h"              // BossAI, spawn_boss
+#include "data/boss_defs.h"    // F10.1: get_boss_def
 #include "combat_system.h"     // rng
 
 // ============================================================
@@ -27,6 +28,11 @@ void BossSystemDirector::reset() {
     intro_text.clear();
     modifier_text.clear();
     dmg_done = 0; dmg_taken = 0;
+    arena_state = BossArenaState::INTRO;
+    domain_timer = 0.0f;
+    boss_invulnerable = false;
+    domain_cycle_count = 0;
+    _behavior_type.clear();
     _arena_spawn_timer = 0.0f;   // G2.3
     _arena_cfg = nullptr;        // G2.3
 }
@@ -114,6 +120,13 @@ void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
     if (!modifier_text.empty() && evolution.evolution_name) {
         modifier_text = modifier_text + " [" + evolution.evolution_name + "]";
     }
+
+    // F10.1: Read behavior_type from BossDef (data-driven)
+    if (auto* bai = dynamic_cast<BossAI*>(boss->ai)) {
+        const BossDef* def = get_boss_def(bai->_boss_id ? bai->_boss_id : "");
+        if (def && !def->behavior_type.empty())
+            _behavior_type = def->behavior_type;
+    }
 }
 
 void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
@@ -165,6 +178,70 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
         }
     }
     arena.tick(dt, player, monsters);
+
+    // ══════════════════════════════════════════════════════
+    // F10.1: Domain boss arena state machine
+    // ══════════════════════════════════════════════════════
+    if (_behavior_type == "domain") {
+        _tick_domain_state(dt, boss);
+        boss->combat.domain_invulnerable = boss_invulnerable;
+    }
+}
+
+// ── F10.1: Domain state machine tick ──
+void BossSystemDirector::_tick_domain_state(float dt, Monster* boss) {
+    switch (arena_state) {
+    case BossArenaState::INTRO:
+        // Brief intro → enter domain
+        domain_timer += dt;
+        if (domain_timer >= 1.5f) {  // 1.5s intro pause
+            domain_timer = 0.0f;
+            arena_state = BossArenaState::DOMAIN_PHASE;
+            boss_invulnerable = true;
+            EventBus::inst().emit(GameEventType::BOSS_DOMAIN_ENTER,
+                boss, 0, 0.0f, "domain_enter");
+        }
+        break;
+
+    case BossArenaState::DOMAIN_PHASE:
+        // Domain cycle — boss invincible, counts down
+        domain_timer += dt;
+        if (domain_timer >= domain_cycle_duration) {
+            domain_timer = 0.0f;
+            arena_state = BossArenaState::VULNERABLE_PHASE;
+            boss_invulnerable = false;
+            domain_cycle_count++;
+            EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
+                boss, domain_cycle_count, 0.0f, "vulnerable_enter");
+        }
+        break;
+
+    case BossArenaState::VULNERABLE_PHASE:
+        // Output window — boss takes damage, brief window
+        domain_timer += dt;
+        if (domain_timer >= 10.0f) {  // 10s vulnerable window
+            domain_timer = 0.0f;
+            arena_state = BossArenaState::DOMAIN_PHASE;
+            boss_invulnerable = true;
+            EventBus::inst().emit(GameEventType::BOSS_DOMAIN_ENTER,
+                boss, domain_cycle_count, 0.0f, "domain_enter");
+        }
+        break;
+
+    case BossArenaState::ENRAGED_PHASE:
+        // Final phase — domain cycles shorter
+        domain_timer += dt;
+        if (domain_timer >= 15.0f) {
+            domain_timer = 0.0f;
+            arena_state = BossArenaState::VULNERABLE_PHASE;
+            boss_invulnerable = false;
+            EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
+                boss, domain_cycle_count, 0.0f, "vulnerable_enter");
+        }
+        break;
+
+    default: break;
+    }
 }
 
 void BossSystemDirector::notify_phase2() {

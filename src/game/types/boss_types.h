@@ -152,3 +152,15 @@ struct TimelineEvent {
 // ── Cinematic / Encounter ──
 enum class CinematicPhase { NONE, INTRO, PHASE2_TRANSITION, LAST_STAND, DEATH };
 enum class EncounterPhase { OPENING, PRESSURE, CONTROL, LAST_STAND, ENDED };
+
+// ═══════════════════════════════════════════════════════════════
+// F10.1: BossArenaState — domain-boss arena cycle
+// ═══════════════════════════════════════════════════════════════
+enum class BossArenaState {
+    INTRO,            // 开场 → 进入领域
+    DOMAIN_PHASE,     // Boss 无敌, 领域规则激活, 玩家解机制
+    MECHANIC_PHASE,   // 机制进行中 (core spawning etc. — F10.2)
+    VULNERABLE_PHASE, // 弱点暴露, 玩家输出窗口
+    ENRAGED_PHASE,    // 最终狂暴
+    DEAD
+};

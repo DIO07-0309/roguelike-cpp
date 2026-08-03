@@ -104,6 +104,7 @@
     "shield_pct": 0.0,
     "summon_speed": 1.0,
     "skill_cycle_bias": 6,
+    "behavior_type": "domain",
     "skills": [
       {"id": "charge",   "cooldown": 6.0, "damage_mult": 2.5, "windup": 0.6, "range": 120},
       {"id": "shockwave","cooldown": 8.0, "damage_mult": 1.6, "windup": 0.7, "range": 100},
