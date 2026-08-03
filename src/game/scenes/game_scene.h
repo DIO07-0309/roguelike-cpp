@@ -171,6 +171,7 @@ public:
     static std::string g_sim_ai_type;   // G8.1: "decision" or "bt"
     static int  g_rl_test_episodes;     // G8.4: --rl-test N
     static int  g_rl_train_episodes;    // G8.4: --rl-train N
+    static int  g_rl_mirror_episodes;   // F15.4: --rl-mirror N
 
 private:
     // 战斗

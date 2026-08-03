@@ -1,10 +1,12 @@
-// G8.4: RL standalone runner — called from main.cpp before engine init.
+// G8.4/F15.4: RL standalone runner — called from main.cpp before engine init.
 // Runs CombatEnvironment + RandomAgent/QAgent without GameScene.
+// F15.4: run_rl_mirror_mode() trains QAgent against 4 player styles.
 #include "ai/rl/environment.h"
 #include "ai/rl/random_agent.h"
 #include "ai/rl/q_agent.h"
 #include "ai/mcts/simulation_state.h"
 #include "ai/mcts/action.h"
+#include "ai/mirror/mirror_agent.h"
 #include <cstdio>
 
 void run_rl_mode(int test_episodes, int train_episodes) {
@@ -83,4 +85,76 @@ void run_rl_mode(int test_episodes, int train_episodes) {
                 printf("  %10s: %5d entries  avg_q=%.2f\n",
                        d.action_name.c_str(), d.count, d.avg_q);
     }
+}
+
+// ── F15.4: Mirror self-play training ──
+void run_rl_mirror_mode(int episodes) {
+    using namespace rl;
+    using namespace mcts;
+
+    // Four player styles to train against
+    PlayerHabitProfile profiles[4];
+    // AGGRESSIVE: high attack, low dodge
+    profiles[0].attack_frequency = 0.90f; profiles[0].dodge_rate = 0.08f;
+    profiles[0].aggression_score = 0.95f; profiles[0].style = PlayerStyle::AGGRESSIVE;
+    profiles[0].predict_attack_heavy = true;
+    // DEFENSIVE: high dodge, low attack
+    profiles[1].attack_frequency = 0.25f; profiles[1].dodge_rate = 0.45f;
+    profiles[1].aggression_score = 0.35f; profiles[1].style = PlayerStyle::DEFENSIVE;
+    profiles[1].predict_low_dodge = false;
+    // SNIPER: retreat-heavy, range attacks
+    profiles[2].attack_frequency = 0.55f; profiles[2].retreat_rate = 0.40f;
+    profiles[2].style = PlayerStyle::SNIPER;
+    // MAGE: skill-heavy
+    profiles[2].skill_frequency = 0.25f; profiles[2].predict_skill_spam = true;
+    profiles[2].predicted_fav_skill = 1;  // fireball
+    // BALANCED (default)
+    profiles[3] = PlayerHabitProfile{};
+
+    auto make_scenario_with_style = [](int style_id) -> SimulationState {
+        SimulationState s;
+        s.player.hp = 100; s.player.max_hp = 100;
+        s.player.x = 5; s.player.y = 5;
+        s.player.attack = 10; s.player.pdef = 3; s.player.mdef = 1;
+        s.player.alive = true;
+        s.monsters.push_back(MonsterSnapshot{"mirror_boss", 200, 200, 3, 0, 15, 5, 5, {}, true, true});
+        s.player_style = style_id + 1; // 1-4
+        return s;
+    };
+
+    CombatEnvironment env;
+    uint32_t seed = 42;
+
+    printf("═══ RL MIRROR: %d episodes × 4 styles ═══\n", episodes);
+    for (int style_i = 0; style_i < 4; style_i++) {
+        QAgent q_agent(0.15, 0.9, 0.12);
+        int wins = 0; double total_r = 0;
+        const auto& profile = profiles[style_i];
+
+        for (int i = 0; i < episodes; i++) {
+            auto initial = make_scenario_with_style(style_i);
+            initial.rng.seed = seed + style_i * 7919u + i * 7331u;
+            auto obs = env.reset(initial);
+            while (!env.is_done()) {
+                uint32_t local_seed = seed + style_i * 7331u + i * 7919u + env.state().depth;
+                auto a = q_agent.select(env.state(), local_seed);
+                auto sr = env.step(a);
+                // Mirror reward replaces default step reward
+                double base = sr.reward;
+                bool dodged = (a == CombatAction::MOVE_LEFT || a == CombatAction::MOVE_RIGHT
+                            || a == CombatAction::MOVE_UP || a == CombatAction::MOVE_DOWN);
+                double mirror_bonus = MirrorAgent::mirror_reward(
+                    profile, (int)a, base, 0, dodged, false);
+                q_agent.update(obs, a, base + mirror_bonus, sr.observation);
+                obs = sr.observation;
+                total_r += base + mirror_bonus;
+            }
+            if (env.state().victory) wins++;
+        }
+        printf("  [%s] %d/%d wins (%.1f%%), avg_r=%.1f, Q=%zu\n",
+            profiles[style_i].style_name(),
+            wins, episodes, wins*100.0/episodes,
+            total_r/episodes, q_agent.table_size());
+    }
+    printf("Mirror RL complete.\n");
 }

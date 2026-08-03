@@ -30,24 +30,25 @@ Observation Observation::from_state(const mcts::SimulationState& state) {
     obs.strongest_hp_ratio = strongest;
     obs.boss_present = has_boss ? 1.0f : 0;
     obs.buff_count = (float)p.buffs.size();
+    obs.player_style = (float)state.player_style;  // F15.4
     return obs;
 }
 
 std::vector<float> Observation::to_vector() const {
     return {player_hp_ratio, player_attack, enemy_count, nearest_enemy_dist,
-            strongest_hp_ratio, boss_present, buff_count};
+            strongest_hp_ratio, boss_present, buff_count, player_style};
 }
 
 std::string Observation::to_key() const {
-    // Discretize continuous values into buckets for Q-table
     int hp_b = (int)(player_hp_ratio * 10);           // 0-10
     int atk_b = (int)(player_attack / 5.0f);          // 0-6
     int ec_b = (int)enemy_count;                       // 0-5
     int nd_b = (int)(nearest_enemy_dist / 2.0f);      // 0-10
     int boss_b = (int)boss_present;
-    // Compact key
+    int style_b = (int)player_style;
     std::ostringstream ss;
-    ss << hp_b << ":" << atk_b << ":" << ec_b << ":" << nd_b << ":" << boss_b;
+    ss << hp_b << ":" << atk_b << ":" << ec_b << ":" << nd_b << ":" << boss_b
+       << ":" << style_b;
     return ss.str();
 }
 

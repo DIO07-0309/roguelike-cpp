@@ -17,6 +17,7 @@ struct Observation {
     float strongest_hp_ratio = 0;      // strongest enemy's HP ratio
     float boss_present = 0;            // 0 or 1
     float buff_count = 0;              // number of active buffs
+    float player_style = 0;            // F15.4: 0=none,1=aggressive,2=defensive,3=sniper,4=mage
 
     // Convert to flat float vector (for neural net input / hash key)
     std::vector<float> to_vector() const;

@@ -55,6 +55,9 @@ struct SimulationState {
     bool terminal = false;
     bool victory = false;      // all monsters dead
 
+    // F15.4: Mirror boss player model (0=none, 1=aggressive, 2=defensive, 3=sniper, 4=mage)
+    int player_style = 0;
+
     SimulationState clone() const;
 
     bool is_terminal() const { return terminal || !player.alive; }

@@ -54,6 +54,7 @@ bool g_font_loaded = false;
 
 // ── G8.4: RL standalone runner (defined in ai/rl/rl_runner.cpp) ──
 extern void run_rl_mode(int test_episodes, int train_episodes);
+extern void run_rl_mirror_mode(int episodes);  // F15.4
 
 static void load_fonts() {
     ResourceManager::inst().load_all();
@@ -116,6 +117,8 @@ int main() {
             GameScene::g_rl_test_episodes = atoi(__argv[++i]);
         } else if (arg == "--rl-train" && i + 1 < __argc) {
             GameScene::g_rl_train_episodes = atoi(__argv[++i]);
+        } else if (arg == "--rl-mirror" && i + 1 < __argc) {
+            GameScene::g_rl_mirror_episodes = atoi(__argv[++i]);
         }
     }
 #endif
@@ -244,6 +247,12 @@ int main() {
     if (GameScene::g_rl_test_episodes > 0 || GameScene::g_rl_train_episodes > 0) {
         run_rl_mode(GameScene::g_rl_test_episodes, GameScene::g_rl_train_episodes);
         printf("[RL] Done. Exiting.\n");
+        return 0;
+    }
+    // F15.4: Mirror self-play training
+    if (GameScene::g_rl_mirror_episodes > 0) {
+        run_rl_mirror_mode(GameScene::g_rl_mirror_episodes);
+        printf("[RL Mirror] Done. Exiting.\n");
         return 0;
     }
 

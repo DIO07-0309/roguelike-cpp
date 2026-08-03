@@ -35,17 +35,21 @@ public:
     void tick_phase_timer(float dt);
 
     // ── During combat: recommend BossAI adjustments ──
-    // Returns recommended pressure distance (BossAI uses this for chase/retreat)
     float recommend_distance() const;
-
-    // Returns true if Boss should prioritize interrupting player skill
     bool should_interrupt_skill() const;
-
-    // Returns true if Boss should be aggressive right now (force close range)
     bool should_pressure_close(const MirrorBattleState& st) const;
-
-    // Predict player's likely next action type after seeing current state
     PlayerActionType predict_next_action(const MirrorBattleState& st) const;
+
+    // ── F15.4: Mirror reward for RL self-play ──
+    // Returns a bonus reward when the Boss successfully counters the player's
+    // predicted action (interrupting a skill, punishing a heal, baiting an attack).
+    // Caller adds this to the base damage-healing reward.
+    static double mirror_reward(const PlayerHabitProfile& profile,
+        int boss_action, double damage_dealt, double damage_taken,
+        bool player_dodged, bool player_healed);
+
+    // ── F15.4: Convert PlayerStyle to an int for SimulationState ──
+    static int style_to_int(PlayerStyle s);
 
     // ── Debug ──
     const char* phase_name() const;
@@ -53,8 +57,8 @@ public:
 
 private:
     PlayerHabitProfile _profile;
-    int  _phase = 1;          // 1=Observe, 2=Mirror, 3=Evolve
+    int  _phase = 1;
     float _phase_timer = 0.0f;
     float _phase_duration = 30.0f;
-    float _preferred_distance = 250.0f; // pixels (derived from profile)
+    float _preferred_distance = 250.0f;
 };

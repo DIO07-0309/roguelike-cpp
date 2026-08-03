@@ -74,22 +74,40 @@ bool MirrorAgent::should_pressure_close(const MirrorBattleState& st) const {
 
 PlayerActionType MirrorAgent::predict_next_action(
     const MirrorBattleState& st) const {
-    // Simple frequency-based prediction
-    // Higher phase = more confident (use actual frequencies)
-
-    // If the player is at range, they'll likely attack
     if (st.dist_tiles < 3.0f && _profile.attack_frequency > 0.6f)
         return PlayerActionType::ATTACK;
-
-    // If their HP is low and they heal often
     if (st.player_hp_pct < _profile.hp_counter_threshold / 100.0f
         && _profile.heal_frequency > 0.01f)
         return PlayerActionType::HEAL;
-
-    // If they have a favorite skill spammed >60%
     if (_profile.predict_skill_spam && _phase >= 2)
         return PlayerActionType::SKILL;
-
-    // Default: they'll attack
     return PlayerActionType::ATTACK;
+}
+
+// ── F15.4: Mirror reward ──
+double MirrorAgent::mirror_reward(const PlayerHabitProfile& profile,
+    int /*boss_action*/, double damage_dealt, double damage_taken,
+    bool player_dodged, bool player_healed)
+{
+    double reward = damage_dealt * 0.5 - damage_taken * 0.3;
+
+    // Counter bonuses
+    if (profile.predict_panic_heal && player_healed)
+        reward += 1.0;  // punished a panic-heal player
+    if (profile.predict_low_dodge && player_dodged)
+        reward += 0.5;  // predicted and hit a low-dodge player
+    if (profile.predict_attack_heavy)
+        reward += 0.3;  // aggressive profile = more opportunities to counter
+
+    return reward;
+}
+
+int MirrorAgent::style_to_int(PlayerStyle s) {
+    switch (s) {
+    case PlayerStyle::AGGRESSIVE: return 1;
+    case PlayerStyle::DEFENSIVE:  return 2;
+    case PlayerStyle::SNIPER:     return 3;
+    case PlayerStyle::MAGE:       return 4;
+    default: return 0;
+    }
 }

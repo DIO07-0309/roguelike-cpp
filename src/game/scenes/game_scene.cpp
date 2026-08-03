@@ -51,6 +51,7 @@ int  GameScene::g_sim_build_type = 0;
 std::string GameScene::g_sim_ai_type = "decision";
 int  GameScene::g_rl_test_episodes = 0;
 int  GameScene::g_rl_train_episodes = 0;
+int  GameScene::g_rl_mirror_episodes = 0;  // F15.4
 
 // G8.1: defined here so unique_ptr<DecisionAgent/BTAgent> can be destroyed
 // (complete type available via includes in this .cpp)
