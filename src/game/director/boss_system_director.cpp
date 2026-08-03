@@ -116,8 +116,9 @@ void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
     }
 }
 
-void BossSystemDirector::tick(float dt, Monster* boss, const Player* player,
-    int floor, const WorldState& ws, const RelationshipSystem& rels) {
+void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
+    const WorldState& ws, const RelationshipSystem& rels,
+    StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters) {
     if (!boss || !boss->is_boss) return;
 
     // Build context for behavior evaluation
@@ -131,9 +132,10 @@ void BossSystemDirector::tick(float dt, Monster* boss, const Player* player,
     ctx.player_far       = ctx.dist_tiles > 7;
     ctx.player_near      = ctx.dist_tiles < 3;
     ctx.last_stand       = evolution.last_stand_triggered;
-    ctx.build = replay_mem.build;
-    ctx.stage = StoryStage::CHAPTER_1; // simplified — real value from StoryDirector
+    ctx.build = calculate_build(player).identify();
+    ctx.stage = stage;
 
+    behavior.personality = boss_personality_for_floor(floor);
     behavior.memory.tick(dt, false);
     evaluate_boss_decision(floor, ctx, ws, rels, behavior, dt);
 
@@ -162,6 +164,7 @@ void BossSystemDirector::tick(float dt, Monster* boss, const Player* player,
             arena.execute_event(ev, *_arena_cfg, bx, by, px, py);
         }
     }
+    arena.tick(dt, player, monsters);
 }
 
 void BossSystemDirector::notify_phase2() {

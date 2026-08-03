@@ -415,8 +415,7 @@ void GameScene::_process(double delta) {
                 _presentation.room_msg_timer = 2.5f;
                 _boss_phase2_shown = true;
                 _presentation.trigger_shake(10.0f);
-                _boss.cinematic.trigger_phase2();   // D5 Step6
-                _boss.timeline.record(_boss.encounter.total_time(), "PHASE2");
+                _boss.notify_phase2();   // D5 Step6 (cinematic + timeline 收敛)
             }
         }
     }
@@ -426,16 +425,7 @@ void GameScene::_process(double delta) {
         auto* boss = _get_boss();
         if (boss && boss->is_boss && (float)boss->combat.current_hp / boss->combat.max_hp < 0.15f) {
             _boss.evolution.last_stand_triggered = true;
-            // Boss 最终阶段: 所有技能CD减半 + 超大范围
-            if (auto* bai = dynamic_cast<BossAI*>(boss->ai)) {
-                bai->_charge->cooldown *= 0.5f;
-                bai->_shockwave->cooldown *= 0.5f;
-                bai->_summon->cooldown *= 0.5f;
-                bai->_shockwave->fx_radius *= 1.5f;
-                bai->_charge->fx_radius *= 1.3f;
-            }
-            _boss.cinematic.trigger_last_stand();  // D5 Step6
-            _boss.timeline.record(_boss.encounter.total_time(), "LAST_STAND");
+            _boss.notify_last_stand(boss);  // CD减半 + 范围提升 + cinematic + timeline
             _presentation.room_msg = _boss.evolution.evolution_name
                 ? std::string(_boss.evolution.evolution_name) + std::string("!")
                 : std::string("LAST STAND!");
@@ -444,35 +434,12 @@ void GameScene::_process(double delta) {
         }
     }
 
-    // D5 Step3: Boss Memory tick + Behavior 评估 (仅Boss存在时)
+    // D5 Step3: Boss Memory tick + Behavior 评估 (收敛至 BossSystemDirector::tick)
     {
         auto* boss = _get_boss();
         if (boss && boss->is_boss) {
-            _boss.behavior.memory.tick(dt, false);
-            BossContext ctx;
-            ctx.hp_pct = (float)boss->combat.current_hp / boss->combat.max_hp;
-            ctx.dist_tiles = hypotf(
-                boss->entity.rect.x - player->entity.rect.x,
-                boss->entity.rect.y - player->entity.rect.y) / TILE_SIZE;
-            ctx.player_low_hp = player->combat.current_hp < player->combat.max_hp * 0.3f;
-            ctx.player_combo_high = player->combo.count >= 4;
-            ctx.player_far = ctx.dist_tiles > 7;
-            ctx.player_near = ctx.dist_tiles < 3;
-            ctx.last_stand = _boss.evolution.last_stand_triggered;
-            ctx.build = calculate_build(player.get()).identify();
-            ctx.stage = _gameplay.story.stage();
-            _boss.behavior.personality = boss_personality_for_floor(current_floor);
-            evaluate_boss_decision(current_floor, ctx, _gameplay.world_state, _gameplay.rels,
-                                    _boss.behavior, dt);
-            // D5 Step5: BossEncounter tick
-            _boss.encounter.tick(dt, ctx.hp_pct);
-            _boss.cinematic.tick(dt);  // D5 Step6
-
-            // D5 Step4: Behavior→Command (决策→执行)
-            _boss.current_cmd = boss_decision_to_command(
-                (int)_boss.behavior.current);
-            // Boss战 arena tick (G2.3: 生成逻辑移入 BossSystemDirector)
-            _boss.arena.tick(dt, player.get(), monsters);
+            _boss.tick(dt, boss, player.get(), current_floor, _gameplay.world_state,
+                       _gameplay.rels, _gameplay.story.stage(), monsters);
         }
     }
 

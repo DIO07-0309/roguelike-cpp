@@ -77,16 +77,12 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
     // Boss reward
     if (m->is_boss) {
         LOG_INFO("Boss击杀! %s - 第%d层", m->name.c_str(), _s.current_floor);
-        _s._boss.replay_mem.survive_time = _s._boss.encounter.total_time();
-        _s._boss.encounter.end(_s._boss.replay_mem, _s._boss.dmg_done,
-                                _s._boss.dmg_taken, (int)_s._boss.arena.zones().size());
-        _s._boss.battle_report = _s._boss.encounter.report();
+        _s._boss.notify_death(_s._gameplay.world_state, _s._gameplay.rels,
+                              _s._gameplay.quest_mgr);
         _s.get_tree()->get_audio()->play_sfx("victory");
         // D9: Boss击杀强化 — shake + freeze + full flash
         _s._presentation.trigger_shake(CombatFeelSystem::SHAKE_BOSS);
         _s._presentation.trigger_freeze(CombatFeelSystem::BOSS_HIT);
-        _s._boss.cinematic.trigger_death();
-        _s._boss.timeline.record(_s._boss.encounter.total_time(), "DEATH");
         {
             BuildType bt = calculate_build(_s.player.get()).identify();
             const BossDialogue* dd = _s._boss.narrative.find_death(

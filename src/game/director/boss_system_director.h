@@ -1,5 +1,7 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <memory>
 #include "boss_narrative.h"
 #include "boss_evolution.h"
 #include "boss_behavior.h"
@@ -49,8 +51,9 @@ public:
     void reset();   // 新楼层开始时调用
     void init_on_spawn(Monster* boss, int floor, const WorldState& ws, BuildType bt,
                        const RelationshipSystem& rels, GameMap* map);
-    void tick(float dt, Monster* boss, const Player* player, int floor,
-              const WorldState& ws, const RelationshipSystem& rels);
+    void tick(float dt, Monster* boss, Player* player, int floor,
+              const WorldState& ws, const RelationshipSystem& rels,
+              StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters);
     void notify_phase2();
     void notify_last_stand(Monster* boss);
     void notify_death(const WorldState& ws, const RelationshipSystem& rels,
