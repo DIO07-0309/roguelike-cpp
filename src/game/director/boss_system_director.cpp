@@ -319,11 +319,12 @@ void BossSystemDirector::notify_phase2() {
 void BossSystemDirector::notify_last_stand(Monster* boss) {
     evolution.last_stand_triggered = true;
     if (auto* bai = dynamic_cast<BossAI*>(boss->ai)) {
-        bai->_charge->cooldown    *= 0.5f;
-        bai->_shockwave->cooldown *= 0.5f;
-        bai->_summon->cooldown    *= 0.5f;
-        bai->_shockwave->fx_radius *= 1.5f;
-        bai->_charge->fx_radius   *= 1.3f;
+        // M4d: LastStand = faster skills + bigger AOEs, NOT more ATK (damage already high from Phase2)
+        bai->_charge->cooldown    *= 0.55f;
+        bai->_shockwave->cooldown *= 0.55f;
+        bai->_summon->cooldown    *= 0.55f;
+        bai->_shockwave->fx_radius *= 1.6f;
+        bai->_charge->fx_radius   *= 1.4f;
     }
     cinematic.trigger_last_stand();
     timeline.record(encounter.total_time(), "LAST_STAND");

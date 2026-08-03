@@ -555,7 +555,9 @@ void BossAI::_enter_phase2(Monster* self, std::vector<Effect>* effects) {
     is_enraged = true;
     move_speed *= _phase2_speed_mult;                   // G1 Step6: from BossDef
     self->attack_cooldown *= _phase2_cd_mult;           // G1 Step6: from BossDef
-    self->combat.attack = (int)(self->combat.attack * _phase2_atk_mult); // G1 Step6
+    // M4d: Phase2 ATK boost capped — base is already scaled by boss_atk_scale
+    float clamped_mul = _phase2_atk_mult > 1.2f ? 1.2f : _phase2_atk_mult;
+    self->combat.attack = (int)(self->combat.attack * clamped_mul);
     self->entity.size = {52, 52};  // visually bigger
     self->entity.sync_rect();
     LOG_INFO("[BOSS] Phase 2 触发! 攻击+%.0f%% 移速+%.0f%%",
@@ -693,13 +695,24 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         if (_charge->windup_left > 0) {
             _charge->windup_left -= (float)dt;
             if (effects) {
+                // Pulsing ring at boss position
                 Effect warn;
-                warn.kind = "pulse";
-                warn.world_x = self->entity.rect.x + self->entity.rect.width/2;
+                warn.kind = "pulse"; warn.world_x = self->entity.rect.x + self->entity.rect.width/2;
                 warn.world_y = self->entity.rect.y + self->entity.rect.height/2;
-                warn.radius = 60; warn.duration = 0.1f; warn.elapsed = 0;
-                warn.color = {255, 40, 30, 180};
+                warn.radius = 72; warn.duration = 0.35f; warn.elapsed = 0;
+                warn.color = {255, 80, 30, 200};
                 effects->push_back(warn);
+                // M4d: Dash direction indicator line
+                float ctx = self->entity.rect.x + self->entity.rect.width/2;
+                float cty = self->entity.rect.y + self->entity.rect.height/2;
+                float ptx = player->entity.rect.x + player->entity.rect.width/2;
+                float pty = player->entity.rect.y + player->entity.rect.height/2;
+                Effect line;
+                line.kind = "bolt"; line.world_x = ctx; line.world_y = cty;
+                line.target_x = ptx; line.target_y = pty;
+                line.duration = 0.35f; line.elapsed = 0;
+                line.color = {255, 60, 30, 200};
+                effects->push_back(line);
             }
             { std::vector<Monster*> dummy; _charge->execute(self, player, dummy, map, gt); }
             if (_charge->windup_left <= 0) {
@@ -745,9 +758,15 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
                 warn.kind = "pulse";
                 warn.world_x = self->entity.rect.x + self->entity.rect.width/2;
                 warn.world_y = self->entity.rect.y + self->entity.rect.height/2;
-                warn.radius = _shockwave->fx_radius; warn.duration = 0.15f; warn.elapsed = 0;
-                warn.color = {255, 200, 50, 130};
+                warn.radius = _shockwave->fx_radius; warn.duration = 0.35f; warn.elapsed = 0;
+                warn.color = {255, 180, 40, 210};
                 effects->push_back(warn);
+                Effect flash;
+                flash.kind = "flash"; flash.world_x = warn.world_x; flash.world_y = warn.world_y;
+                flash.radius = _shockwave->fx_radius * 0.5f;
+                flash.duration = 0.35f; flash.elapsed = 0;
+                flash.color = {255, 120, 30, 180};
+                effects->push_back(flash);
             }
             std::vector<Monster*> dm2;
             _shockwave->execute(self, player, dm2, map, gt);
