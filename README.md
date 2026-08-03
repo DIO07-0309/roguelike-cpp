@@ -143,7 +143,70 @@ build/roguelike_cpp.exe
 | F6–10 | 灰烬火山 | 火妖/精英兽人/冲锋兽人 |
 | F11–15 | 虚空深渊 | 暗术师/虚空行者/石像守卫 |
 
-**三场 Boss 战**：暗影骑士(F5) / 地狱火魔(F10) / 深渊之主(F15)
+**三场 Boss 战**：暗影骑士(F5) / 地狱火魔(F10) / 终焉回响(F15)
+
+---
+
+## 智能 AI 系统 (G8 + F15)
+
+本项目是面向**游戏 AI 研究**的完整实验平台。F5 暗影骑士考验反应，F10 地狱火魔考验规则理解，**F15 终焉回响让 AI 学习你的习惯并用你的方式击败你**。
+
+### 架构全景
+
+```
+Player Behavior Pipeline (F15.1-F15.2)
+  记录 14 层行为 → PlayerAction 事件流
+       │
+       ▼
+PlayerHabitProfile (F15.3)        G8.1 Behavior Tree
+  玩家画像：风格/频率/弱点           基础决策：追击/防御/撤退
+       │                                    │
+       ▼                                    ▼
+MirrorAgent (F15.3-F15.4)          G8.3 Combat MCTS
+  反制策略 + 动作预测               100 次模拟 → 最优动作
+       │                                    │
+       ▼                                    ▼
+  RL Self-play (F15.4)             G8.4 Q-Learning Agent
+  --rl-mirror 500                 离散化状态 → Q-table 训练
+```
+
+### F15 终焉回响 — 从技术到体验
+
+| 阶段 | 技术 | 玩家感受 |
+|------|------|----------|
+| **开场** | PlayerBehaviorAnalyzer 读取 14 层数据 | 面板弹出：「风格: AGGRESSIVE，弱点: 低闪避」— *它认识我* |
+| **Phase 1** | MirrorAgent 实时观察当前战斗 | Boss 复制你的武器/技能/装备，*我在打自己* |
+| **Phase 2** | 历史反制策略激活 | Boss 开始预判你的技能释放、封堵闪避方向 — *它开始预测我* |
+| **Phase 3** | 进化版人格 | *它比我更懂我* |
+
+### AI 技术清单
+
+| 系统 | 文件数 | 说明 |
+|------|--------|------|
+| **Behavior Tree** | 5 | 选择器/序列/条件/动作/黑板，14 个节点，决策时延 <1ms |
+| **A* Pathfinder** | 2 | priority_queue + Manhattan 启发式，有障碍物寻路 |
+| **Combat MCTS** | 3 | UCT 搜索 + 战斗快照 clone，100 次模拟预测最优动作 |
+| **Q-Learning Agent** | 2 | Observation 7 维向量 → Q-table 离散化，ε-greedy 探索 |
+| **Player Behavior Recorder** | 4 | 14 层静默采集：武器攻击/技能/移动/闪避/受伤，每局 260+ 事件 |
+| **Player Behavior Analyzer** | 2 | 事件流 → 玩家画像：频率/偏好/风格聚类 → 反制策略生成 |
+| **MirrorAgent** | 2 | 3 阶段人格演化 + reward 函数：伤害 + 预判 + 反制成功 |
+| **2nd-Layer Boss Domain** | 4 | BossArenaState 状态机 + WeakPoint + 无敌/易伤循环 |
+
+### CLI 训练命令
+
+```bash
+# 离线 RL 训练：MirrorAgent × 4 玩家风格 × 500 局
+build/roguelike_cpp --rl-mirror 500
+
+# 行为树模拟
+build/roguelike_cpp --sim-ai bt
+
+# MCTS 模拟
+build/roguelike_cpp --sim-ai mcts
+
+# Q-learning 训练
+build/roguelike_cpp --rl-train 1000
+```
 
 ---
 
