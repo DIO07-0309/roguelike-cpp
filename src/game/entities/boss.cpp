@@ -559,9 +559,10 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
     case BossState::IDLE: {
         // 基础 AI (追逐/巡逻)
         MonsterAI::update(self, player, map, dt, gt, all, effects);
-        // 检查是否进入ATTACK范围 → 切换为技能循环
+        // M4a-fix: 视野内即进入战斗姿态 (原 attack_range 48px —
+        // 玩家拉扯>48px 时连招/召唤/瞬移永不触发, BOSS 只会追)
         float dist = _dist_to(self, player);
-        if (dist <= attack_range * 32.0f) {
+        if (dist <= sight_range * 32.0f) {
             boss_state = BossState::ATTACK;
             normal_attack_count = 0;
             skill_cycle_index = 0;
