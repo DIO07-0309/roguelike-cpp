@@ -142,7 +142,7 @@ std::string WhirlwindSkill::execute(Monster* boss, Player* player,
     float dist = sqrtf((px - bx) * (px - bx) + (py - by) * (py - by));
     if (dist <= fx_radius && GetTime() - last_hit_time >= 0.5) {
         last_hit_time = GetTime();
-        int dmg = calculate_damage((int)(boss->combat.get_effective_attack() * 1.3),
+        int dmg = calculate_damage((int)(boss->combat.get_effective_attack() * 1.6),
             player->combat.get_effective_defense(AttackType::PHYSICAL));
         player->combat.take_damage(dmg);
         spin_hit_count++;
@@ -191,7 +191,7 @@ BarrageSkill::BarrageSkill() : BossSkill("弹幕", 7.0f) {
     fx_kind = "cone"; fx_radius = 200; fx_color = {150, 80, 255, 255};
 }
 std::string BarrageSkill::execute(Monster* boss, Player* player,
-    std::vector<Monster*>&, GameMap*, double) {
+    std::vector<Monster*>&, GameMap* map, double) {
     if (windup_left > 0) {
         boss->color = Color{180, 60, 60, 255};
         return "";
@@ -215,6 +215,11 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
     for (auto& s : shots) { s.x += s.vx * 0.016f; s.y += s.vy * 0.016f; s.life -= 0.016f; }
     for (auto it = shots.begin(); it != shots.end();) {
         bool dead = it->life <= 0.0f;
+        // M4a-fix: 弹丸撞墙消失 (原为穿墙 770px 追击)
+        if (!dead && map) {
+            auto [tx, ty] = map->pixel_to_tile(it->x, it->y);
+            if (!map->is_walkable(tx, ty)) dead = true;
+        }
         if (!dead && CheckCollisionCircleRec({it->x, it->y}, 8.0f, player->entity.rect)) {
             int dmg = calculate_damage(
                 (int)(boss->combat.get_effective_attack() * damage_mult),
