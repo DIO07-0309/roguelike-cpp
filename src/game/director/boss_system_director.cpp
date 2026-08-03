@@ -8,6 +8,7 @@
 #include "boss.h"              // BossAI, spawn_boss
 #include "data/boss_defs.h"    // F10.1: get_boss_def
 #include "combat_system.h"     // rng
+#include "config.h"            // F10.2: TILE_SIZE
 
 // ============================================================
 // D6 Step3: BossSystemDirector — 组合所有Boss子系统
@@ -192,56 +193,108 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
 void BossSystemDirector::_tick_domain_state(float dt, Monster* boss) {
     switch (arena_state) {
     case BossArenaState::INTRO:
-        // Brief intro → enter domain
         domain_timer += dt;
-        if (domain_timer >= 1.5f) {  // 1.5s intro pause
+        if (domain_timer >= 1.5f) {
             domain_timer = 0.0f;
             arena_state = BossArenaState::DOMAIN_PHASE;
             boss_invulnerable = true;
+            _spawn_domain_core(boss);
             EventBus::inst().emit(GameEventType::BOSS_DOMAIN_ENTER,
                 boss, 0, 0.0f, "domain_enter");
         }
         break;
 
-    case BossArenaState::DOMAIN_PHASE:
-        // Domain cycle — boss invincible, counts down
-        domain_timer += dt;
-        if (domain_timer >= domain_cycle_duration) {
+    case BossArenaState::DOMAIN_PHASE: {
+        // Check if core is dead → break
+        if (_active_core && !_active_core->combat.is_alive) {
+            _active_core = nullptr;
             domain_timer = 0.0f;
             arena_state = BossArenaState::VULNERABLE_PHASE;
             boss_invulnerable = false;
+            boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
+            domain_cycle_count++;
+            EventBus::inst().emit(GameEventType::WEAK_POINT_BREAK,
+                boss, domain_cycle_count, 0.0f, "core_destroyed");
+            EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
+                boss, domain_cycle_count, _vulnerable_dmg_mult, "vulnerable_enter");
+            break;
+        }
+        // Timer fallback: force cycle after max duration
+        domain_timer += dt;
+        if (domain_timer >= domain_cycle_duration) {
+            domain_timer = 0.0f;
+            if (_active_core) { _active_core->combat.is_alive = false; _active_core = nullptr; }
+            arena_state = BossArenaState::VULNERABLE_PHASE;
+            boss_invulnerable = false;
+            boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
             domain_cycle_count++;
             EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
                 boss, domain_cycle_count, 0.0f, "vulnerable_enter");
         }
         break;
-
+    }
     case BossArenaState::VULNERABLE_PHASE:
-        // Output window — boss takes damage, brief window
         domain_timer += dt;
-        if (domain_timer >= 10.0f) {  // 10s vulnerable window
+        if (domain_timer >= 10.0f) {
             domain_timer = 0.0f;
+            boss->combat.vulnerable_dmg_mult = 1.0f;
             arena_state = BossArenaState::DOMAIN_PHASE;
             boss_invulnerable = true;
+            _spawn_domain_core(boss);
             EventBus::inst().emit(GameEventType::BOSS_DOMAIN_ENTER,
                 boss, domain_cycle_count, 0.0f, "domain_enter");
         }
         break;
 
-    case BossArenaState::ENRAGED_PHASE:
-        // Final phase — domain cycles shorter
-        domain_timer += dt;
-        if (domain_timer >= 15.0f) {
+    case BossArenaState::ENRAGED_PHASE: {
+        if (_active_core && !_active_core->combat.is_alive) {
+            _active_core = nullptr;
             domain_timer = 0.0f;
             arena_state = BossArenaState::VULNERABLE_PHASE;
             boss_invulnerable = false;
+            boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
+            domain_cycle_count++;
+            EventBus::inst().emit(GameEventType::WEAK_POINT_BREAK,
+                boss, domain_cycle_count, 0.0f, "core_destroyed");
+            EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
+                boss, domain_cycle_count, _vulnerable_dmg_mult, "vulnerable_enter");
+            break;
+        }
+        domain_timer += dt;
+        if (domain_timer >= 15.0f) {
+            domain_timer = 0.0f;
+            if (_active_core) { _active_core->combat.is_alive = false; _active_core = nullptr; }
+            arena_state = BossArenaState::VULNERABLE_PHASE;
+            boss_invulnerable = false;
+            boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
             EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
                 boss, domain_cycle_count, 0.0f, "vulnerable_enter");
         }
         break;
-
+    }
     default: break;
     }
+}
+
+// ── F10.2: Spawn a domain core (weak point) near the boss ──
+void BossSystemDirector::_spawn_domain_core(Monster* boss) {
+    if (!boss || !_weak_point_pool) return;  // _weak_point_pool is set by caller
+    float cx = boss->entity.rect.x + boss->entity.rect.width / 2;
+    float cy = boss->entity.rect.y + boss->entity.rect.height / 2;
+    float dist = 80.0f + (float)(rng() % 40);
+    float angle = ((float)(rng() % 360)) * 3.14159f / 180.0f;
+    float sx = cx + cosf(angle) * dist;
+    float sy = cy + sinf(angle) * dist;
+
+    auto* core = new Monster(sx, sy, "火焰核心", 200, 0, 8, 4,
+        Color{255, 120, 30, 255});
+    core->is_weak_point = true;
+    core->weak_point_state = 0;  // ACTIVE
+    core->_weak_point_owner = boss;
+    core->entity.size = {28, 28};
+    core->entity.sync_rect();
+    _active_core = core;
+    _weak_point_pool->push_back(std::unique_ptr<Monster>(core));
 }
 
 void BossSystemDirector::notify_phase2() {

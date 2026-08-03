@@ -78,6 +78,7 @@ enum class GameEventType {
     // ── F10.1: Boss arena domain events ──
     BOSS_DOMAIN_ENTER,
     BOSS_VULNERABLE_ENTER,
+    WEAK_POINT_BREAK,
 
     // ── 游戏 ──
     GAME_CLEAR,

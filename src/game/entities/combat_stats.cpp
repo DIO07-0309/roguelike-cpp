@@ -10,6 +10,9 @@ int CombatStats::take_damage(int amount) {
     if (amount < 0) amount = 0;
     // F10.1: Domain boss invulnerability
     if (domain_invulnerable) return 0;
+    // F10.2: Vulnerable phase damage multiplier
+    if (vulnerable_dmg_mult != 1.0f)
+        amount = (int)(amount * vulnerable_dmg_mult);
     // D3 Step3: 护盾吸收 (shield_hp先扣)
     if (shield_hp > 0) {
         int absorbed = (int)std::min((float)amount, shield_hp);

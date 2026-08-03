@@ -448,6 +448,7 @@ void GameScene::_process(double delta) {
     {
         auto* boss = _get_boss();
         if (boss && boss->is_boss) {
+            _boss._weak_point_pool = &monsters;  // F10.2: pass pool for core spawn
             _boss.tick(dt, boss, player.get(), current_floor, _gameplay.world_state,
                        _gameplay.rels, _gameplay.story.stage(), monsters);
 
@@ -461,9 +462,13 @@ void GameScene::_process(double delta) {
                     _presentation.trigger_shake(6.0f);
                     break;
                 case BossArenaState::VULNERABLE_PHASE:
-                    _presentation.show_message("【弱点暴露】全力输出!", 2.0f);
+                    _presentation.show_message("【弱点暴露】全力输出! 伤害 x2", 2.0f);
                     _presentation.trigger_shake(10.0f);
                     _presentation.trigger_freeze(0.08f);
+                    break;
+                case BossArenaState::MECHANIC_PHASE:
+                    _presentation.show_message("【核心破坏!】Boss失去了领域保护", 2.0f);
+                    _presentation.trigger_shake(8.0f);
                     break;
                 default: break;
                 }
@@ -1647,6 +1652,15 @@ void GameScene::_draw_map() {
 void GameScene::_draw_entities() {
     for (auto& m : monsters) {
         m->draw(_cam_x, _cam_y);
+        // F10.2: Weak point glow
+        if (m->is_weak_point && m->combat.is_alive) {
+            float ex = m->entity.rect.x + m->entity.rect.width/2 - _cam_x;
+            float ey = m->entity.rect.y + m->entity.rect.height/2 - _cam_y;
+            float pulse = 14.0f + sinf((float)GetTime() * 8.0f) * 4.0f;
+            DrawRing({ex, ey}, pulse - 3, pulse + 3, 0, 360, 16,
+                {255, 120, 30, 180});
+            DrawCircleLines(ex, ey, pulse, {255, 80, 20, 200});
+        }
         float mx = m->entity.rect.x + m->entity.rect.width/2 - _cam_x;
         float my = m->entity.rect.y - 14 - _cam_y;
         // G9: name label above monster (small, tinted by type)

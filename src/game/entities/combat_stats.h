@@ -43,6 +43,9 @@ struct CombatStats {
     // F10.1: Domain boss invulnerability (set by BossSystemDirector)
     bool domain_invulnerable = false;
 
+    // F10.2: Vulnerable phase damage multiplier (set by BossSystemDirector)
+    float vulnerable_dmg_mult = 1.0f;
+
     // M4a-log: 已记账 HP — 有标签掉血源调用 mark_damage_logged(),
     // 兜底日志据此跳过已上标签的掉血, 避免重复上报
     int logged_hp = -1;

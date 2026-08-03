@@ -51,6 +51,11 @@ public:
     int    domain_cycle_count = 0;          // how many cycles completed
     std::string _behavior_type;             // from BossDef ("" = standard, "domain" = domain boss)
 
+    // ── F10.2: Weak point tracking ──
+    Monster* _active_core = nullptr;         // currently spawned fire_core (nullptr if broken)
+    float    _vulnerable_dmg_mult = 2.0f;   // damage multiplier during VULNERABLE_PHASE
+    std::vector<std::unique_ptr<Monster>>* _weak_point_pool = nullptr;  // set by caller
+
     std::string intro_text;
     std::string modifier_text;
     int  dmg_done = 0, dmg_taken = 0;
@@ -72,6 +77,7 @@ public:
 private:
     void notify_death_ev(const struct GameEvent&);
     void _tick_domain_state(float dt, Monster* boss);  // F10.1
+    void _spawn_domain_core(Monster* boss);             // F10.2
 
 public:
     // ── 查询接口 ──

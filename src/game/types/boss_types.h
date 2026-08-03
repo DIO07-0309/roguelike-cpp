@@ -154,6 +154,11 @@ enum class CinematicPhase { NONE, INTRO, PHASE2_TRANSITION, LAST_STAND, DEATH };
 enum class EncounterPhase { OPENING, PRESSURE, CONTROL, LAST_STAND, ENDED };
 
 // ═══════════════════════════════════════════════════════════════
+// F10.2: WeakPointState — core/weak-point lifecycle
+// ═══════════════════════════════════════════════════════════════
+enum class WeakPointState { ACTIVE, BROKEN };
+
+// ═══════════════════════════════════════════════════════════════
 // F10.1: BossArenaState — domain-boss arena cycle
 // ═══════════════════════════════════════════════════════════════
 enum class BossArenaState {
