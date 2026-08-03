@@ -52,6 +52,16 @@
 
 ## Original v0.8.0 below
 
+## M4a 系列 — Boss 核心环革新 (C++ 版)
+
+| Milestone | 内容 | 状态 |
+|-----------|------|------|
+| M4a | 暗影骑士连招机器: combo 驱动 (弹幕/扇形斩/瞬移/旋风/召唤) + BossSkillQueue + 技能预警 + zone 修正 | ✅ |
+| M4a.1 | 战斗体验修复: 连招触发距离 48→192px / 脱战 384px / 旋风范围圈 / 狂暴演出 / 弹幕特效 | ✅ |
+| M4a.2 | 数值平衡: 毒池 0.5s DOT / 弹幕撞墙消失 / 旋风 1.6× 扇形 1.25× | ✅ |
+| M4a.3 | 伤害日志全链路: attack_target 统一标签 + logged_hp 记账去重 + 每帧兜底 + [COMBO] 可见性 | ✅ |
+| M4b | 第二章 Boss 领域作战 (茶杯头式) | ⏳ 开发中 |
+
 ## Scope
 
 G1 (7 steps) — Architecture Foundation

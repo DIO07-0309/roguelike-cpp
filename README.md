@@ -307,3 +307,7 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | G10.2 | Damage Type: AttackType 实装(PHYSICAL/MAGICAL/TRUE) + DamageResult 管道 | ✅ |
 | G10.3 | Element Combat: Fire暴击/Ice减速冻结/Poison毒伤 + 元素经验 + VFX浮动标签 | ✅ |
 | M4a | Boss 核心环革新样板: 暗影骑士连招机器 (弹幕/扇形斩/瞬移/旋风/召唤 combo 驱动) + 技能预警表现 + zone 伤害间隔修正 | ✅ |
+| M4a.1 | M4a 战斗体验修复: 连招触发距离 48→192px / 脱战 384px 不打断连招 / 旋风范围圈可视化 / 狂暴紫色演出 / 弹幕全特效 | ✅ |
+| M4a.2 | M4a 数值平衡: 毒池 DOT 改 0.5s 周期 + 高亮 / 弹幕撞墙消失 / 旋风 1.6× 扇形 1.25× / shadow_knight 专属连招配置 | ✅ |
+| M4a.3 | 伤害日志全链路: attack_target 统一标签 + CombatStats 记账去重 + 每帧兜底未标注掉血 + [COMBO] 连招可见性 | ✅ |
+| M4b | 第二章 Boss 领域作战 (茶杯头式 Boss 房 / 弹幕演出 / 机制阶段) | ⏳ 开发中 |
