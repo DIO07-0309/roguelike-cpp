@@ -401,6 +401,15 @@ void GameScene::_process(double delta) {
     if (state != GameState::PLAYING) return;
     game_time += dt;
 
+    // M4a-fix: 兜底受击日志 — 捕捉所有无标签来源的玩家掉血
+    {
+        int hp_now = player->combat.current_hp;
+        if (_last_hp_tracked >= 0 && hp_now < _last_hp_tracked)
+            LOG_INFO("[DMG] 未标注来源 玩家掉血 %d → HP:%d/%d",
+                     _last_hp_tracked - hp_now, hp_now, player->combat.max_hp);
+        _last_hp_tracked = hp_now;
+    }
+
     // B15: Boss Phase2 提示
     if (!_boss_phase2_shown) {
         auto* boss = _get_boss();
@@ -654,6 +663,7 @@ void GameScene::_process(double delta) {
                 int sd = (int)(3 * ascale), md = (int)(4 * ascale);
                 if (dist < 0.8f * TILE_SIZE) {
                     player->combat.take_damage(sd);
+                    LOG_INFO("[DMG] 尖刺 造成 %d 伤害 → 玩家", sd);
                     _presentation.damage_floats.push_back({px, py-8, 0.4f, sd, {255, 60, 40, 255}});
                 }
                 for (auto& m : monsters)

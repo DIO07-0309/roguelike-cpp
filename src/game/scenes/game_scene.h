@@ -254,6 +254,9 @@ private:
 
     float _cam_x = 0, _cam_y = 0;
 
+    // M4a-fix: 兜底受击日志 — 每帧对比玩家 HP, 捕捉无标签来源的掉血
+    int _last_hp_tracked = -1;
+
     // ── G4.5: Replay ──
     ReplayRecorder _recorder;
     ReplayPlayer   _replay_player;

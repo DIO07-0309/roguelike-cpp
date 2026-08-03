@@ -609,7 +609,11 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         }
         // 先执行普攻
         if (self->can_attack(gt)) {
+            int hp_before = player->combat.current_hp;
             self->attack_target(player, gt);
+            if (player->combat.current_hp < hp_before)
+                LOG_INFO("[DMG] 暗影骑士普攻 造成 %d 伤害",
+                         hp_before - player->combat.current_hp);
             _spawn_boss_vfx(self, "charge", effects); // reuse vfx for norm attack
             normal_attack_count++;
         }
