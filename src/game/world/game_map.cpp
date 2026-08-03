@@ -169,9 +169,14 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                 case ArenaObjectType::HEALING_TOTEM:
                     DrawRectangle(dx+4, dy+4, tile_size-8, tile_size-8, {30, 140, 60, 255});
                     DrawText("+", dx+11, dy+5, 18, {100, 255, 120, 255}); break;
-                case ArenaObjectType::POISON_POOL:
-                    DrawRectangle(dx+2, dy+2, tile_size-4, tile_size-4, {20, 80, 30, 200});
-                    DrawText("~", dx+10, dy+5, 16, {80, 220, 80, 200}); break;
+                case ArenaObjectType::POISON_POOL: {
+                    // M4a-fix: 亮绿 + 脉动描边 (原深绿不易察觉, 玩家踩毒不自知)
+                    float pulse = 0.6f + 0.4f * sinf((float)GetTime() * 5.0f);
+                    DrawRectangle(dx+2, dy+2, tile_size-4, tile_size-4, {40, 150, 55, 210});
+                    DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4,
+                                       {90, 250, 90, (unsigned char)(170 * pulse)});
+                    DrawText("~", dx+10, dy+5, 16, {170, 255, 170, 230});
+                } break;
                 case ArenaObjectType::ROCK: {
                     DrawRectangle(dx+2, dy+8, tile_size-4, tile_size-10, {100, 95, 100, 255});
                     DrawRectangleLines(dx+2, dy+8, tile_size-4, tile_size-10, {130, 125, 130, 255});

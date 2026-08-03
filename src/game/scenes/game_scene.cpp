@@ -642,7 +642,13 @@ void GameScene::_process(double delta) {
                 }
                 break;
             case ArenaObjectType::POISON_POOL:
-                if (dist < 1.2f * TILE_SIZE) apply_buff(player.get(), "pool_poison", 1);
+                // M4a-fix: 0.5s 间隔叠层 (原每帧 1 层 — 踩毒 0.1s 即叠满 5 层,
+                // 离开后 4s 内每跳 15 伤害 = "离老远莫名死亡" 元凶)
+                ao.timer += dt;
+                if (ao.timer >= 0.5f) {
+                    ao.timer = 0;
+                    if (dist < 1.2f * TILE_SIZE) apply_buff(player.get(), "pool_poison", 1);
+                }
                 break;
             case ArenaObjectType::SPIKE: {
                 int sd = (int)(3 * ascale), md = (int)(4 * ascale);
