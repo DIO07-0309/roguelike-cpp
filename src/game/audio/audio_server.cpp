@@ -171,6 +171,10 @@ void AudioServer::init() {
     if (FileExists(mp3)) _sfx["timestop"] = LoadSound(mp3);
     else _sfx["timestop"] = _compile_bolt();
 
+    // G10: domain expand SFX
+    const char* domain_mp3 = "assets/domain_expand.mp3";
+    if (FileExists(domain_mp3)) _sfx["domain_expand"] = LoadSound(domain_mp3);
+
     // BGM
     LOG_INFO("音频: 合成BGM(4支)...");
     _bgm.init();

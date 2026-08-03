@@ -460,6 +460,7 @@ void GameScene::_process(double delta) {
                 case BossArenaState::DOMAIN_PHASE:
                     _presentation.show_message("【领域展开】Boss受到保护 — 寻找破绽!", 2.5f);
                     _presentation.trigger_shake(6.0f);
+                    get_tree()->get_audio()->play_sfx("domain_expand");
                     break;
                 case BossArenaState::VULNERABLE_PHASE:
                     _presentation.show_message("【弱点暴露】全力输出! 伤害 x2", 2.0f);
