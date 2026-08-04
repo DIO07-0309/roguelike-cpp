@@ -80,7 +80,8 @@ auto* boss = boss_factory_create(btype, _s.stairs_pos.first, _s.stairs_pos.secon
 
             BuildType bt = calculate_build(_s.player.get()).identify();
             _s._boss.init_on_spawn(boss, _s.boss_floor, _s._gameplay.world_state,
-                                    bt, _s._gameplay.rels, _s.game_map.get());
+                                    bt, _s._gameplay.rels, _s.game_map.get(),
+                                    _s.player.get());
             _s._presentation.boss_modifier_text = _s._boss.modifier_text;
 
             _s.boss_cinematic_timer = 1.0f;

@@ -614,14 +614,53 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         if (_combos && !_combos->empty()) {
             if (_tick_combo_attack(self, player, map, dt, gt, effects)) break;
         }
-        // 先执行普攻 (attack_target 内部已打 [DMG] 标签并记账)
-        if (self->can_attack(gt)) {
+        // F15 Mirror: 镜像武器攻击 — 使用玩家武器范围/倍率/连招
+        if (_is_mirror && self->can_attack(gt)) {
+            float range_px = _mirror_active_range > 0 ? _mirror_active_range
+                          : _mirror_weapon_range * 32.0f;
+            if (dist <= range_px) {
+                int stage = _mirror_combo_stage;
+                float mult = _mirror_stage_mults[stage];
+                int dmg = (int)(self->combat.attack * mult * _mirror_attack_mult);
+                dmg = calculate_damage(dmg,
+                    player->combat.get_effective_defense(AttackType::PHYSICAL));
+                player->combat.take_damage(dmg);
+                LOG_INFO("[DMG] 终焉回响·镜像[%d段] 造成 %d 伤害 → 玩家",
+                    stage + 1, dmg);
+                player->combat.mark_damage_logged();
+                _spawn_boss_vfx(self, "charge", effects);
+                normal_attack_count++;
+                _mirror_combo_stage++;
+                if (_mirror_combo_stage >= _mirror_max_stages)
+                    _mirror_combo_stage = 0;
+            }
+        } else if (!_is_mirror && self->can_attack(gt)) {
             self->attack_target(player, gt);
             _spawn_boss_vfx(self, "charge", effects); // reuse vfx for norm attack
             normal_attack_count++;
         }
-        // 普攻2次后 → 使用下个技能 (D8: Golem adds DEFEND to cycle)
+        // 普攻2次后 → 使用下个技能
         if (normal_attack_count >= 2) {
+            // F15 Mirror: 使用镜像技能代替 BossAI 技能循环
+            if (_is_mirror && !_mirror_skills.empty()) {
+                _mirror_skill_idx = (_mirror_skill_idx + 1) % (int)_mirror_skills.size();
+                auto& ms = _mirror_skills[_mirror_skill_idx];
+                if (ms.skill_type == 0 || ms.skill_type == 1) {
+                    // melee/projectile: use shockwave state with mirror params
+                    _shockwave->windup_time = 0.4f;
+                    _shockwave->windup_left = 0.4f;
+                    _shockwave->fx_radius = ms.range;
+                    boss_state = BossState::SHOCKWAVE;
+                    _spawn_boss_vfx(self, "shockwave", effects);
+                } else if (ms.skill_type == 2) {
+                    // self_buff: apply buff to boss
+                    if (!ms.name.empty()) {
+                        apply_buff(self, "attack_up", 2);
+                        LOG_INFO("[MIRROR] Echo mirror skill: %s (buff)", ms.name.c_str());
+                    }
+                }
+                normal_attack_count = 0;
+            } else {
             int sk = _next_cycle_skill();
             // ── G5.4: Phase2 signature skill injection ──
             if (phase2 && _boss_id) {
@@ -679,8 +718,11 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             }
             normal_attack_count = 0;
         }
-        // 仍然追向玩家
-        if (dist > attack_range * 32.0f) {
+        } // end else (非镜像技能循环)
+        // 仍然追向玩家 — F15 Mirror 用镜像武器范围
+        float chase_dist = _is_mirror ? _mirror_weapon_range * 48.0f
+                                      : attack_range * 32.0f;
+        if (dist > chase_dist) {
             float dx = player->entity.rect.x + player->entity.rect.width/2
                      - self->entity.rect.x - self->entity.rect.width/2;
             float dy = player->entity.rect.y + player->entity.rect.height/2

@@ -223,6 +223,31 @@ public:
     const char* _boss_id = nullptr;   // G5.4: 当前 Boss ID 用于 phase2 行为分支
     float _gravity_timer = 0.0f;      // GRAVITY_PULL 拉拽计时 (成员, 原 static 跨实例共享)
 
+    // F15 Mirror Boss: 镜像玩家武器/技能/装备
+    bool _is_mirror = false;
+    int  _mirror_weapon_type = 0;        // WeaponType int
+    float _mirror_weapon_range = 1.5f;   // 基础攻击距离 (tiles)
+    float _mirror_attack_mult = 1.2f;    // ATK = player_atk × 1.2
+    int  _mirror_combo_stage = 0;        // 0-2, 类似玩家连招
+    int  _mirror_max_stages = 1;         // 武器最大连招段数
+    float _mirror_stage_mults[3] = {1.0f, 1.0f, 1.0f};  // 每段伤害倍率
+    float _mirror_active_range = 0.0f;   // 主攻击范围 (pixels)
+    float _mirror_width = 0.0f;          // 攻击宽度 (pixels) — 扇形角度/矩形宽
+    int  _mirror_hit_shape = 0;          // HitShape int (0=circle, 1=sector, 2=rect, 3=capsule)
+
+    // F15 Mirror Boss: 镜像玩家技能
+    struct MirrorSkill {
+        std::string name;           // 技能名 "Fire Slash"
+        float cooldown = 2.0f;
+        float damage_mult = 1.0f;
+        float range = 80.0f;        // pixels
+        int   skill_type = 0;       // 0=melee, 1=projectile, 2=self_buff, 3=aoe
+        float last_used = -99.0f;
+    };
+    std::vector<MirrorSkill> _mirror_skills;
+    int _mirror_skill_idx = 0;    // 当前镜像技能索引
+    int _mirror_action_intent = -1;  // MirrorAgent 预测的下一动作 (-1=none, 0=attack, 1=skill, 2=heal)
+
 private:
     void _enter_phase2(Monster* self, std::vector<Effect>* effects);
     void _tick_boss_state(Monster* self, Player* player, GameMap* map,

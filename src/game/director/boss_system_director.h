@@ -62,7 +62,7 @@ public:
 
     // ── F15.3: MirrorAgent (Ending Echo F15 boss) ──
     std::unique_ptr<MirrorAgent> _mirror_agent;
-    void _init_mirror_boss(Monster* boss);    // called from init_on_spawn
+    void _init_mirror_boss(Monster* boss, const class Player* player);
 
     std::string intro_text;
     std::string modifier_text;
@@ -71,7 +71,8 @@ public:
     // ── 生命周期 Hooks (GameScene 调用) ──
     void reset();   // 新楼层开始时调用
     void init_on_spawn(Monster* boss, int floor, const WorldState& ws, BuildType bt,
-                       const RelationshipSystem& rels, GameMap* map);
+                       const RelationshipSystem& rels, GameMap* map,
+                       const class Player* player = nullptr);
     void tick(float dt, Monster* boss, Player* player, int floor,
               const WorldState& ws, const RelationshipSystem& rels,
               StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters);

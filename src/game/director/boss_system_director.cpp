@@ -7,7 +7,8 @@
 #include "relationship_system.h"
 #include "boss.h"              // BossAI, spawn_boss
 #include "data/boss_defs.h"    // F10.1: get_boss_def
-#include "combat_system.h"     // rng
+#include "combat_system.h"     // rng, get_effective_max_hp
+#include "systems/weapon_component.h"  // WeaponDef (for mirror weapon stages)
 #include "config.h"            // F10.2: TILE_SIZE
 #include "components/element_component.h" // F10.3: ElementType
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.3
@@ -46,7 +47,7 @@ void BossSystemDirector::reset() {
 
 void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
     const WorldState& ws, BuildType bt, const RelationshipSystem& rels,
-    GameMap* map) {
+    GameMap* map, const Player* player) {
     if (!boss) return;
 
     // D5 Step1: BossModifier
@@ -137,15 +138,15 @@ void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
                 domain_cycle_duration = def->domain_config.cycle_time;
                 _vulnerable_dmg_mult  = def->domain_config.damage_multiplier;
             } else if (_behavior_type == "mirror") {
-                _init_mirror_boss(boss);
+                _init_mirror_boss(boss, player);
             }
         }
     }
 }
 
-void BossSystemDirector::_init_mirror_boss(Monster* boss) {
-    if (!boss) return;
-    // Analyze player behavior from the recorded action stream
+void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) {
+    if (!boss || !player) return;
+    // Analyze player behavior
     const auto& history = g_behavior.history();
     if (history.empty()) return;
 
@@ -153,13 +154,70 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss) {
     _mirror_agent = std::make_unique<MirrorAgent>();
     _mirror_agent->init(profile);
 
-    // Copy player equipment/skills onto boss for visual mirroring
-    // (actual stats already set by factory with 1.0× — we use 1.2× manually)
-    boss->combat.max_hp   = (int)(boss->combat.max_hp * 1.2f);
+    // ── 数值: HP=玩家×2.0, ATK=玩家×1.2 ──
+    int p_hp = get_effective_max_hp(player);
+    int p_atk = player->combat.get_effective_attack();
+    boss->combat.max_hp   = p_hp * 2;
     boss->combat.current_hp = boss->combat.max_hp;
-    boss->combat.attack   = (int)(boss->combat.attack * 1.2f);
-    boss->combat.physical_defense = (int)(boss->combat.physical_defense * 1.2f);
-    boss->combat.magical_defense  = (int)(boss->combat.magical_defense * 1.2f);
+    boss->combat.attack   = (int)(p_atk * 1.2f);
+    boss->combat.physical_defense = player->combat.physical_defense + 5;
+    boss->combat.magical_defense  = player->combat.magical_defense + 3;
+
+    // ── 镜像武器: 读取玩家武器类型/范围/连招 ──
+    auto* bai = dynamic_cast<BossAI*>(boss->ai);
+    if (!bai) return;
+    bai->_is_mirror = true;
+    int wtype = (int)player->weapon.weapon_type();
+    bai->_mirror_weapon_type = wtype;
+    const WeaponDef* wdef = player->weapon.current_def();
+    if (wdef) {
+        bai->_mirror_max_stages = wdef->stage_count;
+        for (int i = 0; i < bai->_mirror_max_stages && i < 3; i++) {
+            bai->_mirror_stage_mults[i] = wdef->stages[i].damage_multiplier;
+            if (i == 0) {
+                bai->_mirror_active_range = wdef->stages[i].range * TILE_SIZE;
+                bai->_mirror_width = wdef->stages[i].width;
+                bai->_mirror_hit_shape = (int)wdef->stages[i].hit_shape;
+            }
+        }
+        bai->_mirror_weapon_range = bai->_mirror_active_range / TILE_SIZE;
+    } else {
+        // 拳头 fallback
+        bai->_mirror_max_stages = 1;
+        bai->_mirror_stage_mults[0] = 1.0f;
+        bai->_mirror_weapon_range = 1.5f;
+        bai->_mirror_active_range = 48.0f;
+    }
+
+    // ── 镜像技能: 读取玩家主动技能 ──
+    bai->_mirror_skills.clear();
+    for (auto& sk : player->skills.active_skills) {
+        BossAI::MirrorSkill ms;
+        ms.name = sk->name;
+        ms.cooldown = sk->cooldown;
+        ms.last_used = -99.0f;
+        // 技能类型推断: 自愈类→self_buff, 时停→aoe, 远程→projectile, 其余→melee
+        if (sk->name.find("Heal") != std::string::npos
+            || sk->name.find("愈") != std::string::npos)
+            ms.skill_type = 2;
+        else if (sk->name.find("World") != std::string::npos
+            || sk->name.find("时停") != std::string::npos)
+            ms.skill_type = 3;
+        else if (sk->name.find("Slash") != std::string::npos
+            || sk->name.find("斩") != std::string::npos)
+            ms.skill_type = 0;
+        else
+            ms.skill_type = 1; // projectile default
+        ms.damage_mult = 1.0f;
+        ms.range = 100.0f;
+        bai->_mirror_skills.push_back(ms);
+    }
+    bai->_mirror_skill_idx = 0;
+
+    int mirror_hp = boss->combat.max_hp;
+    int mirror_atk = boss->combat.attack;
+    int mirror_skill_count = (int)bai->_mirror_skills.size();
+    (void)mirror_hp; (void)mirror_atk; (void)mirror_skill_count;
 }
 
 void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
