@@ -89,6 +89,6 @@ int FloorManager::check_floor_transition(const InputMap& input, int current_floo
     if (std::make_pair(tx, ty) != stairs_pos) return -1;
     if (!input.is_action_just_pressed("descend")) return -1;
 
-    if (current_floor >= MAX_FLOORS) return MAX_FLOORS; // 通关
-    return current_floor + 1; // 下楼
+    if (current_floor > MAX_FLOORS) return MAX_FLOORS; // F15通关后 → 胜利
+    return current_floor + 1; // 下楼 (F14→F15 正常)
 }
