@@ -1145,7 +1145,7 @@ void GameScene::_check_floor_transition() {
         current_floor, game_map.get(), player.get(), stairs_pos);
     if (next < 0) return;  // 不下楼
 
-    if (next == MAX_FLOORS) {
+    if (next > MAX_FLOORS) {
         // G5.6: sim stats on game clear
         if (_sim_mode) _collect_sim_stats();
         LOG_INFO("通关! 最终第%d层 Lv%d", current_floor, player->level);

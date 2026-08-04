@@ -24,7 +24,7 @@ public:
     static bool is_floor_cleared(const std::vector<std::unique_ptr<Monster>>& monsters);
 
     // 检查是否应下楼 (玩家在楼梯上按了 >键)
-    // 返回: -1=不下楼, MAX_FLOORS=通关, 其他=下楼
+    // 返回: -1=不下楼, >MAX_FLOORS=通关, 其他=目标楼层
     static int check_floor_transition(const InputMap& input, int current_floor,
                                        GameMap* map, const Player* player,
                                        std::pair<int,int> stairs_pos);
