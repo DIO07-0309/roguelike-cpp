@@ -2,6 +2,8 @@
 #include "skill.h"
 #include "item.h"
 #include "config.h"
+#include "resource_manager.h"                 // M4f.2
+#include "game/rendering/sprite_renderer.h"   // M4f.2
 #include <cmath>
 #include <algorithm>
 
@@ -91,6 +93,25 @@ void Player::auto_level_to(int target) {
     }
 }
 
+// M4f.2: 纹理缺失时的几何回退
+static void _draw_legacy_player_body(float hx, float hy, float hw, float hh,
+                                     Color body_c, Direction dir) {
+    Rectangle body_r = {hx + 3, hy + 2, hw - 6, hh - 4};
+    DrawRectangleRounded(body_r, 0.2f, 4, body_c);
+    DrawRectangleRounded({hx + 5, hy + 3, hw - 10, 8}, 0.15f, 3,
+                          {80, 210, 80, 255});
+    float cx = hx + hw / 2, cy = hy + hh / 2;
+    DrawCircle(cx, cy, 5, WHITE);
+    float ox = 0, oy = 3;
+    switch (dir) {
+        case Direction::UP:    oy = -3; break;
+        case Direction::DOWN:  oy = 3;  break;
+        case Direction::LEFT:  ox = -3; break;
+        case Direction::RIGHT: ox = 3;  break;
+    }
+    DrawCircle(cx + ox, cy + oy, 3, {20, 20, 20, 255});
+}
+
 void Player::draw_no_cam(float cam_x, float cam_y) {
     Rectangle dr = entity.draw_rect(cam_x, cam_y);
 
@@ -109,22 +130,19 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
         combo.count >= 2 ? Color{60, 180, 140, 255} :
                            Color{40, 160, 40, 255};
 
-    Rectangle body_r = {hx + 3, hy + 2, hw - 6, hh - 4};
-    DrawRectangleRounded(body_r, 0.2f, 4, body_c);
-    DrawRectangleRounded({hx + 5, hy + 3, hw - 10, 8}, 0.15f, 3,
-                          {80, 210, 80, 255});
-
-    // 朝向瞳孔
-    float cx = hx + hw / 2, cy = hy + hh / 2;
-    DrawCircle(cx, cy, 5, WHITE);
-    float ox = 0, oy = 3;
-    switch (direction) {
-        case Direction::UP:    oy = -3; break;
-        case Direction::DOWN:  oy = 3;  break;
-        case Direction::LEFT:  ox = -3; break;
-        case Direction::RIGHT: ox = 3;  break;
+    // M4f.2: 程序化像素精灵 (四方向占位, 素材到位后换文件纹理)
+    int eye_dir = (int)direction;
+    char key[32];
+    snprintf(key, sizeof(key), "ply_%d_%02x%02x%02x",
+        eye_dir, body_c.r, body_c.g, body_c.b);
+    Texture2D tex = ResourceManager::inst().procedural_sprite(
+        key, body_c, {80, 210, 80, 255}, 0, eye_dir);
+    if (tex.id > 0) {
+        SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32;
+        SpriteRenderer::draw_sprite(tex, sd, 0, {hx, hy, hw, hh});
+    } else {
+        _draw_legacy_player_body(hx, hy, hw, hh, body_c, direction);
     }
-    DrawCircle(cx + ox, cy + oy, 3, {20, 20, 20, 255});
 
     // D2: Combo 指示器 (连击数显示在头顶)
     if (combo.count >= 2 && combo.timer > 0) {

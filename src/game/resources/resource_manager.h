@@ -30,6 +30,16 @@ public:
     // ── Sound (文件路径 → Sound) ──
     Sound load_sound(const char* path); // MP3/WAV, 自动缓存
 
+    // ── M4f: Texture (文件路径 → Texture, 自动缓存; 失败返回 {0}) ──
+    Texture2D load_texture(const char* path);
+    // 程序化像素纹理缓存 (key 唯一, 如 "wall_1a2a2e"); 同 key 复用
+    Texture2D procedural_tile(const char* key, Color base, bool wall);
+    // M4f.2: 程序化角色/怪物占位精灵缓存
+    Texture2D procedural_sprite(const char* key, Color body, Color accent,
+                                int variant, int eye_dir = 0);
+    // M4f.2: 程序化 VFX 爆点缓存
+    Texture2D procedural_fx(const char* key, Color c);
+
 private:
     ResourceManager() = default;
     ~ResourceManager();
@@ -46,4 +56,6 @@ private:
 
     // Sound 缓存 (path → Sound)
     std::unordered_map<std::string, Sound> _sound_cache;
+    // M4f: 纹理缓存 (path/key → Texture)
+    std::unordered_map<std::string, Texture2D> _texture_cache;
 };

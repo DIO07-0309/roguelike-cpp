@@ -1,6 +1,10 @@
 #include "game_map.h"
 #include "config.h"
+#include "core/logger.h"
+#include "resource_manager.h"                 // M4f: 纹理缓存
+#include "game/rendering/sprite_renderer.h"   // M4f: 像素绘制
 #include <cmath>
+#include <cstdio>
 
 GameMap::GameMap(int w, int h, int ts)
     : width(w), height(h), tile_size(ts),
@@ -83,11 +87,29 @@ const SpecialRoom* GameMap::get_special_room_at(int tile_x, int tile_y) const {
     return nullptr;
 }
 
+void GameMap::set_palette(const TilePalette* palette) {
+    _has_palette = (palette != nullptr);
+    if (_has_palette) _palette = *palette;
+}
+
 void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
     int sc = std::max(0, (int)(cam_x / tile_size));
     int sr = std::max(0, (int)(cam_y / tile_size));
     int ec = std::min(width, (int)((cam_x + sw) / tile_size) + 1);
     int er = std::min(height, (int)((cam_y + sh) / tile_size) + 1);
+
+    // M4f: 程序化像素纹理 (缓存于 ResourceManager, 按基色着色)
+    Color wall_c  = _has_palette ? _palette.wall_face : Color{60, 60, 80, 255};
+    Color floor_c = _has_palette ? _palette.floor_base : Color{25, 25, 35, 255};
+    char wall_key[40], floor_key[40];
+    snprintf(wall_key, sizeof(wall_key), "wall_%02x%02x%02x",
+        wall_c.r, wall_c.g, wall_c.b);
+    snprintf(floor_key, sizeof(floor_key), "floor_%02x%02x%02x",
+        floor_c.r, floor_c.g, floor_c.b);
+    auto& rm = ResourceManager::inst();
+    Texture2D wall_tex  = rm.procedural_tile(wall_key, wall_c, true);
+    Texture2D floor_tex = rm.procedural_tile(floor_key, floor_c, false);
+    SpriteDef sd; sd.frame_w = tile_size; sd.frame_h = tile_size;
 
     for (int y = sr; y < er; y++) {
         for (int x = sc; x < ec; x++) {
@@ -96,7 +118,11 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
             const auto& t = _tiles[y][x];
 
             if (t.type == TileType::WALL) {
-                DrawRectangle(dx, dy, tile_size, tile_size, {60, 60, 80, 255});
+                if (wall_tex.id > 0)
+                    SpriteRenderer::draw_sprite(wall_tex, sd, 0,
+                        {dx, dy, (float)tile_size, (float)tile_size});
+                else
+                    DrawRectangle(dx, dy, tile_size, tile_size, wall_c);
                 DrawRectangleLines(dx, dy, tile_size, tile_size, {40, 40, 55, 255});
             } else if (t.type == TileType::FLOOR) {
                 const SpecialRoom* sr = get_special_room_at(x, y);
@@ -141,7 +167,11 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                         DrawText(icon, (int)dx + 10, (int)dy + 5, 20, ic);
                     }
                 } else {
-                    DrawRectangle(dx, dy, tile_size, tile_size, {25, 25, 35, 255});
+                    if (floor_tex.id > 0)
+                        SpriteRenderer::draw_sprite(floor_tex, sd, 0,
+                            {dx, dy, (float)tile_size, (float)tile_size});
+                    else
+                        DrawRectangle(dx, dy, tile_size, tile_size, floor_c);
                     // 细微网格线
                     DrawRectangleLines(dx, dy, tile_size, tile_size, {35, 35, 45, 255});
                 }

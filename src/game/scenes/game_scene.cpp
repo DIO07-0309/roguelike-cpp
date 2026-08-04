@@ -7,6 +7,7 @@
 #include "skill.h"
 #include "combat_system.h"
 #include "dungeon_generator.h"
+#include "world/biome.h"   // M4f: get_biome_for_floor
 #include "scene_tree.h"
 #include "input_map.h"
 #include "core/logger.h"
@@ -275,6 +276,10 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     DungeonGenerator gen(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
     game_map = gen.generate(_dungeon_seed, fcfg->special_room_count, fcfg->arena_density);
     auto rooms = gen.get_room_centers();
+
+    // M4f: biome palette → 地图 (程序化像素纹理基色)
+    const BiomeDef* biome = get_biome_for_floor(floor);
+    game_map->set_palette(biome ? &biome->palette : nullptr);
 
     // 放置玩家
     if (!rooms.empty()) {

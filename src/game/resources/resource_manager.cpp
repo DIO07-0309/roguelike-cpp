@@ -1,6 +1,7 @@
 #include "resource_manager.h"
 #include "core/logger.h"
 #include "combat_system.h"
+#include "game/rendering/sprite_renderer.h"
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -108,6 +109,8 @@ void ResourceManager::unload_all() {
     _free_font();
     for (auto& [_, s] : _sound_cache) UnloadSound(s);
     _sound_cache.clear();
+    for (auto& [_, t] : _texture_cache) UnloadTexture(t);
+    _texture_cache.clear();
     _json_cache.clear();
     _loaded = false;
 }
@@ -195,4 +198,48 @@ Sound ResourceManager::load_sound(const char* path) {
     Sound s = LoadSound(path);
     _sound_cache[path] = s;
     return s;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// M4f: Texture 缓存 (文件加载 / 程序化生成)
+// ═══════════════════════════════════════════════════════════════
+
+Texture2D ResourceManager::load_texture(const char* path) {
+    auto it = _texture_cache.find(path);
+    if (it != _texture_cache.end()) return it->second;
+    Texture2D tex = {0};
+    if (FileExists(path)) tex = LoadTexture(path);
+    if (tex.id > 0)
+        _texture_cache[path] = tex;
+    else
+        LOG_WARN("Texture: 缺失 %s (回退占位)", path);
+    return tex;
+}
+
+Texture2D ResourceManager::procedural_tile(const char* key, Color base,
+                                           bool wall) {
+    auto it = _texture_cache.find(key);
+    if (it != _texture_cache.end()) return it->second;
+    Texture2D tex = SpriteRenderer::gen_pixel_tile(base, wall);
+    _texture_cache[key] = tex;
+    return tex;
+}
+
+Texture2D ResourceManager::procedural_sprite(const char* key, Color body,
+                                             Color accent, int variant,
+                                             int eye_dir) {
+    auto it = _texture_cache.find(key);
+    if (it != _texture_cache.end()) return it->second;
+    Texture2D tex = SpriteRenderer::gen_pixel_sprite(body, accent, variant,
+                                                      eye_dir);
+    _texture_cache[key] = tex;
+    return tex;
+}
+
+Texture2D ResourceManager::procedural_fx(const char* key, Color c) {
+    auto it = _texture_cache.find(key);
+    if (it != _texture_cache.end()) return it->second;
+    Texture2D tex = SpriteRenderer::gen_pixel_blast(c);
+    _texture_cache[key] = tex;
+    return tex;
 }

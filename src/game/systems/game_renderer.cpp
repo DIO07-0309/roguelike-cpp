@@ -12,6 +12,8 @@
 #include "relic_progression.h"
 #include "attack_evolution.h"   // G1
 #include "skill_evolution.h"   // G1 Step3
+#include "resource_manager.h"                 // M4f.2
+#include "game/rendering/sprite_renderer.h"   // M4f.2
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -87,6 +89,31 @@ static void _draw_slash_arc(const Effect& e, float sx, float sy,
     }
 }
 
+// M4f.2: 纹理爆点 (VFX 接入管线; 缺纹理回退几何圆)
+static void _draw_fx_blast(float sx, float sy, float base_r,
+                           const Color& c, int alpha_scale) {
+    char key[28];
+    snprintf(key, sizeof(key), "fx_%02x%02x%02x", c.r, c.g, c.b);
+    Texture2D tex = ResourceManager::inst().procedural_fx(
+        key, (Color){c.r, c.g, c.b, 255});
+    if (tex.id > 0) {
+        SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32;
+        float r = base_r * 2;
+        SpriteRenderer::draw_sprite(tex, sd, 0,
+            {sx - r, sy - r, r * 2, r * 2},
+            Color{255, 255, 255, (unsigned char)alpha_scale});
+    } else {
+        DrawCircle(sx, sy, base_r, c);
+    }
+}
+
+// 环形脉冲 (pulse/ring/默认分支共用)
+static void _draw_fx_ring(float sx, float sy, float radius, float prog,
+                          const Color& c, int seg) {
+    float r = radius * (0.5f + 0.5f * prog);
+    DrawRing({sx, sy}, r * 0.6f, r, 0, 360, seg, c);
+}
+
 // G5.8.8-fix: 单特效渲染 — 合并原 VFXServer::draw 全部 kind 分支
 static void _draw_effect_body(const Effect& e, float sx, float sy,
                               float cam_x, float cam_y, float t) {
@@ -96,15 +123,14 @@ static void _draw_effect_body(const Effect& e, float sx, float sy,
     float prog = t / e.duration;
 
     if (e.kind == "pulse" || e.kind == "ring") {
-        float r = e.radius * (0.5f + 0.5f * prog);
-        DrawRing({sx, sy}, r * 0.6f, r, 0, 360, 24, c);
+        _draw_fx_ring(sx, sy, e.radius, prog, c, 24);
     } else if (e.kind == "spark") {
-        DrawCircle(sx, sy, e.radius, c);
+        _draw_fx_blast(sx, sy, e.radius * (0.5f + 0.5f * prog), c, c.a);
     } else if (e.kind == "bolt") {
         DrawLineEx({sx, sy}, {e.target_x - cam_x, e.target_y - cam_y}, 2, c);
     } else if (e.kind == "flash") {
-        DrawCircle(sx, sy, e.radius, c);
-        DrawCircle(sx, sy, e.radius * 1.5f, Fade(c, 0.3f));
+        _draw_fx_blast(sx, sy, e.radius, c, c.a);
+        _draw_fx_blast(sx, sy, e.radius * 1.5f, c, c.a / 3);
     } else if (e.kind == "smoke") {
         float sr = e.radius * (0.3f + 0.7f * prog);
         DrawCircle(sx, sy, sr, Fade(c, 0.5f));
@@ -119,8 +145,7 @@ static void _draw_effect_body(const Effect& e, float sx, float sy,
         DrawRectangleLines(sx - e.radius / 2, sy - e.radius / 4,
                            e.radius, e.radius / 2, c);
     } else {
-        float r = e.radius * (0.5f + 0.5f * prog);
-        DrawRing({sx, sy}, r * 0.6f, r, 0, 360, 12, c);
+        _draw_fx_ring(sx, sy, e.radius, prog, c, 12);
     }
 }
 

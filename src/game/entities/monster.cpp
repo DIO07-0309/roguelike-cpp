@@ -4,6 +4,26 @@
 #include "combat_system.h"
 #include "core/logger.h"
 #include "data/enemy_defs.h"   // G1 Step5
+#include "resource_manager.h"                 // M4f.2
+#include "game/rendering/sprite_renderer.h"   // M4f.2
+
+// M4f.2: 程序化怪物精灵 (0人形 1史莱姆 2Boss), 纹理缺失时返回空矩形
+static Rectangle _draw_monster_sprite(const Rectangle& dr, Color body_c,
+                                      int variant, bool& ok) {
+    char key[32];
+    snprintf(key, sizeof(key), "mon_%02x%02x%02x_%d",
+        body_c.r, body_c.g, body_c.b, variant);
+    Texture2D tex = ResourceManager::inst().procedural_sprite(
+        key, body_c, {255, 255, 255, 255}, variant, 0);
+    ok = tex.id > 0;
+    if (!ok) return dr;
+    SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32;
+    float inset = dr.width > 30 ? 0 : (dr.width < 22 ? 6 : 3);
+    Rectangle dst = {dr.x + inset, dr.y + inset,
+                     dr.width - inset * 2, dr.height - inset * 2};
+    SpriteRenderer::draw_sprite(tex, sd, 0, dst);
+    return dst;
+}
 
 Monster::Monster(float x, float y, const std::string& n, int hp, int atk,
                  int pdef, int mdef, Color c, MonsterAI* a)
@@ -84,33 +104,34 @@ void Monster::draw(float cam_x, float cam_y) {
     DrawEllipse(dr.x + dr.width/2, dr.y + dr.height + 2, dr.width/2 - 2, 3,
                 {0, 0, 0, 80});
 
-    // 身体
-    DrawRectangleRounded(dr, 0.15f, 4, color);
-
-    // 高光
-    DrawRectangleRounded({dr.x + 3, dr.y + 2, dr.width - 6, 6}, 0.1f, 3,
-                         Color{(unsigned char)std::min(255u, (unsigned)color.r + 60),
-                               (unsigned char)std::min(255u, (unsigned)color.g + 60),
-                               (unsigned char)std::min(255u, (unsigned)color.b + 60), 255});
-
-    // 眼睛
-    if (name.find("史莱姆") != std::string::npos) {
+    // M4f.2: 程序化像素精灵 (史莱姆圆形 / Boss大体型 / 其余人形)
+    int variant = is_boss ? 2 :
+                  (name.find("史莱姆") != std::string::npos) ? 1 : 0;
+    bool spr_ok = false;
+    Rectangle spr = _draw_monster_sprite(dr, color, variant, spr_ok);
+    if (!spr_ok) {
+        DrawRectangleRounded(dr, 0.15f, 4, color);
+        DrawRectangleRounded({dr.x + 3, dr.y + 2, dr.width - 6, 6}, 0.1f, 3,
+            Color{(unsigned char)std::min(255u, (unsigned)color.r + 60),
+                  (unsigned char)std::min(255u, (unsigned)color.g + 60),
+                  (unsigned char)std::min(255u, (unsigned)color.b + 60), 255});
         float ey = dr.y + dr.height / 2 - 2;
-        DrawCircle(dr.x + dr.width / 3, ey, 5, WHITE);
-        DrawCircle(dr.x + dr.width * 2 / 3, ey, 5, WHITE);
-        DrawCircle(dr.x + dr.width / 3 + 1, ey + 1, 3, {20, 20, 20, 255});
-        DrawCircle(dr.x + dr.width * 2 / 3 + 1, ey + 1, 3, {20, 20, 20, 255});
-    } else if (name.find("兽人") != std::string::npos) {
-        float ey = dr.y + dr.height / 2 - 1;
-        for (int sx : {int(dr.x + 5), int(dr.x + dr.width - 9)}) {
-            DrawTriangle({(float)sx, ey}, {(float)sx + 5, ey + 2},
-                        {(float)sx, ey + 5}, {255, 50, 50, 255});
+        if (name.find("史莱姆") != std::string::npos) {
+            DrawCircle(dr.x + dr.width / 3, ey, 5, WHITE);
+            DrawCircle(dr.x + dr.width * 2 / 3, ey, 5, WHITE);
+            DrawCircle(dr.x + dr.width / 3 + 1, ey + 1, 3, {20, 20, 20, 255});
+            DrawCircle(dr.x + dr.width * 2 / 3 + 1, ey + 1, 3, {20, 20, 20, 255});
+        } else if (name.find("兽人") != std::string::npos) {
+            for (int sx : {int(dr.x + 5), int(dr.x + dr.width - 9)}) {
+                DrawTriangle({(float)sx, ey}, {(float)sx + 5, ey + 2},
+                            {(float)sx, ey + 5}, {255, 50, 50, 255});
+            }
         }
     }
 
-    // 边框
+    // 边框 (纹理精灵带轮廓, 仍画描边强化辨识)
     Color bc = is_boss ? Color{255, 180, 30, 255} : Color{0, 0, 0, 255};
-    DrawRectangleRoundedLines(dr, 0.15f, 4, 2, bc);
+    DrawRectangleRoundedLines(spr, 0.15f, 4, is_boss ? 3 : 2, bc);
 
     // 血条 (非Boss 且受伤)
     if (!is_boss && combat.current_hp < combat.max_hp) {

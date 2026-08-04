@@ -4,6 +4,7 @@
 #include "entity.h"
 #include "raylib.h"
 #include "special_room.h"
+#include "biome.h"   // M4f: TilePalette
 
 // 前向声明 (避免循环依赖)
 enum class EventType : int;
@@ -66,10 +67,17 @@ public:
     Vector2 tile_to_pixel(int tx, int ty) const;
     std::pair<int,int> pixel_to_tile(float px, float py) const;
 
+    // M4f: biome palette (绘制程序化像素纹理的基色)
+    void set_palette(const TilePalette* palette);
+    const TilePalette& palette() const { return _palette; }
+    bool has_palette() const { return _has_palette; }
+
     void draw(float cam_x, float cam_y, int screen_w, int screen_h) const;
 
 private:
     std::vector<std::vector<Tile>> _tiles;
     bool _in_bounds(int tx, int ty) const;
     void _init_walls();
+    TilePalette _palette;      // M4f: 当前 biome 调色板
+    bool _has_palette = false;
 };
