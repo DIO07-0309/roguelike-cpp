@@ -31,7 +31,9 @@ void FloorSelectScene::_render() {
     for (int i = 0; i < MAX_FLOORS; i++) {
         int cx = sx + (i % cols) * (cell_w + gap);
         int cy = sy + (i / cols) * (cell_h + gap);
-        bool unlocked = (i + 1) <= max_unlocked;
+        int floor_num = i + 1;
+        bool unlocked = floor_num <= max_unlocked
+                     || (floor_num == 15 && max_unlocked >= 14);
         bool selected = i == cursor;
 
         Color bg = selected ? Color{60, 60, 160, 255}
@@ -68,7 +70,7 @@ void FloorSelectScene::_input(const InputMap& input) {
     if (input.is_action_just_pressed("move_down"))  cursor = std::min(MAX_FLOORS - 1, cursor + 5);
     if (input.is_action_just_pressed("confirm")) {
         int floor = cursor + 1;
-        if (floor <= max_unlocked) {
+        if (floor <= max_unlocked || (floor == 15 && max_unlocked >= 14)) {
             auto gs = std::make_shared<GameScene>();
             gs->name = "GameScene";
             // 尝试加载存档中的玩家数据

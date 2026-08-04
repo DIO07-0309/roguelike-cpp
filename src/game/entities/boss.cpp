@@ -617,18 +617,20 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         // F15 Mirror: 镜像武器攻击 — 使用玩家武器范围/倍率/连招
         if (_is_mirror && self->can_attack(gt)) {
             float range_px = _mirror_active_range > 0 ? _mirror_active_range
-                          : _mirror_weapon_range * 32.0f;
+                          : _mirror_weapon_range * TILE_SIZE;
             if (dist <= range_px) {
                 int stage = _mirror_combo_stage;
                 float mult = _mirror_stage_mults[stage];
-                int dmg = (int)(self->combat.attack * mult * _mirror_attack_mult);
-                dmg = calculate_damage(dmg,
+                // ATK already mirrored in _init_mirror_boss (player_atk * 1.2)
+                int raw_dmg = (int)(self->combat.attack * mult);
+                int dmg = calculate_damage(raw_dmg,
                     player->combat.get_effective_defense(AttackType::PHYSICAL));
                 player->combat.take_damage(dmg);
-                LOG_INFO("[DMG] 终焉回响·镜像[%d段] 造成 %d 伤害 → 玩家",
-                    stage + 1, dmg);
+                LOG_INFO("[DMG] 终焉回响·镜像[%d段] atk=%d mult=%.2f raw=%d → %d 伤害",
+                    stage + 1, self->combat.attack, mult, raw_dmg, dmg);
                 player->combat.mark_damage_logged();
                 _spawn_boss_vfx(self, "charge", effects);
+                self->last_attack_time = (float)gt;  // 更新攻击间隔
                 normal_attack_count++;
                 _mirror_combo_stage++;
                 if (_mirror_combo_stage >= _mirror_max_stages)
