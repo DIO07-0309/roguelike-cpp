@@ -154,14 +154,18 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
     _mirror_agent = std::make_unique<MirrorAgent>();
     _mirror_agent->init(profile);
 
-    // ── 数值: HP=玩家×2.0, ATK=玩家×1.2 ──
+    // ── 数值: HP=玩家×5, ATK≥玩家PDEF×0.8 (保证破防) ──
     int p_hp = get_effective_max_hp(player);
     int p_atk = player->combat.get_effective_attack();
-    boss->combat.max_hp   = p_hp * 2;
+    int p_pdef = player->combat.get_effective_defense(AttackType::PHYSICAL);
+    boss->combat.max_hp   = p_hp * 5;
     boss->combat.current_hp = boss->combat.max_hp;
-    boss->combat.attack   = (int)(p_atk * 1.2f);
+    // ATK = max(玩家ATK×1.2, 玩家PDEF×0.85) — 确保 calculate_damage 不归1
+    int min_atk = (int)(p_pdef * 0.85f);
+    boss->combat.attack   = std::max((int)(p_atk * 1.2f), min_atk);
     boss->combat.physical_defense = player->combat.physical_defense + 5;
     boss->combat.magical_defense  = player->combat.magical_defense + 3;
+    boss->attack_cooldown = 1.2f;  // 镜像攻击间隔
 
     // ── 镜像武器: 读取玩家武器类型/范围/连招 ──
     auto* bai = dynamic_cast<BossAI*>(boss->ai);
@@ -189,35 +193,12 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
         bai->_mirror_active_range = 48.0f;
     }
 
-    // ── 镜像技能: 读取玩家主动技能 ──
-    bai->_mirror_skills.clear();
-    for (auto& sk : player->skills.active_skills) {
-        BossAI::MirrorSkill ms;
-        ms.name = sk->name;
-        ms.cooldown = sk->cooldown;
-        ms.last_used = -99.0f;
-        // 技能类型推断: 自愈类→self_buff, 时停→aoe, 远程→projectile, 其余→melee
-        if (sk->name.find("Heal") != std::string::npos
-            || sk->name.find("愈") != std::string::npos)
-            ms.skill_type = 2;
-        else if (sk->name.find("World") != std::string::npos
-            || sk->name.find("时停") != std::string::npos)
-            ms.skill_type = 3;
-        else if (sk->name.find("Slash") != std::string::npos
-            || sk->name.find("斩") != std::string::npos)
-            ms.skill_type = 0;
-        else
-            ms.skill_type = 1; // projectile default
-        ms.damage_mult = 1.0f;
-        ms.range = 100.0f;
-        bai->_mirror_skills.push_back(ms);
-    }
-    bai->_mirror_skill_idx = 0;
+    // ── 初始化 MirrorCombatDirector (替代旧BossAI补丁) ──
+    _mirror_combat.init(player, boss, bai, _mirror_agent.get());
 
     int mirror_hp = boss->combat.max_hp;
     int mirror_atk = boss->combat.attack;
-    int mirror_skill_count = (int)bai->_mirror_skills.size();
-    (void)mirror_hp; (void)mirror_atk; (void)mirror_skill_count;
+    (void)mirror_hp; (void)mirror_atk;
 }
 
 void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
@@ -280,9 +261,10 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
         _tick_domain_state(dt, boss);
         boss->combat.domain_invulnerable = boss_invulnerable;
     }
-    // F15.3: Mirror boss (Ending Echo)
+    // F15: Mirror boss — MirrorCombatDirector 接管全部战斗决策
     else if (_behavior_type == "mirror" && _mirror_agent) {
         _mirror_agent->tick_phase_timer(dt);
+        _mirror_combat.tick(dt, boss, player, GetTime(), _mirror_agent.get(), nullptr);
     }
 }
 

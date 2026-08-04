@@ -15,6 +15,8 @@
 
 // F15.3: MirrorAgent
 #include "ai/mirror/mirror_agent.h"
+// F15 Mirror Combat
+#include "mirror_combat_director.h"
 
 class Monster;
 class Player;
@@ -60,8 +62,9 @@ public:
     int      _player_weakpoint_element = 0;  // F10.3: player element type for bonus (set in tick)
     std::vector<std::unique_ptr<Monster>>* _weak_point_pool = nullptr;  // set by caller
 
-    // ── F15.3: MirrorAgent (Ending Echo F15 boss) ──
+    // ── F15: Mirror Boss ──
     std::unique_ptr<MirrorAgent> _mirror_agent;
+    MirrorCombatDirector _mirror_combat;
     void _init_mirror_boss(Monster* boss, const class Player* player);
 
     std::string intro_text;
