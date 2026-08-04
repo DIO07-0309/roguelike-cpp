@@ -1408,11 +1408,56 @@ void GameScene::_render() {
 
     _cam_x = saved_cx; _cam_y = saved_cy;  // 恢复
 
+    // F15.5.1: Build echo mirror panel data
+    CharacterPanelData echo_panel_data;
+    bool is_echo = (boss_floor == 15 && _boss._behavior_type == "mirror");
+    if (is_echo) {
+        auto* boss = _get_boss();
+        if (boss) {
+            echo_panel_data.name = "ENDING ECHO";
+            echo_panel_data.hp = boss->combat.current_hp;
+            echo_panel_data.max_hp = boss->combat.max_hp;
+            echo_panel_data.atk = boss->combat.get_effective_attack();
+            echo_panel_data.pdef = boss->combat.get_effective_defense(AttackType::PHYSICAL);
+            echo_panel_data.mdef = boss->combat.get_effective_defense(AttackType::MAGICAL);
+            echo_panel_data.mirror_mode = true;
+            // Mirror player skills
+            for (auto& sk : player->skills.active_skills) {
+                SkillDisplay sd;
+                sd.name = sk->name;
+                sd.cooldown_ratio = sk->remaining_cooldown(game_time) / sk->cooldown;
+                sd.ready = sk->can_use(game_time);
+                echo_panel_data.skills.push_back(sd);
+            }
+            // Mirror player buffs with corrupted names
+            for (auto& b : player->active_buffs) {
+                BuffDisplay bd;
+                bd.icon = "?";  // will use _buff_icon mapping
+                if (b.id == "attack_up") { bd.icon = "攻"; bd.label = "Echo Atk"; }
+                else if (b.id == "defense_up") { bd.icon = "防"; bd.label = "腐化防御"; }
+                else if (b.id == "poison" || b.id == "poison2s") { bd.icon = "毒"; bd.label = "腐败毒"; }
+                else if (b.id == "slow") { bd.icon = "缓"; bd.label = "暗影缓"; }
+                else if (b.id == "freeze") { bd.icon = "冻"; bd.label = "黑冰"; }
+                else if (b.id == "bleed") { bd.icon = "血"; bd.label = "暗血"; }
+                else if (b.id == "burn") { bd.icon = "燃"; bd.label = "黑焰"; }
+                else if (b.id == "electrified") { bd.icon = "雷"; bd.label = "暗雷"; }
+                else { bd.icon = "?"; bd.label = b.id; }
+                echo_panel_data.buffs.push_back(bd);
+            }
+            // Phase from MirrorAgent
+            if (_boss._mirror_agent) {
+                echo_panel_data.mirror_phase = _boss._mirror_agent->current_phase();
+                echo_panel_data.sub_label = _boss._mirror_agent->phase_name();
+            }
+        }
+    }
+
     // HUD (委托给 GameRenderer)
     _renderer.draw_hud(player.get(), current_floor, game_time,
                         _get_boss(), _show_relic_panel,
                         inventory_open, inventory_cursor,
-                        _presentation.room_msg, _presentation.room_msg_timer, sw, sh);
+                        _presentation.room_msg, _presentation.room_msg_timer, sw, sh,
+                        is_echo ? &echo_panel_data : nullptr);
 
     // G9.1: Combo stage UI (bottom center)
     if (player->weapon.weapon_type() != WeaponType::FIST && player->weapon.combo_index() > 0) {

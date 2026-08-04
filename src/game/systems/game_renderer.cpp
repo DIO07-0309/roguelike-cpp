@@ -422,11 +422,107 @@ void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw
     }
 }
 
+// ============================================================
+// F15.5.1: Mirror HUD — character panel helpers
+// ============================================================
+
+void GameRenderer::_draw_panel_skills(const std::vector<SkillDisplay>& skills,
+                                       float x, float y, bool mirror) {
+    float ry = y;
+    for (int i = 0; i < (int)skills.size(); i++) {
+        auto& sk = skills[i];
+        Color bg = sk.ready ? Color{50, 160, 50, 255} : Color{60, 60, 60, 255};
+        if (mirror) bg = sk.ready ? Color{140, 40, 40, 255} : Color{50, 20, 20, 255};
+        DrawRectangleRounded({x, ry, 22, 18}, 0.2f, 3, bg);
+        DrawTextEx(g_font_small, std::to_string(i + 1).c_str(), {x + 7, ry + 1}, 14, 1, WHITE);
+        Color lc = sk.ready ? Color{180, 220, 255, 255} : Color{100, 100, 100, 255};
+        if (mirror) lc = sk.ready ? Color{200, 140, 140, 255} : Color{100, 60, 60, 255};
+        DrawTextEx(g_font_small, sk.name.c_str(), {x + 26, ry + 2}, 14, 1, lc);
+        if (mirror) {
+            DrawLine(x + 4, ry + 4, x + 16, ry + 14, {80, 20, 20, 120});
+            DrawLine(x + 8, ry + 2, x + 14, ry + 10, {80, 20, 20, 80});
+        }
+        draw_progress_bar({x + 26, ry + 16, 90, 8}, sk.cooldown_ratio,
+                          sk.ready ? Color{60, 180, 255, 255} : Color{70, 70, 70, 255});
+        ry += 28;
+    }
+}
+
+void GameRenderer::_draw_panel_buffs(const std::vector<BuffDisplay>& buffs,
+                                      float x, float y, bool mirror) {
+    float ry = y;
+    for (auto& b : buffs) {
+        Color ic = mirror ? Color{180, 100, 100, 255} : Color{255, 220, 100, 255};
+        DrawTextEx(g_font_small, b.icon.c_str(), {x, ry}, 16, 1, ic);
+        Color lc = mirror ? Color{160, 120, 120, 255} : Color{200, 220, 255, 255};
+        DrawTextEx(g_font_small, b.label.c_str(), {x + 18, ry + 1}, 13, 1, lc);
+        ry += 18;
+    }
+}
+
+void GameRenderer::draw_character_panel(const CharacterPanelData& d, float px, float py) {
+    if (!g_font_loaded) return;
+    float pw = 240.0f;
+    // Phase opacity
+    float op = 1.0f;
+    if (d.mirror_mode && d.mirror_phase == 1) op = 0.55f;
+    else if (d.mirror_mode && d.mirror_phase == 3)
+        op = 0.82f + 0.18f * sinf((float)GetTime() * 4.0f);
+    // Panel frame
+    Color pbg = d.mirror_mode ? Color{25, 8, 8, 230} : Color{15, 15, 35, 220};
+    Color bc  = d.mirror_mode ? Color{120, 30, 30, 200} : Color{60, 60, 120, 180};
+    pbg.a = (unsigned char)(pbg.a * op); bc.a = (unsigned char)(bc.a * op);
+    int rows = 2 + (int)d.skills.size() + (int)d.buffs.size();
+    if (!d.mirror_mode && d.level > 0) rows++;
+    float ph = rows * 24.0f + 20.0f;
+    DrawRectangleRounded({px, py, pw, ph}, 0.15f, 4, pbg);
+    DrawRectangleRoundedLines({px, py, pw, ph}, 0.15f, 4, 1.5f, bc);
+    // Name
+    Color nc = d.mirror_mode ? Color{200, 60, 50, 255} : Color{220, 220, 255, 255};
+    DrawTextEx(g_font_small, d.name, {px + 10, py + 4}, 16, 1, nc);
+    float ly = py + 24;
+    if (d.sub_label && d.sub_label[0]) {
+        Color sc = d.mirror_mode ? Color{160, 90, 80, (unsigned char)(200*op)}
+                                 : Color{160, 180, 200, 200};
+        DrawTextEx(g_font_small, d.sub_label, {px + 10, ly}, 11, 1, sc);
+        ly += 14;
+    }
+    // HP bar
+    float hr = d.max_hp > 0 ? (float)d.hp / d.max_hp : 0.0f;
+    if (hr > 1.0f) hr = 1.0f;
+    Color hf = d.mirror_mode ? Color{160, 30, 30, 255} : Color{50, 200, 50, 255};
+    Color hbg = d.mirror_mode ? Color{50, 10, 10, 255} : Color{40, 20, 20, 255};
+    draw_progress_bar({px + 10, ly, pw - 20, 14}, hr, hf, hbg);
+    ly += 18;
+    // Stats
+    char buf[96];
+    snprintf(buf, sizeof(buf), "HP:%d/%d  ATK:%d", d.hp, d.max_hp, d.atk);
+    Color stc = d.mirror_mode ? Color{180, 130, 130, 255} : Color{200, 200, 200, 255};
+    DrawTextEx(g_font_small, buf, {px + 10, ly}, 12, 1, stc);
+    ly += 16;
+    // XP (player only)
+    if (!d.mirror_mode && d.level > 0) {
+        float xr = d.xp_to_next > 0 ? (float)d.xp / d.xp_to_next : 0.0f;
+        draw_progress_bar({px + 10, ly, pw - 20, 8}, xr, {80, 120, 255, 255});
+        snprintf(buf, sizeof(buf), "Lv%d", d.level);
+        DrawTextEx(g_font_small, buf, {px + 12, ly - 2}, 10, 1, {180, 200, 255, 255});
+        ly += 12;
+    }
+    ly += 2;
+    // Skills + Buffs
+    if (!d.skills.empty())
+        _draw_panel_skills(d.skills, px + 10, ly, d.mirror_mode);
+    ly += d.skills.size() * 28.0f + 4.0f;
+    if (!d.buffs.empty())
+        _draw_panel_buffs(d.buffs, px + 10, ly, d.mirror_mode);
+}
+
 void GameRenderer::draw_hud(const Player* player, int current_floor, float game_time,
                              Monster* boss, bool show_relic_panel,
                              int inventory_open, int inventory_cursor,
                              const std::string& room_msg, float room_msg_timer,
-                             int screen_w, int screen_h) {
+                             int screen_w, int screen_h,
+                             const CharacterPanelData* echo_panel) {
     if (!player) return;
     auto& c = player->combat;
 
@@ -464,19 +560,17 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
         DrawTextEx(g_font_small, buf, {220, 42}, 16, 1, {200, 200, 50, 255});
     }
 
-    // Boss HP bar (B15: 更大更明显 + C1: pulse + Phase2 标记)
-    if (boss) {
+    // Boss HP bar — F15.5.1: hide for echo boss (HP shown in mirror panel)
+    if (boss && !echo_panel) {
         float bw = 500, bh = 24;
         float bx = screen_w / 2 - bw / 2, by = 4;
         Color bar_bg = {30, 5, 5, 255};
         Color bar_fg = {220, 100, 30, 255};
-        // B15: Phase2 时血条颜色偏红
         auto* bai = dynamic_cast<const BossAI*>(boss->ai);
         if (bai && bai->phase2) {
             bar_fg = {255, 40, 20, 255};
             bar_bg = {50, 5, 5, 255};
         }
-        // C1: Boss 血条微弱呼吸脉冲
         float glow = 1.0f + sinf((float)GetTime() * 3) * 0.03f;
         DrawRectangleLinesEx({bx - 2, by - 2, bw + 4, bh + 4}, 1.5f,
                              Color{220, 100, 30, (unsigned char)(60 * glow)});
@@ -485,7 +579,6 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
             bar_fg, bar_bg);
         if (g_font_loaded) {
             char buf[80];
-            // D9: Boss 状态标签组合
             const char* phase_tag = (bai && bai->phase2) ? "[狂暴] " : "";
             const char* defend_tag = (bai && bai->boss_state == BossState::DEFEND)
                 ? "[护盾] " : "";
@@ -499,6 +592,10 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
                        {255, 220, 100, 255});
         }
     }
+
+    // F15.5.1: Echo mirror panel (right side)
+    if (echo_panel)
+        draw_character_panel(*echo_panel, (float)(screen_w - 260), 6.0f);
 
     draw_skill_bar(player, game_time);
     draw_player_buffs(player);
@@ -518,7 +615,6 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
             DrawTextEx(g_font_small, buf, {12, y}, 12, 1, {255, 220, 100, 230});
             y += 16;
         }
-        // G1: 普攻进化等级显示 (通过 Manager 查询 — 不直接读 struct)
         int atk_lv = AttackEvolutionManager::current_level(player);
         if (atk_lv >= 2 && g_font_loaded) {
             char buf[32];
@@ -526,7 +622,6 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
             DrawTextEx(g_font_small, buf, {12, y}, 12, 1, {255, 200, 60, 230});
             y += 16;
         }
-        // G1 Step3: 技能进化显示 (取第一个已进化的技能, 简写)
         for (int si = 0; si < (int)player->skills.active_skills.size(); si++) {
             const char* ev = SkillEvolutionManager::evo_name(player, si);
             if (ev && ev[0] && g_font_loaded) {
