@@ -183,6 +183,13 @@ void GameScene::new_game() {
     }
 }
 
+// ── M4e: 注入跨对局镜像记忆 ──
+void GameScene::set_mirror_memory(const std::vector<float>& alpha,
+                                  const std::vector<float>& beta) {
+    _mirror_mem_alpha = alpha;
+    _mirror_mem_beta = beta;
+}
+
 void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
                                  uint32_t seed,
                                  const std::vector<bool>& special_triggered,
@@ -456,7 +463,8 @@ void GameScene::_process(double delta) {
         if (boss && boss->is_boss) {
             _boss._weak_point_pool = &monsters;  // F10.2: pass pool for core spawn
             _boss.tick(dt, boss, player.get(), current_floor, _gameplay.world_state,
-                       _gameplay.rels, _gameplay.story.stage(), monsters);
+                       _gameplay.rels, _gameplay.story.stage(), monsters,
+                       &active_effects);  // F15-fix: 镜像战特效通道
 
             // F10.1: Domain state change VFX
             if (_boss._behavior_type == "domain"
@@ -467,6 +475,11 @@ void GameScene::_process(double delta) {
                     _presentation.show_message("【领域展开】Boss受到保护 — 寻找破绽!", 2.5f);
                     _presentation.trigger_shake(6.0f);
                     get_tree()->get_audio()->play_sfx("domain_expand", 1.0f);
+                    break;
+                case BossArenaState::ENRAGED_PHASE:
+                    _presentation.show_message("【狂暴领域!】核心周期减半 — 最终回响!", 2.5f);
+                    _presentation.trigger_shake(14.0f);
+                    _presentation.trigger_freeze(0.10f);
                     break;
                 case BossArenaState::VULNERABLE_PHASE:
                     _presentation.show_message("【弱点暴露】全力输出! 伤害 x2", 2.0f);
@@ -1101,7 +1114,10 @@ void GameScene::_update_monsters(float dt) {
 }
 
 void GameScene::_on_monster_killed(Monster* m)  { _combat.on_monster_killed(m); }
-void GameScene::_cleanup_dead_monsters()         { _combat.cleanup_dead_monsters(); }
+void GameScene::_cleanup_dead_monsters() {
+    _boss.on_core_maybe_erased();   // F10.2-fix: UAF guard — DOT 击杀核心先解除引用
+    _combat.cleanup_dead_monsters();
+}
 void GameScene::_check_floor_clear() {
     if (FloorManager::is_floor_cleared(monsters) && !stairs_active) _activate_stairs();
 }
@@ -1131,10 +1147,13 @@ void GameScene::_activate_stairs() {
             int v = _gameplay.world_state.counter(ALL_RULES[i]);
             if (v > 0) rcm[ALL_RULES[i]] = v;
         }
+        std::vector<float> mirror_alpha, mirror_beta;
+        _boss.export_mirror_memory(mirror_alpha, mirror_beta);
         SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
                                _dungeon_seed, spr, spd, rcm,
                                _gameplay.quest_mgr.export_states(),
-                               _gameplay.ending_dir.unlocked());
+                               _gameplay.ending_dir.unlocked(),
+                               mirror_alpha, mirror_beta);
     }
     on_floor_cleared.emit();
 }
@@ -1448,6 +1467,14 @@ void GameScene::_render() {
             if (_boss._mirror_agent) {
                 echo_panel_data.mirror_phase = _boss._mirror_agent->current_phase();
                 echo_panel_data.sub_label = _boss._mirror_agent->phase_name();
+                // M4e: 在线学习 HUD 数据
+                echo_panel_data.mirror_last_action =
+                    _boss._mirror_agent->last_action();
+                int mb = _boss._mirror_agent->last_bucket();
+                if (mb < 0) mb = 0;   // 观察期未决策 → 展示桶0
+                for (int i = 0; i < 4; i++)
+                    echo_panel_data.mirror_arm_rates[i] =
+                        _boss._mirror_agent->arm_win_rate(mb, i);
             }
         }
     }

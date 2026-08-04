@@ -515,6 +515,39 @@ void GameRenderer::draw_character_panel(const CharacterPanelData& d, float px, f
     ly += d.skills.size() * 28.0f + 4.0f;
     if (!d.buffs.empty())
         _draw_panel_buffs(d.buffs, px + 10, ly, d.mirror_mode);
+
+    // M4e: 在线学习 HUD (决策后才显示)
+    if (d.mirror_mode && d.mirror_last_action >= 0)
+        _draw_mirror_learning(d, px, py, ph);
+}
+
+// M4e: 镜像在线学习 HUD — 当前桶 4 臂胜率 + 上次决策
+void GameRenderer::_draw_mirror_learning(const CharacterPanelData& d,
+                                         float px, float py, float panel_h) {
+    static const char* ARM_NAMES[4] = {"近战压制", "后撤拉扯", "技能反制", "连招输出"};
+    float ly2 = py + panel_h + 8.0f;
+    float lh = 74.0f;
+    DrawRectangleRounded({px, ly2, 240.0f, lh}, 0.12f, 4, {20, 8, 8, 220});
+    DrawRectangleRoundedLines({px, ly2, 240.0f, lh}, 0.12f, 4, 1.0f,
+        {90, 30, 30, 180});
+    char lbuf[48];
+    snprintf(lbuf, sizeof(lbuf), "在线学习 · 决策: %s",
+        ARM_NAMES[d.mirror_last_action]);
+    DrawTextEx(g_font_small, lbuf, {px + 8, ly2 + 3}, 12, 1,
+        {220, 150, 140, 255});
+    float ry = ly2 + 22.0f;
+    for (int i = 0; i < 4; i++) {
+        bool cur = (i == d.mirror_last_action);
+        Color ac = cur ? Color{220, 90, 80, 255} : Color{170, 130, 130, 255};
+        DrawTextEx(g_font_small, ARM_NAMES[i], {px + 8, ry}, 11, 1, ac);
+        snprintf(lbuf, sizeof(lbuf), "%d%%",
+            (int)(d.mirror_arm_rates[i] * 100.0f));
+        DrawTextEx(g_font_small, lbuf, {px + 66, ry}, 11, 1, ac);
+        draw_progress_bar({px + 104, ry + 3, 112, 8}, d.mirror_arm_rates[i],
+            cur ? Color{220, 90, 80, 255} : Color{120, 60, 60, 255},
+            {50, 20, 20, 255});
+        ry += 13.0f;
+    }
 }
 
 void GameRenderer::draw_hud(const Player* player, int current_floor, float game_time,

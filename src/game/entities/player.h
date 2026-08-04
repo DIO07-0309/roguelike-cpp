@@ -53,6 +53,7 @@ public:
 
     static constexpr float ATTACK_COOLDOWN = 0.5f;
     float _last_attack_time = -999.0f;
+    float _last_skill_time = -999.0f;   // M4e: 最近技能施放时刻 (镜像观察)
 
     // 构造
     Player(float x, float y, float spd, int hp, int atk, int pdef, int mdef);

@@ -119,6 +119,8 @@ std::string CombatCoordinator::use_skill(int index, Player* player,
     // 普通/Heavy 技能
     std::string result = sk->execute(player, mlist, map, is_heavy);
     sk->mark_used(game_time);
+    // M4e: 记录技能施放时刻 (镜像 AI 观察窗口)
+    player->_last_skill_time = (float)game_time;
     // F15.2: record skill usage with full context
     g_behavior.on_skill_use(sk->_skill_id.c_str(),
         (float)game_time, 0,  // floor set by game_scene

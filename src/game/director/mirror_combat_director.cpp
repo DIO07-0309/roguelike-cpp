@@ -14,6 +14,7 @@ void MirrorCombatDirector::init(const Player* player, Monster* boss,
                                  BossAI* bai, MirrorAgent* agent) {
     if (!player || !boss || !bai) return;
     _boss = boss; _bai = bai;
+    _agent = agent;   // M4e: 在线自适应反馈通道
     _combo_stage = 0; _combo_timer = 0; _last_attack = -99.0f;
     _skill_idx = 0; _skill_cd_timer = 0;
     _behavior_state = 0; _decision_timer = 0;
@@ -84,11 +85,18 @@ bool MirrorCombatDirector::tick(float dt, Monster* boss, Player* player,
                                  double game_time, MirrorAgent* agent,
                                  std::vector<Effect>* effects) {
     if (!boss || !player) return false;
-    (void)effects;
 
     float dist = hypotf(
         player->entity.rect.x - boss->entity.rect.x,
         player->entity.rect.y - boss->entity.rect.y);
+
+    // M4e: 玩家闪避检测 (单帧位移>200px) → 最近决策视为落空
+    float pdx = player->entity.rect.x - _last_player_x;
+    float pdy = player->entity.rect.y - _last_player_y;
+    if (_agent && (pdx * pdx + pdy * pdy) > 200.0f * 200.0f)
+        _agent->report_outcome(false, 0.0f);   // 已反馈过则内部自动跳过
+    _last_player_x = player->entity.rect.x;
+    _last_player_y = player->entity.rect.y;
 
     // 每0.5s做一次AI决策
     _decision_timer += dt;
@@ -159,6 +167,8 @@ void MirrorCombatDirector::_weapon_attack(Monster* boss, Player* player,
         LOG_INFO("[DMG] Echo镜像[%d段] atk=%d mult=%.2f raw=%d → %d 伤害",
             stage + 1, boss->combat.attack, mult * _aggression_bonus, raw, dmg);
     }
+    // M4e: 决策结果反馈 (命中/被防)
+    if (_agent) _agent->report_outcome(dmg > 0, (float)dmg);
     _last_attack = (float)gt;
     _combo_stage++;
     bool combo_end = (_combo_stage >= _total_stages);
@@ -195,25 +205,30 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
 
     switch (ms.skill_type) {
     case 0: { // melee — 扇形/矩形近战
-        if (dist > ms.range) break;
+        if (dist > ms.range) { if (_agent) _agent->report_outcome(false, 0.0f); break; }
         int raw = (int)(atk * ms.dmg_mult * _aggression_bonus);
         int dmg = calculate_damage(raw,
             player->combat.get_effective_defense(AttackType::PHYSICAL));
         player->combat.take_damage(dmg);
         LOG_INFO("[MIRROR] 镜像近战 [%s]: raw=%d → %d dmg", ms.name.c_str(), raw, dmg);
         if (dmg > 0) player->combat.mark_damage_logged();
+        if (_agent) _agent->report_outcome(dmg > 0, (float)dmg);
         break;
     }
-    case 1: { // projectile — 弹幕
+    case 1: { // projectile — 弹幕 (需在射程内, 可拉开距离闪避)
+        if (dist > ms.range) { if (_agent) _agent->report_outcome(false, 0.0f); break; }
+        int total_dmg = 0;
         for (int i = 0; i < 3; i++) {
             int raw = (int)(atk * ms.dmg_mult * 0.6f);
             int dmg = calculate_damage(raw,
                 player->combat.get_effective_defense(AttackType::MAGICAL),
                 AttackType::MAGICAL);
             player->combat.take_damage(dmg);
+            total_dmg += dmg;
             if (dmg > 0) player->combat.mark_damage_logged();
         }
         LOG_INFO("[MIRROR] 镜像弹幕 [%s]: 3发", ms.name.c_str());
+        if (_agent) _agent->report_outcome(total_dmg > 0, (float)total_dmg);
         break;
     }
     case 2: { // self_heal — 真正回血
@@ -222,7 +237,8 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
         LOG_INFO("[MIRROR] 镜像自愈 [%s]: +%d HP", ms.name.c_str(), heal_amt);
         break;
     }
-    case 3: { // aoe — 范围伤害
+    case 3: { // aoe — 范围伤害 (需在范围半径内)
+        if (dist > ms.range) { if (_agent) _agent->report_outcome(false, 0.0f); break; }
         int raw = (int)(atk * ms.dmg_mult * _aggression_bonus);
         int dmg = calculate_damage(raw,
             player->combat.get_effective_defense(AttackType::MAGICAL),
@@ -230,6 +246,7 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
         player->combat.take_damage(dmg);
         LOG_INFO("[MIRROR] 镜像AOE [%s]: raw=%d → %d dmg", ms.name.c_str(), raw, dmg);
         if (dmg > 0) player->combat.mark_damage_logged();
+        if (_agent) _agent->report_outcome(dmg > 0, (float)dmg);
         break;
     }
     case 4: { // time_stop — 玩家减速
@@ -268,7 +285,10 @@ void MirrorCombatDirector::_ai_decide(Monster* boss, Player* player,
     float dy = player->entity.rect.y - boss->entity.rect.y;
     st.dist_tiles = hypotf(dx, dy) / 32.0f;
     st.player_attacking = (gt - player->_last_attack_time < 1.0);
-    st.player_using_skill = false;  // TODO: track player skill casting
+    st.player_using_skill = (gt - player->_last_skill_time < 1.0);
+
+    // M4e: 在线自适应决策 — Phase>=2 时 Thompson 完全接管行为选择
+    if (_apply_online_action(agent->recommend_action(st))) return;
 
     // 预测玩家下一步
     PlayerActionType pred = agent->predict_next_action(st);
@@ -282,8 +302,8 @@ void MirrorCombatDirector::_ai_decide(Monster* boss, Player* player,
         _aggression_bonus = 1.0f;
     }
 
-    // 打断技能
-    if (agent->should_interrupt_skill()) {
+    // 打断技能 (M4e: 观察期也响应玩家技能窗口)
+    if (agent->should_interrupt_skill(st)) {
         _skill_cd_timer = 0.0f;  // 立即可用技能
         _behavior_state = 2;     // 切换到技能状态
     }
@@ -294,6 +314,18 @@ void MirrorCombatDirector::_ai_decide(Monster* boss, Player* player,
     } else if (pred == PlayerActionType::ATTACK && agent->should_pressure_close(st)) {
         _behavior_state = 3;  // 预测攻击+可压制→战略后撤
     }
+}
+
+// M4e: 在线决策动作映射 — Thompson 采样臂 → 行为状态
+bool MirrorCombatDirector::_apply_online_action(int act) {
+    if (act < 0) return false;   // 观察期: 走规则
+    switch ((MirrorAction)act) {
+    case MirrorAction::APPROACH: _behavior_state = 0; break;
+    case MirrorAction::RETREAT:  _behavior_state = 3; break;
+    case MirrorAction::SKILL:    _behavior_state = 2; _skill_cd_timer = 0.0f; break;
+    case MirrorAction::COMBO:    _behavior_state = 1; break;
+    }
+    return true;
 }
 
 // ============================================================

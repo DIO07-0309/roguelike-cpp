@@ -154,6 +154,12 @@ public:
     // 输入 (override Node::_input)
     void _input(const InputMap& input) override;
 
+    // ── M4e: 跨对局镜像记忆 (读档时由场景注入, spawn 自动恢复) ──
+    void set_mirror_memory(const std::vector<float>& alpha,
+                           const std::vector<float>& beta);
+    std::vector<float> _mirror_mem_alpha;
+    std::vector<float> _mirror_mem_beta;
+
     // ── G4.5: Replay ──
     void start_recording(uint32_t seed);
     void start_replay(const std::string& path);

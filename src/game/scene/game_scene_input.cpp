@@ -57,10 +57,13 @@ void GameSceneInput::handle_input(const InputMap& input) {
                 int v = _s._gameplay.world_state.counter(ALL_RULES[i]);
                 if (v > 0) rcm[ALL_RULES[i]] = v;
             }
+            std::vector<float> mirror_alpha, mirror_beta;
+            _s._boss.export_mirror_memory(mirror_alpha, mirror_beta);
             SaveManager::save_game(_s.player.get(), _s.current_floor,
                 _s.max_unlocked_floor, _s._dungeon_seed, spr, spd, rcm,
                 _s._gameplay.quest_mgr.export_states(),
-                _s._gameplay.ending_dir.unlocked());
+                _s._gameplay.ending_dir.unlocked(),
+                mirror_alpha, mirror_beta);
             LOG_INFO("Save→第%d层", _s.current_floor);
         }
         auto ts = std::make_shared<TitleScene>();
@@ -82,6 +85,9 @@ auto* boss = boss_factory_create(btype, _s.stairs_pos.first, _s.stairs_pos.secon
             _s._boss.init_on_spawn(boss, _s.boss_floor, _s._gameplay.world_state,
                                     bt, _s._gameplay.rels, _s.game_map.get(),
                                     _s.player.get());
+            // M4e: 跨对局镜像记忆注入 (空 vector 安全)
+            _s._boss.inject_mirror_memory(_s._mirror_mem_alpha,
+                                          _s._mirror_mem_beta);
             _s._presentation.boss_modifier_text = _s._boss.modifier_text;
 
             _s.boss_cinematic_timer = 1.0f;

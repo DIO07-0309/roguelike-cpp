@@ -38,6 +38,9 @@ struct CharacterPanelData {
     std::vector<BuffDisplay> buffs;
     bool mirror_mode = false;         // true = dark-red inverted theme
     int  mirror_phase = 0;            // 1=Observe, 2=Mirror, 3=Evolve
+    // M4e: 在线学习 HUD (当前桶 4 臂胜率, -1 = 未决策)
+    int mirror_last_action = -1;
+    float mirror_arm_rates[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 };
 
 // ============================================================
@@ -90,4 +93,7 @@ private:
                                    float x, float y, bool mirror);
     static void _draw_panel_buffs(const std::vector<BuffDisplay>& buffs,
                                   float x, float y, bool mirror);
+    // M4e: 镜像在线学习 HUD
+    static void _draw_mirror_learning(const CharacterPanelData& d,
+                                      float px, float py, float panel_h);
 };

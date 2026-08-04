@@ -6,6 +6,7 @@
 #include "world_state.h"
 #include "relationship_system.h"
 #include "boss.h"              // BossAI, spawn_boss
+#include "ai.h"               // F10.2-fix: MonsterAI (stationary weak point)
 #include "data/boss_defs.h"    // F10.1: get_boss_def
 #include "combat_system.h"     // rng, get_effective_max_hp
 #include "systems/weapon_component.h"  // WeaponDef (for mirror weapon stages)
@@ -39,6 +40,11 @@ void BossSystemDirector::reset() {
     boss_invulnerable = false;
     domain_cycle_count = 0;
     _behavior_type.clear();
+    _active_core = nullptr;              // F10.2-fix: 跨楼层重置弱点点指针
+    _weak_point_pool = nullptr;
+    _vulnerable_duration = 10.0f;        // F10.3-fix
+    _weakness_dmg_mult = 1.0f;           // F10.3-fix
+    _enraged = false;                    // M4d-fix: 狂暴领域标记
     _arena_spawn_timer = 0.0f;   // G2.3
     _arena_cfg = nullptr;        // G2.3
     _arena_phase = 0;            // M4b
@@ -137,6 +143,16 @@ void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
             if (_behavior_type == "domain") {
                 domain_cycle_duration = def->domain_config.cycle_time;
                 _vulnerable_dmg_mult  = def->domain_config.damage_multiplier;
+                _vulnerable_duration  = def->domain_config.vulnerable_duration;
+                // F10.3-fix: 数据驱动弱点元素 — 克制元素提升对核心伤害
+                _weakness_dmg_mult = 1.0f;
+                if (player && player->element.initialized) {
+                    ElementType we = element_from_string(
+                        def->domain_config.weakness_element.c_str());
+                    if (we != ElementType::NONE && we == player->element.type)
+                        _weakness_dmg_mult = 1.0f
+                            + def->domain_config.weakness_bonus;
+                }
             } else if (_behavior_type == "mirror") {
                 _init_mirror_boss(boss, player);
             }
@@ -201,9 +217,24 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
     (void)mirror_hp; (void)mirror_atk;
 }
 
+// M4e: 导出镜像跨对局记忆 (供保存)
+void BossSystemDirector::export_mirror_memory(
+    std::vector<float>& alpha, std::vector<float>& beta) const {
+    alpha.clear();
+    beta.clear();
+    if (_mirror_agent) _mirror_agent->export_memory(alpha, beta);
+}
+
+// M4e: 注入镜像跨对局记忆 (新对局/读档时, 叠加进先验)
+void BossSystemDirector::inject_mirror_memory(
+    const std::vector<float>& alpha, const std::vector<float>& beta) {
+    if (_mirror_agent) _mirror_agent->import_memory(alpha, beta);
+}
+
 void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
     const WorldState& ws, const RelationshipSystem& rels,
-    StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters) {
+    StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters,
+    std::vector<Effect>* effects) {
     if (!boss || !boss->is_boss) return;
 
     // Build context for behavior evaluation
@@ -256,15 +287,14 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
     // F10.1: Domain boss arena state machine
     // ══════════════════════════════════════════════════════
     if (_behavior_type == "domain") {
-        _player_weakpoint_element = player->element.initialized
-            ? (int)player->element.type : 0;
         _tick_domain_state(dt, boss);
         boss->combat.domain_invulnerable = boss_invulnerable;
     }
     // F15: Mirror boss — MirrorCombatDirector 接管全部战斗决策
     else if (_behavior_type == "mirror" && _mirror_agent) {
         _mirror_agent->tick_phase_timer(dt);
-        _mirror_combat.tick(dt, boss, player, GetTime(), _mirror_agent.get(), nullptr);
+        _mirror_combat.tick(dt, boss, player, GetTime(), _mirror_agent.get(),
+                            effects);   // F15-fix: 传递特效通道 — 镜像攻击可见
     }
 }
 
@@ -283,41 +313,21 @@ void BossSystemDirector::_tick_domain_state(float dt, Monster* boss) {
         }
         break;
 
-    case BossArenaState::DOMAIN_PHASE: {
-        // Check if core is dead → break
-        if (_active_core && !_active_core->combat.is_alive) {
-            _active_core = nullptr;
-            domain_timer = 0.0f;
-            arena_state = BossArenaState::VULNERABLE_PHASE;
-            boss_invulnerable = false;
-            boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
-            domain_cycle_count++;
-            EventBus::inst().emit(GameEventType::WEAK_POINT_BREAK,
-                boss, domain_cycle_count, 0.0f, "core_destroyed");
-            EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
-                boss, domain_cycle_count, _vulnerable_dmg_mult, "vulnerable_enter");
-            break;
-        }
-        // Timer fallback: force cycle after max duration
-        domain_timer += dt;
-        if (domain_timer >= domain_cycle_duration) {
-            domain_timer = 0.0f;
-            if (_active_core) { _active_core->combat.is_alive = false; _active_core = nullptr; }
-            arena_state = BossArenaState::VULNERABLE_PHASE;
-            boss_invulnerable = false;
-            boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
-            domain_cycle_count++;
-            EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
-                boss, domain_cycle_count, 0.0f, "vulnerable_enter");
-        }
+    case BossArenaState::ENRAGED_PHASE:   // M4d-fix: 狂暴领域 — 核心周期减半
+        _tick_core_phase(dt, boss, _enraged_cycle_duration());
         break;
-    }
+
+    case BossArenaState::DOMAIN_PHASE:
+        _tick_core_phase(dt, boss, _enraged_cycle_duration());
+        break;
+
     case BossArenaState::VULNERABLE_PHASE:
         domain_timer += dt;
-        if (domain_timer >= 10.0f) {
+        if (domain_timer >= _enraged_vulnerable_duration()) {
             domain_timer = 0.0f;
             boss->combat.vulnerable_dmg_mult = 1.0f;
-            arena_state = BossArenaState::DOMAIN_PHASE;
+            arena_state = _enraged
+                ? BossArenaState::ENRAGED_PHASE : BossArenaState::DOMAIN_PHASE;
             boss_invulnerable = true;
             _spawn_domain_core(boss);
             EventBus::inst().emit(GameEventType::BOSS_DOMAIN_ENTER,
@@ -325,34 +335,51 @@ void BossSystemDirector::_tick_domain_state(float dt, Monster* boss) {
         }
         break;
 
-    case BossArenaState::ENRAGED_PHASE: {
-        if (_active_core && !_active_core->combat.is_alive) {
-            _active_core = nullptr;
-            domain_timer = 0.0f;
-            arena_state = BossArenaState::VULNERABLE_PHASE;
-            boss_invulnerable = false;
-            boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
-            domain_cycle_count++;
-            EventBus::inst().emit(GameEventType::WEAK_POINT_BREAK,
-                boss, domain_cycle_count, 0.0f, "core_destroyed");
-            EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
-                boss, domain_cycle_count, _vulnerable_dmg_mult, "vulnerable_enter");
-            break;
-        }
-        domain_timer += dt;
-        if (domain_timer >= 15.0f) {
-            domain_timer = 0.0f;
-            if (_active_core) { _active_core->combat.is_alive = false; _active_core = nullptr; }
-            arena_state = BossArenaState::VULNERABLE_PHASE;
-            boss_invulnerable = false;
-            boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
-            EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
-                boss, domain_cycle_count, 0.0f, "vulnerable_enter");
-        }
-        break;
-    }
     default: break;
     }
+}
+
+// ── M4d-fix: 核心阶段共用逻辑 (DOMAIN/ENRAGED): 核心破坏→弱点; 超时强转 ──
+void BossSystemDirector::_tick_core_phase(float dt, Monster* boss,
+                                          float max_duration) {
+    // 核心被破坏 (普攻: 本帧检测; DOT: cleanup 前置钩子置 null) → 进入弱点阶段
+    if (_active_core && !_active_core->combat.is_alive)
+        _active_core = nullptr;
+    if (!_active_core) {
+        _enter_vulnerable_phase(boss, true);
+        return;
+    }
+    domain_timer += dt;
+    if (domain_timer >= max_duration) {
+        domain_timer = 0.0f;
+        _active_core->combat.is_alive = false;
+        _active_core = nullptr;
+        _enter_vulnerable_phase(boss, false);
+    }
+}
+
+// ── M4d-fix: 统一进入弱点阶段 (核心破坏/超时共用) ──
+void BossSystemDirector::_enter_vulnerable_phase(Monster* boss,
+                                                 bool core_destroyed) {
+    _active_core = nullptr;
+    domain_timer = 0.0f;
+    arena_state = BossArenaState::VULNERABLE_PHASE;
+    boss_invulnerable = false;
+    boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
+    domain_cycle_count++;
+    if (core_destroyed)
+        EventBus::inst().emit(GameEventType::WEAK_POINT_BREAK,
+            boss, domain_cycle_count, 0.0f, "core_destroyed");
+    EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
+        boss, domain_cycle_count, _vulnerable_dmg_mult, "vulnerable_enter");
+}
+
+float BossSystemDirector::_enraged_cycle_duration() const {
+    return domain_cycle_duration * (_enraged ? 0.5f : 1.0f);
+}
+
+float BossSystemDirector::_enraged_vulnerable_duration() const {
+    return _vulnerable_duration * (_enraged ? 0.5f : 1.0f);
 }
 
 // ── F10.2: Spawn a domain core (weak point) near the boss ──
@@ -365,13 +392,12 @@ void BossSystemDirector::_spawn_domain_core(Monster* boss) {
     float sx = cx + cosf(angle) * dist;
     float sy = cy + sinf(angle) * dist;
 
-    // F10.3: Ice element bonus — 30% more damage to fire core
-    int core_hp = 200;
-    if (_player_weakpoint_element == (int)ElementType::ICE) {
-        core_hp = 140;  // 200 * 0.7
-    }
-    auto* core = new Monster(sx, sy, "火焰核心", core_hp, 0, 8, 4,
-        Color{255, 120, 30, 255});
+    // F10.3-fix: 数据驱动弱点加成 — 克制元素提升核心受击伤害 (CombatStats 乘区)
+    // F10.2-fix: 惰性AI (静止桩) — 不追逐玩家、无普攻
+    auto* core = new Monster(sx, sy, "火焰核心", 200, 0, 8, 4,
+        Color{255, 120, 30, 255}, new MonsterAI(0.0f, 0.0f, 0.0f, 0.0f));
+    core->combat.vulnerable_dmg_mult = _weakness_dmg_mult;
+    core->attack_cooldown = 999999.0f;   // 静止桩: 永不普攻
     core->is_weak_point = true;
     core->weak_point_type = (int)WeakPointType::CORE;
     core->weak_point_state = (int)WeakPointState::ACTIVE; // F10.3
@@ -380,6 +406,12 @@ void BossSystemDirector::_spawn_domain_core(Monster* boss) {
     core->entity.sync_rect();
     _active_core = core;
     _weak_point_pool->push_back(std::unique_ptr<Monster>(core));
+}
+
+// ── F10.2-fix: UAF guard — 核心死于 DOT/延迟结算时, cleanup 前解除引用 ──
+void BossSystemDirector::on_core_maybe_erased() {
+    if (_active_core && !_active_core->combat.is_alive)
+        _active_core = nullptr;   // cleanup 将 erase 该对象, 状态转换由下一帧 tick 完成
 }
 
 void BossSystemDirector::notify_phase2() {
@@ -410,6 +442,20 @@ void BossSystemDirector::notify_last_stand(Monster* boss) {
         ev.type     = ArenaEventType::INTENSIFY;
         ev.duration = _arena_cfg->zone_duration;  // 重置为满 duration
         arena.execute_event(ev, *_arena_cfg, 0, 0, 0, 0);
+    }
+    // M4d-fix: 狂暴领域 — domain boss 进入 ENRAGED_PHASE (攻击+30%, 周期/弱点减半)
+    if (_behavior_type == "domain" && boss) {
+        _enraged = true;
+        boss->combat.attack = (int)(boss->combat.attack * 1.3f);
+        if (_active_core) { _active_core->combat.is_alive = false; }
+        _active_core = nullptr;
+        boss->combat.vulnerable_dmg_mult = 1.0f;
+        domain_timer = 0.0f;
+        arena_state = BossArenaState::ENRAGED_PHASE;
+        boss_invulnerable = true;
+        _spawn_domain_core(boss);
+        EventBus::inst().emit(GameEventType::BOSS_DOMAIN_ENTER,
+            boss, domain_cycle_count, 0.0f, "enraged_domain");
     }
 }
 

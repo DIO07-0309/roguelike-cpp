@@ -22,6 +22,25 @@
 | Phase | G5-G6 Complete |
 | Status | Current Release |
 
+# v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
+
+## Boss 战斗六大 Bug 修复 (F10/F15)
+- BUG 1 UAF: `on_core_maybe_erased()` 钩子 + DOMAIN_PHASE 空核心路径 + reset 清理
+- BUG 2 镜像 VFX 禁用: BossSystemDirector 透传 `effects` 通道
+- BUG 3 ENRAGED_PHASE 实装: 狂暴攻击×1.3、周期/弱点窗口减半、震屏+文案
+- BUG 4 领域核心追玩家: 惰性 MonsterAI 静态桩 (attack_cooldown=999999)
+- BUG 5 数据驱动: vulnerable_duration / weakness_dmg_mult 从 domain_config 读取
+- BUG 6 弹幕必中: 弹幕/AOE 距离判定
+
+## M4e — 在线自适应 Mirror AI (Thompson Sampling)
+- 新增 `src/ai/mirror/online_adaptive_policy.h/.cpp`: contextual bandit (9 上下文桶 × 4 动作臂), Marsaglia-Tsang Beta 采样, 画像先验注入
+- MirrorAgent: `recommend_action()` (Phase≥2 接管) + `report_outcome()` (命中/落空反馈)
+- MirrorCombatDirector: 决策接管 + 命中/闪避(位移>200px)反馈回路, `_apply_online_action` 动作映射
+- 冷启动知识: 玩家习惯画像 → Beta 先验; 战斗中实时纠正
+- **跨对局记忆**: Beta 参数持久化到 `saves/save.json` (`mra`/`mrb`), 旧后验叠加为新先验, 镜像跨局累积适应玩家 — 对标觉悟人机"累计学习"
+- **玩家技能上下文**: `Player._last_skill_time` 记录技能施放, `player_using_skill` 实装; 技能窗口 40% 探索性反制 (Thompson 决策) + 观察期即时打断 (`should_interrupt_skill(st)`) — 不扩桶保存档兼容
+- **日志收敛 + 学习可视化**: 决策/反馈日志降 `LOG_DEBUG`; 镜像面板下方新增"在线学习"HUD — 实时显示上次决策臂 + 当前桶 4 臂胜率进度条 (`_draw_mirror_learning`)
+
 ## G5 (C++ Sync)
 - 5 new skill behavior classes: IceNova, ChainLightning, ShadowStrike, BloodFrenzy, SummonSpirit
 - AIArchetype (4 types: Sniper/Controller/Ambush/Guardian) + MonsterSkillType (12)

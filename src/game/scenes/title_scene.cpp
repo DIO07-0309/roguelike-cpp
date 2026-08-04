@@ -174,6 +174,9 @@ void TitleScene::_input(const InputMap& input) {
                                     data->special_discovered, data->rule_counters,
                                     data->quest_states, data->unlocked_endings);
             }
+            // M4e: 跨对局镜像记忆
+            gs->set_mirror_memory(data->mirror_prior_alpha,
+                                  data->mirror_prior_beta);
             delete data;
             tree->change_scene(gs);
             LOG_INFO("继续游戏: 第%d层", floor);

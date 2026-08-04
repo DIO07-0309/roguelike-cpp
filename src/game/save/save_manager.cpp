@@ -32,6 +32,9 @@ static std::string trim(const std::string& s) {
     return (a == std::string::npos) ? "" : s.substr(a, b - a + 1);
 }
 
+// ---- M4e: float 列表解析 (前置声明, 定义在文件末) ----
+static void _parse_float_list(const std::string& s, std::vector<float>& out);
+
 // ---- 序列化 ----
 bool SaveManager::save_game(Player* player, int floor, int max_f,
                               uint32_t dungeon_seed,
@@ -39,7 +42,9 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
                               const std::vector<bool>& special_discovered,
                               const std::unordered_map<std::string, int>& rule_counters,
                               const std::unordered_map<int, int>& quest_states,
-                              const std::vector<int>& unlocked_endings) {
+                              const std::vector<int>& unlocked_endings,
+                              const std::vector<float>& mirror_prior_alpha,
+                              const std::vector<float>& mirror_prior_beta) {
     mkdir_impl(_save_dir().c_str());
     FILE* f = fopen(_save_path().c_str(), "w");
     if (!f) { LOG_ERROR("存档无法写入"); return false; }
@@ -171,6 +176,22 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
         fprintf(f, "%d", unlocked_endings[i]);
     }
     fprintf(f, "\n");
+
+    // ── M4e: 跨对局镜像记忆 (逗号分隔 float) ──
+    if (!mirror_prior_alpha.empty() && !mirror_prior_beta.empty()) {
+        fprintf(f, "mra:");
+        for (size_t i = 0; i < mirror_prior_alpha.size(); i++) {
+            if (i > 0) fprintf(f, ",");
+            fprintf(f, "%.4f", mirror_prior_alpha[i]);
+        }
+        fprintf(f, "\n");
+        fprintf(f, "mrb:");
+        for (size_t i = 0; i < mirror_prior_beta.size(); i++) {
+            if (i > 0) fprintf(f, ",");
+            fprintf(f, "%.4f", mirror_prior_beta[i]);
+        }
+        fprintf(f, "\n");
+    }
 
     fclose(f);
     LOG_INFO("存档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff seed:%u",
@@ -497,6 +518,10 @@ SaveData* SaveManager::load_save() {
 
     d->attack_evo_level = getV("atl", 1);
 
+    // ── M4e: 跨对局镜像记忆恢复 ──
+    _parse_float_list(getS("mra"), d->mirror_prior_alpha);
+    _parse_float_list(getS("mrb"), d->mirror_prior_beta);
+
     std::string rul = getS("rul");
     if (!rul.empty()) {
         for (size_t pos = 0; pos < rul.size(); ) {
@@ -548,4 +573,17 @@ std::vector<bool> SaveManager::_decode_spr(const std::string& s) {
         pos = comma + 1;
     }
     return out;
+}
+
+// M4e: "1.0,2.0,..." → vector<float> (空串忽略)
+static void _parse_float_list(const std::string& s, std::vector<float>& out) {
+    out.clear();
+    if (s.empty()) return;
+    for (size_t pos = 0; pos < s.size(); ) {
+        size_t comma = s.find(',', pos);
+        std::string tok = s.substr(pos, (comma == std::string::npos) ? std::string::npos : (comma - pos));
+        if (!tok.empty()) out.push_back((float)atof(tok.c_str()));
+        if (comma == std::string::npos) break;
+        pos = comma + 1;
+    }
 }

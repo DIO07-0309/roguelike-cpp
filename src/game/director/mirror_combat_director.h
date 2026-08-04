@@ -44,6 +44,8 @@ private:
                        int skill_idx, std::vector<Effect>* effects);
     void _ai_decide(Monster* boss, Player* player, double gt,
                     MirrorAgent* agent);
+    // M4e: 在线决策动作映射 — act<0 返回false (观察期走规则)
+    bool _apply_online_action(int act);
     void _chase_player(Monster* boss, Player* player, float dt);
 
     // 武器镜像数据
@@ -66,4 +68,8 @@ private:
     // Boss 引用
     Monster* _boss = nullptr;
     BossAI*  _bai = nullptr;
+    // M4e: 在线自适应反馈
+    MirrorAgent* _agent = nullptr;
+    float _last_player_x = 0.0f;   // 玩家闪避检测
+    float _last_player_y = 0.0f;
 };

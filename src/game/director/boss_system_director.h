@@ -59,13 +59,19 @@ public:
     // ── F10.2: Weak point tracking ──
     Monster* _active_core = nullptr;          // currently spawned fire_core (nullptr if broken)
     float    _vulnerable_dmg_mult = 2.0f;    // damage multiplier during VULNERABLE_PHASE
-    int      _player_weakpoint_element = 0;  // F10.3: player element type for bonus (set in tick)
+    float    _vulnerable_duration = 10.0f;   // F10.3: 弱点阶段时长 (数据驱动)
+    float    _weakness_dmg_mult = 1.0f;      // F10.3: 克制元素对核心伤害倍率 (数据驱动)
     std::vector<std::unique_ptr<Monster>>* _weak_point_pool = nullptr;  // set by caller
 
     // ── F15: Mirror Boss ──
     std::unique_ptr<MirrorAgent> _mirror_agent;
     MirrorCombatDirector _mirror_combat;
     void _init_mirror_boss(Monster* boss, const class Player* player);
+    // M4e: 跨对局记忆 — 导出/注入 (空 vector 安全)
+    void export_mirror_memory(std::vector<float>& alpha,
+                              std::vector<float>& beta) const;
+    void inject_mirror_memory(const std::vector<float>& alpha,
+                              const std::vector<float>& beta);
 
     std::string intro_text;
     std::string modifier_text;
@@ -78,11 +84,13 @@ public:
                        const class Player* player = nullptr);
     void tick(float dt, Monster* boss, Player* player, int floor,
               const WorldState& ws, const RelationshipSystem& rels,
-              StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters);
+              StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters,
+              std::vector<Effect>* effects = nullptr);
     void notify_phase2();
     void notify_last_stand(Monster* boss);
     void notify_death(const WorldState& ws, const RelationshipSystem& rels,
                       const QuestManager& qm);
+    void on_core_maybe_erased();   // F10.2-fix: UAF guard — cleanup 前置钩子
 
     void init_events();  // D7 Step5: 订阅 EventBus
 
@@ -90,6 +98,11 @@ private:
     void notify_death_ev(const struct GameEvent&);
     void _tick_domain_state(float dt, Monster* boss);  // F10.1
     void _spawn_domain_core(Monster* boss);             // F10.2
+    bool _enraged = false;                              // M4d-fix: 狂暴领域标记
+    void _tick_core_phase(float dt, Monster* boss, float max_duration);  // M4d-fix
+    void _enter_vulnerable_phase(Monster* boss, bool core_destroyed);    // M4d-fix
+    float _enraged_cycle_duration() const;      // M4d-fix: 狂暴时核心周期减半
+    float _enraged_vulnerable_duration() const; // M4d-fix: 狂暴时弱点窗口减半
 
 public:
     // ── 查询接口 ──

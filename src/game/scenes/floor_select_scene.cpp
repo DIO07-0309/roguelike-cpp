@@ -79,6 +79,9 @@ void FloorSelectScene::_input(const InputMap& input) {
                 gs->load_saved_game(floor, max_unlocked, std::move(data->player),
                                     0, {}, {}, data->rule_counters, data->quest_states,
                                     data->unlocked_endings);
+                // M4e: 跨对局镜像记忆
+                gs->set_mirror_memory(data->mirror_prior_alpha,
+                                      data->mirror_prior_beta);
                 delete data;
             } else {
                 // 无存档: 创建新玩家

@@ -27,6 +27,9 @@ struct SaveData {
     int element_exp = 0;
     int element_type = 0;  // 0=NONE, 1=FIRE, 2=ICE, 3=POISON
     bool element_initialized = false;
+    // ── M4e: 跨对局镜像 AI 记忆 (72 alpha + 72 beta, 桶-major) ──
+    std::vector<float> mirror_prior_alpha;
+    std::vector<float> mirror_prior_beta;
 };
 
 class SaveManager {
@@ -38,7 +41,9 @@ public:
                           const std::vector<bool>& special_discovered = {},
                           const std::unordered_map<std::string, int>& rule_counters = {},
                           const std::unordered_map<int, int>& quest_states = {},
-                          const std::vector<int>& unlocked_endings = {});
+                          const std::vector<int>& unlocked_endings = {},
+                          const std::vector<float>& mirror_prior_alpha = {},
+                          const std::vector<float>& mirror_prior_beta = {});
     static SaveData* load_save();
     static void delete_save();
 
@@ -48,4 +53,5 @@ private:
     // B8: spr 序列化辅助
     static std::string _encode_spr(const std::vector<bool>& v);
     static std::vector<bool> _decode_spr(const std::string& s);
+    // M4e: float 列表序列化辅助 (文件内静态函数, 不占类接口)
 };

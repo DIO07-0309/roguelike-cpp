@@ -1,4 +1,6 @@
 #include "ai/mirror/mirror_agent.h"
+#include "core/logger.h"
+#include "combat_system.h"   // rng()
 #include <algorithm>
 #include <cstdio>
 
@@ -8,6 +10,12 @@ void MirrorAgent::init(const PlayerHabitProfile& profile) {
     _profile = profile;
     _phase = 1;
     _phase_timer = 0.0f;
+
+    // M4e: 创建在线学习策略, 注入离线画像先验
+    _policy = std::make_unique<OnlineAdaptivePolicy>();
+    _policy->init_prior(profile);
+    _last_bucket = -1;
+    _last_action = -1;
 
     // Derive preferred distance from profile
     if (_profile.style == PlayerStyle::AGGRESSIVE)
@@ -54,10 +62,10 @@ float MirrorAgent::recommend_distance() const {
     return base;
 }
 
-bool MirrorAgent::should_interrupt_skill() const {
+bool MirrorAgent::should_interrupt_skill(const MirrorBattleState& st) const {
     if (_phase < 2) return false;
-    // If player spams a single skill >60%, prepare to interrupt it
-    return _profile.predict_skill_spam;
+    // M4e: 玩家正在施放技能 → 立即打断; 或按画像预判技能流
+    return st.player_using_skill || _profile.predict_skill_spam;
 }
 
 bool MirrorAgent::should_pressure_close(const MirrorBattleState& st) const {
@@ -82,6 +90,63 @@ PlayerActionType MirrorAgent::predict_next_action(
     if (_profile.predict_skill_spam && _phase >= 2)
         return PlayerActionType::SKILL;
     return PlayerActionType::ATTACK;
+}
+
+// ── M4e: 在线自适应 — Thompson 采样决策 ──
+float MirrorAgent::_rand01() {
+    return (float)((rng() % 1000000) / 1000000.0);
+}
+
+int MirrorAgent::recommend_action(const MirrorBattleState& st) {
+    if (!_policy || _phase < 2) return -1;   // 观察期: 走规则
+    float dist_px = st.dist_tiles * 32.0f;
+    _last_bucket = OnlineAdaptivePolicy::bucket_for(dist_px, st.player_hp_pct);
+    int act = _policy->select_action(_last_bucket);
+    // 技能窗口探索: 玩家放技能时 40% 概率尝试技能反制 (反馈落在实际臂上)
+    if (st.player_using_skill && act != (int)MirrorAction::SKILL
+        && _rand01() < 0.4f)
+        act = (int)MirrorAction::SKILL;
+    _last_action = act;
+    LOG_DEBUG("[MIRROR] 在线决策 phase=%d bucket=%d action=%d (%.0fpx, HP%.0f%%)",
+        _phase, _last_bucket, _last_action, dist_px,
+        st.player_hp_pct * 100.0f);
+    return _last_action;
+}
+
+void MirrorAgent::report_outcome(bool hit, float damage) {
+    if (!_policy || _last_bucket < 0 || _last_action < 0) return;
+    // 命中: 伤害越高奖励越接近1; 落空/被躲: 0
+    float reward = hit
+        ? std::min(1.0f, 0.6f + 0.4f * std::min(1.0f, damage / 30.0f))
+        : 0.0f;
+    _policy->update(_last_bucket, _last_action, reward);
+    LOG_DEBUG("[MIRROR] 反馈 bucket=%d action=%d hit=%d dmg=%.0f reward=%.2f",
+        _last_bucket, _last_action, hit ? 1 : 0, damage, reward);
+    _last_bucket = -1;   // 一次决策只允许一次反馈 (防 dodge 重复上报)
+    _last_action = -1;
+}
+
+void MirrorAgent::export_memory(std::vector<float>& alpha,
+                                std::vector<float>& beta) const {
+    if (_policy) {
+        _policy->export_alpha(alpha);
+        _policy->export_beta(beta);
+    } else {
+        alpha.clear();
+        beta.clear();
+    }
+}
+
+void MirrorAgent::import_memory(const std::vector<float>& alpha,
+                                const std::vector<float>& beta_vals) {
+    if (!_policy) return;
+    _policy->import_alpha(alpha);   // 旧后验 = 新先验 (叠加)
+    _policy->import_beta(beta_vals);
+}
+
+float MirrorAgent::arm_win_rate(int bucket, int action) const {
+    if (!_policy) return 0.0f;
+    return _policy->win_rate(bucket, action);
 }
 
 // ── F15.4: Mirror reward ──

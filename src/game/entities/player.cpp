@@ -52,6 +52,7 @@ void Player::render(Camera2D& cam) { (void)cam; }
 
 void Player::reset_attack_timers() {
     _last_attack_time = -999.0f;
+    _last_skill_time = -999.0f;   // M4e
     weapon.runtime().last_attack_time = -999.0f;  // G9: floor transition fix
     for (auto& s : skills.active_skills) {
         s->last_use_time = -999.0f;
