@@ -97,4 +97,6 @@ public:
     // ── G2.3: Arena spawn timer (属于 BossSystemDirector — Encounter 节奏) ──
     float _arena_spawn_timer = 0.0f;
     const BossArenaDef* _arena_cfg = nullptr;
+    int   _arena_phase = 0;     // M4b: 0=normal, 1=phase2, 2=last_stand
+    float _arena_spawn_mult = 1.0f; // M4b: spawn_interval multiplier per phase
 };

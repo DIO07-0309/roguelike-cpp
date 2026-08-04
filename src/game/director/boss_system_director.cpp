@@ -40,6 +40,8 @@ void BossSystemDirector::reset() {
     _behavior_type.clear();
     _arena_spawn_timer = 0.0f;   // G2.3
     _arena_cfg = nullptr;        // G2.3
+    _arena_phase = 0;            // M4b
+    _arena_spawn_mult = 1.0f;    // M4b
 }
 
 void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
@@ -192,10 +194,11 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
     // Cinematic tick
     cinematic.tick(dt);
 
-    // ── G2.3: Arena 生成 (原在 GameScene 中的硬编码) ──
+    // ── G2.3 + M4b: Arena 生成 — 阶段驱动间隔加速 ──
     if (_arena_cfg && _arena_cfg->danger_type != "none") {
         _arena_spawn_timer += dt;
-        if (_arena_spawn_timer >= _arena_cfg->spawn_interval) {
+        float effective_interval = _arena_cfg->spawn_interval * _arena_spawn_mult;
+        if (_arena_spawn_timer >= effective_interval) {
             _arena_spawn_timer = 0.0f;
             ArenaEvent ev;
             ev.type     = ArenaEventType::SPAWN_ZONE;
@@ -342,6 +345,9 @@ void BossSystemDirector::_spawn_domain_core(Monster* boss) {
 void BossSystemDirector::notify_phase2() {
     cinematic.trigger_phase2();
     timeline.record(encounter.total_time(), "PHASE2");
+    // M4b: Phase2 arena — 生成间隔减半, 战场压力升级
+    _arena_phase = 1;
+    _arena_spawn_mult = 0.5f;
 }
 
 void BossSystemDirector::notify_last_stand(Monster* boss) {
@@ -356,6 +362,15 @@ void BossSystemDirector::notify_last_stand(Monster* boss) {
     }
     cinematic.trigger_last_stand();
     timeline.record(encounter.total_time(), "LAST_STAND");
+    // M4b: LastStand arena — INTENSIFY 重置所有zone + 间隔再加速
+    _arena_phase = 2;
+    _arena_spawn_mult = 0.35f;
+    if (_arena_cfg && _arena_cfg->danger_type != "none") {
+        ArenaEvent ev;
+        ev.type     = ArenaEventType::INTENSIFY;
+        ev.duration = _arena_cfg->zone_duration;  // 重置为满 duration
+        arena.execute_event(ev, *_arena_cfg, 0, 0, 0, 0);
+    }
 }
 
 void BossSystemDirector::notify_death(const WorldState& ws,
