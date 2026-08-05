@@ -36,6 +36,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include "resource_manager.h"                 // M4f: NPC 精灵加载
+#include "game/rendering/sprite_renderer.h"   // M4f: NPC 精灵绘制
 
 // 字体指针 (在 main.cpp 中初始化)
 extern Font g_font;
@@ -1804,24 +1806,39 @@ void GameScene::_draw_entities() {
     }
     if (player) player->draw_no_cam(_cam_x, _cam_y);
 
-    // D4 Step4: NPC — name label (floor-based lookup) + green dot
-    static const struct { int floor; const char* name; } _npc_lookup[] = {
-        {2,"埃德加"},{3,"瑞卡"},{4,"卡利安"},{6,"卡兹"},{7,"泰伦斯"},
-        {8,"维拉"},{9,"索拉斯"},{11,"迷失灵魂"},{12,"眠者"},{14,"守望者"}
+    // D4 Step4: NPC — sprite (floor-based lookup) + name label
+    static const struct { int floor; const char* name; const char* key; } _npc_lookup[] = {
+        {2,"埃德加","npc_1"},{3,"瑞卡","npc_2"},{4,"卡利安","npc_3"},
+        {6,"卡兹","npc_2"},{7,"泰伦斯","npc_1"},{8,"维拉","npc_3"},
+        {9,"索拉斯","npc_2"},{11,"迷失灵魂","npc_3"},{12,"眠者","npc_1"},
+        {14,"守望者","npc_blacksmith"}
     };
     for (int i = 0; i < _npc_count; i++) {
         if (_npc_state[i].finished) continue;
         float nx = _npc_tile_x[i] * TILE_SIZE + TILE_SIZE/2 - _cam_x;
         float ny = _npc_tile_y[i] * TILE_SIZE + TILE_SIZE/2 - _cam_y;
-        float pulse = 4 + sinf((float)GetTime() * 4) * 2;
-        DrawCircle(nx, ny - 10, pulse, {100, 220, 140, 180});
-        DrawCircle(nx, ny - 10, 3, {60, 180, 80, 255});
+        const char* nn = "NPC";
+        const char* skey = "npc_1";
+        for (auto& lk : _npc_lookup) {
+            if (lk.floor != current_floor) continue;
+            nn = lk.name;
+            skey = lk.key;
+            break;
+        }
+        SpriteDef sdef;
+        Texture2D stex = ResourceManager::inst().sprite_by_key(skey, sdef);
+        float s = TILE_SIZE - 4;
+        float sx = nx - s/2, sy = ny - s/2;
+        if (stex.id > 0) {
+            SpriteRenderer::draw_sprite(stex, sdef, 0, {sx, sy, s, s});
+        } else {
+            // 素材缺失回退: 历史绿点
+            float pulse = 4 + sinf((float)GetTime() * 4) * 2;
+            DrawCircle(nx, ny - 10, pulse, {100, 220, 140, 180});
+            DrawCircle(nx, ny - 10, 3, {60, 180, 80, 255});
+        }
         // G9: NPC name label
         if (g_font_loaded) {
-            const char* nn = "NPC";
-            for (auto& lk : _npc_lookup) {
-                if (lk.floor == current_floor) { nn = lk.name; break; }
-            }
             float tw = MeasureTextEx(g_font_small, nn, 10, 1).x;
             DrawTextEx(g_font_small, nn, {nx - tw/2, ny - 26}, 10, 1, {180,240,180,200});
         }

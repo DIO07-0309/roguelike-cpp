@@ -140,6 +140,36 @@ static void _draw_procedural_player(float hx, float hy, float hw, float hh,
     }
 }
 
+// G9.4: 武器精灵 key — 三件素材可用, 徒手/无素材时返回空
+static const char* _weapon_sprite_key(WeaponType wt) {
+    switch (wt) {
+        case WeaponType::DAGGER: return "weapon_dagger";
+        case WeaponType::SWORD:  return "weapon_sword";
+        case WeaponType::SPEAR:  return "weapon_spear";
+        default:                 return nullptr;
+    }
+}
+
+// G9.4: 武器图标悬浮于人物侧面 (朝向偏移 + 轻浮动), 无素材则静默
+static void _draw_player_weapon(WeaponType wt, Direction dir,
+                                float hx, float hy, float hw, float hh) {
+    const char* wkey = _weapon_sprite_key(wt);
+    if (!wkey) return;
+    SpriteDef wdef;
+    Texture2D wtex = ResourceManager::inst().sprite_by_key(wkey, wdef);
+    if (wtex.id <= 0) return;
+    float w = hw * 0.5f, h = hh * 0.5f;
+    float wx = hx, wy = hy;
+    switch (dir) {
+        case Direction::DOWN:  wx = hx - w - 2;           wy = hy + hh - h; break;
+        case Direction::UP:    wx = hx + hw + 2;          wy = hy + hh - h; break;
+        case Direction::LEFT:  wx = hx - w - 2;           wy = hy + hh*0.25f; break;
+        case Direction::RIGHT: wx = hx + hw + 2;          wy = hy + hh*0.25f; break;
+    }
+    float bob = sinf((float)GetTime() * 3 + (int)dir) * 1.0f;
+    SpriteRenderer::draw_sprite(wtex, wdef, 0, {wx, wy + bob, w, h});
+}
+
 void Player::draw_no_cam(float cam_x, float cam_y) {
     Rectangle dr = entity.draw_rect(cam_x, cam_y);
 
@@ -167,6 +197,9 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
     } else {
         _draw_procedural_player(hx, hy, hw, hh, body_c, direction);
     }
+
+    // G9.4: 装备武器图标 (徒手/无素材时静默)
+    _draw_player_weapon(weapon.weapon_type(), direction, hx, hy, hw, hh);
 
     // D2: Combo 指示器 (连击数显示在头顶)
     if (combo.count >= 2 && combo.timer > 0) {

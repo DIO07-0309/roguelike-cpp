@@ -19,6 +19,13 @@
     "spring_top":     { "file": "assets/sprites/spring_top.png",     "frame_w": 16, "frame_h": 16 },
     "spring_bottom":  { "file": "assets/sprites/spring_bottom.png",  "frame_w": 16, "frame_h": 16 },
     "altar":          { "file": "assets/sprites/altar.png",          "frame_w": 16, "frame_h": 16 },
-    "boss_self":      { "file": "assets/sprites/player_fire.png",    "frame_w": 16, "frame_h": 16 }
+    "boss_self":      { "file": "assets/sprites/player_fire.png",    "frame_w": 16, "frame_h": 16 },
+    "npc_1":          { "file": "assets/sprites/npc_1.png",          "frame_w": 16, "frame_h": 16 },
+    "npc_2":          { "file": "assets/sprites/npc_2.png",          "frame_w": 16, "frame_h": 16 },
+    "npc_3":          { "file": "assets/sprites/npc_3.png",          "frame_w": 16, "frame_h": 16 },
+    "npc_blacksmith": { "file": "assets/sprites/npc_blacksmith.png", "frame_w": 16, "frame_h": 16 },
+    "weapon_dagger":  { "file": "assets/sprites/weapon_dagger.png",  "frame_w": 16, "frame_h": 16 },
+    "weapon_sword":   { "file": "assets/sprites/weapon_sword.png",   "frame_w": 16, "frame_h": 16 },
+    "weapon_spear":   { "file": "assets/sprites/weapon_spear.png",   "frame_w": 16, "frame_h": 16 }
   }
 }
