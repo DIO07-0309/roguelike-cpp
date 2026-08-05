@@ -158,7 +158,7 @@ static void _draw_procedural_player(float hx, float hy, float hw, float hh,
 }
 
 // G9.4: 武器握持 — 手腕锚点 + 待机/挥砍角度 + 朝向镜像
-// 素材朝向: 刀/剑尖朝下(柄在顶), 矛尖朝上(柄在底)
+// 素材朝向: 刀/剑尖朝下(柄在顶), 矛尖朝上(柄在底), 弩弓臂朝上(托在底)
 static void _draw_player_weapon(Player* self, Direction dir,
                                 float hx, float hy, float hw, float hh) {
     const char* wkey = weapon_sprite_key(self->weapon.weapon_type());
@@ -174,10 +174,14 @@ static void _draw_player_weapon(Player* self, Direction dir,
         self->_swing_start = -1.0f;
     }
 
-    // 尺寸按类型: 匕首短/剑中/矛长
-    bool is_spear = self->weapon.weapon_type() == WeaponType::SPEAR;
-    float w = is_spear ? 10.0f : 12.0f;
-    float h = is_spear ? 26.0f : (self->weapon.weapon_type() == WeaponType::DAGGER ? 14.0f : 18.0f);
+    WeaponType wt = self->weapon.weapon_type();
+    bool is_spear = wt == WeaponType::SPEAR;
+    bool is_crossbow = wt == WeaponType::CROSSBOW;
+    bool bottom_grip = is_spear || is_crossbow;
+    float w = is_spear ? 10.0f : (is_crossbow ? 16.0f : 12.0f);
+    float h = is_spear ? 26.0f
+             : (is_crossbow ? 13.0f
+             : (wt == WeaponType::DAGGER ? 14.0f : 18.0f));
 
     // 手腕锚点 (身体中心 + 朝向偏移)
     float cx = hx + hw / 2, cy = hy + hh * 0.55f;
@@ -189,16 +193,17 @@ static void _draw_player_weapon(Player* self, Direction dir,
         case Direction::RIGHT: ox = hw * 0.42f;  break;
     }
 
-    // 角度: 待机 0°(竖直) → 攻击挥向面前 90° 弧线 (0.35s)
+    // 角度: 待机 0°(竖直) → 攻击挥向面前 90° 弧线 (0.35s); 弩小幅摆动保持水平
     float p = 0.0f;
     if (self->_swing_start >= 0.0f)
         p = std::min(1.0f, (float)(GetTime() - self->_swing_start) / 0.35f);
-    float angle = 90.0f * sinf(p * 3.14159265f);
+    float angle = is_crossbow ? 15.0f * sinf(p * 3.14159265f)
+                              : 90.0f * sinf(p * 3.14159265f);
     if (dir == Direction::LEFT || dir == Direction::UP) angle = -angle;
 
-    // 柄部锚点: 刀/剑在顶部, 矛在底部
-    Vector2 origin = is_spear ? Vector2{w / 2, h - 2} : Vector2{w / 2, 2};
-    float dst_y = is_spear ? cy - h + 2 : cy - 2;
+    // 柄部锚点: 刀/剑在顶部, 矛/弩在底部
+    Vector2 origin = bottom_grip ? Vector2{w / 2, h - 2} : Vector2{w / 2, 2};
+    float dst_y = bottom_grip ? cy - h + 2 : cy - 2;
     Rectangle src = SpriteRenderer::frame_rect(wdef, 0);
     // raylib: 绘制位置 = dest - origin → dest 补偿 origin 后, 主体归位且旋转真正绕柄部
     Rectangle dst = {cx + ox - w / 2 + origin.x, dst_y + origin.y, w, h};

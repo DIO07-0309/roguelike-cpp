@@ -26,6 +26,8 @@
     "npc_blacksmith": { "file": "assets/sprites/npc_blacksmith.png", "frame_w": 16, "frame_h": 16 },
     "weapon_dagger":  { "file": "assets/sprites/weapon_dagger.png",  "frame_w": 16, "frame_h": 16 },
     "weapon_sword":   { "file": "assets/sprites/weapon_sword.png",   "frame_w": 16, "frame_h": 16 },
-    "weapon_spear":   { "file": "assets/sprites/weapon_spear.png",   "frame_w": 16, "frame_h": 16 }
+    "weapon_spear":   { "file": "assets/sprites/weapon_spear.png",   "frame_w": 16, "frame_h": 16 },
+    "weapon_nunchaku": { "file": "assets/sprites/weapon_nunchaku.png", "frame_w": 16, "frame_h": 16 },
+    "weapon_crossbow": { "file": "assets/sprites/weapon_crossbow.png", "frame_w": 16, "frame_h": 16 }
   }
 }

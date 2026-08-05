@@ -46,10 +46,12 @@ inline WeaponType weapon_type_from_string(const char* s) {
 // ── G9.4: Weapon sprite registry key — 素材未覆盖的类型返回空 ──
 inline const char* weapon_sprite_key(WeaponType wt) {
     switch (wt) {
-        case WeaponType::DAGGER: return "weapon_dagger";
-        case WeaponType::SWORD:  return "weapon_sword";
-        case WeaponType::SPEAR:  return "weapon_spear";
-        default:                 return nullptr;
+        case WeaponType::DAGGER:   return "weapon_dagger";
+        case WeaponType::SWORD:    return "weapon_sword";
+        case WeaponType::SPEAR:    return "weapon_spear";
+        case WeaponType::NUNCHAKU: return "weapon_nunchaku";
+        case WeaponType::CROSSBOW: return "weapon_crossbow";
+        default:                   return nullptr;
     }
 }
 
