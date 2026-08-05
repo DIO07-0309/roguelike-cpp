@@ -122,6 +122,23 @@ static const char* _player_sprite_key(ElementType e) {
     }
 }
 
+// G9.4: 素材精灵无朝向 → 眼睛指示器 (瞳孔朝方向偏移, 远程瞄准可辨)
+static void _draw_facing_eyes(float hx, float hy, float hw, float hh,
+                              Direction dir) {
+    float cx = hx + hw / 2, cy = hy + hh * 0.16f;
+    float dx = 0.0f, dy = 0.0f;
+    switch (dir) {
+        case Direction::UP:    dy = -2.0f; break;
+        case Direction::DOWN:  dy = 2.0f;  break;
+        case Direction::LEFT:  dx = -2.0f; break;
+        case Direction::RIGHT: dx = 2.0f;  break;
+    }
+    DrawCircle(cx - 2.5f, cy, 2.0f, {255, 255, 255, 235});
+    DrawCircle(cx + 2.5f, cy, 2.0f, {255, 255, 255, 235});
+    DrawCircle(cx - 2.5f + dx, cy + dy, 1.1f, {15, 15, 20, 255});
+    DrawCircle(cx + 2.5f + dx, cy + dy, 1.1f, {15, 15, 20, 255});
+}
+
 // M4f.2/3: 程序化占位精灵 (四方向 + 呼吸帧), 素材未配置时使用
 static void _draw_procedural_player(float hx, float hy, float hw, float hh,
                                     Color body_c, Direction dir) {
@@ -183,7 +200,8 @@ static void _draw_player_weapon(Player* self, Direction dir,
     Vector2 origin = is_spear ? Vector2{w / 2, h - 2} : Vector2{w / 2, 2};
     float dst_y = is_spear ? cy - h + 2 : cy - 2;
     Rectangle src = SpriteRenderer::frame_rect(wdef, 0);
-    Rectangle dst = {cx + ox - w / 2, dst_y, w, h};
+    // raylib: 绘制位置 = dest - origin → dest 补偿 origin 后, 主体归位且旋转真正绕柄部
+    Rectangle dst = {cx + ox - w / 2 + origin.x, dst_y + origin.y, w, h};
     DrawTexturePro(wtex, src, dst, origin, angle, WHITE);
 }
 
@@ -251,8 +269,13 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
         float rot = (combo.is_heavy() && p > 0.0f)
             ? 6.0f * sinf(p * 6.2831853f) : 0.0f;
         Rectangle src = SpriteRenderer::frame_rect(fdef, 0);
-        DrawTexturePro(ftex, src, {hx, hy, hw, hh},
-                       {hw / 2, hh * 0.9f}, rot, WHITE);
+        // raylib: 绘制位置 = dest - origin, 旋转绕 dest 进行。
+        // 平时 origin 归零 → 精灵贴满碰撞盒; 重击旋转时 dest 补偿 origin → 绕脚底旋转
+        Vector2 origin = {hw / 2, hh};
+        Rectangle dst = {hx + origin.x, hy + origin.y, hw, hh};
+        if (rot == 0.0f) { dst.x -= origin.x; dst.y -= origin.y; origin = {0, 0}; }
+        DrawTexturePro(ftex, src, dst, origin, rot, WHITE);
+        if (rot == 0.0f) _draw_facing_eyes(hx, hy, hw, hh, direction);
     } else {
         _draw_procedural_player(hx, hy, hw, hh,
                                 _combo_body_color(combo.count), direction);

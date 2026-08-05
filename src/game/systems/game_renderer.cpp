@@ -78,6 +78,9 @@ static void _draw_slash_arc(const Effect& e, float sx, float sy,
         case Direction::LEFT:  startAngle = 90;  break;
     }
     float endAngle = startAngle + 120;
+    // 贴图地板较亮: 先画深色厚底弧保证亮色弧可见
+    DrawRing({sx, sy}, arc_r * 0.4f - 1.5f, arc_r + 1.5f, startAngle, endAngle, 12,
+             {0, 0, 0, 130});
     DrawRing({sx, sy}, arc_r * 0.4f, arc_r, startAngle, endAngle, 12, c);
     DrawLineEx({sx, sy},
                {sx + cosf((startAngle + 60) * DEG2RAD) * arc_r,
@@ -125,12 +128,14 @@ static void _draw_effect_body(const Effect& e, float sx, float sy,
     if (e.kind == "pulse" || e.kind == "ring") {
         _draw_fx_ring(sx, sy, e.radius, prog, c, 24);
     } else if (e.kind == "spark") {
-        _draw_fx_blast(sx, sy, e.radius * (0.5f + 0.5f * prog), c, c.a);
+        _draw_fx_blast(sx, sy, e.radius * (0.5f + 0.5f * prog), c,
+                       (unsigned char)std::min(255, c.a * 2));
     } else if (e.kind == "bolt") {
-        DrawLineEx({sx, sy}, {e.target_x - cam_x, e.target_y - cam_y}, 2, c);
+        DrawLineEx({sx, sy}, {e.target_x - cam_x, e.target_y - cam_y}, 3, c);
     } else if (e.kind == "flash") {
-        _draw_fx_blast(sx, sy, e.radius, c, c.a);
-        _draw_fx_blast(sx, sy, e.radius * 1.5f, c, c.a / 3);
+        _draw_fx_blast(sx, sy, e.radius, c,
+                       (unsigned char)std::min(255, c.a * 2));
+        _draw_fx_blast(sx, sy, e.radius * 1.5f, c, c.a / 2);
     } else if (e.kind == "smoke") {
         float sr = e.radius * (0.3f + 0.7f * prog);
         DrawCircle(sx, sy, sr, Fade(c, 0.5f));

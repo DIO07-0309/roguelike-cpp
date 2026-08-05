@@ -125,12 +125,12 @@ void GameSceneInteraction::draw_event_ui(int sw, int sh) {
                 const char* choice_text = "?";
                 if (ui.current == EventType::BLOOD_RITUAL || ui.current == EventType::PRISONER
                     || ui.current == EventType::CURSED_ROOM)
-                    choice_text = (i == 0) ? "▶ YES" : "  NO";
+                    choice_text = (i == 0) ? "→ YES" : "  NO";
                 else if (ui.current == EventType::ALTAR_CHOICE) {
-                    const char* opts[] = {"▶ 攻击强化", "  生命恢复", "  技能进化"};
+                    const char* opts[] = {"→ 攻击强化", "  生命恢复", "  技能进化"};
                     choice_text = (i < 3) ? opts[i] : "?";
                 } else if (ui.current == EventType::MERCHANT) {
-                    const char* opts[] = {"▶ 购买药水", "  攻击祝福", "  随机圣物"};
+                    const char* opts[] = {"→ 购买药水", "  攻击祝福", "  随机圣物"};
                     choice_text = (i < 3) ? opts[i] : "?";
                 }
                 Color cc = (i == ui.selected) ? gold : Color{180,180,180,(unsigned char)(200*alpha)};
@@ -280,7 +280,7 @@ void GameSceneInteraction::draw_quest_log(int sw, int sh) {
             const char* status; Color c;
             switch (q.state) {
                 case QuestState::COMPLETED: status = "[?完成]"; c = {100,200,100,255}; break;
-                case QuestState::ACCEPTED:  status = "▶进行中!"; c = {255,200,50,255}; break;
+                case QuestState::ACCEPTED:  status = "→进行中!"; c = {255,200,50,255}; break;
                 case QuestState::AVAILABLE: status = "○可接"; c = {180,180,220,255}; break;
                 case QuestState::FAILED:    status = "[?失败]"; c = {200,100,100,255}; break;
                 default: status = "[锁]"; c = {100,100,100,200}; break;

@@ -1380,6 +1380,7 @@ void GameScene::_render() {
                 DrawCircle(sx, sy, 6.0f, ec);
                 DrawCircle(sx, sy, 3.0f, {255,255,200,200});
             } else {
+                DrawCircle(sx, sy, 6.0f, {0, 0, 0, 150});
                 DrawCircle(sx, sy, 4.0f, {200,160,100,255});
                 DrawCircle(sx, sy, 2.0f, {255,255,220,180});
             }
@@ -1400,19 +1401,23 @@ void GameScene::_render() {
                 const WeaponDef* ndef = player->weapon.current_def();
                 float inner_r = (ndef ? ndef->min_range : 2.0f) * TILE_SIZE;
                 float outer_r = (ndef ? ndef->max_range : 5.0f) * TILE_SIZE;
-                Color nc  = {220,160,80,(unsigned char)(90.0f*fade)};
-                Color fill = {220,160,60,(unsigned char)(25.0f*fade)};
+                // 贴图地板较亮: 深色厚底衬 + 亮色细环, 保证可见
+                DrawRing({sx, sy}, inner_r - 3, outer_r + 3, 0, 360, 64,
+                         {0, 0, 0, (unsigned char)(110.0f * fade)});
+                Color nc  = {235,175,95,(unsigned char)(200.0f*fade)};
+                Color fill = {220,160,60,(unsigned char)(45.0f*fade)};
                 DrawRing({sx, sy}, inner_r, outer_r, 0, 360, 64, fill);
-                DrawCircleLines(sx, sy, inner_r, nc);
-                DrawCircleLines(sx, sy, outer_r, nc);
+                DrawRing({sx, sy}, inner_r - 2, inner_r + 2, 0, 360, 64, nc);
+                DrawRing({sx, sy}, outer_r - 2, outer_r + 2, 0, 360, 64, nc);
             } else {
                 bool is_cb = (wt == WeaponType::CROSSBOW);
-                Color oc = is_cb ? Color{255,160,40,(unsigned char)(90.0f*fade)}
-                                 : Color{120,180,255,(unsigned char)(90.0f*fade)};
-                Color ic = is_cb ? Color{255,120,20,(unsigned char)(35.0f*fade)}
-                                 : Color{80,140,220,(unsigned char)(35.0f*fade)};
-                DrawCircleLines(sx, sy, rpx, oc);
-                DrawCircleLines(sx, sy, rpx - 1.0f, oc);
+                Color oc = is_cb ? Color{255,175,55,(unsigned char)(210.0f*fade)}
+                                 : Color{130,195,255,(unsigned char)(210.0f*fade)};
+                Color ic = is_cb ? Color{255,120,20,(unsigned char)(70.0f*fade)}
+                                 : Color{80,140,220,(unsigned char)(70.0f*fade)};
+                DrawRing({sx, sy}, rpx - 3, rpx + 3, 0, 360, 64,
+                         {0, 0, 0, (unsigned char)(130.0f * fade)});
+                DrawRing({sx, sy}, rpx - 2, rpx + 2, 0, 360, 64, oc);
                 DrawCircle(sx, sy, rpx, ic);
             }
         }

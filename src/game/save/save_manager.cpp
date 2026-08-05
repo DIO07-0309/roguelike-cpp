@@ -373,7 +373,7 @@ SaveData* SaveManager::load_save() {
                 int a = atoi(parts[3].c_str());
                 int pd2 = atoi(parts[4].c_str());
                 int md2 = atoi(parts[5].c_str());
-                auto ei = std::make_shared<EquipmentItem>(nm, rar, typ, a, pd2, md2);
+                auto ei = std::make_shared<EquipmentItem>(nm, rar, typ, a, pd2, md2, false);
                 // G9: restore weapon_def_id if present (7th field)
                 if (parts.size() >= 7 && !parts[6].empty())
                     ei->weapon_def_id = parts[6];
@@ -397,7 +397,8 @@ SaveData* SaveManager::load_save() {
         Rarity rar = (Rarity)atoi(parts[1].c_str());
         return std::make_shared<EquipmentItem>(
             parts[0], rar, parts[2],
-            atoi(parts[3].c_str()), atoi(parts[4].c_str()), atoi(parts[5].c_str()));
+            atoi(parts[3].c_str()), atoi(parts[4].c_str()), atoi(parts[5].c_str()),
+            false);
     };
 
     auto eqw = parseEquip("eqw");

@@ -41,8 +41,10 @@ struct EquipmentItem : Item {
     int atk_bonus = 0, pdef_bonus = 0, mdef_bonus = 0;
     std::string weapon_def_id; // G9: links to WeaponDef in weapons.json
 
+    // rarity_scaled=false: 读档专用, bonus 已含品质加成, 不再乘 rarity_mult
     EquipmentItem(const std::string& name, Rarity r, const std::string& sl,
-                  int atk = 0, int pdef = 0, int mdef = 0);
+                  int atk = 0, int pdef = 0, int mdef = 0,
+                  bool rarity_scaled = true);
 
     void apply(Player* player);
     void remove(Player* player);
