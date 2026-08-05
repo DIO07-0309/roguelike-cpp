@@ -158,9 +158,15 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                     if (x == sr->cx && y == sr->cy) {
                         const char* pkey = nullptr;
                         switch (sr->type) {
-                            case SpecialRoomType::ALTAR:      pkey = "altar"; break;
-                            case SpecialRoomType::TREASURE:   pkey = "chest"; break;
-                            case SpecialRoomType::FOUNTAIN:   pkey = "spring_top"; break;
+                            case SpecialRoomType::ALTAR:      pkey = "room_altar"; break;
+                            case SpecialRoomType::TREASURE:   pkey = "room_chest"; break;
+                            case SpecialRoomType::FOUNTAIN:   pkey = "room_spring"; break;
+                            case SpecialRoomType::SHOP:       pkey = "room_shop"; break;
+                            case SpecialRoomType::BLACKSMITH: pkey = "room_blacksmith"; break;
+                            case SpecialRoomType::LIBRARY:    pkey = "room_library"; break;
+                            case SpecialRoomType::GAMBLER:    pkey = "room_gambler"; break;
+                            case SpecialRoomType::SHRINE:     pkey = "room_shrine"; break;
+                            case SpecialRoomType::SECRET:     pkey = "room_secret"; break;
                             default: break;
                         }
                         SpriteDef pdef;

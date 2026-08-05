@@ -28,6 +28,26 @@
     "weapon_sword":   { "file": "assets/sprites/weapon_sword.png",   "frame_w": 16, "frame_h": 16 },
     "weapon_spear":   { "file": "assets/sprites/weapon_spear.png",   "frame_w": 16, "frame_h": 16 },
     "weapon_nunchaku": { "file": "assets/sprites/weapon_nunchaku.png", "frame_w": 16, "frame_h": 16 },
-    "weapon_crossbow": { "file": "assets/sprites/weapon_crossbow.png", "frame_w": 16, "frame_h": 16 }
+    "weapon_crossbow": { "file": "assets/sprites/weapon_crossbow.png", "frame_w": 16, "frame_h": 16 },
+    "room_altar":      { "file": "assets/sprites/room_altar.png",      "frame_w": 16, "frame_h": 16 },
+    "room_chest":      { "file": "assets/sprites/room_chest.png",      "frame_w": 16, "frame_h": 16 },
+    "room_spring":     { "file": "assets/sprites/room_spring.png",     "frame_w": 16, "frame_h": 16 },
+    "room_shop":       { "file": "assets/sprites/room_shop.png",       "frame_w": 16, "frame_h": 16 },
+    "room_blacksmith": { "file": "assets/sprites/room_blacksmith.png", "frame_w": 16, "frame_h": 16 },
+    "room_library":    { "file": "assets/sprites/room_library.png",    "frame_w": 16, "frame_h": 16 },
+    "room_gambler":    { "file": "assets/sprites/room_gambler.png",    "frame_w": 16, "frame_h": 16 },
+    "room_shrine":     { "file": "assets/sprites/room_shrine.png",     "frame_w": 16, "frame_h": 16 },
+    "room_secret":     { "file": "assets/sprites/room_secret.png",     "frame_w": 16, "frame_h": 16 },
+    "item_armor_leather": { "file": "assets/sprites/item_armor_leather.png", "frame_w": 16, "frame_h": 16 },
+    "item_armor_chain":   { "file": "assets/sprites/item_armor_chain.png",   "frame_w": 16, "frame_h": 16 },
+    "item_armor_iron":    { "file": "assets/sprites/item_armor_iron.png",    "frame_w": 16, "frame_h": 16 },
+    "item_armor_scale":   { "file": "assets/sprites/item_armor_scale.png",   "frame_w": 16, "frame_h": 16 },
+    "item_armor_plate":   { "file": "assets/sprites/item_armor_plate.png",   "frame_w": 16, "frame_h": 16 },
+    "item_armor_rune":    { "file": "assets/sprites/item_armor_rune.png",    "frame_w": 16, "frame_h": 16 },
+    "item_armor_ice":     { "file": "assets/sprites/item_armor_ice.png",     "frame_w": 16, "frame_h": 16 },
+    "item_armor_robe":    { "file": "assets/sprites/item_armor_robe.png",    "frame_w": 16, "frame_h": 16 },
+    "item_potion_red":    { "file": "assets/sprites/item_potion_red.png",    "frame_w": 16, "frame_h": 16 },
+    "item_potion_blue":   { "file": "assets/sprites/item_potion_blue.png",   "frame_w": 16, "frame_h": 16 },
+    "item_charm":         { "file": "assets/sprites/item_charm.png",         "frame_w": 16, "frame_h": 16 }
   }
 }

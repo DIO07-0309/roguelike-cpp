@@ -86,6 +86,9 @@ struct DroppedItem {
     int tile_x = 0, tile_y = 0;
 };
 
+// M4f.13: 物品图标派生 — 按类别/名字映射 sprite key (无素材返回空)
+const char* item_icon_key(const Item* item);
+
 // 工厂
 extern std::mt19937 rng;
 Rarity random_rarity();

@@ -246,3 +246,31 @@ std::shared_ptr<CharmItem> generate_random_charm() {
     return std::make_shared<CharmItem>(t->name, Rarity::COMMON, t->skill_id,
                                        t->cd_bonus * m, t->power_bonus * m);
 }
+
+// M4f.13: 物品图标派生 — 武器走 weapon_sprite_key, 装甲按名字, 药水按效果, 护符通用
+const char* item_icon_key(const Item* item) {
+    if (!item) return nullptr;
+    auto* eq = dynamic_cast<const EquipmentItem*>(item);
+    if (eq) {
+        if (eq->slot == "weapon") {
+            const WeaponDef* wdef = get_weapon_def(eq->weapon_def_id);
+            return wdef ? weapon_sprite_key(wdef->type) : nullptr;
+        }
+        if (eq->slot == "charm") return "item_charm";
+        if (eq->slot == "armor") {
+            static const char* MAP[][2] = {
+                {"皮甲", "item_armor_leather"}, {"锁子", "item_armor_chain"},
+                {"铁铠", "item_armor_iron"},    {"鳞甲", "item_armor_scale"},
+                {"板甲", "item_armor_plate"},   {"符文", "item_armor_rune"},
+                {"冰霜", "item_armor_ice"},     {"暗影", "item_armor_robe"},
+            };
+            for (auto& kv : MAP)
+                if (item->base_name.find(kv[0]) != std::string::npos)
+                    return kv[1];
+            return "item_armor_leather";
+        }
+    }
+    auto* c = dynamic_cast<const ConsumableItem*>(item);
+    if (c) return (c->effect_type == "buff") ? "item_potion_blue" : "item_potion_red";
+    return nullptr;
+}

@@ -1885,21 +1885,16 @@ void GameScene::_draw_ground_items() {
         float size = TILE_SIZE - 4;
         float cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
 
-        // G9.4: 武器掉落 → 数据驱动图标 + 稀有度光环
-        auto* eq = dynamic_cast<EquipmentItem*>(d.item.get());
-        const char* wkey = nullptr;
-        if (eq && eq->slot == "weapon") {
-            const WeaponDef* wdef = get_weapon_def(eq->weapon_def_id);
-            if (wdef) wkey = weapon_sprite_key(wdef->type);
-        }
-        if (wkey) {
-            SpriteDef wdef2;
-            Texture2D wtex = ResourceManager::inst().sprite_by_key(wkey, wdef2);
-            if (wtex.id > 0) {
+        // M4f.13: 物品图标 → 数据驱动贴图 (武器/装甲/药水/护符) + 稀有度光环
+        const char* ikey = item_icon_key(d.item.get());
+        if (ikey) {
+            SpriteDef xd;
+            Texture2D itex = ResourceManager::inst().sprite_by_key(ikey, xd);
+            if (itex.id > 0) {
                 float pulse = 6 + sinf((float)GetTime() * 5 + px * 0.1f) * 3;
                 DrawRectangleLinesEx({cx - pulse, cy - pulse, pulse * 2, pulse * 2}, 1,
                                      rarity_color(d.item->rarity));
-                SpriteRenderer::draw_sprite(wtex, wdef2, 0,
+                SpriteRenderer::draw_sprite(itex, xd, 0,
                     {cx - size/2, cy - size/2, size, size});
                 continue;
             }

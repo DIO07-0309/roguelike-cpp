@@ -443,8 +443,16 @@ void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw
         std::string mk = (i == cursor) ? ">" : " ";
         char idx[4]; snprintf(idx, sizeof(idx), "%2d", i + 1);
         std::string txt = mk + " [" + idx + "] " + inv.items[i]->get_description();
+        // M4f.13: 物品图标 (16px 贴图)
+        const char* ikey = item_icon_key(inv.items[i].get());
+        if (ikey) {
+            SpriteDef xd;
+            Texture2D itex = ResourceManager::inst().sprite_by_key(ikey, xd);
+            if (itex.id > 0)
+                SpriteRenderer::draw_sprite(itex, xd, 0, {pr.x + 8, ry + 1, 20, 20});
+        }
         if (g_font_loaded)
-            DrawTextEx(g_font_small, txt.c_str(), {pr.x + 30, ry}, 18, 1, inv.items[i]->color);
+            DrawTextEx(g_font_small, txt.c_str(), {pr.x + 34, ry}, 18, 1, inv.items[i]->color);
     }
     if (g_font_loaded) {
         DrawTextEx(g_font_small, "^v择 X装 U用 D丢 I关",

@@ -4,6 +4,8 @@
 #include "combat_system.h"
 #include "config.h"
 #include "audio_server.h"
+#include "rendering/sprite_renderer.h"
+#include "resources/resource_manager.h"
 #include "core/logger.h"
 #include <cmath>
 
@@ -97,7 +99,17 @@ void TutorialScene::_render() {
             for (int i = 0; i < (int)inv.items.size(); i++) {
                 std::string mk = (i == inv_cursor) ? ">" : " ";
                 std::string txt = mk + " " + inv.items[i]->get_description();
-                DrawTextEx(g_font_small, txt.c_str(), {sw/2.0f - 180, sh/2.0f - 160 + (float)i * 26}, 16, 1, inv.items[i]->color);
+                // M4f.13: 物品图标 (16px 贴图)
+                const char* ikey = item_icon_key(inv.items[i].get());
+                if (ikey) {
+                    SpriteDef xd;
+                    Texture2D itex = ResourceManager::inst().sprite_by_key(ikey, xd);
+                    if (itex.id > 0)
+                        SpriteRenderer::draw_sprite(itex, xd, 0,
+                            {sw/2.0f - 215, sh/2.0f - 160 + (float)i * 26 + 2, 18, 18});
+                }
+                DrawTextEx(g_font_small, txt.c_str(),
+                    {sw/2.0f - 192, sh/2.0f - 160 + (float)i * 26}, 16, 1, inv.items[i]->color);
             }
         }
     }
