@@ -154,23 +154,40 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                     }
                     DrawRectangle(dx, dy, tile_size, tile_size, base);
                     DrawRectangleLines(dx, dy, tile_size, tile_size, {35, 35, 45, 255});
-                    // 房间中心绘制图标
+                    // 房间中心绘制图标 (M4f.5: 素材装饰优先, 缺配回退字符)
                     if (x == sr->cx && y == sr->cy) {
-                        const char* icon = "?";
+                        const char* pkey = nullptr;
                         switch (sr->type) {
-                            case SpecialRoomType::ALTAR:      icon = "+"; break;
-                            case SpecialRoomType::TREASURE:   icon = "$"; break;
-                            case SpecialRoomType::FOUNTAIN:   icon = "~"; break;
-                            case SpecialRoomType::SHOP:       icon = "S"; break;
-                            case SpecialRoomType::BLACKSMITH: icon = "B"; break;
-                            case SpecialRoomType::LIBRARY:    icon = "L"; break;
-                            case SpecialRoomType::GAMBLER:    icon = "G"; break;
-                            case SpecialRoomType::SHRINE:     icon = "!"; break;
-                            case SpecialRoomType::SECRET:     icon = "?"; break;
+                            case SpecialRoomType::ALTAR:      pkey = "altar"; break;
+                            case SpecialRoomType::TREASURE:   pkey = "chest"; break;
+                            case SpecialRoomType::FOUNTAIN:   pkey = "spring_top"; break;
+                            default: break;
                         }
-                        Color ic = sr->triggered ? Color{100, 100, 100, 255}
-                                                 : Color{255, 255, 200, 255};
-                        DrawText(icon, (int)dx + 10, (int)dy + 5, 20, ic);
+                        SpriteDef pdef;
+                        Texture2D ptex = pkey
+                            ? rm.sprite_by_key(pkey, pdef) : Texture2D{0};
+                        if (ptex.id > 0 && !sr->triggered) {
+                            float isz = tile_size * 0.75f;
+                            SpriteRenderer::draw_sprite(ptex, pdef, 0,
+                                {dx + (tile_size - isz) / 2, dy + (tile_size - isz) / 2,
+                                 isz, isz});
+                        } else {
+                            const char* icon = "?";
+                            switch (sr->type) {
+                                case SpecialRoomType::ALTAR:      icon = "+"; break;
+                                case SpecialRoomType::TREASURE:   icon = "$"; break;
+                                case SpecialRoomType::FOUNTAIN:   icon = "~"; break;
+                                case SpecialRoomType::SHOP:       icon = "S"; break;
+                                case SpecialRoomType::BLACKSMITH: icon = "B"; break;
+                                case SpecialRoomType::LIBRARY:    icon = "L"; break;
+                                case SpecialRoomType::GAMBLER:    icon = "G"; break;
+                                case SpecialRoomType::SHRINE:     icon = "!"; break;
+                                case SpecialRoomType::SECRET:     icon = "?"; break;
+                            }
+                            Color ic = sr->triggered ? Color{100, 100, 100, 255}
+                                                     : Color{255, 255, 200, 255};
+                            DrawText(icon, (int)dx + 10, (int)dy + 5, 20, ic);
+                        }
                     }
                 } else {
                     if (floor_tex.id > 0) {

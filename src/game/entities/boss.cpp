@@ -1060,6 +1060,7 @@ Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
             boss->is_boss = true;
             boss->entity.size = {48, 48};
             boss->entity.rect = {boss->entity.position.x, boss->entity.position.y, 48, 48};
+            boss->sprite_override = "boss_f5";   // M4f.5: 降级默认 F5 形象
             return boss;
         }
     }
@@ -1074,6 +1075,10 @@ Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
     boss->is_boss = true;
     boss->entity.size = {48, 48};
     boss->entity.rect = {boss->entity.position.x, boss->entity.position.y, 48, 48};
+
+    // ── M4f.5: Boss 素材精灵按层指定 (F5/F10 专属图, F15 玩家形象) ──
+    boss->sprite_override = floor <= 5 ? "boss_f5"
+                          : floor <= 10 ? "boss_f10" : "boss_self";
 
     // ── G1 Step6: Phase2 参数 (替代硬编码) ──
     ai->_phase2_hp_threshold = def->phase2_hp_threshold;

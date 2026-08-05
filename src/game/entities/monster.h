@@ -45,6 +45,8 @@ public:
     Color color{200, 80, 80, 255};
     bool is_boss = false;
     MonsterType monster_type = MonsterType::NORMAL;  // B14
+    // M4f.5: 素材精灵 key 覆盖 (Boss 按层指定, 空 = 按类型自动映射)
+    std::string sprite_override = "";
     bool is_elite = false;                            // B14: Elite 标记
     TeamRole team_role = TeamRole::NONE;              // D2 Step4: 协同职责
     std::vector<BuffTrigger> on_hit_triggers;  // 命中玩家时触发的 Buff 规则

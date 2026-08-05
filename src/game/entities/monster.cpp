@@ -22,7 +22,7 @@ static int _sprite_variant_for(bool is_boss, MonsterType type,
     return (name.find("史莱姆") != std::string::npos) ? 1 : 0;
 }
 
-// M4f.4: MonsterType/名字 → 素材精灵 key; Boss 暂未映射返回 nullptr
+// M4f.4: MonsterType/名字 → 素材精灵 key; 空 = 程序化占位
 static const char* _monster_sprite_key(MonsterType type,
                                        const std::string& name, bool is_boss) {
     if (is_boss) return nullptr;
@@ -81,8 +81,10 @@ static void _draw_legacy_monster_body(const Rectangle& dr, Color color,
 // M4f.4: 怪物身体三态 fallback — 素材精灵 > 程序化占位 > 几何回退
 static Rectangle _draw_monster_body(const Rectangle& dr, Color color,
                                     MonsterType type, const std::string& name,
-                                    bool is_boss) {
-    const char* skey = _monster_sprite_key(type, name, is_boss);
+                                    bool is_boss,
+                                    const std::string& override_key) {
+    const char* skey = !override_key.empty()
+        ? override_key.c_str() : _monster_sprite_key(type, name, is_boss);
     SpriteDef sdef;
     Texture2D stex = skey
         ? ResourceManager::inst().sprite_by_key(skey, sdef)
@@ -179,7 +181,8 @@ void Monster::draw(float cam_x, float cam_y) {
                 {0, 0, 0, 80});
 
     // M4f.4: 怪物身体三态 fallback — 素材精灵 > 程序化 > 几何
-    Rectangle spr = _draw_monster_body(dr, color, monster_type, name, is_boss);
+    Rectangle spr = _draw_monster_body(dr, color, monster_type, name, is_boss,
+                                       sprite_override);
 
     // 边框 (纹理精灵带轮廓, 仍画描边强化辨识)
     Color bc = is_boss ? Color{255, 180, 30, 255} : Color{0, 0, 0, 255};
