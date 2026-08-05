@@ -140,24 +140,51 @@ static void _draw_procedural_player(float hx, float hy, float hw, float hh,
     }
 }
 
-// G9.4: 武器图标悬浮于人物侧面 (朝向偏移 + 轻浮动), 无素材则静默
-static void _draw_player_weapon(WeaponType wt, Direction dir,
+// G9.4: 武器握持 — 手腕锚点 + 待机/挥砍角度 + 朝向镜像
+// 素材朝向: 刀/剑尖朝下(柄在顶), 矛尖朝上(柄在底)
+static void _draw_player_weapon(Player* self, Direction dir,
                                 float hx, float hy, float hw, float hh) {
-    const char* wkey = weapon_sprite_key(wt);
+    const char* wkey = weapon_sprite_key(self->weapon.weapon_type());
     if (!wkey) return;
     SpriteDef wdef;
     Texture2D wtex = ResourceManager::inst().sprite_by_key(wkey, wdef);
     if (wtex.id <= 0) return;
-    float w = hw * 0.5f, h = hh * 0.5f;
-    float wx = hx, wy = hy;
-    switch (dir) {
-        case Direction::DOWN:  wx = hx - w - 2;           wy = hy + hh - h; break;
-        case Direction::UP:    wx = hx + hw + 2;          wy = hy + hh - h; break;
-        case Direction::LEFT:  wx = hx - w - 2;           wy = hy + hh*0.25f; break;
-        case Direction::RIGHT: wx = hx + hw + 2;          wy = hy + hh*0.25f; break;
+
+    // 挥砍动画: is_attacking 上升沿记录起始, 结束重置
+    if (self->weapon.is_attacking()) {
+        if (self->_swing_start < 0.0f) self->_swing_start = GetTime();
+    } else {
+        self->_swing_start = -1.0f;
     }
-    float bob = sinf((float)GetTime() * 3 + (int)dir) * 1.0f;
-    SpriteRenderer::draw_sprite(wtex, wdef, 0, {wx, wy + bob, w, h});
+
+    // 尺寸按类型: 匕首短/剑中/矛长
+    bool is_spear = self->weapon.weapon_type() == WeaponType::SPEAR;
+    float w = is_spear ? 10.0f : 12.0f;
+    float h = is_spear ? 26.0f : (self->weapon.weapon_type() == WeaponType::DAGGER ? 14.0f : 18.0f);
+
+    // 手腕锚点 (身体中心 + 朝向偏移)
+    float cx = hx + hw / 2, cy = hy + hh * 0.55f;
+    float ox = 0.0f;
+    switch (dir) {
+        case Direction::DOWN:  ox = hw * 0.30f;  break;
+        case Direction::UP:    ox = -hw * 0.30f; break;
+        case Direction::LEFT:  ox = -hw * 0.42f; break;
+        case Direction::RIGHT: ox = hw * 0.42f;  break;
+    }
+
+    // 角度: 待机 0°(竖直) → 攻击挥向面前 90° 弧线 (0.35s)
+    float p = 0.0f;
+    if (self->_swing_start >= 0.0f)
+        p = std::min(1.0f, (float)(GetTime() - self->_swing_start) / 0.35f);
+    float angle = 90.0f * sinf(p * 3.14159265f);
+    if (dir == Direction::LEFT || dir == Direction::UP) angle = -angle;
+
+    // 柄部锚点: 刀/剑在顶部, 矛在底部
+    Vector2 origin = is_spear ? Vector2{w / 2, h - 2} : Vector2{w / 2, 2};
+    float dst_y = is_spear ? cy - h + 2 : cy - 2;
+    Rectangle src = SpriteRenderer::frame_rect(wdef, 0);
+    Rectangle dst = {cx + ox - w / 2, dst_y, w, h};
+    DrawTexturePro(wtex, src, dst, origin, angle, WHITE);
 }
 
 void Player::draw_no_cam(float cam_x, float cam_y) {
@@ -188,8 +215,8 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
         _draw_procedural_player(hx, hy, hw, hh, body_c, direction);
     }
 
-    // G9.4: 装备武器图标 (徒手/无素材时静默)
-    _draw_player_weapon(weapon.weapon_type(), direction, hx, hy, hw, hh);
+    // G9.4: 装备武器握持效果 (徒手/无素材时静默)
+    _draw_player_weapon(this, direction, hx, hy, hw, hh);
 
     // D2: Combo 指示器 (连击数显示在头顶)
     if (combo.count >= 2 && combo.timer > 0) {
