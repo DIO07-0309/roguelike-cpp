@@ -24,6 +24,15 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
+# v0.9.4 — 怪物差异化 + 待机帧动画 (2026-08-05)
+
+## 像素管线补全角色辨识度
+- `SpriteRenderer::gen_pixel_sprite` body 生成升级为 **2 帧 spritesheet** (32×64: 待机/呼吸), 经 `_blit_frame` (RGBA8 行拷贝, raylib 5.0 无 ImageDrawImage) 拼帧; 呼吸帧亮度 +18 — 与 `frame_rect` 管线直通, 真素材到位仅改 `frame_count`
+- Player/Monster 绘制处新增待机帧轮换 (`(int)(GetTime()*4)&1`), `SpriteDef.frame_count=2`
+- **怪物差异化体型** (variant 3-6): Charger=箭形三角+冲刺亮条, Tank=方甲+头盔+甲缝, Bomber=圆身+引信火花, Summoner/Shaman=尖帽法袍+水晶; 映射 `_sprite_variant_for(is_boss, MonsterType, name)` 与形状层解耦 (SpriteRenderer 不依赖 game 枚举)
+- `_brighten()` 亮度工具替代原先发带的 std::clamp 内联计算
+- 验证: Release 100%, 4s 冒烟运行无崩溃, 桌面版已同步重编译
+
 # v0.9.3 — 渲染管线闭环: 角色/怪物/VFX 全接入 SpriteRenderer (2026-08-05)
 
 ## 像素管线的圆心落在实体与特效

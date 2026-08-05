@@ -138,8 +138,9 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
     Texture2D tex = ResourceManager::inst().procedural_sprite(
         key, body_c, {80, 210, 80, 255}, 0, eye_dir);
     if (tex.id > 0) {
-        SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32;
-        SpriteRenderer::draw_sprite(tex, sd, 0, {hx, hy, hw, hh});
+        SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32; sd.frame_count = 2;
+        int frame = ((int)(GetTime() * 4)) & 1;   // M4f.3: 待机/呼吸轮换
+        SpriteRenderer::draw_sprite(tex, sd, frame, {hx, hy, hw, hh});
     } else {
         _draw_legacy_player_body(hx, hy, hw, hh, body_c, direction);
     }

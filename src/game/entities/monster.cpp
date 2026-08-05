@@ -7,7 +7,22 @@
 #include "resource_manager.h"                 // M4f.2
 #include "game/rendering/sprite_renderer.h"   // M4f.2
 
-// M4f.2: 程序化怪物精灵 (0人形 1史莱姆 2Boss), 纹理缺失时返回空矩形
+// M4f.3: MonsterType → 精灵体型 (0人形 1史莱姆 2Boss 3箭 4甲 5炸弹 6帽)
+static int _sprite_variant_for(bool is_boss, MonsterType type,
+                               const std::string& name) {
+    if (is_boss) return 2;
+    switch (type) {
+        case MonsterType::CHARGER:      return 3;
+        case MonsterType::TANK:         return 4;
+        case MonsterType::BOMBER:       return 5;
+        case MonsterType::SUMMONER:
+        case MonsterType::SHAMAN:       return 6;
+        default:                        break;
+    }
+    return (name.find("史莱姆") != std::string::npos) ? 1 : 0;
+}
+
+// M4f.2: 程序化怪物精灵, 纹理缺失时返回空矩形
 static Rectangle _draw_monster_sprite(const Rectangle& dr, Color body_c,
                                       int variant, bool& ok) {
     char key[32];
@@ -17,11 +32,12 @@ static Rectangle _draw_monster_sprite(const Rectangle& dr, Color body_c,
         key, body_c, {255, 255, 255, 255}, variant, 0);
     ok = tex.id > 0;
     if (!ok) return dr;
-    SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32;
+    SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32; sd.frame_count = 2;
+    int frame = ((int)(GetTime() * 4)) & 1;   // M4f.3: 待机/呼吸轮换
     float inset = dr.width > 30 ? 0 : (dr.width < 22 ? 6 : 3);
     Rectangle dst = {dr.x + inset, dr.y + inset,
                      dr.width - inset * 2, dr.height - inset * 2};
-    SpriteRenderer::draw_sprite(tex, sd, 0, dst);
+    SpriteRenderer::draw_sprite(tex, sd, frame, dst);
     return dst;
 }
 
@@ -104,9 +120,8 @@ void Monster::draw(float cam_x, float cam_y) {
     DrawEllipse(dr.x + dr.width/2, dr.y + dr.height + 2, dr.width/2 - 2, 3,
                 {0, 0, 0, 80});
 
-    // M4f.2: 程序化像素精灵 (史莱姆圆形 / Boss大体型 / 其余人形)
-    int variant = is_boss ? 2 :
-                  (name.find("史莱姆") != std::string::npos) ? 1 : 0;
+    // M4f.2/3: 程序化像素精灵 (差异体型 + 功能标记保留)
+    int variant = _sprite_variant_for(is_boss, monster_type, name);
     bool spr_ok = false;
     Rectangle spr = _draw_monster_sprite(dr, color, variant, spr_ok);
     if (!spr_ok) {

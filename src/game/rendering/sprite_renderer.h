@@ -31,7 +31,9 @@ public:
     static Texture2D gen_pixel_tile(Color base, bool wall);
 
     // M4f.2: 程序化角色/怪物占位精灵 32×32
-    // variant: 0=人形 1=圆形(史莱姆) 2=大体型(Boss); eye_dir: 0下1上2左3右
+    // variant: 0=人形 1=圆形(史莱姆) 2=大体型(Boss) 3=箭形(Charger)
+    //          4=方甲(Tank) 5=炸弹(Bomber) 6=尖帽(Summoner/Shaman)
+    //          eye_dir: 0下1上2左3右
     static Texture2D gen_pixel_sprite(Color body, Color accent,
                                       int variant, int eye_dir = 0);
 
@@ -43,5 +45,6 @@ private:
     static void _draw_eyes(Image* img, Color accent, int variant, int eye_dir);
     static void _draw_person_body(Image* img, Color body, bool big);
     static void _draw_circle_body(Image* img, Color body);
+    static void _draw_shapes(Image* img, Color body, int variant);
     static void _draw_blast_lines(Image* img, Color c);
 };
