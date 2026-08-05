@@ -22,6 +22,21 @@ static int _sprite_variant_for(bool is_boss, MonsterType type,
     return (name.find("史莱姆") != std::string::npos) ? 1 : 0;
 }
 
+// M4f.4: MonsterType/名字 → 素材精灵 key; Boss 暂未映射返回 nullptr
+static const char* _monster_sprite_key(MonsterType type,
+                                       const std::string& name, bool is_boss) {
+    if (is_boss) return nullptr;
+    switch (type) {
+        case MonsterType::BOMBER:      return "mon_bomber";
+        case MonsterType::TANK:        return "mon_tank";
+        case MonsterType::CHARGER:     return "mon_charger";
+        case MonsterType::SUMMONER:
+        case MonsterType::SHAMAN:      return "mon_summoner";
+        default:                       break;
+    }
+    return (name.find("史莱姆") != std::string::npos) ? "mon_slime" : "mon_orc";
+}
+
 // M4f.2: 程序化怪物精灵, 纹理缺失时返回空矩形
 static Rectangle _draw_monster_sprite(const Rectangle& dr, Color body_c,
                                       int variant, bool& ok) {
@@ -39,6 +54,49 @@ static Rectangle _draw_monster_sprite(const Rectangle& dr, Color body_c,
                      dr.width - inset * 2, dr.height - inset * 2};
     SpriteRenderer::draw_sprite(tex, sd, frame, dst);
     return dst;
+}
+
+// 素材/程序化双缺席时的几何回退 (历史绘制)
+static void _draw_legacy_monster_body(const Rectangle& dr, Color color,
+                                      const std::string& name) {
+    DrawRectangleRounded(dr, 0.15f, 4, color);
+    DrawRectangleRounded({dr.x + 3, dr.y + 2, dr.width - 6, 6}, 0.1f, 3,
+        Color{(unsigned char)std::min(255u, (unsigned)color.r + 60),
+              (unsigned char)std::min(255u, (unsigned)color.g + 60),
+              (unsigned char)std::min(255u, (unsigned)color.b + 60), 255});
+    float ey = dr.y + dr.height / 2 - 2;
+    if (name.find("史莱姆") != std::string::npos) {
+        DrawCircle(dr.x + dr.width / 3, ey, 5, WHITE);
+        DrawCircle(dr.x + dr.width * 2 / 3, ey, 5, WHITE);
+        DrawCircle(dr.x + dr.width / 3 + 1, ey + 1, 3, {20, 20, 20, 255});
+        DrawCircle(dr.x + dr.width * 2 / 3 + 1, ey + 1, 3, {20, 20, 20, 255});
+    } else if (name.find("兽人") != std::string::npos) {
+        for (int sx : {int(dr.x + 5), int(dr.x + dr.width - 9)}) {
+            DrawTriangle({(float)sx, ey}, {(float)sx + 5, ey + 2},
+                        {(float)sx, ey + 5}, {255, 50, 50, 255});
+        }
+    }
+}
+
+// M4f.4: 怪物身体三态 fallback — 素材精灵 > 程序化占位 > 几何回退
+static Rectangle _draw_monster_body(const Rectangle& dr, Color color,
+                                    MonsterType type, const std::string& name,
+                                    bool is_boss) {
+    const char* skey = _monster_sprite_key(type, name, is_boss);
+    SpriteDef sdef;
+    Texture2D stex = skey
+        ? ResourceManager::inst().sprite_by_key(skey, sdef)
+        : Texture2D{0};
+    if (stex.id > 0) {
+        SpriteRenderer::draw_sprite(stex, sdef, 0, dr);
+        return dr;
+    }
+    int variant = _sprite_variant_for(is_boss, type, name);
+    bool spr_ok = false;
+    Rectangle spr = _draw_monster_sprite(dr, color, variant, spr_ok);
+    if (spr_ok) return spr;
+    _draw_legacy_monster_body(dr, color, name);
+    return dr;
 }
 
 Monster::Monster(float x, float y, const std::string& n, int hp, int atk,
@@ -120,29 +178,8 @@ void Monster::draw(float cam_x, float cam_y) {
     DrawEllipse(dr.x + dr.width/2, dr.y + dr.height + 2, dr.width/2 - 2, 3,
                 {0, 0, 0, 80});
 
-    // M4f.2/3: 程序化像素精灵 (差异体型 + 功能标记保留)
-    int variant = _sprite_variant_for(is_boss, monster_type, name);
-    bool spr_ok = false;
-    Rectangle spr = _draw_monster_sprite(dr, color, variant, spr_ok);
-    if (!spr_ok) {
-        DrawRectangleRounded(dr, 0.15f, 4, color);
-        DrawRectangleRounded({dr.x + 3, dr.y + 2, dr.width - 6, 6}, 0.1f, 3,
-            Color{(unsigned char)std::min(255u, (unsigned)color.r + 60),
-                  (unsigned char)std::min(255u, (unsigned)color.g + 60),
-                  (unsigned char)std::min(255u, (unsigned)color.b + 60), 255});
-        float ey = dr.y + dr.height / 2 - 2;
-        if (name.find("史莱姆") != std::string::npos) {
-            DrawCircle(dr.x + dr.width / 3, ey, 5, WHITE);
-            DrawCircle(dr.x + dr.width * 2 / 3, ey, 5, WHITE);
-            DrawCircle(dr.x + dr.width / 3 + 1, ey + 1, 3, {20, 20, 20, 255});
-            DrawCircle(dr.x + dr.width * 2 / 3 + 1, ey + 1, 3, {20, 20, 20, 255});
-        } else if (name.find("兽人") != std::string::npos) {
-            for (int sx : {int(dr.x + 5), int(dr.x + dr.width - 9)}) {
-                DrawTriangle({(float)sx, ey}, {(float)sx + 5, ey + 2},
-                            {(float)sx, ey + 5}, {255, 50, 50, 255});
-            }
-        }
-    }
+    // M4f.4: 怪物身体三态 fallback — 素材精灵 > 程序化 > 几何
+    Rectangle spr = _draw_monster_body(dr, color, monster_type, name, is_boss);
 
     // 边框 (纹理精灵带轮廓, 仍画描边强化辨识)
     Color bc = is_boss ? Color{255, 180, 30, 255} : Color{0, 0, 0, 255};

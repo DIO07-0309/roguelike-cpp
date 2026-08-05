@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "source": "Kenney Tiny Dungeon (CC0) + Tiny Creatures (CC0)",
+  "sprites": {
+    "player_poison":  { "file": "assets/sprites/player_poison.png",  "frame_w": 16, "frame_h": 16 },
+    "player_ice":     { "file": "assets/sprites/player_ice.png",     "frame_w": 16, "frame_h": 16 },
+    "player_fire":    { "file": "assets/sprites/player_fire.png",    "frame_w": 16, "frame_h": 16 },
+    "mon_slime":      { "file": "assets/sprites/mon_slime.png",      "frame_w": 16, "frame_h": 16 },
+    "mon_orc":        { "file": "assets/sprites/mon_orc.png",        "frame_w": 16, "frame_h": 16 },
+    "mon_bomber":     { "file": "assets/sprites/mon_bomber.png",     "frame_w": 16, "frame_h": 16 },
+    "mon_tank":       { "file": "assets/sprites/mon_tank.png",       "frame_w": 16, "frame_h": 16 },
+    "mon_charger":    { "file": "assets/sprites/mon_charger.png",    "frame_w": 16, "frame_h": 16 },
+    "mon_summoner":   { "file": "assets/sprites/mon_summoner.png",   "frame_w": 16, "frame_h": 16 },
+    "boss_f5":        { "file": "assets/sprites/boss_f5.png",        "frame_w": 16, "frame_h": 16 },
+    "boss_f10":       { "file": "assets/sprites/boss_f10.png",       "frame_w": 16, "frame_h": 16 },
+    "wall":           { "file": "assets/sprites/wall.png",           "frame_w": 16, "frame_h": 16 },
+    "floor":          { "file": "assets/sprites/floor.png",          "frame_w": 16, "frame_h": 16 },
+    "chest":          { "file": "assets/sprites/chest.png",          "frame_w": 16, "frame_h": 16 },
+    "spring_top":     { "file": "assets/sprites/spring_top.png",     "frame_w": 16, "frame_h": 16 },
+    "spring_bottom":  { "file": "assets/sprites/spring_bottom.png",  "frame_w": 16, "frame_h": 16 },
+    "altar":          { "file": "assets/sprites/altar.png",          "frame_w": 16, "frame_h": 16 },
+    "boss_self":      { "file": "assets/sprites/player_fire.png",    "frame_w": 16, "frame_h": 16 }
+  }
+}

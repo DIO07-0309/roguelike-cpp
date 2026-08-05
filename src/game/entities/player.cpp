@@ -112,6 +112,34 @@ static void _draw_legacy_player_body(float hx, float hy, float hw, float hh,
     DrawCircle(cx + ox, cy + oy, 3, {20, 20, 20, 255});
 }
 
+// M4f.4: 元素核心 → 玩家精灵 key (毒/冰/火三形象)
+static const char* _player_sprite_key(ElementType e) {
+    switch (e) {
+        case ElementType::FIRE:   return "player_fire";
+        case ElementType::ICE:    return "player_ice";
+        case ElementType::POISON: return "player_poison";
+        default:                  return "player_poison";
+    }
+}
+
+// M4f.2/3: 程序化占位精灵 (四方向 + 呼吸帧), 素材未配置时使用
+static void _draw_procedural_player(float hx, float hy, float hw, float hh,
+                                    Color body_c, Direction dir) {
+    int eye_dir = (int)dir;
+    char key[32];
+    snprintf(key, sizeof(key), "ply_%d_%02x%02x%02x",
+        eye_dir, body_c.r, body_c.g, body_c.b);
+    Texture2D tex = ResourceManager::inst().procedural_sprite(
+        key, body_c, {80, 210, 80, 255}, 0, eye_dir);
+    if (tex.id > 0) {
+        SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32; sd.frame_count = 2;
+        int frame = ((int)(GetTime() * 4)) & 1;   // M4f.3: 待机/呼吸轮换
+        SpriteRenderer::draw_sprite(tex, sd, frame, {hx, hy, hw, hh});
+    } else {
+        _draw_legacy_player_body(hx, hy, hw, hh, body_c, dir);
+    }
+}
+
 void Player::draw_no_cam(float cam_x, float cam_y) {
     Rectangle dr = entity.draw_rect(cam_x, cam_y);
 
@@ -123,26 +151,21 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
     // 阴影
     DrawEllipse(hx + hw/2, hy + hh + 2, hw/2 - 2, 3, {0, 0, 0, 100});
 
-    // D2: 连击段数 → 身体颜色渐变 (Lv1绿 → Lv4金黄)
+    // D2: 连击段数 → 身体颜色渐变 (程序化占位用)
     Color body_c =
         combo.count >= 4 ? Color{255, 200, 40, 255} :
         combo.count >= 3 ? Color{80, 200, 80, 255}  :
         combo.count >= 2 ? Color{60, 180, 140, 255} :
                            Color{40, 160, 40, 255};
 
-    // M4f.2: 程序化像素精灵 (四方向占位, 素材到位后换文件纹理)
-    int eye_dir = (int)direction;
-    char key[32];
-    snprintf(key, sizeof(key), "ply_%d_%02x%02x%02x",
-        eye_dir, body_c.r, body_c.g, body_c.b);
-    Texture2D tex = ResourceManager::inst().procedural_sprite(
-        key, body_c, {80, 210, 80, 255}, 0, eye_dir);
-    if (tex.id > 0) {
-        SpriteDef sd; sd.frame_w = 32; sd.frame_h = 32; sd.frame_count = 2;
-        int frame = ((int)(GetTime() * 4)) & 1;   // M4f.3: 待机/呼吸轮换
-        SpriteRenderer::draw_sprite(tex, sd, frame, {hx, hy, hw, hh});
+    // M4f.4: 数据驱动素材精灵 (元素形象), 未配置回退程序化占位
+    SpriteDef fdef;
+    Texture2D ftex = ResourceManager::inst().sprite_by_key(
+        _player_sprite_key(element.type), fdef);
+    if (ftex.id > 0) {
+        SpriteRenderer::draw_sprite(ftex, fdef, 0, {hx, hy, hw, hh});
     } else {
-        _draw_legacy_player_body(hx, hy, hw, hh, body_c, direction);
+        _draw_procedural_player(hx, hy, hw, hh, body_c, direction);
     }
 
     // D2: Combo 指示器 (连击数显示在头顶)

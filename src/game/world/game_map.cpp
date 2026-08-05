@@ -98,7 +98,7 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
     int ec = std::min(width, (int)((cam_x + sw) / tile_size) + 1);
     int er = std::min(height, (int)((cam_y + sh) / tile_size) + 1);
 
-    // M4f: 程序化像素纹理 (缓存于 ResourceManager, 按基色着色)
+    // M4f.4: 数据驱动素材 (wall/floor) 优先, 未配置回退程序化像素
     Color wall_c  = _has_palette ? _palette.wall_face : Color{60, 60, 80, 255};
     Color floor_c = _has_palette ? _palette.floor_base : Color{25, 25, 35, 255};
     char wall_key[40], floor_key[40];
@@ -107,8 +107,13 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
     snprintf(floor_key, sizeof(floor_key), "floor_%02x%02x%02x",
         floor_c.r, floor_c.g, floor_c.b);
     auto& rm = ResourceManager::inst();
-    Texture2D wall_tex  = rm.procedural_tile(wall_key, wall_c, true);
-    Texture2D floor_tex = rm.procedural_tile(floor_key, floor_c, false);
+    SpriteDef wall_def, floor_def;
+    Texture2D wall_data = rm.sprite_by_key("wall", wall_def);
+    Texture2D floor_data = rm.sprite_by_key("floor", floor_def);
+    Texture2D wall_tex = wall_data.id > 0 ? wall_data
+                       : rm.procedural_tile(wall_key, wall_c, true);
+    Texture2D floor_tex = floor_data.id > 0 ? floor_data
+                        : rm.procedural_tile(floor_key, floor_c, false);
     SpriteDef sd; sd.frame_w = tile_size; sd.frame_h = tile_size;
 
     for (int y = sr; y < er; y++) {
@@ -118,10 +123,11 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
             const auto& t = _tiles[y][x];
 
             if (t.type == TileType::WALL) {
-                if (wall_tex.id > 0)
-                    SpriteRenderer::draw_sprite(wall_tex, sd, 0,
+                if (wall_tex.id > 0) {
+                    SpriteDef& wd = wall_data.id > 0 ? wall_def : sd;
+                    SpriteRenderer::draw_sprite(wall_tex, wd, 0,
                         {dx, dy, (float)tile_size, (float)tile_size});
-                else
+                } else
                     DrawRectangle(dx, dy, tile_size, tile_size, wall_c);
                 DrawRectangleLines(dx, dy, tile_size, tile_size, {40, 40, 55, 255});
             } else if (t.type == TileType::FLOOR) {
@@ -167,10 +173,11 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                         DrawText(icon, (int)dx + 10, (int)dy + 5, 20, ic);
                     }
                 } else {
-                    if (floor_tex.id > 0)
-                        SpriteRenderer::draw_sprite(floor_tex, sd, 0,
+                    if (floor_tex.id > 0) {
+                        SpriteDef& fd = floor_data.id > 0 ? floor_def : sd;
+                        SpriteRenderer::draw_sprite(floor_tex, fd, 0,
                             {dx, dy, (float)tile_size, (float)tile_size});
-                    else
+                    } else
                         DrawRectangle(dx, dy, tile_size, tile_size, floor_c);
                     // 细微网格线
                     DrawRectangleLines(dx, dy, tile_size, tile_size, {35, 35, 45, 255});

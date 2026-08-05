@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include "raylib.h"
+#include "game/rendering/sprite_renderer.h"   // M4f.4: SpriteDef
 
 // ============================================================
 // D7 Step4: ResourceManager — 统一资源管理层
@@ -40,6 +41,11 @@ public:
     // M4f.2: 程序化 VFX 爆点缓存
     Texture2D procedural_fx(const char* key, Color c);
 
+    // ── M4f.4: 数据驱动精灵 (resources/sprites.json → 文件纹理) ──
+    bool load_sprite_config();
+    // 命中 sprites.json 返回纹理并填出参 def; 未命中返回 {0} (调用方回退程序化)
+    Texture2D sprite_by_key(const char* key, SpriteDef& out_def);
+
 private:
     ResourceManager() = default;
     ~ResourceManager();
@@ -58,4 +64,7 @@ private:
     std::unordered_map<std::string, Sound> _sound_cache;
     // M4f: 纹理缓存 (path/key → Texture)
     std::unordered_map<std::string, Texture2D> _texture_cache;
+    // M4f.4: 数据驱动精灵定义 (key → SpriteDef)
+    std::unordered_map<std::string, SpriteDef> _sprite_defs;
+    bool _sprite_cfg_ok = false;
 };

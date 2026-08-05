@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include "raylib.h"
 
 // ============================================================
@@ -11,10 +12,10 @@
 
 // 精灵定义 — 对齐 ART_ASSET_PLAN 规格 (32×32 tile, 4方向×5帧)
 struct SpriteDef {
-    const char* path = nullptr;      // assets/*.png; nullptr = 程序化占位
-    int frame_w = 32;                // 单帧宽 px
-    int frame_h = 32;                // 单帧高 px
-    int frame_count = 1;             // 行内帧数
+    std::string path = "";        // 文件路径 (assets/*.png); 空 = 程序化占位
+    int frame_w = 32;             // 单帧宽 px
+    int frame_h = 32;             // 单帧高 px
+    int frame_count = 1;          // 行内帧数
 };
 
 class SpriteRenderer {

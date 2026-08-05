@@ -2,6 +2,7 @@
 #include "core/logger.h"
 #include "combat_system.h"
 #include "game/rendering/sprite_renderer.h"
+#include <nlohmann/json.hpp>
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -102,6 +103,7 @@ void ResourceManager::load_all() {
     if (_loaded) return;
     _loaded = true;
     _init_font();
+    load_sprite_config();   // M4f.4: 数据驱动精灵定义
     LOG_INFO("ResourceManager: fonts loaded");
 }
 
@@ -242,4 +244,38 @@ Texture2D ResourceManager::procedural_fx(const char* key, Color c) {
     Texture2D tex = SpriteRenderer::gen_pixel_blast(c);
     _texture_cache[key] = tex;
     return tex;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// M4f.4: 数据驱动精灵 (resources/sprites.json)
+// ═══════════════════════════════════════════════════════════════
+
+bool ResourceManager::load_sprite_config() {
+    std::string text = load_json_text("resources/sprites.json");
+    if (text.empty()) { LOG_WARN("sprites.json 缺失, 使用程序化占位"); return false; }
+    try {
+        auto j = nlohmann::json::parse(text);
+        for (auto& [key, def] : j.at("sprites").items()) {
+            SpriteDef sd;
+            sd.path = def.value("file", "");
+            sd.frame_w = def.value("frame_w", 16);
+            sd.frame_h = def.value("frame_h", 16);
+            sd.frame_count = def.value("frame_count", 1);
+            _sprite_defs[key] = sd;
+        }
+        _sprite_cfg_ok = true;
+    } catch (const std::exception& e) {
+        LOG_ERROR("sprites.json 解析失败: %s", e.what());
+        return false;
+    }
+    LOG_INFO("sprites.json: %d 个精灵定义", (int)_sprite_defs.size());
+    return _sprite_cfg_ok;
+}
+
+Texture2D ResourceManager::sprite_by_key(const char* key, SpriteDef& out_def) {
+    auto it = _sprite_defs.find(key);
+    if (it == _sprite_defs.end() || it->second.path.empty())
+        return Texture2D{0};
+    out_def = it->second;
+    return load_texture(out_def.path.c_str());
 }
