@@ -37,6 +37,42 @@ static const char* _monster_sprite_key(MonsterType type,
     return (name.find("史莱姆") != std::string::npos) ? "mon_slime" : "mon_orc";
 }
 
+// M4f.12: 怪物持械 — 按类型映射武器素材 (Boss持剑/冲锋持矛/弓手持弩/重装持剑)
+static const char* _monster_weapon_key(MonsterType type, bool is_boss,
+                                       const std::string& name) {
+    if (is_boss) return "weapon_sword";
+    if (name.find("兽人") != std::string::npos) return "weapon_sword";
+    switch (type) {
+        case MonsterType::CHARGER: return "weapon_spear";
+        case MonsterType::TANK:    return "weapon_sword";
+        case MonsterType::ARCHER:  return "weapon_crossbow";
+        case MonsterType::ELITE:   return "weapon_sword";
+        default: break;
+    }
+    return nullptr;
+}
+
+// M4f.12: 怪物武器绘制 — 身体右缘竖持, 攻击后 0.25s 内挥砍
+static void _draw_monster_weapon(const Monster* m, const Rectangle& dr) {
+    const char* wkey = _monster_weapon_key(m->monster_type, m->is_boss, m->name);
+    if (!wkey) return;
+    SpriteDef wdef;
+    Texture2D wtex = ResourceManager::inst().sprite_by_key(wkey, wdef);
+    if (wtex.id <= 0) return;
+    float t = (float)GetTime();
+    float since = t - m->last_attack_wall_time;
+    float p = std::min(1.0f, since / 0.25f);
+    const float kPi = 3.14159265f;
+    float angle = since < 0.25f ? 70.0f * sinf(p * kPi)
+                                : 4.0f * sinf(t * 2.5f);
+    float w = 10.0f, h = 16.0f;
+    float cx = dr.x + dr.width - 4, cy = dr.y + dr.height / 2 + 2;
+    Vector2 origin{w / 2, 2};
+    Rectangle src = SpriteRenderer::frame_rect(wdef, 0);
+    Rectangle dst = {cx - w / 2 + origin.x, cy - h + origin.y, w, h};
+    DrawTexturePro(wtex, src, dst, origin, angle, WHITE);
+}
+
 // M4f.2: 程序化怪物精灵, 纹理缺失时返回空矩形
 static Rectangle _draw_monster_sprite(const Rectangle& dr, Color body_c,
                                       int variant, bool& ok) {
@@ -124,6 +160,7 @@ int Monster::attack_target(Player* target, double gt) {
         target->combat.mark_damage_logged();
     }
     last_attack_time = (float)gt;
+    last_attack_wall_time = (float)GetTime();
     // 怪物命中附带 Buff (统一触发规则)
     for (auto& tr : on_hit_triggers) {
         if (tr.chance >= 1.0f || (float)(rng() % 1000) / 1000.0f < tr.chance)
@@ -183,6 +220,9 @@ void Monster::draw(float cam_x, float cam_y) {
     // M4f.4: 怪物身体三态 fallback — 素材精灵 > 程序化 > 几何
     Rectangle spr = _draw_monster_body(dr, color, monster_type, name, is_boss,
                                        sprite_override);
+
+    // M4f.12: 怪物持械 (身体上层)
+    _draw_monster_weapon(this, dr);
 
     // 边框 (纹理精灵带轮廓, 仍画描边强化辨识)
     Color bc = is_boss ? Color{255, 180, 30, 255} : Color{0, 0, 0, 255};

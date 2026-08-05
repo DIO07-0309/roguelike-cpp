@@ -53,6 +53,7 @@ public:
     AttackType attack_type = AttackType::PHYSICAL;
     float attack_cooldown = 1.5f;
     float last_attack_time = 0.0f;
+    float last_attack_wall_time = -10.0f;   // M4f.12: 墙钟攻击时刻 (持械挥砍动画用)
 
     // B14: Bomber / Shaman 专用计时器
     float explode_timer = 0.0f;      // 自爆倒计时 (Bomber)
