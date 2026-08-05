@@ -157,6 +157,26 @@ static void _draw_procedural_player(float hx, float hy, float hw, float hh,
     }
 }
 
+// G9.4: 武器角度 — 每类武器独立待机姿态(摆动幅度/频率) 与攻击轨迹
+// 姿态个性: 匕首敏捷快颤 / 剑沉稳 / 矛挺拔轻颤 / 弩瞄准微调 / 双节棍惯性晃
+static float _weapon_angle(WeaponType wt, bool attacking, float p, Direction dir) {
+    float t = GetTime();
+    const float PI_F = 3.14159265f;
+    float base = 0.0f;
+    if (wt == WeaponType::NUNCHAKU)
+        base = attacking ? 360.0f * p : 8.0f * sinf(t * 3.0f);
+    else if (wt == WeaponType::CROSSBOW)
+        base = attacking ? 15.0f * sinf(p * PI_F) : 3.0f * sinf(t * 1.5f);
+    else if (wt == WeaponType::SPEAR)
+        base = attacking ? 90.0f * sinf(p * PI_F) : 2.0f * sinf(t * 1.2f);
+    else if (wt == WeaponType::DAGGER)
+        base = attacking ? 90.0f * sinf(p * PI_F) : 4.0f * sinf(t * 4.0f);
+    else
+        base = attacking ? 90.0f * sinf(p * PI_F) : 3.0f * sinf(t * 2.0f);
+    if (dir == Direction::LEFT || dir == Direction::UP) return -base;
+    return base;
+}
+
 // G9.4: 武器握持 — 手腕锚点 + 待机/挥砍角度 + 朝向镜像
 // 素材朝向: 刀/剑尖朝下(柄在顶), 矛尖朝上(柄在底), 弩弓臂朝上(托在底)
 static void _draw_player_weapon(Player* self, Direction dir,
@@ -194,20 +214,11 @@ static void _draw_player_weapon(Player* self, Direction dir,
         case Direction::RIGHT: ox = hw * 0.42f;  break;
     }
 
-    // 角度: 刀/剑 90° 弧线; 弩水平小幅摆动; 双节棍待机惯性轻摆 / 攻击整圈甩动
+    // 角度: 每类武器独立待机姿态 + 攻击轨迹 (见 _weapon_angle)
     float p = 0.0f;
     if (self->_swing_start >= 0.0f)
         p = std::min(1.0f, (float)(GetTime() - self->_swing_start) / 0.35f);
-    float angle = 0.0f;
-    if (is_nunchaku)
-        angle = self->_swing_start >= 0.0f
-              ? 360.0f * p
-              : 8.0f * sinf(GetTime() * 3.0f);
-    else if (is_crossbow)
-        angle = 15.0f * sinf(p * 3.14159265f);
-    else
-        angle = 90.0f * sinf(p * 3.14159265f);
-    if (dir == Direction::LEFT || dir == Direction::UP) angle = -angle;
+    float angle = _weapon_angle(wt, self->_swing_start >= 0.0f, p, dir);
 
     // 柄部锚点: 刀/剑在顶部, 矛/弩在底部
     Vector2 origin = bottom_grip ? Vector2{w / 2, h - 2} : Vector2{w / 2, 2};
