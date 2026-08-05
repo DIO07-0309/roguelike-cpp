@@ -177,6 +177,7 @@ static void _draw_player_weapon(Player* self, Direction dir,
     WeaponType wt = self->weapon.weapon_type();
     bool is_spear = wt == WeaponType::SPEAR;
     bool is_crossbow = wt == WeaponType::CROSSBOW;
+    bool is_nunchaku = wt == WeaponType::NUNCHAKU;
     bool bottom_grip = is_spear || is_crossbow;
     float w = is_spear ? 10.0f : (is_crossbow ? 16.0f : 12.0f);
     float h = is_spear ? 26.0f
@@ -193,12 +194,19 @@ static void _draw_player_weapon(Player* self, Direction dir,
         case Direction::RIGHT: ox = hw * 0.42f;  break;
     }
 
-    // 角度: 待机 0°(竖直) → 攻击挥向面前 90° 弧线 (0.35s); 弩小幅摆动保持水平
+    // 角度: 刀/剑 90° 弧线; 弩水平小幅摆动; 双节棍待机惯性轻摆 / 攻击整圈甩动
     float p = 0.0f;
     if (self->_swing_start >= 0.0f)
         p = std::min(1.0f, (float)(GetTime() - self->_swing_start) / 0.35f);
-    float angle = is_crossbow ? 15.0f * sinf(p * 3.14159265f)
-                              : 90.0f * sinf(p * 3.14159265f);
+    float angle = 0.0f;
+    if (is_nunchaku)
+        angle = self->_swing_start >= 0.0f
+              ? 360.0f * p
+              : 8.0f * sinf(GetTime() * 3.0f);
+    else if (is_crossbow)
+        angle = 15.0f * sinf(p * 3.14159265f);
+    else
+        angle = 90.0f * sinf(p * 3.14159265f);
     if (dir == Direction::LEFT || dir == Direction::UP) angle = -angle;
 
     // 柄部锚点: 刀/剑在顶部, 矛/弩在底部
