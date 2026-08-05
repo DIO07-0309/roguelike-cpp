@@ -12,6 +12,8 @@ extern bool g_font_loaded;
 #include "game_renderer.h"
 #include "gameplay_system_director.h"
 #include "presentation_system_director.h"
+#include "resource_manager.h"                 // G9.4: 对话头像
+#include "game/rendering/sprite_renderer.h"   // G9.4
 #include <cstdio>
 
 // ============================================================
@@ -237,6 +239,16 @@ void GameSceneInteraction::draw_dialogue(int sw, int sh) {
     Rectangle pr = {sw/2.0f - pw/2, sh/2.0f - ph/2, pw, ph};
     GameRenderer::draw_panel(pr, d.pages[d.page].speaker.c_str(), {20,20,45,240});
 
+    // G9.4: NPC 对话头像 (target_npc->id → 楼层 → 精灵)
+    if (d.target_npc) {
+        SpriteDef sdef;
+        Texture2D stex = ResourceManager::inst().sprite_by_key(
+            npc_sprite_key(d.target_npc->id / 10), sdef);
+        if (stex.id > 0)
+            SpriteRenderer::draw_sprite(stex, sdef, 0,
+                {pr.x + pw - 90, pr.y + 18, 56, 56});
+    }
+
     if (g_font_loaded)
         DrawTextEx(g_font_small, d.pages[d.page].text.c_str(), {pr.x+30, pr.y+50}, 16, 1, {230,230,240,255});
 
@@ -246,7 +258,7 @@ void GameSceneInteraction::draw_dialogue(int sw, int sh) {
         {pr.x + (pw - MeasureTextEx(g_font_small,hint,14,1).x)/2, pr.y+ph-28},
         14, 1, {140,140,160,200});
     char pg[16]; snprintf(pg, sizeof(pg), "%d/%d", d.page+1, (int)d.pages.size());
-    DrawTextEx(g_font_small, pg, {pr.x+pw-40, pr.y+12}, 13, 1, {180,180,200,200});
+    DrawTextEx(g_font_small, pg, {pr.x+16, pr.y+ph-30}, 13, 1, {180,180,200,200});
 }
 
 void GameSceneInteraction::draw_quest_log(int sw, int sh) {

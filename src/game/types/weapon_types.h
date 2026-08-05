@@ -43,6 +43,16 @@ inline WeaponType weapon_type_from_string(const char* s) {
     return WeaponType::FIST;
 }
 
+// ── G9.4: Weapon sprite registry key — 素材未覆盖的类型返回空 ──
+inline const char* weapon_sprite_key(WeaponType wt) {
+    switch (wt) {
+        case WeaponType::DAGGER: return "weapon_dagger";
+        case WeaponType::SWORD:  return "weapon_sword";
+        case WeaponType::SPEAR:  return "weapon_spear";
+        default:                 return nullptr;
+    }
+}
+
 // ── Hit shape for attack detection ──
 enum class HitShape : int {
     CIRCLE = 0,

@@ -140,20 +140,10 @@ static void _draw_procedural_player(float hx, float hy, float hw, float hh,
     }
 }
 
-// G9.4: 武器精灵 key — 三件素材可用, 徒手/无素材时返回空
-static const char* _weapon_sprite_key(WeaponType wt) {
-    switch (wt) {
-        case WeaponType::DAGGER: return "weapon_dagger";
-        case WeaponType::SWORD:  return "weapon_sword";
-        case WeaponType::SPEAR:  return "weapon_spear";
-        default:                 return nullptr;
-    }
-}
-
 // G9.4: 武器图标悬浮于人物侧面 (朝向偏移 + 轻浮动), 无素材则静默
 static void _draw_player_weapon(WeaponType wt, Direction dir,
                                 float hx, float hy, float hw, float hh) {
-    const char* wkey = _weapon_sprite_key(wt);
+    const char* wkey = weapon_sprite_key(wt);
     if (!wkey) return;
     SpriteDef wdef;
     Texture2D wtex = ResourceManager::inst().sprite_by_key(wkey, wdef);

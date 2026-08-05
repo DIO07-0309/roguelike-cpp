@@ -49,4 +49,6 @@ struct NPCData {
 };
 
 const NPCData* get_npc_config(int floor, int slot);  // slot=0或1
-int            get_npc_count_for_floor(int floor);
+
+// G9.4: NPC 楼层 → 精灵 key (素材覆盖10层, 未知楼层回退 npc_1)
+const char* npc_sprite_key(int floor);

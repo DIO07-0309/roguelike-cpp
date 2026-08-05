@@ -1807,26 +1807,23 @@ void GameScene::_draw_entities() {
     if (player) player->draw_no_cam(_cam_x, _cam_y);
 
     // D4 Step4: NPC — sprite (floor-based lookup) + name label
-    static const struct { int floor; const char* name; const char* key; } _npc_lookup[] = {
-        {2,"埃德加","npc_1"},{3,"瑞卡","npc_2"},{4,"卡利安","npc_3"},
-        {6,"卡兹","npc_2"},{7,"泰伦斯","npc_1"},{8,"维拉","npc_3"},
-        {9,"索拉斯","npc_2"},{11,"迷失灵魂","npc_3"},{12,"眠者","npc_1"},
-        {14,"守望者","npc_blacksmith"}
+    static const struct { int floor; const char* name; } _npc_lookup[] = {
+        {2,"埃德加"},{3,"瑞卡"},{4,"卡利安"},{6,"卡兹"},{7,"泰伦斯"},
+        {8,"维拉"},{9,"索拉斯"},{11,"迷失灵魂"},{12,"眠者"},{14,"守望者"}
     };
     for (int i = 0; i < _npc_count; i++) {
         if (_npc_state[i].finished) continue;
         float nx = _npc_tile_x[i] * TILE_SIZE + TILE_SIZE/2 - _cam_x;
         float ny = _npc_tile_y[i] * TILE_SIZE + TILE_SIZE/2 - _cam_y;
         const char* nn = "NPC";
-        const char* skey = "npc_1";
         for (auto& lk : _npc_lookup) {
             if (lk.floor != current_floor) continue;
             nn = lk.name;
-            skey = lk.key;
             break;
         }
         SpriteDef sdef;
-        Texture2D stex = ResourceManager::inst().sprite_by_key(skey, sdef);
+        Texture2D stex = ResourceManager::inst().sprite_by_key(
+            npc_sprite_key(current_floor), sdef);
         float s = TILE_SIZE - 4;
         float sx = nx - s/2, sy = ny - s/2;
         if (stex.id > 0) {
@@ -1851,6 +1848,27 @@ void GameScene::_draw_ground_items() {
         float py = d.tile_y * TILE_SIZE - _cam_y;
         float size = TILE_SIZE - 4;
         float cx = px + TILE_SIZE / 2, cy = py + TILE_SIZE / 2;
+
+        // G9.4: 武器掉落 → 数据驱动图标 + 稀有度光环
+        auto* eq = dynamic_cast<EquipmentItem*>(d.item.get());
+        const char* wkey = nullptr;
+        if (eq && eq->slot == "weapon") {
+            const WeaponDef* wdef = get_weapon_def(eq->weapon_def_id);
+            if (wdef) wkey = weapon_sprite_key(wdef->type);
+        }
+        if (wkey) {
+            SpriteDef wdef2;
+            Texture2D wtex = ResourceManager::inst().sprite_by_key(wkey, wdef2);
+            if (wtex.id > 0) {
+                float pulse = 6 + sinf((float)GetTime() * 5 + px * 0.1f) * 3;
+                DrawRectangleLinesEx({cx - pulse, cy - pulse, pulse * 2, pulse * 2}, 1,
+                                     rarity_color(d.item->rarity));
+                SpriteRenderer::draw_sprite(wtex, wdef2, 0,
+                    {cx - size/2, cy - size/2, size, size});
+                continue;
+            }
+        }
+
         float pulse = 6 + sinf((float)GetTime() * 5 + px * 0.1f) * 3;
         DrawRectangleLinesEx({cx - pulse, cy - pulse, pulse * 2, pulse * 2}, 1,
                              Color{(unsigned char)(d.item->color.r / 3),

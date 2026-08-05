@@ -147,8 +147,13 @@ const NPCData* get_npc_config(int floor, int slot) {
     return nullptr;
 }
 
-int get_npc_count_for_floor(int floor) {
-    for (auto& e : {std::make_pair(2,1),{3,1},{4,1},{6,1},{7,1},{8,1},{9,1},{11,1},{12,1},{14,1}})
-        if (e.first == floor) return e.second;
-    return 0;
+// G9.4: 楼层 → 精灵 key (与 game_scene 楼层名表一致)
+const char* npc_sprite_key(int floor) {
+    switch (floor) {
+        case 2: case 7: case 12: return "npc_1";
+        case 3: case 6: case 9:  return "npc_2";
+        case 4: case 8: case 11: return "npc_3";
+        case 14:                 return "npc_blacksmith";
+        default:                 return "npc_1";
+    }
 }
