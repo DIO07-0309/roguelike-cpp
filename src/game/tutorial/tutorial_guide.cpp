@@ -18,7 +18,7 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
         return {
             "欢迎来到 Roguelike 新手教程！",
             "",
-            "WASD 移动  空格 攻击  E 拾取  I 背包",
+            "WASD 移动  空格 攻击  E 交互  I 背包",
             "1-4 技能  X 装备  U 使用  D 丢弃",
             "T/Esc 退出教程",
             "",
@@ -39,7 +39,7 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
     case TutorialStage::PICKUP:
         return {
             "第3步：拾取物品",
-            "走过去按 E 键捡起地面物品！"
+            "走过去按 E 键拾取地面物品，也能与 NPC 对话！"
         };
     case TutorialStage::INVENTORY:
         return {
@@ -64,7 +64,7 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
         return {
             "恭喜完成所有训练！",
             "WASD移动 | 空格攻击 | 1-4技能",
-            "E拾取 | I背包 | X装备 | U使用",
+            "E交互 | I背包 | X装备 | U使用",
             "",
             "按 Enter 返回标题，开始冒险！"
         };

@@ -187,6 +187,41 @@ static void _draw_player_weapon(Player* self, Direction dir,
     DrawTexturePro(wtex, src, dst, origin, angle, WHITE);
 }
 
+// G9.4: 攻击姿态 — 挥砍进度 p(0-1) → 朝向位移 (重击幅度更大)
+static Rectangle _attack_pose_rect(Direction dir, Rectangle base, float p,
+                                   bool heavy) {
+    float amp = heavy ? 7.0f : 4.0f;
+    float k = sinf(p * 3.14159265f);
+    float dx = 0.0f, dy = 0.0f;
+    switch (dir) {
+        case Direction::DOWN:  dy = amp * k; break;
+        case Direction::UP:    dy = -amp * k; break;
+        case Direction::LEFT:  dx = -amp * k; break;
+        case Direction::RIGHT: dx = amp * k; break;
+    }
+    return {base.x + dx, base.y + dy, base.width, base.height};
+}
+
+// D2: 连击段数 → 身体颜色渐变 (程序化占位用)
+static Color _combo_body_color(int count) {
+    if (count >= 4) return Color{255, 200, 40, 255};
+    if (count >= 3) return Color{80, 200, 80, 255};
+    if (count >= 2) return Color{60, 180, 140, 255};
+    return Color{40, 160, 40, 255};
+}
+
+// D2: Combo 指示器 (连击数显示在头顶)
+static void _draw_combo_indicator(int count, float timer, float hx, float hy,
+                                  float hw) {
+    if (count < 2 || timer <= 0) return;
+    char buf[4];
+    snprintf(buf, sizeof(buf), "%d", count);
+    int fsize = count >= 4 ? 20 : 14;
+    Color cc = count >= 4 ? Color{255, 200, 30, 255}
+                          : Color{255, 255, 220, 200};
+    DrawText(buf, (int)(hx + hw/2 - 4), (int)(hy - 18), fsize, cc);
+}
+
 void Player::draw_no_cam(float cam_x, float cam_y) {
     Rectangle dr = entity.draw_rect(cam_x, cam_y);
 
@@ -195,35 +230,37 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
     float hw = dr.width * heavy_scale, hh = dr.height * heavy_scale;
     float hx = dr.x - (hw - dr.width) / 2, hy = dr.y - (hh - dr.height) / 2;
 
+    // G9.4: 攻击前倾位移 (p=挥砍进度)
+    float p = 0.0f;
+    if (_swing_start >= 0.0f)
+        p = std::min(1.0f, (float)(GetTime() - _swing_start) / 0.35f);
+    Rectangle pose = _attack_pose_rect(direction, {hx, hy, hw, hh}, p,
+                                       combo.is_heavy());
+    hx = pose.x;
+    hy = pose.y;
+
     // 阴影
     DrawEllipse(hx + hw/2, hy + hh + 2, hw/2 - 2, 3, {0, 0, 0, 100});
-
-    // D2: 连击段数 → 身体颜色渐变 (程序化占位用)
-    Color body_c =
-        combo.count >= 4 ? Color{255, 200, 40, 255} :
-        combo.count >= 3 ? Color{80, 200, 80, 255}  :
-        combo.count >= 2 ? Color{60, 180, 140, 255} :
-                           Color{40, 160, 40, 255};
 
     // M4f.4: 数据驱动素材精灵 (元素形象), 未配置回退程序化占位
     SpriteDef fdef;
     Texture2D ftex = ResourceManager::inst().sprite_by_key(
         _player_sprite_key(element.type), fdef);
     if (ftex.id > 0) {
-        SpriteRenderer::draw_sprite(ftex, fdef, 0, {hx, hy, hw, hh});
+        // G9.4: 重击绕脚底回弹旋转
+        float rot = (combo.is_heavy() && p > 0.0f)
+            ? 6.0f * sinf(p * 6.2831853f) : 0.0f;
+        Rectangle src = SpriteRenderer::frame_rect(fdef, 0);
+        DrawTexturePro(ftex, src, {hx, hy, hw, hh},
+                       {hw / 2, hh * 0.9f}, rot, WHITE);
     } else {
-        _draw_procedural_player(hx, hy, hw, hh, body_c, direction);
+        _draw_procedural_player(hx, hy, hw, hh,
+                                _combo_body_color(combo.count), direction);
     }
 
     // G9.4: 装备武器握持效果 (徒手/无素材时静默)
     _draw_player_weapon(this, direction, hx, hy, hw, hh);
 
     // D2: Combo 指示器 (连击数显示在头顶)
-    if (combo.count >= 2 && combo.timer > 0) {
-        char buf[4];
-        snprintf(buf, sizeof(buf), "%d", combo.count);
-        int fsize = combo.count >= 4 ? 20 : 14;
-        Color cc = combo.count >= 4 ? Color{255, 200, 30, 255} : Color{255, 255, 220, 200};
-        DrawText(buf, (int)(hx + hw/2 - 4), (int)(hy - 18), fsize, cc);
-    }
+    _draw_combo_indicator(combo.count, combo.timer, hx, hy, hw);
 }

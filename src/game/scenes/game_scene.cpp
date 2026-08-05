@@ -1755,7 +1755,26 @@ void GameScene::_draw_map() {
     if (game_map) game_map->draw(_cam_x, _cam_y, get_tree()->get_width(), get_tree()->get_height());
 }
 
+// G9.4: 交互提示气泡 — 黑底黄字小标签 (E 交互)
+static void _draw_interact_hint(const char* text, float cx, float cy) {
+    if (!g_font_loaded) return;
+    float tw = MeasureTextEx(g_font_small, text, 10, 1).x;
+    DrawRectangle((int)(cx - tw/2 - 4), (int)(cy - 5), (int)(tw + 8), 17,
+                  {25, 25, 30, 210});
+    DrawRectangleLines((int)(cx - tw/2 - 4), (int)(cy - 5), (int)(tw + 8), 17,
+                       {255, 210, 60, 220});
+    DrawTextEx(g_font_small, text, {cx - tw/2, cy - 3}, 10, 1,
+               {255, 225, 110, 255});
+}
+
 void GameScene::_draw_entities() {
+    // G9.4: 玩家瓦片 (交互相邻判断)
+    std::pair<int,int> ppl = player && game_map
+        ? game_map->pixel_to_tile(
+            player->entity.rect.x + player->entity.rect.width/2,
+            player->entity.rect.y + player->entity.rect.height/2)
+        : std::pair<int,int>{0, 0};
+    int ptx = ppl.first, pty = ppl.second;
     for (auto& m : monsters) {
         m->draw(_cam_x, _cam_y);
         // F10.2: Weak point glow
@@ -1838,6 +1857,18 @@ void GameScene::_draw_entities() {
         if (g_font_loaded) {
             float tw = MeasureTextEx(g_font_small, nn, 10, 1).x;
             DrawTextEx(g_font_small, nn, {nx - tw/2, ny - 26}, 10, 1, {180,240,180,200});
+            // G9.4: 玩家相邻 → E 对话提示
+            if (abs(_npc_tile_x[i] - ptx) <= 1 && abs(_npc_tile_y[i] - pty) <= 1)
+                _draw_interact_hint("E 对话", nx, ny - 42);
+        }
+    }
+
+    // G9.4: 事件房间未触发 → E 调查
+    if (game_map && game_map->event_room_index >= 0 && !game_map->event_triggered) {
+        if (ptx == game_map->event_tile_x && pty == game_map->event_tile_y) {
+            float evx = game_map->event_tile_x * TILE_SIZE + TILE_SIZE/2 - _cam_x;
+            float evy = game_map->event_tile_y * TILE_SIZE + TILE_SIZE/2 - _cam_y;
+            _draw_interact_hint("E 调查", evx, evy - 30);
         }
     }
 }
@@ -1876,6 +1907,15 @@ void GameScene::_draw_ground_items() {
                                    (unsigned char)(d.item->color.b / 3), 200});
         DrawRectangleRounded({px + 2, py + 2, size, size}, 0.1f, 4, d.item->color);
         DrawRectangleRoundedLines({px + 2, py + 2, size, size}, 0.1f, 4, 1, BLACK);
+
+        // G9.4: 玩家相邻 → E 拾取提示
+        if (player && game_map) {
+            auto [itx, ity] = game_map->pixel_to_tile(
+                player->entity.rect.x + player->entity.rect.width/2,
+                player->entity.rect.y + player->entity.rect.height/2);
+            if (abs(d.tile_x - itx) <= 1 && abs(d.tile_y - ity) <= 1)
+                _draw_interact_hint("E 拾取", cx, cy - TILE_SIZE/2 - 8);
+        }
     }
 }
 

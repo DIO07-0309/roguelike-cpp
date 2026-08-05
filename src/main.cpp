@@ -46,6 +46,10 @@
 #include <memory>
 #include <exception>
 #include <cstring>
+#include <string>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 // 全局字体 (向后兼容 — 由 ResourceManager 管理)
 Font g_font = {0};
@@ -76,9 +80,38 @@ static void _terminate_handler() {
     getchar();
 }
 
-int main() {
+// M4f.6: 工作目录修复 — 兼容 exe 在 build/ 或项目根两种启动布局
+// 资源全部使用相对路径 (resources/ assets/), 必须切到含 resources/ 的目录
+#ifdef _WIN32
+static void _fix_working_dir(const char* argv0) {
+    if (!argv0 || !*argv0) return;
+    std::string p(argv0);
+    auto slash = p.find_last_of("\\/");
+    std::string dir = (slash == std::string::npos) ? "."
+                                                  : p.substr(0, slash);
+    for (int i = 0; i < 2; i++) {
+        std::string cand;
+        if (i == 0) {
+            cand = dir;
+        } else {
+            auto sl2 = dir.find_last_of("\\/");
+            cand = (sl2 == std::string::npos) ? "." : dir.substr(0, sl2);
+        }
+        std::string probe = cand + "\\resources\\sprites.json";
+        FILE* f = nullptr;
+        if (fopen_s(&f, probe.c_str(), "rb") == 0) {
+            fclose(f);
+            _chdir(cand.c_str());
+            return;
+        }
+    }
+}
+#endif
+
+int main(int argc, char** argv) {
     Logger::inst().init();
 #ifdef _WIN32
+    _fix_working_dir(argc > 0 ? argv[0] : "");
     install_seh_handler();
 #endif
     std::set_terminate(_terminate_handler);
