@@ -178,6 +178,7 @@ public:
     static int  g_rl_test_episodes;     // G8.4: --rl-test N
     static int  g_rl_train_episodes;    // G8.4: --rl-train N
     static int  g_rl_mirror_episodes;   // F15.4: --rl-mirror N
+    static bool g_show_mirror_acc;      // 验收: F9 toggle MIRROR AI 调用链统计
 
 private:
     // 战斗

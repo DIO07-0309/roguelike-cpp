@@ -51,6 +51,7 @@ bool GameScene::g_record_mode = false;
 bool GameScene::g_replay_mode = false;
 bool GameScene::g_sim_mode = false;
 int  GameScene::g_sim_runs = 100;
+bool GameScene::g_show_mirror_acc = false;   // 验收: F9 toggle MIRROR AI 统计
 bool GameScene::g_sim_all_builds = false;
 int  GameScene::g_sim_build_type = 0;
 std::string GameScene::g_sim_ai_type = "decision";
@@ -1535,9 +1536,21 @@ void GameScene::_render() {
     // D4.6 Step1: F8 Growth Curve debug
     // F15.2: F9 — print player behavior stats
     if (IsKeyPressed(KEY_F9)) {
+        g_show_mirror_acc = !g_show_mirror_acc;   // 验收: toggle MIRROR AI 统计
         char dbg[256];
         g_behavior.print_debug(dbg, sizeof(dbg));
         _presentation.show_message(dbg, 4.0f);
+    }
+
+    // 验收: F9 overlay — MIRROR AI 调用链统计 (Predict/克隆/规则/打断/Phase)
+    if (g_show_mirror_acc && _boss._mirror_agent && g_font_loaded) {
+        const MirrorDebugStats* st = _boss._mirror_agent->debug_stats();
+        if (st) {
+            const char* title = "MIRROR AI [F9]";
+            DrawTextEx(g_font_small, title, {18, 58}, 18, 1, {255, 200, 80, 255});
+            DrawTextEx(g_font_small, st->summary().c_str(), {18, 84}, 14, 1,
+                       {200, 230, 255, 230});
+        }
     }
 
     if (_presentation.show_growth_debug && g_font_loaded) {

@@ -96,6 +96,7 @@ public:
 
 private:
     void notify_death_ev(const struct GameEvent&);
+    bool _mirror_stats_logged = false;              // 验收: 战斗统计只导出一 次
     void _tick_domain_state(float dt, Monster* boss);  // F10.1
     void _spawn_domain_core(Monster* boss);             // F10.2
     bool _enraged = false;                              // M4d-fix: 狂暴领域标记

@@ -113,10 +113,10 @@ Boss 拥有玩家的武器、技能、属性，并且能预测玩家的下一步
 
 | Milestone | 内容 | 验证 |
 |---|---|---|
-| M0 | 采集器/画像/Agent 现状核对 | 本文档 (完成) |
 | M1 | BehaviorCloneTable 构建 + 查询 + 稀疏降级 | 单测: 构造 action 流 → 表 → 预测命中 |
 | M2 | 动态 Phase 触发 + 滚动准确率 + 一致性比对 | 单测: 模拟命中/落空 → 阈值触发 |
 | M3 | MirrorAgent 仲裁接入克隆层 + ML 插槽 | 集成: --sim 冒烟无崩 |
+| M3-AC | **后验验收: 证明 AI 链路真闭环** | 下节 §7 五项验收 + MirrorDebugStats |
 | M4 | F15 实战调参 (触发阈值/降级权重) | World Validator + 全测试 + 冒烟 |
 
 ## 6. 风险与决策
@@ -128,3 +128,38 @@ Boss 拥有玩家的武器、技能、属性，并且能预测玩家的下一步
    (M4 时核对 director init), 位移类技能做适配
 4. **跨局 Meta Memory**: `export/import_memory` 已存在, 仅预留,
    不参与本版本核心 AI (按用户决策)
+
+## 7. M3 后验验收 — 证明 AI 链路真闭环 (非"存在未调用")
+
+验收工具: `MirrorDebugStats` (`src/ai/mirror/`) + 战斗中 **F9** 切换 HUD 统计 + 战斗结束 `[MIRROR-ACC]` 日志摘要。
+
+### 7.1 验收目标链路
+```
+F1-F14 行为采集 → PlayerAction → 分析器 → PlayerHabitProfile
+  → BehaviorCloneTable (M1) → MirrorAgent → MirrorCombatDirector → Echo 出招
+```
+
+### 7.2 手工验收流程 (1 局 ~10-15 min)
+1. **测试A — 回血习惯 (验证 CloneTable 驱动战斗)**: 前 14 层刻意在 HP<30% 时立即回血 (~10+ 次)
+2. F15 进入终焉回响战斗, **按 F9** 打开 MIRROR AI 统计
+3. 观察 HUD: Predict 计数每 0.5s 增长, Phase 1→2→3 时长变化
+4. 观察低血+近距离: Echo 是否**靠近/打断/技能加速** (对应 HEAL 意图→APPROACH/SKILL 臂)
+5. 战斗结束后看控制台/`game.log` 的 `[MIRROR-ACC] battle ended — ...` 摘要
+
+### 7.3 通过判据 (对照用户 5 验收点)
+| # | 验证点 | 通过证据 |
+|---|---|---|
+| 1 | CloneTable 真驱动战斗 | HUD `CloneHit>0` 且 Phase≥2 时行为臂来自克隆意图 (HEAL→压近) |
+| 2 | 调用链统计 | `Predict>0` 且增长; `仲裁[Clone/ML/Tho]` 合计>0; `[MIRROR-ACC]` 摘要出现在战斗结束 |
+| 3 | Phase 真改变行为 | 行为分布变化: P1 以 普攻(Attack)为主 → P2 技能(Skill)/压近(App) 占比升 → P3 连招/打断 |
+| 4 | 技能真实效果 | 已代码核对 ✅: heals 真实 `boss.combat.heal(max/5)`; 时停真实 `slow` x4; 近战/弹幕/AOE 真实伤害 — 无"名字镜像" |
+| — | 不加 ML | M3-AC 不含任何神经网络; G5 插槽默认 nullptr |
+
+### 7.4 验收已知缺陷 (不阻塞验收, 记录后续修)
+1. `--sim N` 需在标题画面手动按 N 才进入 (G5.6 无自动开始) — 命令行无人值守验证不可用, 故验收需人工实操
+2. 修复: 自愈/时停技能此前缺 `report_outcome` 在线反馈 (臂学不到信号) → 已补正反馈
+3. 修复: 退出时 `unload_all()` 双调 double-free (0xC0000374) → 已加防重入
+
+### 7.5 验收结论
+单测 30/30 绿 (含 `mirror_acc_test` 10 项: 统计逻辑 + MirrorAgent 真实路径接入)。
+链路代码路径全部有计数出口; **实测闭环证据需按 §7.2 实战获得** (CLI 无法注入键盘操作)。

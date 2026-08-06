@@ -4,7 +4,8 @@
 #include <algorithm>
 #include <cstdio>
 
-MirrorAgent::MirrorAgent() = default;
+MirrorAgent::MirrorAgent()
+    : _debug_stats(std::make_unique<MirrorDebugStats>()) {}
 
 void MirrorAgent::init(const PlayerHabitProfile& profile) {
     _profile = profile;
@@ -85,12 +86,14 @@ PlayerActionType MirrorAgent::predict_next_action(
     if (_phase >= 2 && _clone) {
         ClonePrediction p = _clone->predict(st.dist_tiles, st.player_hp_pct,
                                             st.player_skills_ready);
+        _debug_stats->on_predict(p.level);   // 验收: 记录降级链等级
         if (p.level <= 2 && p.confidence >= 0.5f) {
             PlayerActionType t = intent_to_action(p.best);
             if (t != PlayerActionType::NONE) return t;
         }
     }
     // Rule-based fallback (existing profile logic)
+    _debug_stats->on_predict(-1);            // 验收: 记录规则兜底
     if (st.dist_tiles < 3.0f && _profile.attack_frequency > 0.6f)
         return PlayerActionType::ATTACK;
     if (st.player_hp_pct < _profile.hp_counter_threshold / 100.0f
@@ -129,7 +132,10 @@ int MirrorAgent::recommend_action(const MirrorBattleState& st) {
     // M3: ML 插槽优先 (G5 — 注册即启用, 默认关闭)
     if (_ml_predictor) {
         int arm = boss_arm_for_action(_ml_predictor(st));
-        if (arm >= 0) return _record_arm(arm, st);
+        if (arm >= 0) {
+            _debug_stats->on_arbitrate(false, true);   // 验收: ML 仲裁
+            return _record_arm(arm, st);
+        }
     }
     // M3: 克隆层仲裁 — 置信度>0.5 时克隆意图驱动 Boss 臂
     if (_clone) {
@@ -137,9 +143,13 @@ int MirrorAgent::recommend_action(const MirrorBattleState& st) {
                                             st.player_skills_ready);
         if (p.level <= 1 && p.confidence > 0.5f) {
             int arm = boss_arm_for_intent(p.best);
-            if (arm >= 0) return _record_arm(arm, st);
+            if (arm >= 0) {
+                _debug_stats->on_arbitrate(true, false);   // 验收: 克隆仲裁
+                return _record_arm(arm, st);
+            }
         }
     }
+    _debug_stats->on_arbitrate(false, false);   // 验收: Thompson 采样
     float dist_px = st.dist_tiles * 32.0f;
     _last_bucket = OnlineAdaptivePolicy::bucket_for(dist_px, st.player_hp_pct);
     int act = _policy->select_action(_last_bucket);
@@ -245,6 +255,7 @@ float MirrorAgent::profile_drift() const {
 
 void MirrorAgent::tick_phase(float dt, const MirrorBattleState& st) {
     _battle_time += dt;
+    _debug_stats->tick_phase(_phase, dt);   // 验收: 各 Phase 时长统计
     switch (_phase) {
     case 1: {
         float acc = _rolling_accuracy.accuracy();

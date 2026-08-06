@@ -4,6 +4,7 @@
 #include "ai/mirror/online_adaptive_policy.h"
 #include "ai/mirror/behavior_clone_table.h"
 #include "ai/mirror/rolling_accuracy.h"
+#include "ai/mirror/mirror_debug_stats.h"
 #include <vector>
 #include <memory>
 #include <map>
@@ -53,6 +54,12 @@ public:
     float profile_drift() const;
     // 动态阶段判定: P1→P2 (准确率/观察数/时间), P2→P3 (核心模式/濒危) — 替代纯计时
     void  tick_phase(float dt, const MirrorBattleState& st);
+
+    // ── 验收: 战斗内 AI 调用链统计 (F9 HUD / 战斗结束日志) ──
+    void begin_battle() { _debug_stats->reset(); }
+    void report_interrupt(bool success) { _debug_stats->on_interrupt(success); }
+    void debug_behavior_state(int state) { _debug_stats->on_behavior_state(state); }
+    const MirrorDebugStats* debug_stats() const { return _debug_stats.get(); }
 
     // ── M1: behavior-clone layer (built from F1-F14 action stream) ──
     void set_clone_table(std::unique_ptr<BehaviorCloneTable> t);
@@ -125,4 +132,5 @@ private:
     // M3: 记录选中臂 (含上下文桶) — 保证 report_outcome 反馈链
     int _record_arm(int act, const MirrorBattleState& st);
     MlPredictor _ml_predictor;                       // M3: G5 插槽, 默认关闭
+    std::unique_ptr<MirrorDebugStats> _debug_stats;  // 验收: AI 调用链统计
 };

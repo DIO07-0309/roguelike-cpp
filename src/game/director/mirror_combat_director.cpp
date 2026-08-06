@@ -242,6 +242,7 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
         int heal_amt = boss->combat.max_hp / 5;  // 20% max HP
         boss->combat.heal(heal_amt);
         LOG_INFO("[MIRROR] 镜像自愈 [%s]: +%d HP", ms.name.c_str(), heal_amt);
+        if (_agent) _agent->report_outcome(true, 0.0f);   // 验收: 执行成功正反馈
         break;
     }
     case 3: { // aoe — 范围伤害 (需在范围半径内)
@@ -259,6 +260,10 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
     case 4: { // time_stop — 玩家减速
         apply_buff(player, "slow", 4);
         LOG_INFO("[MIRROR] 镜像时停 [%s]: 玩家减速×4层", ms.name.c_str());
+        if (_agent) {
+            _agent->report_outcome(true, 0.0f);     // 验收: 执行成功正反馈
+            _agent->report_interrupt(true);         // 验收: 打断成功 (减速命中)
+        }
         break;
     }
     }
@@ -315,7 +320,11 @@ void MirrorCombatDirector::_ai_decide(Monster* boss, Player* player,
     if (agent->should_interrupt_skill(st)) {
         _skill_cd_timer = 0.0f;  // 立即可用技能
         _behavior_state = 2;     // 切换到技能状态
+        agent->report_interrupt(false);   // 验收: 打断尝试计数 (成功在时停命中时计)
     }
+
+    // 验收: 行为状态分布采样 (每决策帧) — 证明 Phase 改变行为而非文字
+    agent->debug_behavior_state(_behavior_state);
 
     // 根据预测调整
     if (pred == PlayerActionType::HEAL) {

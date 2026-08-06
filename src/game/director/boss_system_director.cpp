@@ -211,6 +211,8 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
 
     // ── 初始化 MirrorCombatDirector (替代旧BossAI补丁) ──
     _mirror_combat.init(player, boss, bai, _mirror_agent.get());
+    _mirror_agent->begin_battle();   // 验收: 每场战斗重置 AI 调用链统计
+    _mirror_stats_logged = false;
 
     int mirror_hp = boss->combat.max_hp;
     int mirror_atk = boss->combat.attack;
@@ -301,6 +303,13 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
         _mirror_agent->tick_phase(dt, mst);
         _mirror_combat.tick(dt, boss, player, GetTime(), _mirror_agent.get(),
                             effects);   // F15-fix: 传递特效通道 — 镜像攻击可见
+        // 验收: 战斗结束导出 AI 调用链统计 (任一阵亡, 只记一次)
+        if (!_mirror_stats_logged &&
+            (boss->combat.current_hp <= 0 || player->combat.current_hp <= 0)) {
+            printf("[MIRROR-ACC] battle ended — %s\n",
+                   _mirror_agent->debug_stats()->summary().c_str());
+            _mirror_stats_logged = true;
+        }
     }
 }
 
