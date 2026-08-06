@@ -98,6 +98,13 @@ bool MirrorCombatDirector::tick(float dt, Monster* boss, Player* player,
     _last_player_x = player->entity.rect.x;
     _last_player_y = player->entity.rect.y;
 
+    // M2: 玩家实际动作识别 → 在线准确率反馈
+    if (_agent) {
+        PlayerActionType actual = _detect_player_action(player, game_time,
+                                                        pdx, pdy, &_last_player_hp);
+        if (actual != PlayerActionType::NONE) _agent->observe_actual(actual);
+    }
+
     // 每0.5s做一次AI决策
     _decision_timer += dt;
     if (_decision_timer >= 0.5f && agent) {
@@ -292,6 +299,8 @@ void MirrorCombatDirector::_ai_decide(Monster* boss, Player* player,
 
     // 预测玩家下一步
     PlayerActionType pred = agent->predict_next_action(st);
+    agent->on_prediction(pred, st.dist_tiles, st.player_hp_pct,
+                         st.player_skills_ready);   // M2: 上报预测上下文
 
     // 压力追击
     if (agent->should_pressure_close(st)) {
@@ -314,6 +323,20 @@ void MirrorCombatDirector::_ai_decide(Monster* boss, Player* player,
     } else if (pred == PlayerActionType::ATTACK && agent->should_pressure_close(st)) {
         _behavior_state = 3;  // 预测攻击+可压制→战略后撤
     }
+}
+
+// M2: 识别玩家本帧实际动作 — 优先级: 攻击/技能(0.5s内) > 闪避(位移>200px) > 喝药(HP上升)
+PlayerActionType MirrorCombatDirector::_detect_player_action(Player* player,
+                                                             double gt,
+                                                             float dx, float dy,
+                                                             float* last_hp) {
+    if (gt - player->_last_attack_time < 0.5f) return PlayerActionType::ATTACK;
+    if (gt - player->_last_skill_time  < 0.5f) return PlayerActionType::SKILL;
+    if (dx * dx + dy * dy > 200.0f * 200.0f)   return PlayerActionType::DODGE;
+    float hp = player->combat.current_hp;
+    bool healed = (*last_hp > 0.0f) && (hp > *last_hp + 1.0f);
+    *last_hp = hp;
+    return healed ? PlayerActionType::HEAL : PlayerActionType::NONE;
 }
 
 // M4e: 在线决策动作映射 — Thompson 采样臂 → 行为状态

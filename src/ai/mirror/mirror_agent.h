@@ -3,8 +3,11 @@
 #include "ai/player_behavior/player_action.h"
 #include "ai/mirror/online_adaptive_policy.h"
 #include "ai/mirror/behavior_clone_table.h"
+#include "ai/mirror/rolling_accuracy.h"
 #include <vector>
 #include <memory>
+#include <map>
+#include <string>
 
 class Monster;
 class Player;
@@ -37,7 +40,18 @@ public:
     // ── Phase 1-2-3 behavior selection ──
     int  current_phase() const { return _phase; }   // 1=observe, 2=mirror, 3=evolve
     void set_phase(int p) { _phase = p; }
-    void tick_phase_timer(float dt);
+
+    // ── M2: 在线观测与动态阶段触发 ──
+    // 预测后立即上报 (附上下文用于同桶命中统计); 玩家实际动作出现时上报比对
+    void on_prediction(PlayerActionType predicted, float dist_tiles,
+                       float hp_pct, int skills_ready);
+    void observe_actual(PlayerActionType actual);
+    float prediction_accuracy() const { return _rolling_accuracy.accuracy(); }
+    int   observed_actions() const { return _observed_actions; }
+    // 当前战斗攻击/技能频率 vs 画像频率的归一化偏差 [0,1] (数据不足返回0)
+    float profile_drift() const;
+    // 动态阶段判定: P1→P2 (准确率/观察数/时间), P2→P3 (核心模式/濒危) — 替代纯计时
+    void  tick_phase(float dt, const MirrorBattleState& st);
 
     // ── M1: behavior-clone layer (built from F1-F14 action stream) ──
     void set_clone_table(std::unique_ptr<BehaviorCloneTable> t);
@@ -83,8 +97,6 @@ public:
 private:
     PlayerHabitProfile _profile;
     int  _phase = 1;
-    float _phase_timer = 0.0f;
-    float _phase_duration = 30.0f;
     float _preferred_distance = 250.0f;
     // M4e: 在线学习
     std::unique_ptr<OnlineAdaptivePolicy> _policy;
@@ -92,4 +104,16 @@ private:
     int _last_action = -1;    // 最近一次决策的动作臂
     std::unique_ptr<BehaviorCloneTable> _clone;   // M1: 行为克隆层
     static float _rand01();   // [0,1) 均匀采样 (技能窗口探索用)
+
+    // M2: 在线观察
+    RollingAccuracy _rolling_accuracy;
+    PlayerActionType _last_prediction = PlayerActionType::NONE;
+    std::string _last_obs_key;                       // 最近预测的 ObservationKey
+    std::map<std::string, int> _bucket_hits;         // 同桶命中计数
+    int _observed_actions = 0;
+    int _obs_attack = 0, _obs_skill = 0;
+    int _obs_dodge = 0, _obs_heal = 0;
+    float _battle_time = 0.0f;
+    static constexpr int kPhase1Observations = 40;   // 观察数兜底阈值
+    int _max_bucket_hits() const;
 };

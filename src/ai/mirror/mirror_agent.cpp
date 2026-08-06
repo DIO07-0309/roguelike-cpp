@@ -9,7 +9,6 @@ MirrorAgent::MirrorAgent() = default;
 void MirrorAgent::init(const PlayerHabitProfile& profile) {
     _profile = profile;
     _phase = 1;
-    _phase_timer = 0.0f;
 
     // M4e: 创建在线学习策略, 注入离线画像先验
     _policy = std::make_unique<OnlineAdaptivePolicy>();
@@ -28,20 +27,6 @@ void MirrorAgent::init(const PlayerHabitProfile& profile) {
         _preferred_distance = 150.0f;   // force them into a corner, no escape
     else
         _preferred_distance = 230.0f;   // balanced
-}
-
-void MirrorAgent::tick_phase_timer(float dt) {
-    _phase_timer += dt;
-    // Phase transitions:
-    // Phase 1 → 2 at 30s (observe current patterns)
-    // Phase 2 → 3 at 60s (start using history data for counters)
-    if (_phase == 1 && _phase_timer >= _phase_duration) {
-        _phase = 2;
-        _phase_timer = 0.0f;
-    } else if (_phase == 2 && _phase_timer >= _phase_duration) {
-        _phase = 3;
-        _phase_timer = 0.0f;
-    }
 }
 
 const char* MirrorAgent::phase_name() const {
@@ -171,6 +156,71 @@ void MirrorAgent::import_memory(const std::vector<float>& alpha,
 float MirrorAgent::arm_win_rate(int bucket, int action) const {
     if (!_policy) return 0.0f;
     return _policy->win_rate(bucket, action);
+}
+
+// ── M2: 在线观测 ──
+void MirrorAgent::on_prediction(PlayerActionType predicted, float dist_tiles,
+                                float hp_pct, int skills_ready) {
+    if (!is_decision_action(predicted)) return;
+    _last_prediction = predicted;
+    _last_obs_key = CloneContext::from_state(dist_tiles, hp_pct, skills_ready).key();
+}
+
+void MirrorAgent::observe_actual(PlayerActionType actual) {
+    if (!is_decision_action(actual)) return;
+    _observed_actions++;
+    switch (actual) {
+    case PlayerActionType::ATTACK: _obs_attack++; break;
+    case PlayerActionType::SKILL:  _obs_skill++;  break;
+    case PlayerActionType::DODGE:  _obs_dodge++;  break;
+    case PlayerActionType::HEAL:   _obs_heal++;   break;
+    default: break;
+    }
+    if (_last_prediction == PlayerActionType::NONE) return;
+    bool hit = (actual == _last_prediction);
+    _rolling_accuracy.add(hit);
+    if (hit) _bucket_hits[_last_obs_key]++;
+    _last_prediction = PlayerActionType::NONE;
+}
+
+int MirrorAgent::_max_bucket_hits() const {
+    int best = 0;
+    for (const auto& kv : _bucket_hits) {
+        if (kv.second > best) best = kv.second;
+    }
+    return best;
+}
+
+float MirrorAgent::profile_drift() const {
+    if (_observed_actions < 10 || _battle_time <= 0.01f) return 0.0f;
+    float cur_attack = (float)_obs_attack / _battle_time;
+    float cur_skill  = (float)_obs_skill  / _battle_time;
+    float attack_norm = _profile.attack_frequency > 0.01f
+        ? fabsf(cur_attack - _profile.attack_frequency) / _profile.attack_frequency : 0.0f;
+    float skill_norm = _profile.skill_frequency > 0.01f
+        ? fabsf(cur_skill - _profile.skill_frequency) / _profile.skill_frequency : 0.0f;
+    float drift = (attack_norm + skill_norm) * 0.5f;
+    return drift > 1.0f ? 1.0f : drift;
+}
+
+void MirrorAgent::tick_phase(float dt, const MirrorBattleState& st) {
+    _battle_time += dt;
+    switch (_phase) {
+    case 1: {
+        float acc = _rolling_accuracy.accuracy();
+        bool learned = (acc >= 0.65f && _observed_actions >= 20)
+                    || _observed_actions >= kPhase1Observations;
+        if (learned || _battle_time >= 20.0f) set_phase(2);
+        break;
+    }
+    case 2: {
+        bool pattern = _max_bucket_hits() >= 10 && _rolling_accuracy.accuracy() >= 0.7f;
+        bool danger  = st.player_hp_pct < 0.35f || st.boss_hp_pct < 0.35f;
+        if (pattern || danger) set_phase(3);
+        break;
+    }
+    default: break;
+    }
 }
 
 // ── F15.4: Mirror reward ──

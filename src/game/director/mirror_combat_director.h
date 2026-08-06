@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include "types/weapon_types.h"
+#include "ai/player_behavior/player_action.h"
 
 class Player;
 class Monster;
@@ -47,6 +48,9 @@ private:
     // M4e: 在线决策动作映射 — act<0 返回false (观察期走规则)
     bool _apply_online_action(int act);
     void _chase_player(Monster* boss, Player* player, float dt);
+    // M2: 识别玩家本帧实际动作 (攻击/技能/闪避/喝药) — 供在线准确率反馈
+    PlayerActionType _detect_player_action(Player* player, double gt,
+                                           float dx, float dy, float* last_hp);
 
     // 武器镜像数据
     int   _combo_stage = 0;
@@ -72,4 +76,5 @@ private:
     MirrorAgent* _agent = nullptr;
     float _last_player_x = 0.0f;   // 玩家闪避检测
     float _last_player_y = 0.0f;
+    float _last_player_hp = 0.0f;  // M2: 玩家喝药检测 (HP 上升判定)
 };

@@ -20,6 +20,12 @@ enum class PlayerActionType : int {
     FLOOR_ENTER,  // entered new floor
 };
 
+// 是否为战斗决策动作 (可供行为克隆/在线观察学习)
+inline bool is_decision_action(PlayerActionType t) {
+    return t == PlayerActionType::ATTACK || t == PlayerActionType::SKILL
+        || t == PlayerActionType::DODGE || t == PlayerActionType::HEAL;
+}
+
 struct PlayerAction {
     PlayerActionType type = PlayerActionType::NONE;
     float timestamp = 0.0f;   // seconds since game start

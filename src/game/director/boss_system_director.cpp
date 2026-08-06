@@ -292,7 +292,13 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
     }
     // F15: Mirror boss — MirrorCombatDirector 接管全部战斗决策
     else if (_behavior_type == "mirror" && _mirror_agent) {
-        _mirror_agent->tick_phase_timer(dt);
+        // M2: 动态阶段触发 — 准确率/观察数/时间/濒危, 不再纯计时
+        MirrorBattleState mst;
+        mst.boss_hp_pct = boss->combat.max_hp > 0
+            ? (float)boss->combat.current_hp / boss->combat.max_hp : 1.0f;
+        mst.player_hp_pct = player->combat.max_hp > 0
+            ? (float)player->combat.current_hp / player->combat.max_hp : 1.0f;
+        _mirror_agent->tick_phase(dt, mst);
         _mirror_combat.tick(dt, boss, player, GetTime(), _mirror_agent.get(),
                             effects);   // F15-fix: 传递特效通道 — 镜像攻击可见
     }
