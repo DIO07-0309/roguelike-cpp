@@ -19,6 +19,9 @@ public:
     const std::vector<PlayerAction>& history() const { return _history; }
     void clear();
 
+    // M1: per-frame context snapshot — attached to every recorded action
+    void set_context(float hp_pct, float enemy_dist, int skill_ready_mask);
+
     // ── Convenience hooks ──
     void on_weapon_attack(const char* wt_name, float time, int floor,
                           float px, float py);
@@ -48,6 +51,9 @@ private:
     PlayerBehaviorRecorder() = default;
     std::vector<PlayerAction> _history;
     PlayerBehaviorData _data;
+    float _ctx_hp = -1.0f;
+    float _ctx_dist = -1.0f;
+    int   _ctx_mask = 0;
 };
 
 #define g_behavior PlayerBehaviorRecorder::inst()

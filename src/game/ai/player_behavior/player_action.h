@@ -28,4 +28,10 @@ struct PlayerAction {
     int value = 0;            // damage dealt/taken, or skill_id, or movement direction
     int skill_id = -1;        // -1=N/A, 0=slash, 1=fireball, 2=self_heal, 3=the_world
     const char* weapon_name = nullptr;  // nullptr unless ATTACK
+
+    // M1: decision context snapshot at the moment of the action.
+    // Filled by PlayerBehaviorRecorder::record() from the latest frame context.
+    float hp = -1.0f;          // player HP ratio [0,1], -1 = unknown (legacy stream)
+    float enemy_dist = -1.0f;  // distance to nearest alive enemy in tiles, -1 = unknown
+    int skill_ready_mask = 0;  // bit i = skill i cooldown ready (bit 0 = slash)
 };

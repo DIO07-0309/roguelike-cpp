@@ -24,6 +24,25 @@
 void PlayerController::tick(float dt) {
     if (!_scene || !_scene->player || !_scene->player->combat.is_alive) return;
 
+    // M1: 每帧刷新行为克隆上下文 (HP 比例/最近敌人距离/技能就绪位)
+    {
+        auto& c = *_scene;
+        float hp = c.player->combat.max_hp > 0
+            ? (float)c.player->combat.current_hp / c.player->combat.max_hp : 0;
+        float nearest = 999.0f;
+        for (auto& m : c.monsters) {
+            if (!m->combat.is_alive) continue;
+            float d = hypotf(m->entity.rect.x - c.player->entity.rect.x,
+                             m->entity.rect.y - c.player->entity.rect.y) / 32.0f;
+            if (d < nearest) nearest = d;
+        }
+        int mask = 0;
+        for (size_t i = 0; i < c.player->skills.active_skills.size() && i < 4; i++)
+            if (c.player->skills.active_skills[i]->remaining_cooldown(c.game_time) <= 0.0f)
+                mask |= 1 << (int)i;
+        g_behavior.set_context(hp, nearest > 900.0f ? -1.0f : nearest, mask);
+    }
+
     // ── 移动 ──
     auto& gs = *_scene;
     static float _last_mx = 0, _last_my = 0;

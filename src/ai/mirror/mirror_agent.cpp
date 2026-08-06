@@ -80,8 +80,32 @@ bool MirrorAgent::should_pressure_close(const MirrorBattleState& st) const {
     return false;
 }
 
+void MirrorAgent::set_clone_table(std::unique_ptr<BehaviorCloneTable> t) {
+    _clone = std::move(t);
+}
+
+static PlayerActionType intent_to_action(PlayerIntention i) {
+    switch (i) {
+    case PlayerIntention::ATTACK: return PlayerActionType::ATTACK;
+    case PlayerIntention::SKILL:  return PlayerActionType::SKILL;
+    case PlayerIntention::DODGE:  return PlayerActionType::DODGE;
+    case PlayerIntention::HEAL:   return PlayerActionType::HEAL;
+    default:                      return PlayerActionType::NONE;  // no mapping -> rules
+    }
+}
+
 PlayerActionType MirrorAgent::predict_next_action(
     const MirrorBattleState& st) const {
+    // M1: behavior-clone layer first (exact/fuzzy/profile), rules as fallback
+    if (_phase >= 2 && _clone) {
+        ClonePrediction p = _clone->predict(st.dist_tiles, st.player_hp_pct,
+                                            st.player_skills_ready);
+        if (p.level <= 2 && p.confidence >= 0.5f) {
+            PlayerActionType t = intent_to_action(p.best);
+            if (t != PlayerActionType::NONE) return t;
+        }
+    }
+    // Rule-based fallback (existing profile logic)
     if (st.dist_tiles < 3.0f && _profile.attack_frequency > 0.6f)
         return PlayerActionType::ATTACK;
     if (st.player_hp_pct < _profile.hp_counter_threshold / 100.0f

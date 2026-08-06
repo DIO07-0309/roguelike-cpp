@@ -12,9 +12,20 @@ PlayerBehaviorRecorder& PlayerBehaviorRecorder::inst() {
     return rec;
 }
 
+void PlayerBehaviorRecorder::set_context(float hp_pct, float enemy_dist,
+    int skill_ready_mask) {
+    _ctx_hp = hp_pct;
+    _ctx_dist = enemy_dist;
+    _ctx_mask = skill_ready_mask;
+}
+
 void PlayerBehaviorRecorder::record(const PlayerAction& action) {
     if (action.type == PlayerActionType::NONE) return;
-    _history.push_back(action);
+    PlayerAction a = action;
+    if (a.hp < 0) a.hp = _ctx_hp;
+    if (a.enemy_dist < 0) a.enemy_dist = _ctx_dist;
+    a.skill_ready_mask = _ctx_mask;
+    _history.push_back(a);
 
     // ── Update aggregate data in real time ──
     if (action.type == PlayerActionType::ATTACK && action.weapon_name) {

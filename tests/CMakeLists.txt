@@ -174,4 +174,7 @@ add_roguelike_test(element_test      element/element_test.cpp)
 add_roguelike_test(element_combat    element/element_combat_test.cpp)
 add_roguelike_test(element_vfx       element/element_vfx_test.cpp)
 
+# M1: Behavior-clone table + MirrorAgent clone layer tests
+add_roguelike_test(clone_test        mirror/behavior_clone_test.cpp)
+
 

@@ -2,6 +2,7 @@
 #include "ai/player_behavior/player_habit_profile.h"
 #include "ai/player_behavior/player_action.h"
 #include "ai/mirror/online_adaptive_policy.h"
+#include "ai/mirror/behavior_clone_table.h"
 #include <vector>
 #include <memory>
 
@@ -23,6 +24,7 @@ struct MirrorBattleState {
     bool  player_using_skill = false;
     bool  boss_can_attack = false;
     bool  boss_in_domain = false;       // F10 domain phase
+    int   player_skills_ready = 0;      // M1: cooldown-ready skill count
 };
 
 class MirrorAgent {
@@ -36,6 +38,10 @@ public:
     int  current_phase() const { return _phase; }   // 1=observe, 2=mirror, 3=evolve
     void set_phase(int p) { _phase = p; }
     void tick_phase_timer(float dt);
+
+    // ── M1: behavior-clone layer (built from F1-F14 action stream) ──
+    void set_clone_table(std::unique_ptr<BehaviorCloneTable> t);
+    const BehaviorCloneTable* clone_table() const { return _clone.get(); }
 
     // ── During combat: recommend BossAI adjustments ──
     float recommend_distance() const;
@@ -84,5 +90,6 @@ private:
     std::unique_ptr<OnlineAdaptivePolicy> _policy;
     int _last_bucket = -1;    // 最近一次决策的上下文桶
     int _last_action = -1;    // 最近一次决策的动作臂
+    std::unique_ptr<BehaviorCloneTable> _clone;   // M1: 行为克隆层
     static float _rand01();   // [0,1) 均匀采样 (技能窗口探索用)
 };
