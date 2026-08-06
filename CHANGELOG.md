@@ -24,6 +24,20 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
+# v0.9.20 — 热修复: 玩家时停期间世界未冻结 (镜像/尖刺/弹体/DOT 穿透) (2026-08-06)
+
+## 热修复
+- **Bug 复现**: 玩家放 The World 时停后, 镜像 Boss/尖刺/敌方弹体/敌方 DOT 仍在结算 —
+  玩家在"时停期间"被镜像伤害击杀 (日志: 镜像 AOE/时停减速照常命中)
+- **根因**: 时停门控只覆盖普通怪物 AI (`player_controller.cpp` L94 `_update_monsters`),
+  Boss/镜像 (`_boss.tick`)、arena 尖刺毒池、敌方弹体、敌方 buff 四条伤害链全部绕过
+- **修复** (game_scene.cpp, 4 处门控 `time_stop_remaining <= 0`):
+  - `_boss.tick` 调用 (BossAI/镜像/领域/arena 区域伤害)
+  - arena 物体循环 (尖刺/毒池/图腾)
+  - 敌方弹体 (MONSTER/ENVIRONMENT owner)
+  - 敌方 buff tick (毒 DOT/venom_fang; 玩家自身 buff 不受影响)
+- 全量 **30/30 绿** · 桌面已同步
+
 # v0.9.19 — 热修复: 死亡后继续游戏闪退 (EventBus 悬挂订阅) (2026-08-06)
 
 ## 热修复

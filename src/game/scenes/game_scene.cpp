@@ -473,7 +473,7 @@ void GameScene::_process(double delta) {
     // D5 Step3: Boss Memory tick + Behavior 评估 (收敛至 BossSystemDirector::tick)
     {
         auto* boss = _get_boss();
-        if (boss && boss->is_boss) {
+        if (boss && boss->is_boss && time_stop_remaining <= 0) {
             _boss._weak_point_pool = &monsters;  // F10.2: pass pool for core spawn
             _boss.tick(dt, boss, player.get(), current_floor, _gameplay.world_state,
                        _gameplay.rels, _gameplay.story.stage(), monsters,
@@ -531,7 +531,9 @@ void GameScene::_process(double delta) {
     // ── Buff 逐帧结算 ──
     std::vector<BuffEvent> buf_events;
     tick_buffs(player.get(), dt, &buf_events);
-    for (auto& m : monsters) tick_buffs(m.get(), dt, &buf_events, player.get()); // B11: venom_fang
+    // 时停期间世界冻结 — 敌方 buff (毒/DOT) 不结算 (玩家自身 buff 正常)
+    if (time_stop_remaining <= 0)
+        for (auto& m : monsters) tick_buffs(m.get(), dt, &buf_events, player.get()); // B11: venom_fang
 
     // Buff 事件日志 + C1: poison tick 伤害数字
     for (auto& ev : buf_events) {
@@ -683,8 +685,8 @@ void GameScene::_process(double delta) {
         _elem_events.clear();
     }
 
-    // D2 Step5: Arena 环境 tick (D4.6: arena_scale)
-    if (game_map && !game_map->arena_objects.empty()) {
+    // D2 Step5: Arena 环境 tick (D4.6: arena_scale) — 时停期间世界冻结
+    if (game_map && !game_map->arena_objects.empty() && time_stop_remaining <= 0) {
         float px = player->entity.rect.x + player->entity.rect.width/2;
         float py = player->entity.rect.y + player->entity.rect.height/2;
         float ascale = g_growth.arena_scale(current_floor);
@@ -846,8 +848,10 @@ void GameScene::_process(double delta) {
     }
 
     // D2: tick enemy projectiles (MONSTER/ENVIRONMENT owner → hit player)
+    // 时停期间世界冻结 — 敌方弹体不飞行不结算
     for (auto& p : projectiles) {
         if (!p.alive) continue;
+        if (time_stop_remaining > 0) continue;
         if (p.owner != (int)ProjectileOwner::MONSTER
             && p.owner != (int)ProjectileOwner::ENVIRONMENT) continue;
         // Warning phase countdown only
