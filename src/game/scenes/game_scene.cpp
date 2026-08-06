@@ -1542,7 +1542,9 @@ void GameScene::_render() {
         _presentation.show_message(dbg, 4.0f);
     }
 
-const MirrorDebugStats* st = _boss._mirror_agent->debug_stats();
+    // F9 toggle 且仅 Boss 层 (镜像 agent 存在) 才绘制
+    if (g_show_mirror_acc && _boss._mirror_agent && g_font_loaded) {
+        const MirrorDebugStats* st = _boss._mirror_agent->debug_stats();
         if (st) {
             const char* title = "MIRROR AI [F9]";
             DrawTextEx(g_font_small, title, {18, 58}, 18, 1, {255, 200, 80, 255});
@@ -1555,6 +1557,7 @@ const MirrorDebugStats* st = _boss._mirror_agent->debug_stats();
             DrawTextEx(g_font_small, drift_buf, {18, 104}, 14, 1,
                        {230, 160, 120, 230});
         }
+    }
 
     if (_presentation.show_growth_debug && g_font_loaded) {
         const GrowthCurve& gc = g_growth.curve(current_floor);

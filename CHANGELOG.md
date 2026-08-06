@@ -24,6 +24,17 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
+# v0.9.18 — 热修复: 选关进入普通层闪退 (F9 overlay 空指针) (2026-08-06)
+
+## 热修复
+- **闪退根因**: v0.9.17 修改 F9 MIRROR AI overlay 时误删外层守卫,
+  `game_scene.cpp` L1545 无条件解引用 `_boss._mirror_agent` — 普通层 (选关11层)
+  不创建镜像 agent, `unique_ptr` 为空 → 0xC0000005 (SEH) → 闪退; 15 层 Boss 层 agent
+  非空, 故读档从未触发
+- 修复: 恢复守卫 `if (g_show_mirror_acc && _boss._mirror_agent && g_font_loaded)`
+- 调试工具增强: `seh_handler` 崩溃日志增加 RVA+模块基址 (配合 Debug 构建 addr2line 定位)
+- 全量 **30/30 绿** · 桌面已同步 (Release exe 3.3MB)
+
 # v0.9.17 — M4 调参基础设施: MirrorTuning 参数表 + 漂移降权消费 (2026-08-06)
 
 ## M4 (第一批: 参数化 + 断链修复)

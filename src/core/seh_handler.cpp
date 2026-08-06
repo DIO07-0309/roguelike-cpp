@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <ctime>
 #include <cstdio>
+#include <cstdint>
 
 // 独立崩溃日志 (不依赖 Logger 单例，崩溃时它可能已死)
 static void _write_crash(const char* msg) {
@@ -28,11 +29,14 @@ extern "C" long __stdcall _seh_handler(void* pinfo) {
     DWORD code = info->ExceptionRecord->ExceptionCode;
     void* addr = info->ExceptionRecord->ExceptionAddress;
 
+    void* base = (void*)GetModuleHandleA(NULL);  // 主模块基址 (AddressOfEntryPoint 偏移用)
+    uint64_t rva = base ? (uintptr_t)addr - (uintptr_t)base : 0;
+
     char buf[256];
     snprintf(buf, sizeof(buf),
-        "SEH Exception 0x%08X at 0x%p\n"
+        "SEH Exception 0x%08X at 0x%p (RVA 0x%llX, base 0x%p)\n"
         "开发者：ruozhiDIO",
-        (unsigned)code, addr);
+        (unsigned)code, addr, (unsigned long long)rva, base);
     _write_crash(buf);
 
     return (long)EXCEPTION_EXECUTE_HANDLER;
