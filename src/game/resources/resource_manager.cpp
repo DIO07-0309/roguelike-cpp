@@ -108,6 +108,8 @@ void ResourceManager::load_all() {
 }
 
 void ResourceManager::unload_all() {
+    if (!_loaded) return;   // 防重入: main 显式卸载 + 静态析构双调 (double-free 根因)
+    _loaded = false;
     _free_font();
     for (auto& [_, s] : _sound_cache) UnloadSound(s);
     _sound_cache.clear();

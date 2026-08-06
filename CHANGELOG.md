@@ -24,7 +24,13 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
-# v0.9.13 — F15 M3: MirrorAgent 决策仲裁 + ML 插槽 (2026-08-06)
+# v0.9.14 — 修复 --sim 退出堆损坏 (0xC0000374 Double-Free) (2026-08-06)
+
+## Bugfix: sim/正常退出不再崩
+- **根因 (gdb 栈回溯定位)**: main.cpp 显式 `ResourceManager::inst().unload_all()` 后, 静态单例析构再调一次 `unload_all()` → 二次 `UnloadFont` → 字体 double-free → 堆损坏 (Release 0xC0000409 / Debug 0xC0000374), 崩在程序退出阶段
+- 修复: `unload_all()` 加 `_loaded` 防重入保护 (一次性卸载), 二次调用直接返回
+- 验证: `--sim 1` 退出码 0 (修复前稳定崩溃), Debug+gdb backtrace 确认崩溃帧 = 单例析构卸载字体; 29/29 全绿
+- 顺带: `.gitignore` 补 `build-dbg/` · 桌面版已同步
 
 ## M3: 克隆层接入行为选择仲裁 (G5)
 - `recommend_action` 仲裁链: **ML 插槽 (G5, 注册即启用, 默认关闭)** → **克隆层 (Phase≥2, 置信度>0.5 驱动行为臂)** → **Thompson 采样** → 规则兜底 (观察期)
