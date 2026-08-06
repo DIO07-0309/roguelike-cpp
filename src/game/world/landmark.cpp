@@ -14,6 +14,7 @@ bool load_landmark_defs(const char* json_path) {
         if (!f.is_open()) { printf("[Landmark] Cannot open %s\n", json_path); return false; }
         json data = json::parse(f);
         g_landmarks.clear(); g_landmarks_by_biome.clear();
+        g_landmarks.reserve(data.size());
         for (auto& obj : data) {
             LandmarkDef lm;
             lm.id = obj["id"].get<std::string>();
@@ -25,9 +26,10 @@ bool load_landmark_defs(const char* json_path) {
             lm.icon = obj.value("icon", "?");
             lm.message = obj.value("message", "");
             lm.discovery_msg = obj.value("discovery_msg", "");
-            g_landmarks.push_back(lm);
-            g_landmarks_by_biome[lm.biome].push_back(&g_landmarks.back());
+            g_landmarks.push_back(std::move(lm));
         }
+        for (size_t i = 0; i < g_landmarks.size(); ++i)
+            g_landmarks_by_biome[g_landmarks[i].biome].push_back(&g_landmarks[i]);
         printf("[Landmark] Loaded %zu landmarks across %zu biomes\n",
                g_landmarks.size(), g_landmarks_by_biome.size());
         return true;

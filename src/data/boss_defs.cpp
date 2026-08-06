@@ -1,4 +1,4 @@
-#include "data/boss_defs.h"
+﻿#include "data/boss_defs.h"
 #include "core/merge_patch.h"   // G4.3
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -139,7 +139,7 @@ bool load_boss_defs(const std::string& json_path) {
         return false;
     }
     std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    return load_boss_defs_from_json(text.c_str(), MergeMode::Skip) > 0;
+    return load_boss_defs_from_json(text.c_str(), MergeMode::Skip) > 0 || is_boss_defs_loaded();
 }
 
 const BossDef* get_boss_def(const std::string& id) {

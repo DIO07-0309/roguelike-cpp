@@ -52,11 +52,11 @@ TEST(Pathfinder, WallObstacleGoesAround) {
 
 TEST(Pathfinder, UnreachableGoal) {
     TestGrid g(10, 10);
-    // Completely enclose the goal
-    for (int x = 0; x < 10; x++) g.wall(x, 0);
-    for (int y = 0; y < 10; y++) { g.wall(0, y); g.wall(9, y); }
-    for (int x = 0; x < 10; x++) g.wall(x, 9);
-    // Only start tile is open
+    // Target (1,1) fully enclosed by a 3x3 wall ring — start (5,5) outside
+    for (int x = 0; x < 3; x++) for (int y = 0; y < 3; y++) {
+        if (x == 1 && y == 1) continue;
+        g.wall(x, y);
+    }
     PathResult r = find_path({5,5}, {1,1}, g.walkable_fn(), 10, 10);
     EXPECT_FALSE(r.reachable);
 }

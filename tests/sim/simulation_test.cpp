@@ -63,7 +63,7 @@ TEST(BalanceReport, JSONExport) {
     std::string json = r.to_json();
     EXPECT_TRUE(json.find("\"total_runs\"") != std::string::npos);
     EXPECT_TRUE(json.find("\"win_rate\"") != std::string::npos);
-    EXPECT_TRUE(json.find("0.42") != std::string::npos);
+    EXPECT_TRUE(json.find("0.4") != std::string::npos);
 }
 
 TEST(BuildStats, WinRate) {

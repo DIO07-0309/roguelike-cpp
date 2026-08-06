@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // CombatSystem - Buff + find_attack_target implementation
 // ============================================================
 #include "combat_system.h"
@@ -130,7 +130,7 @@ bool load_buff_defs(const std::string& path) {
     std::string buf(sz + 1, '\0');
     fread(&buf[0], 1, sz, f);
     fclose(f);
-    return load_buff_defs_from_json(buf.c_str(), MergeMode::Skip) > 0;
+    return load_buff_defs_from_json(buf.c_str(), MergeMode::Skip) > 0 || is_buff_defs_loaded();
 }
 
 const std::unordered_map<std::string, BuffDef>& get_all_buff_defs() { return g_buff_defs; }
@@ -557,7 +557,7 @@ bool load_relic_defs(const std::string& path) {
     std::string buf(sz + 1, '\0');
     fread(&buf[0], 1, sz, f);
     fclose(f);
-    return load_relic_defs_from_json(buf.c_str(), MergeMode::Skip) > 0;
+    return load_relic_defs_from_json(buf.c_str(), MergeMode::Skip) > 0 || is_relic_defs_loaded();
 }
 #if 0
     p = _skip_ws(p);

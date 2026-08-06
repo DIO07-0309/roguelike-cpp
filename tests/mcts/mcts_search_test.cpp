@@ -12,7 +12,7 @@ static SimulationState make_simple_state() {
     s.player.x = 5; s.player.y = 5;
     s.player.attack = 10; s.player.pdef = 3; s.player.mdef = 1;
     s.player.alive = true;
-    s.monsters.push_back(MonsterSnapshot{"slime", 20, 20, 3, 0, 3, 1, 0, {}, true});
+    s.monsters.push_back(MonsterSnapshot{"slime", 20, 20, 6, 5, 3, 1, 0, {}, true});
     return s;
 }
 
@@ -70,13 +70,8 @@ TEST(MCTS, ManyIterationsConverge) {
     auto state = make_simple_state();
     MCTS mcts(200);
     CombatAction result = mcts.search(state);
-    // Should strongly prefer attack against single nearby enemy
-    auto name = std::string(action_name(result));
-    // With 200 iterations, should almost always find attack as best
-    // But MCTS may pick skill sometimes — both are valid combat options
-    bool is_combat = (name == "attack" || name.find("skill") != std::string::npos);
-    // Relaxed: just check it's a combat action, not movement
-    EXPECT_TRUE(is_combat || name.find("move") != std::string::npos);
+    // With 200 iterations and an adjacent enemy, MCTS should not stall on wait
+    EXPECT_NE(result, CombatAction::WAIT);
 }
 
 TEST(MCTS, DangerousEnemyRetreatPreference) {

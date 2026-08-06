@@ -14,6 +14,7 @@ bool load_hazard_defs(const char* json_path) {
         if (!f.is_open()) { printf("[Hazard] Cannot open %s\n", json_path); return false; }
         json data = json::parse(f);
         g_hazards.clear(); g_hazards_by_landmark.clear();
+        g_hazards.reserve(data.size());
         for (auto& obj : data) {
             HazardDef hz;
             hz.id = obj["id"].get<std::string>();
@@ -25,9 +26,10 @@ bool load_hazard_defs(const char* json_path) {
             hz.slow_factor = obj.value("slow_factor", 1.0f);
             hz.param = obj.value("param", 0.0f);
             hz.message = obj.value("message", "");
-            g_hazards.push_back(hz);
-            g_hazards_by_landmark[hz.landmark_id].push_back(&g_hazards.back());
+            g_hazards.push_back(std::move(hz));
         }
+        for (size_t i = 0; i < g_hazards.size(); ++i)
+            g_hazards_by_landmark[g_hazards[i].landmark_id].push_back(&g_hazards[i]);
         printf("[Hazard] Loaded %zu hazards across %zu landmarks\n",
                g_hazards.size(), g_hazards_by_landmark.size());
         return true;

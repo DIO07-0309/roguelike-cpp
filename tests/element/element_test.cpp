@@ -114,7 +114,7 @@ TEST(ElementDef, FireDef) {
     ASSERT_NE(d, nullptr);
     EXPECT_EQ(d->id, "fire");
     EXPECT_EQ(d->name, "火焰核心");
-    EXPECT_GT(d->base_value, 0);
+    EXPECT_GT(d->crit_base, 0);
 }
 
 TEST(ElementDef, IceDef) {
@@ -122,7 +122,7 @@ TEST(ElementDef, IceDef) {
     const ElementDef* d = get_element_def("ice");
     ASSERT_NE(d, nullptr);
     EXPECT_EQ(d->name, "冰霜核心");
-    EXPECT_GT(d->base_value, 0);
+    EXPECT_GT(d->freeze_counter_max, 0);
 }
 
 TEST(ElementDef, PoisonDef) {
@@ -130,7 +130,7 @@ TEST(ElementDef, PoisonDef) {
     const ElementDef* d = get_element_def("poison");
     ASSERT_NE(d, nullptr);
     EXPECT_EQ(d->name, "剧毒核心");
-    EXPECT_GT(d->base_value, 0);
+    EXPECT_GT(d->dot_scale_base, 0);
 }
 
 TEST(ElementDef, AllThreeLoaded) {

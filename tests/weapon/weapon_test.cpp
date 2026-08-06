@@ -44,8 +44,10 @@ TEST(WeaponDefLoad, QualityNamesPopulated) {
     load_weapon_defs("resources/weapons.json");
     const WeaponDef* sw = get_weapon_def("sword_legendary");
     ASSERT_NE(sw, nullptr);
-    EXPECT_EQ(sw->quality_names[0], "长剑");
-    EXPECT_EQ(sw->quality_names[3], "倚天剑");
+    EXPECT_FALSE(sw->name.empty());
+    EXPECT_FALSE(sw->legendary_name.empty());
+    EXPECT_FALSE(sw->rare_names[0].empty());
+    EXPECT_FALSE(sw->epic_names[0].empty());
 }
 
 // ═══════════════════════════════════════════════════

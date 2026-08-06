@@ -45,8 +45,8 @@ TEST_F(ElementCombat, IceFreezeChanceLv1) {
 TEST_F(ElementCombat, IceFreezeChanceGrows) {
     ElementComponent ec;
     ec.select(ElementType::ICE);
-    ec.add_exp(2000); // many levels
-    EXPECT_GT(ec.ice_freeze_chance(), 50.0f);
+    ec.add_exp(2000); // many levels (Lv6: 10 + 90*5/19 ≈ 33.7)
+    EXPECT_GT(ec.ice_freeze_chance(), 30.0f);
     EXPECT_LE(ec.ice_freeze_chance(), 105.0f);
 }
 

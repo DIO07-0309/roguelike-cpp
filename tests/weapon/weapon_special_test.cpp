@@ -122,9 +122,10 @@ TEST(ComboReset, TimeoutResetsIndex) {
         EXPECT_TRUE(fired) << "Hit " << (i + 1) << " should fire";
     }
 
-    // After 5 hits, special should auto-reset
+    // After 5 hits, special should be deactivated (last hit's stats retained
+    // so the caller can read its multiplier/tracked target)
     EXPECT_FALSE(sp.active);
-    EXPECT_EQ(sp.hit_count, 0);
+    EXPECT_EQ(sp.hit_count, 5);
 }
 
 TEST(ComboReset, ManualReset) {

@@ -87,6 +87,7 @@ endif()
 # G7.2: ENABLE_TESTS option
 option(ENABLE_TESTS "Build automated test suite" OFF)
 if(ENABLE_TESTS)
+    enable_testing()
     include(FetchContent)
     FetchContent_Declare(googletest GIT_REPOSITORY https://github.com/google/googletest.git GIT_TAG v1.14.0)
     FetchContent_MakeAvailable(googletest)

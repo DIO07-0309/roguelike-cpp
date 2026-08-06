@@ -244,6 +244,6 @@ struct AttackContext {
 
     void reset() { *this = AttackContext{}; }
     bool valid(float t) const {
-        return (t - timestamp) < 2.0f && primary_tag != AttackTag::NONE;
+        return t >= timestamp && (t - timestamp) < 2.0f && primary_tag != AttackTag::NONE;
     }
 };

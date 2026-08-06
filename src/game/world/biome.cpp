@@ -31,6 +31,7 @@ bool load_biome_defs(const char* json_path) {
         if (!f.is_open()) { printf("[Biome] Cannot open %s\n", json_path); return false; }
         json data = json::parse(f);
         g_biomes.clear(); g_floor_to_biome.clear();
+        g_biomes.reserve(data.size());
         for (auto& obj : data) {
             BiomeDef b;
             b.id = obj["id"].get<std::string>();
@@ -45,9 +46,11 @@ bool load_biome_defs(const char* json_path) {
             }
             b.boss_id = obj.value("boss_id", "");
             b.bgm = obj.value("bgm", "");
-            g_biomes.push_back(b);
-            const BiomeDef* bp = &g_biomes.back();
-            for (int f = b.floor_start; f <= b.floor_end; ++f)
+            g_biomes.push_back(std::move(b));
+        }
+        for (size_t i = 0; i < g_biomes.size(); ++i) {
+            const BiomeDef* bp = &g_biomes[i];
+            for (int f = bp->floor_start; f <= bp->floor_end; ++f)
                 g_floor_to_biome[f] = bp;
         }
         printf("[Biome] Loaded %zu biomes (floors 1-15 mapped)\n", g_biomes.size());

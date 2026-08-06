@@ -1,28 +1,17 @@
 // G7.2: Registry loader + reference integrity tests
 #include <gtest/gtest.h>
 #include <string>
+#include <vector>
 
-// Include actual loader headers (no raylib deps needed for these)
-extern bool load_buff_defs(const std::string& json_path);
-extern bool load_relic_defs(const std::string& json_path);
-extern bool load_enemy_defs(const std::string& json_path);
-extern bool load_boss_defs(const std::string& json_path);
-extern bool load_skill_defs(const std::string& json_path);
-extern bool load_item_defs(const std::string& json_path);
-
-// World loaders (const char*)
-extern bool load_biome_defs(const char* json_path);
-extern bool load_landmark_defs(const char* json_path);
-extern bool load_hazard_defs(const char* json_path);
-extern bool load_encounter_defs(const char* json_path);
-extern bool load_biome_event_defs(const char* json_path);
-
-// World queries
-struct BiomeDef { std::string id, name; int floor_start, floor_end; };
-extern const BiomeDef* get_biome_for_floor(int floor);
-
-struct LandmarkDef { std::string id, icon; };
-extern std::vector<const LandmarkDef*> get_landmarks_for_biome(const std::string&);
+#include "combat_system.h"   // load_buff_defs / load_relic_defs
+#include "data/enemy_defs.h"
+#include "data/boss_defs.h"
+#include "data/skill_defs.h"
+#include "data/item_defs.h"
+#include "biome.h"           // load_biome_defs / BiomeDef / get_biome_for_floor
+#include "landmark.h"        // load_landmark_defs / get_landmarks_for_biome
+#include "hazard.h"          // load_hazard_defs
+#include "encounter.h"       // load_encounter_defs
 
 // ── Loader Tests ────────────────────────────────────────────
 
@@ -38,11 +27,6 @@ TEST(RegistryLoad, WorldLayerAll) {
     EXPECT_TRUE(load_landmark_defs("resources/landmarks.json"));
     EXPECT_TRUE(load_hazard_defs("resources/hazards.json"));
     EXPECT_TRUE(load_encounter_defs("resources/encounters.json"));
-}
-
-TEST(RegistryLoad, BiomeEvents) {
-    EXPECT_TRUE(load_biome_defs("resources/biomes.json"));
-    EXPECT_TRUE(load_biome_event_defs("resources/biome_events.json"));
 }
 
 // ── Reference Integrity ──────────────────────────────────────

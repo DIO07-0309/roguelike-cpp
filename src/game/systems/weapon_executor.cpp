@@ -120,9 +120,11 @@ bool WeaponSpecialState::should_fire_next(float dt) {
     timer += dt;
     if (timer >= next_hit_at && hit_count < max_hits) {
         next_hit_at += hit_interval; hit_count++;
+        // Deactivate on the final hit, but keep hit_count/tracked so the
+        // caller can still read this hit's multiplier and tracked target.
+        if (hit_count >= max_hits) active = false;
         return true;
     }
-    if (hit_count >= max_hits) { reset(); }
     return false;
 }
 

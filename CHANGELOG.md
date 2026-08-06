@@ -24,7 +24,21 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
-# v0.9.6 — Boss 形象 + 特殊房间装饰上线 (2026-08-06)
+# v0.9.10 — 测试全绿回归 + 加载器稳定化 (2026-08-06)
+
+## 稳定性修复
+- **数据加载器幂等化**: enemy/boss/skill/item/buff/relic 的 `load_xxx_defs` 统一补 `|| is_xxx_defs_loaded()` 快路径, 重复加载不再触发 MergeMode::Skip 空档
+- **World 加载器指针悬垂修复**: biome/encounter/hazard/landmark 从 “push_back 后取 `&back()`” 改为 "先 push 全部再建索引", 消除 vector 扩容导致的悬挂指针
+- `item_defs` 流读取顺序修复 (先读全文再 parse, 避免 `f >> j` 后迭代器读到空)
+- `WeaponSpecialState::should_fire_next`: 连击末击后去激活但保留 `hit_count/tracked`, 修复第 5 击伤害错用第 1 档倍率
+- `AttackContext::valid()` 补 `t >= timestamp` 过滤, 未来时间戳不再判定有效
+- CMake `enable_testing()` 补全 (ENABLE_TESTS 分支)
+
+## 测试套件 26/26 全绿
+- save_test 重写为自足 roundtrip (原依赖运行时生成的 `saves/` 产物)
+- astar "不可达" 用例改为 3×3 墙环孤岛 (原包围圈逻辑实际可达)
+- 同步过时断言: observation 8 特征/999 哨兵, element 冰冻曲线 (Lv6≈33.7), sim 浮点序列化, q_agent 空状态 ATTACK 合法性, buff DOT 末档计数, mcts 邻近怪物收敛, condition 空串语义
+- World Validator 0 错误 · Release 构建 100% · --sim 20 冒烟无崩 · 桌面版已同步
 
 ## 素材覆盖补齐最后一块
 - `Monster.sprite_override`: 素材 key 覆盖字段 — Boss 工厂按层指定 (F5→boss_f5 暗影骑士图, F10→boss_f10 地狱火魔图, F15→boss_self 玩家形象), 降级路径默认 F5 形象

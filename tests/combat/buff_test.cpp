@@ -45,9 +45,9 @@ TEST(BuffLifecycle, DotTickDamage) {
     SimpleBuff b{"poison", 2, 4.0f, 0.5f};
     int tick_count = 0;
     for (int i = 0; i < 8; i++) {
-        if (!tick_buff(b, 0.5f, def)) {
-            tick_count++;
-        }
+        bool was_alive = b.remaining > 0;
+        tick_buff(b, 0.5f, def);
+        if (was_alive) tick_count++;
     }
     EXPECT_EQ(tick_count, 8); // 4.0s / 0.5s = 8 ticks
     EXPECT_TRUE(b.remaining <= 0);

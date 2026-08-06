@@ -41,7 +41,10 @@ TEST(QAgent, QValueConverges) {
     QAgent qa(0.5, 0.9, 0.0); // epsilon=0, always greedy
     SimulationState s;
     s.player.hp = 100; s.player.max_hp = 100;
+    s.player.x = 5; s.player.y = 5;
     s.player.alive = true;
+    // Adjacent enemy so ATTACK is a legal action in this state
+    s.monsters.push_back(MonsterSnapshot{"slime", 20, 20, 5, 6, 3, 1, 0, {}, true});
     auto obs = Observation::from_state(s);
 
     // Repeated updates with positive reward should increase Q for attack

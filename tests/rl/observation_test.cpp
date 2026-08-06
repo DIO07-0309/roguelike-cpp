@@ -13,7 +13,7 @@ TEST(Observation, FixedLengthVector) {
     s.monsters.push_back(MonsterSnapshot{"orc", 30, 30, 5, 0, 7, 3, 1, {}, true});
     auto obs = Observation::from_state(s);
     auto vec = obs.to_vector();
-    EXPECT_EQ(vec.size(), 7u); // 7 features
+    EXPECT_EQ(vec.size(), 8u); // 8 features (incl. player_style)
     EXPECT_NEAR(vec[0], 0.8f, 0.01f);  // hp_ratio
     EXPECT_FLOAT_EQ(vec[1], 10.0f);    // attack
     EXPECT_FLOAT_EQ(vec[2], 1.0f);     // enemy_count
@@ -50,5 +50,5 @@ TEST(Observation, EmptyStateDefaults) {
     s.player.hp = 100; s.player.max_hp = 100;
     auto obs = Observation::from_state(s);
     EXPECT_FLOAT_EQ(obs.enemy_count, 0);
-    EXPECT_FLOAT_EQ(obs.nearest_enemy_dist, 99.0f);
+    EXPECT_FLOAT_EQ(obs.nearest_enemy_dist, 999.0f);
 }

@@ -1,4 +1,4 @@
-#include "data/skill_defs.h"
+﻿#include "data/skill_defs.h"
 #include "core/merge_patch.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -95,7 +95,7 @@ bool load_skill_defs(const std::string& json_path) {
         return false;
     }
     std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    return load_skill_defs_from_json(text.c_str(), MergeMode::Skip) > 0;
+    return load_skill_defs_from_json(text.c_str(), MergeMode::Skip) > 0 || is_skill_defs_loaded();
 }
 
 const SkillDef* get_skill_def(const std::string& id) {

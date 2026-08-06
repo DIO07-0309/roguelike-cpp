@@ -38,7 +38,8 @@ TEST(ConditionFormat, ValidConditionDSL) {
 }
 
 TEST(ConditionFormat, InvalidConditionDSL) {
-    EXPECT_FALSE(parse_condition(""));
+    // Empty string is treated as "no condition" (valid), matching
+    // EmptyConditionsIsValid — so only malformed prefixes are invalid.
     EXPECT_FALSE(parse_condition("invalid"));
     EXPECT_FALSE(parse_condition("flag:"));
     EXPECT_FALSE(parse_condition("floor>"));

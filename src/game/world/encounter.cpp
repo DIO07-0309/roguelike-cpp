@@ -51,9 +51,11 @@ bool load_encounter_defs(const char* json_path) {
                 }
             }
             g_encounters.push_back(enc);
-            EncounterDef* ep = &g_encounters.back();
-            g_encounter_by_id[enc.id] = ep;
-            g_encounters_by_biome[enc.biome].push_back(ep);
+        }
+        for (size_t i = 0; i < g_encounters.size(); ++i) {
+            EncounterDef* ep = &g_encounters[i];
+            g_encounter_by_id[ep->id] = ep;
+            g_encounters_by_biome[ep->biome].push_back(ep);
         }
         printf("[Encounter] Loaded %zu encounters across %zu biomes\n",
                g_encounters.size(), g_encounters_by_biome.size());

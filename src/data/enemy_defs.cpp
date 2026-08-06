@@ -1,4 +1,4 @@
-#include "data/enemy_defs.h"
+﻿#include "data/enemy_defs.h"
 #include "core/merge_patch.h"   // G4.3
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -176,7 +176,7 @@ bool load_enemy_defs(const std::string& json_path) {
 
     std::string text((std::istreambuf_iterator<char>(f)),
                       std::istreambuf_iterator<char>());
-    return load_enemy_defs_from_json(text.c_str(), MergeMode::Skip) > 0;
+    return load_enemy_defs_from_json(text.c_str(), MergeMode::Skip) > 0 || is_enemy_defs_loaded();
 }
 
 const EnemyDef* get_enemy_def(const std::string& id) {

@@ -1,4 +1,4 @@
-#include "data/item_defs.h"
+﻿#include "data/item_defs.h"
 #include "core/merge_patch.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -76,15 +76,15 @@ bool load_item_defs(const std::string& json_path) {
         printf("[ITEM_DEFS] ERROR: cannot open %s\n", json_path.c_str());
         return false;
     }
+    std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     json j;
-    try { f >> j; }
+    try { j = json::parse(text); }
     catch (const std::exception& e) {
         printf("[ITEM_DEFS] JSON parse error: %s\n", e.what());
         return false;
     }
-
-    std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    return load_item_defs_from_json(text.c_str(), MergeMode::Skip) > 0;
+    (void)j;
+    return load_item_defs_from_json(text.c_str(), MergeMode::Skip) > 0 || is_item_defs_loaded();
 }
 
 const RarityConfig& get_rarity_config() { return g_rarity; }
