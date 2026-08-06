@@ -64,8 +64,17 @@ TEST(DynamicPhase, LowAccuracyKeepsObserving) {
 
 TEST(DynamicPhase, TimeBackstopPromotesToPhase2) {
     MirrorAgent agent;
-    agent.tick_phase(21.0f, MirrorBattleState{});
+    agent.tick_phase(13.0f, MirrorBattleState{});   // M4: 兜底 20→12s
     EXPECT_EQ(agent.current_phase(), 2);
+}
+
+TEST(DynamicPhase, TuningCanExtendTimeBackstop) {
+    auto& t = mirror_tuning();
+    t.phase1_time_backstop = 99.0f;   // 拉长兜底 → 不触发
+    MirrorAgent agent;
+    agent.tick_phase(13.0f, MirrorBattleState{});
+    EXPECT_EQ(agent.current_phase(), 1);
+    t.phase1_time_backstop = 12.0f;   // 恢复默认, 避免影响其他用例
 }
 
 TEST(DynamicPhase, CorePatternPromotesToPhase3) {
@@ -111,6 +120,29 @@ TEST(ProfileDrift, DeviatesFromProfiledFrequency) {
     }
     // 当前 3.0/s vs 2.0 → 0.5; 技能 0 vs 1.0 → 1.0; drift=(0.5+1.0)/2
     EXPECT_NEAR(agent.profile_drift(), 0.75f, 0.01f);
+}
+
+// M4: 漂移降权 — 玩家换打法 → 克隆置信门槛上浮 (模仿降权)
+TEST(M4DriftPenalty, HighDriftRaisesConfidenceBar) {
+    PlayerHabitProfile prof;
+    prof.attack_frequency = 2.0f;
+    prof.skill_frequency  = 1.0f;
+    MirrorAgent agent;
+    agent.init(prof);
+    agent.tick_phase(10.0f, MirrorBattleState{});
+    for (int i = 0; i < 30; ++i) {
+        agent.on_prediction(PlayerActionType::ATTACK, 5.0f, 0.9f, 0);
+        agent.observe_actual(PlayerActionType::ATTACK);
+    }
+    EXPECT_GT(agent.profile_drift(), 0.5f);              // 漂移已超惩罚阈值
+    EXPECT_FLOAT_EQ(agent.clone_confidence_threshold(), 0.75f);  // 0.5+0.25
+}
+
+TEST(M4DriftPenalty, LowDriftKeepsBaseBar) {
+    PlayerHabitProfile prof;
+    MirrorAgent agent;
+    agent.init(prof);
+    EXPECT_FLOAT_EQ(agent.clone_confidence_threshold(), 0.50f);   // 无漂移 → 门槛不变
 }
 
 }  // namespace

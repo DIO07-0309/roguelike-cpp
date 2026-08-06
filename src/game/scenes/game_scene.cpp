@@ -1542,16 +1542,19 @@ void GameScene::_render() {
         _presentation.show_message(dbg, 4.0f);
     }
 
-    // 验收: F9 overlay — MIRROR AI 调用链统计 (Predict/克隆/规则/打断/Phase)
-    if (g_show_mirror_acc && _boss._mirror_agent && g_font_loaded) {
-        const MirrorDebugStats* st = _boss._mirror_agent->debug_stats();
+const MirrorDebugStats* st = _boss._mirror_agent->debug_stats();
         if (st) {
             const char* title = "MIRROR AI [F9]";
             DrawTextEx(g_font_small, title, {18, 58}, 18, 1, {255, 200, 80, 255});
             DrawTextEx(g_font_small, st->summary().c_str(), {18, 84}, 14, 1,
                        {200, 230, 255, 230});
+            char drift_buf[64];
+            snprintf(drift_buf, sizeof(drift_buf), "Drift:%d%% Bar:%.2f",
+                (int)(_boss._mirror_agent->profile_drift() * 100),
+                _boss._mirror_agent->clone_confidence_threshold());
+            DrawTextEx(g_font_small, drift_buf, {18, 104}, 14, 1,
+                       {230, 160, 120, 230});
         }
-    }
 
     if (_presentation.show_growth_debug && g_font_loaded) {
         const GrowthCurve& gc = g_growth.curve(current_floor);

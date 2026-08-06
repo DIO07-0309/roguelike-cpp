@@ -87,7 +87,7 @@ PlayerActionType MirrorAgent::predict_next_action(
         ClonePrediction p = _clone->predict(st.dist_tiles, st.player_hp_pct,
                                             st.player_skills_ready);
         _debug_stats->on_predict(p.level);   // 验收: 记录降级链等级
-        if (p.level <= 2 && p.confidence >= 0.5f) {
+        if (p.level <= 2 && p.confidence >= clone_confidence_threshold()) {
             PlayerActionType t = intent_to_action(p.best);
             if (t != PlayerActionType::NONE) return t;
         }
@@ -137,11 +137,11 @@ int MirrorAgent::recommend_action(const MirrorBattleState& st) {
             return _record_arm(arm, st);
         }
     }
-    // M3: 克隆层仲裁 — 置信度>0.5 时克隆意图驱动 Boss 臂
+    // M3: 克隆层仲裁 — 置信度>门槛 时克隆意图驱动 Boss 臂 (M4: 漂移大则门槛上浮)
     if (_clone) {
         ClonePrediction p = _clone->predict(st.dist_tiles, st.player_hp_pct,
                                             st.player_skills_ready);
-        if (p.level <= 1 && p.confidence > 0.5f) {
+        if (p.level <= 1 && p.confidence > clone_confidence_threshold()) {
             int arm = boss_arm_for_intent(p.best);
             if (arm >= 0) {
                 _debug_stats->on_arbitrate(true, false);   // 验收: 克隆仲裁
@@ -253,20 +253,32 @@ float MirrorAgent::profile_drift() const {
     return drift > 1.0f ? 1.0f : drift;
 }
 
+// M4: 漂移降权 — 玩家已换打法 → 克隆/画像模仿降权 (门槛上浮, 交 Thompson)
+float MirrorAgent::clone_confidence_threshold() const {
+    const MirrorTuning& t = mirror_tuning();
+    float bar = t.clone_confidence;
+    if (profile_drift() > t.drift_penalty_threshold) bar += t.drift_penalty_step;
+    return bar;
+}
+
 void MirrorAgent::tick_phase(float dt, const MirrorBattleState& st) {
     _battle_time += dt;
     _debug_stats->tick_phase(_phase, dt);   // 验收: 各 Phase 时长统计
+    const MirrorTuning& t = mirror_tuning();
     switch (_phase) {
     case 1: {
         float acc = _rolling_accuracy.accuracy();
-        bool learned = (acc >= 0.65f && _observed_actions >= 20)
-                    || _observed_actions >= kPhase1Observations;
-        if (learned || _battle_time >= 20.0f) set_phase(2);
+        bool learned = (acc >= t.phase1_accuracy_threshold
+                     && _observed_actions >= t.phase1_min_observations)
+                    || _observed_actions >= t.phase1_obs_backstop;
+        if (learned || _battle_time >= t.phase1_time_backstop) set_phase(2);
         break;
     }
     case 2: {
-        bool pattern = _max_bucket_hits() >= 10 && _rolling_accuracy.accuracy() >= 0.7f;
-        bool danger  = st.player_hp_pct < 0.35f || st.boss_hp_pct < 0.35f;
+        bool pattern = _max_bucket_hits() >= t.phase2_same_bucket_hits
+                    && _rolling_accuracy.accuracy() >= t.phase2_accuracy_threshold;
+        bool danger = st.player_hp_pct < t.phase2_hp_danger
+                   || st.boss_hp_pct < t.phase2_hp_danger;
         if (pattern || danger) set_phase(3);
         break;
     }

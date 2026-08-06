@@ -5,6 +5,7 @@
 #include "ai/mirror/behavior_clone_table.h"
 #include "ai/mirror/rolling_accuracy.h"
 #include "ai/mirror/mirror_debug_stats.h"
+#include "ai/mirror/mirror_tuning.h"
 #include <vector>
 #include <memory>
 #include <map>
@@ -52,6 +53,8 @@ public:
     int   observed_actions() const { return _observed_actions; }
     // 当前战斗攻击/技能频率 vs 画像频率的归一化偏差 [0,1] (数据不足返回0)
     float profile_drift() const;
+    // M4: 克隆层置信门槛 — 漂移大时上浮 (模仿降权, 交 Thompson 在线适应)
+    float clone_confidence_threshold() const;
     // 动态阶段判定: P1→P2 (准确率/观察数/时间), P2→P3 (核心模式/濒危) — 替代纯计时
     void  tick_phase(float dt, const MirrorBattleState& st);
 
@@ -127,7 +130,6 @@ private:
     int _obs_attack = 0, _obs_skill = 0;
     int _obs_dodge = 0, _obs_heal = 0;
     float _battle_time = 0.0f;
-    static constexpr int kPhase1Observations = 40;   // 观察数兜底阈值
     int _max_bucket_hits() const;
     // M3: 记录选中臂 (含上下文桶) — 保证 report_outcome 反馈链
     int _record_arm(int act, const MirrorBattleState& st);
