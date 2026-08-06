@@ -496,9 +496,14 @@ void BossSystemDirector::notify_death(const WorldState& ws,
 
 void BossSystemDirector::init_events() {
     EventBus::inst().subscribe(GameEventType::BOSS_DEAD,
-        [this](const GameEvent& ev) { notify_death_ev(ev); }, "BossSys");
+        [this](const GameEvent& ev) { notify_death_ev(ev); }, "BossSys", this);
     EventBus::inst().subscribe(GameEventType::FLOOR_ENTER,
-        [this](const GameEvent&) { reset(); }, "BossSys");
+        [this](const GameEvent&) { reset(); }, "BossSys", this);
+}
+
+void BossSystemDirector::unregister_events() {
+    EventBus::inst().unsubscribe(GameEventType::BOSS_DEAD, this);
+    EventBus::inst().unsubscribe(GameEventType::FLOOR_ENTER, this);
 }
 
 void BossSystemDirector::notify_death_ev(const GameEvent&) {

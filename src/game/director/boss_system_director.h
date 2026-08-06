@@ -93,6 +93,7 @@ public:
     void on_core_maybe_erased();   // F10.2-fix: UAF guard — cleanup 前置钩子
 
     void init_events();  // D7 Step5: 订阅 EventBus
+    void unregister_events();  // 场景析构时注销, 防止悬挂订阅
 
 private:
     void notify_death_ev(const struct GameEvent&);

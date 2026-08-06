@@ -62,7 +62,12 @@ int  GameScene::g_rl_mirror_episodes = 0;  // F15.4
 // G8.1: defined here so unique_ptr<DecisionAgent/BTAgent> can be destroyed
 // (complete type available via includes in this .cpp)
 GameScene::GameScene() = default;
-GameScene::~GameScene() = default;
+GameScene::~GameScene() {
+    // 死亡/切场景后 EventBus 悬挂订阅 → 继续游戏 FLOOR_ENTER 崩溃
+    _boss.unregister_events();
+    _gameplay.unregister_events();
+    _presentation.unregister_events();
+}
 
 // ============================================================
 // C1: 体验打磨 — 伤害数字/震动/冻结 辅助函数

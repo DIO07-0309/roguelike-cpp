@@ -18,7 +18,8 @@ public:
 
     // ── 订阅/注销 ──
     void subscribe(GameEventType type, const EventCallback& cb,
-                   const char* subscriber_name = nullptr);
+                   const char* subscriber_name = nullptr,
+                   void* owner = nullptr);
     void unsubscribe(GameEventType type, void* owner);
 
     // ── 广播 ──

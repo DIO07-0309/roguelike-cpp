@@ -229,11 +229,11 @@ void PresentationSystemDirector::init_events() {
     EventBus::inst().subscribe(GameEventType::PLAYER_LEVEL_UP,
         [](const GameEvent& ev) {
             (void)ev;  // reserved: 升级特效
-        }, "Presentation");
+        }, "Presentation", this);
     EventBus::inst().subscribe(GameEventType::MONSTER_DIED,
         [](const GameEvent& ev) {
             (void)ev;  // reserved: 击杀飘字/震动
-        }, "Presentation");
+        }, "Presentation", this);
     // G1: 普攻进化 — 弹 toast 消息
     EventBus::inst().subscribe(GameEventType::ATTACK_EVOLVED,
         [](const GameEvent& ev) {
@@ -247,7 +247,7 @@ void PresentationSystemDirector::init_events() {
                 snprintf(buf, sizeof(buf), "普攻进化: %s (Lv%d)", name, new_lv);
                 pres->show_message(buf, 2.5f);
             }
-        }, "Presentation");
+        }, "Presentation", this);
     // G1 Step3: 技能进化 — 弹 toast
     EventBus::inst().subscribe(GameEventType::SKILL_EVOLVED,
         [](const GameEvent& ev) {
@@ -264,7 +264,7 @@ void PresentationSystemDirector::init_events() {
                     pres->show_message(buf, 2.5f);
                 }
             }
-        }, "Presentation");
+        }, "Presentation", this);
     // G1 Step4: Boss 规则激活 — 弹 toast
     EventBus::inst().subscribe(GameEventType::BOSS_RULE_ACTIVATED,
         [](const GameEvent& ev) {
@@ -275,7 +275,7 @@ void PresentationSystemDirector::init_events() {
                 snprintf(buf, sizeof(buf), "Boss 规则激活: %s", name);
                 pres->show_message(buf, 3.0f);
             }
-        }, "Presentation");
+        }, "Presentation", this);
     // G2.4: Quest 完成 — 弹 toast
     EventBus::inst().subscribe(GameEventType::QUEST_COMPLETE,
         [](const GameEvent& ev) {
@@ -285,5 +285,14 @@ void PresentationSystemDirector::init_events() {
                 snprintf(buf, sizeof(buf), "任务完成: %s", ev.str_val);
                 pres->show_message(buf, 2.5f);
             }
-        }, "Presentation");
+        }, "Presentation", this);
+}
+
+void PresentationSystemDirector::unregister_events() {
+    EventBus::inst().unsubscribe(GameEventType::PLAYER_LEVEL_UP, this);
+    EventBus::inst().unsubscribe(GameEventType::MONSTER_DIED, this);
+    EventBus::inst().unsubscribe(GameEventType::ATTACK_EVOLVED, this);
+    EventBus::inst().unsubscribe(GameEventType::SKILL_EVOLVED, this);
+    EventBus::inst().unsubscribe(GameEventType::BOSS_RULE_ACTIVATED, this);
+    EventBus::inst().unsubscribe(GameEventType::QUEST_COMPLETE, this);
 }

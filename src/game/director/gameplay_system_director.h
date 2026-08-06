@@ -40,4 +40,5 @@ public:
                        const class BossBattleReport& boss_report,
                        float collection_pct);
     void init_events();  // D7 Step5: 订阅 EventBus
+    void unregister_events();  // 场景析构时注销, 防止悬挂订阅
 };

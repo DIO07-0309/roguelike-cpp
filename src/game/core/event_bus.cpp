@@ -14,9 +14,9 @@ EventBus& EventBus::inst() {
 // 订阅
 // ═══════════════════════════════════════════════════════════════
 void EventBus::subscribe(GameEventType type, const EventCallback& cb,
-                          const char* name) {
+                          const char* name, void* owner) {
     int idx = (int)type;
-    Sub sub{cb, nullptr, name};
+    Sub sub{cb, owner, name};
     _listeners[idx].push_back(sub);
 #ifdef _DEBUG
     printf("[EventBus] SUB %s ← %s\n",

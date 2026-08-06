@@ -130,6 +130,7 @@ public:
     // ── Tick (更新所有表现层计时器) ──
     void tick(float dt);
     void init_events();  // D7 Step5: 订阅 EventBus
+    void unregister_events();  // 场景析构时注销, 防止悬挂订阅
 };
 
 // C1 helper
