@@ -115,6 +115,9 @@ public:
     float time_stop_remaining = 0.0f;
     std::vector<std::pair<Monster*, int>> pending_damage;
 
+    // M4.2: 镜像专属真冻结 — 玩家禁移动/攻击 (Echo 可行动, 计时在 Director::tick 递减)
+    bool player_frozen_by_mirror() const { return _boss.mirror_freeze_active(); }
+
     // Boss
     std::string boss_intro_title, boss_intro_lore, boss_intro_skills;
     Color boss_intro_color{200, 40, 40, 255};

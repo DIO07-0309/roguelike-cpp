@@ -65,6 +65,39 @@ void PlayerController::tick(float dt) {
         }
     };
 
+    // M4.2: 镜像冻结期间玩家禁移动 (仍 tick 怪物AI与玩家buff)
+    if (gs.player_frozen_by_mirror()) {
+        if (gs.time_stop_remaining <= 0) {
+            int hp_before = gs.player->combat.current_hp;
+            gs._update_monsters(dt);
+            int dmg_taken = hp_before - gs.player->combat.current_hp;
+            if (dmg_taken > 0) {
+                gs._boss.dmg_taken += dmg_taken;
+                // F15.2: record damage taken
+                PlayerAction a;
+                a.type = PlayerActionType::TAKE_DAMAGE;
+                a.timestamp = (float)gs.game_time; a.floor = gs.current_floor;
+                a.pos_x = gs.player->entity.rect.x + gs.player->entity.rect.width/2;
+                a.pos_y = gs.player->entity.rect.y + gs.player->entity.rect.height/2;
+                a.value = dmg_taken;
+                g_behavior.record(a);
+            } else if (int heal_amt = gs.player->combat.current_hp - hp_before; heal_amt > 0) {
+                g_behavior.on_heal((float)gs.game_time, gs.current_floor, heal_amt);
+            }
+            if (dmg_taken > 0 && gs.player->combat.is_alive) {
+                gs._presentation.damage_floats.push_back({
+                    gs.player->entity.rect.x + gs.player->entity.rect.width/2,
+                    gs.player->entity.rect.y - 12, 0.6f, dmg_taken,
+                    dmg_taken >= 30 ? Color{255, 60, 30, 255} : Color{255, 80, 80, 255}
+                });
+                float shake = dmg_taken >= 30 ? 12.0f : dmg_taken > 15 ? 5.0f : 2.0f;
+                gs._presentation.trigger_shake(shake);
+                if (dmg_taken >= 20) gs._presentation.trigger_freeze(0.05f);
+            }
+        }
+        return;
+    }
+
     if (!gs.inventory_open && !gs._is_event_running() && !gs._dialogue.active && !gs._quest_log_open) {
         Vector2 move = gs.player->handle_input(gs.get_tree()->get_input());
         auto& e = gs.player->entity;
@@ -148,6 +181,9 @@ void PlayerController::handle_input(const InputMap& input) {
             { gs.player->inventory.remove(gs.inventory_cursor); gs.inventory_cursor = std::min(gs.inventory_cursor, std::max(0, (int)gs.player->inventory.items.size() - 1)); }
         return;
     }
+
+    // M4.2: 镜像冻结期间禁攻击/技能/拾取/交互
+    if (gs.player_frozen_by_mirror()) return;
 
     if (gs._is_action_just_pressed(input,"attack")) player_attack();
     else if (gs._is_action_just_pressed(input,"pickup")) {

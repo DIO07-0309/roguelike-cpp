@@ -4,11 +4,105 @@
 #include "boss.h"
 #include "combat_system.h"
 #include "ai/mirror/mirror_agent.h"
+#include "ai/player_behavior/player_habit_profile.h"
+#include "data/weapon_defs.h"   // M4.3: CROSSBOW 槽查询
 #include "vfx_server.h"
 #include "core/logger.h"
 #include <cmath>
 
 MirrorCombatDirector::MirrorCombatDirector() = default;
+
+// ── M4.1: 战术状态名 (F9 HUD 用) ──
+const char* MirrorCombatDirector::tactic_name() const {
+    switch (_tactic) {
+    case MirrorTactic::OPEN_RANGED:  return "远程消耗";
+    case MirrorTactic::ENGAGE_MELEE: return "压进近战";
+    case MirrorTactic::KITE:         return "拉扯";
+    default:                         return "平衡";
+    }
+}
+
+// ── M4.1: 画像 + 态势 → 战术状态 (带切换冷却防抖动) ──
+void MirrorCombatDirector::_update_tactic(const PlayerHabitProfile& profile,
+                                          float dist, float player_hp_pct) {
+    if (_tactic_timer > 0) return;
+    MirrorTactic next = _tactic;
+    // 玩家低血: 主动压进终结
+    if (player_hp_pct < 0.30f) {
+        next = MirrorTactic::ENGAGE_MELEE;
+    } else if (profile.style == PlayerStyle::SNIPER
+               || profile.average_distance > 260.0f) {
+        // 玩家爱远距离: 镜像保持距离远程消耗 + 玩家近身时拉扯
+        next = (dist < 4.0f * 32.0f) ? MirrorTactic::KITE
+                                     : MirrorTactic::OPEN_RANGED;
+    } else if (profile.aggression_score > 0.55f
+               || profile.predict_low_dodge) {
+        next = MirrorTactic::ENGAGE_MELEE;
+    } else {
+        next = MirrorTactic::ADAPTIVE;
+    }
+    if (next != _tactic) {
+        _tactic = next;
+        _tactic_timer = 3.0f;   // 3s 内不再切换
+        LOG_INFO("[MIRROR] 战术切换 → %s", tactic_name());
+    }
+}
+
+// ── M4.1: 按战术挑选技能 (替代循环轮转: 远程消耗优先弹幕/AOE, 压进优先近战/时停) ──
+int MirrorCombatDirector::_pick_skill_for_tactic() const {
+    if (_skills.empty()) return -1;
+    int best = _skill_idx;
+    for (size_t i = 0; i < _skills.size(); i++) {
+        const auto& ms = _skills[i];
+        bool fits = false;
+        switch (_tactic) {
+        case MirrorTactic::OPEN_RANGED:
+            fits = (ms.skill_type == 1 || ms.skill_type == 3);
+            break;
+        case MirrorTactic::ENGAGE_MELEE:
+            fits = (ms.skill_type == 0 || ms.skill_type == 4);
+            break;
+        case MirrorTactic::KITE:
+            fits = (ms.skill_type == 1 || ms.skill_type == 2);
+            break;
+        default:
+            fits = true;
+        }
+        if (fits) { best = (int)i; break; }
+    }
+    return best;
+}
+
+void MirrorCombatDirector::_tick_tactic_timer(float dt) {
+    if (_tactic_timer > 0) _tactic_timer -= dt;
+}
+
+// ── M4.3: 武器槽切换 ──
+void MirrorCombatDirector::_switch_to_slot(const MirrorWeaponSlot& slot) {
+    _total_stages = slot.total_stages;
+    _attack_cd = slot.cd;
+    for (int i = 0; i < 3; i++) {
+        _stage_mults[i]  = slot.mults[i];
+        _stage_ranges[i] = slot.ranges[i];
+    }
+    _combo_stage = 0;   // 换武器重置连招
+    LOG_INFO("[MIRROR] 武器切换 → %s", weapon_type_name((WeaponType)slot.type));
+}
+
+// 战术 → 期望武器族, 切换冷却 2.5s 防抖 (独立于战术冷却)
+void MirrorCombatDirector::_sync_weapon_slot() {
+    if (_weapon_switch_timer > 0) return;
+    bool want_ranged = (_tactic == MirrorTactic::OPEN_RANGED || _tactic == MirrorTactic::KITE);
+    if (want_ranged != _slot_is_ranged) {
+        _slot_is_ranged = want_ranged;
+        _weapon_switch_timer = 2.5f;
+        _switch_to_slot(want_ranged ? _slot_ranged : _slot_melee);
+    }
+}
+
+const char* MirrorCombatDirector::active_weapon_name() const {
+    return weapon_type_name((WeaponType)(_slot_is_ranged ? _slot_ranged.type : _slot_melee.type));
+}
 
 void MirrorCombatDirector::init(const Player* player, Monster* boss,
                                  BossAI* bai, MirrorAgent* agent) {
@@ -32,6 +126,30 @@ void MirrorCombatDirector::init(const Player* player, Monster* boss,
             _stage_ranges[i] = 48.0f;  // 拳头范围
         }
     }
+
+    // ── M4.3: 武器槽初始化 — 近战=玩家武器, 远程=CROSSBOW ──
+    _slot_melee.type   = (int)(wdef ? wdef->type : WeaponType::FIST);
+    _slot_melee.total_stages = _total_stages;
+    _slot_melee.cd = 1.2f;
+    for (int i = 0; i < 3; i++) {
+        _slot_melee.mults[i]  = _stage_mults[i];
+        _slot_melee.ranges[i] = _stage_ranges[i];
+    }
+    const auto crossbows = get_weapon_defs_for_type(WeaponType::CROSSBOW);
+    const WeaponDef* bow = crossbows.empty() ? nullptr : crossbows[0];
+    _slot_ranged.type = (int)WeaponType::CROSSBOW;
+    _slot_ranged.total_stages = bow ? bow->stage_count : 1;
+    _slot_ranged.cd = 1.4f;   // 远程射速略慢
+    for (int i = 0; i < 3; i++) {
+        if (bow && i < bow->stage_count) {
+            _slot_ranged.mults[i]  = bow->stages[i].damage_multiplier * 0.8f; // 远程略弱
+            _slot_ranged.ranges[i] = bow->stages[i].range * 32.0f;
+        } else {
+            _slot_ranged.mults[i]  = 0.8f;
+            _slot_ranged.ranges[i] = 220.0f;
+        }
+    }
+    _slot_is_ranged = false;
 
     // 复制技能数据
     _skills.clear();
@@ -90,6 +208,16 @@ bool MirrorCombatDirector::tick(float dt, Monster* boss, Player* player,
         player->entity.rect.x - boss->entity.rect.x,
         player->entity.rect.y - boss->entity.rect.y);
 
+    // M4.1: 战术状态机 — 画像 + 态势驱动 (带切换冷却)
+    if (_agent) {
+        float php = player->combat.max_hp > 0
+            ? (float)player->combat.current_hp / player->combat.max_hp : 0.0f;
+        _update_tactic(_agent->profile(), dist, php);
+        _tick_tactic_timer(dt);
+        // M4.3: 战术 → 武器槽同步 (2.5s 防抖)
+        _sync_weapon_slot();
+    }
+
     // M4e: 玩家闪避检测 (单帧位移>200px) → 最近决策视为落空
     float pdx = player->entity.rect.x - _last_player_x;
     float pdy = player->entity.rect.y - _last_player_y;
@@ -114,6 +242,10 @@ bool MirrorCombatDirector::tick(float dt, Monster* boss, Player* player,
 
     // 技能冷却计时
     if (_skill_cd_timer > 0) _skill_cd_timer -= dt;
+    // M4.2: 镜像冻结倒计时 (与玩家门控独立 — Echo 冻结玩家但自身可继续行动)
+    if (_freeze_timer > 0) _freeze_timer -= dt;
+    // M4.3: 武器切换冷却
+    if (_weapon_switch_timer > 0) _weapon_switch_timer -= dt;
 
     // 行为状态机
     switch (_behavior_state) {
@@ -126,9 +258,11 @@ bool MirrorCombatDirector::tick(float dt, Monster* boss, Player* player,
         // 每2次攻击切换状态
         if (_combo_stage == 0) _behavior_state = (_skill_cd_timer <= 0) ? 2 : 0;
         break;
-    case 2: // skill — 使用镜像技能
+    case 2: // skill — 使用镜像技能 (M4.1: 按战术挑选, 替代循环轮转)
         if (_skill_cd_timer <= 0 && !_skills.empty()) {
-            _skill_idx = (_skill_idx + 1) % (int)_skills.size();
+            int pick = _pick_skill_for_tactic();
+            if (pick < 0) pick = (_skill_idx + 1) % (int)_skills.size();
+            _skill_idx = pick;
             _mirror_skill(boss, player, game_time, _skill_idx, effects);
             _skill_cd_timer = _skills[_skill_idx].cooldown;
             _behavior_state = 0;
@@ -257,12 +391,18 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
         if (_agent) _agent->report_outcome(dmg > 0, (float)dmg);
         break;
     }
-    case 4: { // time_stop — 玩家减速
-        apply_buff(player, "slow", 4);
-        LOG_INFO("[MIRROR] 镜像时停 [%s]: 玩家减速×4层", ms.name.c_str());
+    case 4: { // M4.2: time_stop — Mirror 专属真冻结 (Phase≥2 + CD 由状态机保证)
+        if (!_agent || _agent->current_phase() < 2) {
+            // Phase<2: 观察期不冻结, 仅减速 (防前期欺压)
+            apply_buff(player, "slow", 4);
+            LOG_INFO("[MIRROR] 镜像时停 [%s]: 观察期仅减速", ms.name.c_str());
+        } else {
+            _freeze_timer = 3.0f;   // 冻结 3 秒
+            LOG_INFO("[MIRROR] 镜像时停 [%s]: 玩家冻结 3s", ms.name.c_str());
+        }
         if (_agent) {
             _agent->report_outcome(true, 0.0f);     // 验收: 执行成功正反馈
-            _agent->report_interrupt(true);         // 验收: 打断成功 (减速命中)
+            _agent->report_interrupt(true);         // 验收: 打断成功
         }
         break;
     }
@@ -307,12 +447,21 @@ void MirrorCombatDirector::_ai_decide(Monster* boss, Player* player,
     agent->on_prediction(pred, st.dist_tiles, st.player_hp_pct,
                          st.player_skills_ready);   // M2: 上报预测上下文
 
-    // 压力追击
+    // M4.1: 战术驱动首选距离 — 远程消耗保持距, 压进近战贴近, 拉扯中距
+    float tactic_dist = _preferred_dist;
+    switch (_tactic) {
+    case MirrorTactic::OPEN_RANGED: tactic_dist = 260.0f; break;
+    case MirrorTactic::ENGAGE_MELEE: tactic_dist = 96.0f;  break;
+    case MirrorTactic::KITE:         tactic_dist = 220.0f; break;
+    default:                         tactic_dist = 200.0f; break;
+    }
+
+    // 压力追击 (M4.1: 压进战术时探测到压力同样贴近)
     if (agent->should_pressure_close(st)) {
         _preferred_dist = 80.0f;
         _aggression_bonus = 1.3f;
     } else {
-        _preferred_dist = agent->recommend_distance();
+        _preferred_dist = tactic_dist;
         _aggression_bonus = 1.0f;
     }
 

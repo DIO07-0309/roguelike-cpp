@@ -64,6 +64,8 @@ public:
     // ---- 特效与覆盖层 ----
     void draw_effects(const std::vector<Effect>& effects, float cam_x, float cam_y);
     void draw_time_stop_overlay(int sw, int sh, float time_stop_remaining);
+    // M4.2: 镜像专属冻结 overlay — 红色压制感, 与玩家时停(蓝/白)区分
+    void draw_mirror_freeze_overlay(int sw, int sh, float freeze_remaining);
     void draw_boss_cinematic_overlay(int sw, int sh);
     void draw_boss_intro(int sw, int sh, const std::string& title, const std::string& lore,
                          const std::string& skills_text, Color color, int boss_floor);

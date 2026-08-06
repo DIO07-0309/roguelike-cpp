@@ -1743,7 +1743,12 @@ void GameScene::_render() {
     // D4 Step2: 事件演出 UI (在所有 HUD 之上)
     _draw_event_ui(sw, sh);
 
-    if (time_stop_remaining > 0) _renderer.draw_time_stop_overlay(sw, sh, time_stop_remaining);
+    // M4.2: 镜像冻结 overlay (优先级高于玩家时停 — 显示红霜)
+    if (player_frozen_by_mirror()) {
+        _renderer.draw_mirror_freeze_overlay(sw, sh, _boss.mirror_freeze_remaining());
+    } else if (time_stop_remaining > 0) {
+        _renderer.draw_time_stop_overlay(sw, sh, time_stop_remaining);
+    }
     if (state == GameState::BOSS_CINEMATIC && _boss_entrance_timer > 0) {
         // B15/F15.5: Boss entrance cinematic
         DrawRectangle(0, 0, sw, sh, {0, 0, 0, 160});

@@ -106,6 +106,9 @@ public:
     // ── F15.4: Convert PlayerStyle to an int for SimulationState ──
     static int style_to_int(PlayerStyle s);
 
+    // ── M4.1: 画像访问 (战术层驱动) ──
+    const PlayerHabitProfile& profile() const { return _profile; }
+
     // ── Debug ──
     const char* phase_name() const;
     const char* strategy_summary() const { return _profile.counter_strategy_text(); }

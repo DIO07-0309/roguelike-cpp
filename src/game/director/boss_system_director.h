@@ -82,6 +82,9 @@ public:
     void init_on_spawn(Monster* boss, int floor, const WorldState& ws, BuildType bt,
                        const RelationshipSystem& rels, GameMap* map,
                        const class Player* player = nullptr);
+    // M4.2: 镜像冻结透传 (GameScene 只读)
+    bool mirror_freeze_active() const { return _mirror_combat.freeze_active(); }
+    float mirror_freeze_remaining() const { return _mirror_combat.freeze_remaining(); }
     void tick(float dt, Monster* boss, Player* player, int floor,
               const WorldState& ws, const RelationshipSystem& rels,
               StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters,

@@ -174,6 +174,16 @@ void GameRenderer::draw_time_stop_overlay(int sw, int sh, float time_stop_remain
     draw_glow_text("The World · 时停", sw / 2.0f, 60, 24, WHITE, true);
 }
 
+// M4.2: 镜像冻结 overlay — 红霜 + 剩余秒数 + 提示 (玩家被冻结, Echo 可行动)
+void GameRenderer::draw_mirror_freeze_overlay(int sw, int sh, float freeze_remaining) {
+    DrawRectangle(0, 0, sw, sh, {120, 30, 40, 90});
+    DrawRectangle(0, sh - 64, sw, 64, {120, 30, 40, 140});
+    char buf[64];
+    snprintf(buf, sizeof(buf), "镜像时停冻结 · %.1fs", freeze_remaining);
+    draw_glow_text(buf, sw / 2.0f, sh - 56, 26, {255, 120, 120, 255}, true);
+    draw_glow_text("你被冻结了 — 镜像仍可行动！", sw / 2.0f, sh - 28, 18, {255, 200, 200, 255}, true);
+}
+
 void GameRenderer::draw_boss_cinematic_overlay(int sw, int sh) {
     DrawRectangle(0, 0, sw, sh, {0, 0, 0, 160});
     draw_glow_text("BOSS 来了！", sw / 2.0f, sh / 2.0f, 48, {230, 50, 50, 255}, true);
