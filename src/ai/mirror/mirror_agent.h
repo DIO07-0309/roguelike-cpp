@@ -8,6 +8,7 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <functional>
 
 class Monster;
 class Player;
@@ -69,6 +70,11 @@ public:
     // 战斗中上报最近一次决策的结果: 命中/落空 → 更新 Beta 后验
     void report_outcome(bool hit, float damage);
 
+    // ── M3: ML 预测器插槽 (G5) — 注册即启用, 仲裁优先于克隆层 ──
+    // 默认 nullptr = 关闭 (当前版本无外部 ML)
+    using MlPredictor = std::function<PlayerActionType(const MirrorBattleState&)>;
+    void set_ml_predictor(MlPredictor fn) { _ml_predictor = std::move(fn); }
+
     // 跨对局记忆: 导出 Beta (alpha, beta) 供存档; 导入叠加回先验
     void export_memory(std::vector<float>& alpha, std::vector<float>& beta) const;
     void import_memory(const std::vector<float>& alpha,
@@ -116,4 +122,7 @@ private:
     float _battle_time = 0.0f;
     static constexpr int kPhase1Observations = 40;   // 观察数兜底阈值
     int _max_bucket_hits() const;
+    // M3: 记录选中臂 (含上下文桶) — 保证 report_outcome 反馈链
+    int _record_arm(int act, const MirrorBattleState& st);
+    MlPredictor _ml_predictor;                       // M3: G5 插槽, 默认关闭
 };

@@ -24,7 +24,15 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
-# v0.9.12 — F15 M2: 动态 Phase 触发 + 在线准确率 + 画像漂移 (2026-08-06)
+# v0.9.13 — F15 M3: MirrorAgent 决策仲裁 + ML 插槽 (2026-08-06)
+
+## M3: 克隆层接入行为选择仲裁 (G5)
+- `recommend_action` 仲裁链: **ML 插槽 (G5, 注册即启用, 默认关闭)** → **克隆层 (Phase≥2, 置信度>0.5 驱动行为臂)** → **Thompson 采样** → 规则兜底 (观察期)
+- 玩家意图 → Boss 应对臂映射 (镜像反制语义): HEAL/DODGE/RETREAT→压近惩罚, SKILL→技能打断, ATTACK→连招, ADVANCE→拉扯
+- `_record_arm` 统一记录臂+上下文桶, 保持 `report_outcome` 在线反馈链完整
+- `set_ml_predictor(std::function<PlayerActionType(state)>)` 插槽预留 (G5), 默认 nullptr 关闭
+- 单测 6 项 (高/低置信度仲裁、ML 覆盖克隆、非决策忽略、观察期不介入), 全量 29/29 绿
+- ⚠️ 已知问题: `--sim` 冒烟崩 (0xC0000374 堆损坏) 为**既有缺陷** (M2 exe 复现一致), 待独立修复, 与 M3 无关 · 桌面版已同步
 
 ## M2: Phase 1-2-3 从纯计时改为数据驱动
 - 新增 `RollingAccuracy` (`src/ai/mirror/`): 32 次滑动窗口在线命中率, 只关注近期表现

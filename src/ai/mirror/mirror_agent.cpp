@@ -106,8 +106,40 @@ float MirrorAgent::_rand01() {
     return (float)((rng() % 1000000) / 1000000.0);
 }
 
+namespace {
+// M3: 玩家意图 → Boss 应对臂 (镜像反制语义: 惩罚治疗/打断技能/拉扯走位)
+int boss_arm_for_intent(PlayerIntention i) {
+    switch (i) {
+    case PlayerIntention::ATTACK:  return (int)MirrorAction::COMBO;
+    case PlayerIntention::SKILL:   return (int)MirrorAction::SKILL;
+    case PlayerIntention::HEAL:    return (int)MirrorAction::APPROACH;
+    case PlayerIntention::DODGE:
+    case PlayerIntention::RETREAT: return (int)MirrorAction::APPROACH;
+    case PlayerIntention::ADVANCE: return (int)MirrorAction::RETREAT;
+    default: return -1;
+    }
+}
+int boss_arm_for_action(PlayerActionType t) {
+    return boss_arm_for_intent(intention_from_action(t));
+}
+}  // namespace
+
 int MirrorAgent::recommend_action(const MirrorBattleState& st) {
     if (!_policy || _phase < 2) return -1;   // 观察期: 走规则
+    // M3: ML 插槽优先 (G5 — 注册即启用, 默认关闭)
+    if (_ml_predictor) {
+        int arm = boss_arm_for_action(_ml_predictor(st));
+        if (arm >= 0) return _record_arm(arm, st);
+    }
+    // M3: 克隆层仲裁 — 置信度>0.5 时克隆意图驱动 Boss 臂
+    if (_clone) {
+        ClonePrediction p = _clone->predict(st.dist_tiles, st.player_hp_pct,
+                                            st.player_skills_ready);
+        if (p.level <= 1 && p.confidence > 0.5f) {
+            int arm = boss_arm_for_intent(p.best);
+            if (arm >= 0) return _record_arm(arm, st);
+        }
+    }
     float dist_px = st.dist_tiles * 32.0f;
     _last_bucket = OnlineAdaptivePolicy::bucket_for(dist_px, st.player_hp_pct);
     int act = _policy->select_action(_last_bucket);
@@ -156,6 +188,14 @@ void MirrorAgent::import_memory(const std::vector<float>& alpha,
 float MirrorAgent::arm_win_rate(int bucket, int action) const {
     if (!_policy) return 0.0f;
     return _policy->win_rate(bucket, action);
+}
+
+// M3: 记录选中臂与上下文桶 — 保持 report_outcome 反馈链完整
+int MirrorAgent::_record_arm(int act, const MirrorBattleState& st) {
+    float dist_px = st.dist_tiles * 32.0f;
+    _last_bucket = OnlineAdaptivePolicy::bucket_for(dist_px, st.player_hp_pct);
+    _last_action = act;
+    return act;
 }
 
 // ── M2: 在线观测 ──
