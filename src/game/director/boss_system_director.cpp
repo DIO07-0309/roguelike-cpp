@@ -15,6 +15,7 @@
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.3
 #include "ai/player_behavior/player_behavior_analyzer.h"  // F15.3
 #include "ai/mirror/mirror_agent.h"                       // F15.3
+#include "core/logger.h"   // M4: [MIRROR-ACC] 战斗统计进 game.log
 
 // ============================================================
 // D6 Step3: BossSystemDirector — 组合所有Boss子系统
@@ -170,6 +171,15 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
     _mirror_agent = std::make_unique<MirrorAgent>();
     _mirror_agent->init(profile);
 
+    // M1-fix (M4 验收发现): 克隆表从未在运行时注入 — 补上真实链路:
+    // F1-F14 采集流 → state→意图分布 → MirrorAgent 预测与仲裁
+    auto clone = std::make_unique<BehaviorCloneTable>();
+    clone->build(history);
+    clone->set_profile(profile);
+    _mirror_agent->set_clone_table(std::move(clone));
+    LOG_INFO("[MIRROR] CloneTable built: %zu entries from %zu actions",
+             _mirror_agent->clone_table()->entries(), history.size());
+
     // ── 数值: HP=玩家×5, ATK≥玩家PDEF×0.8 (保证破防) ──
     int p_hp = get_effective_max_hp(player);
     int p_atk = player->combat.get_effective_attack();
@@ -306,8 +316,8 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
         // 验收: 战斗结束导出 AI 调用链统计 (任一阵亡, 只记一次)
         if (!_mirror_stats_logged &&
             (boss->combat.current_hp <= 0 || player->combat.current_hp <= 0)) {
-            printf("[MIRROR-ACC] battle ended — %s\n",
-                   _mirror_agent->debug_stats()->summary().c_str());
+            LOG_INFO("[MIRROR-ACC] battle ended — %s",
+                     _mirror_agent->debug_stats()->summary().c_str());
             _mirror_stats_logged = true;
         }
     }
