@@ -180,6 +180,13 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
     LOG_INFO("[MIRROR] CloneTable built: %zu entries from %zu actions",
              _mirror_agent->clone_table()->entries(), history.size());
 
+    // M4.4: 战术链序列记忆 — 与克隆表同步离线 build + 注入 (F15 enter)
+    auto chain = std::make_unique<TacticalChainTable>();
+    chain->build(history);
+    _mirror_agent->set_chain_table(std::move(chain));
+    LOG_INFO("[MIRROR] ChainTable built: %zu triples from %zu actions",
+             _mirror_agent->chain_table()->entries(), history.size());
+
     // ── 数值: HP=玩家×5, ATK≥玩家PDEF×0.8 (保证破防) ──
     int p_hp = get_effective_max_hp(player);
     int p_atk = player->combat.get_effective_attack();

@@ -70,6 +70,19 @@ void MirrorAgent::set_clone_table(std::unique_ptr<BehaviorCloneTable> t) {
     _clone = std::move(t);
 }
 
+// M4.4: 注入战术链表 (离线构建, F15 enter 时与克隆表同步注入)
+void MirrorAgent::set_chain_table(std::unique_ptr<TacticalChainTable> t) {
+    _chain = std::move(t);
+}
+
+// M4.4: 滚动战术符号缓冲 — 新符号进入, 旧 a 移位
+int MirrorAgent::_recent_tactical(int symbol) {
+    int prev_a = _seq_a;
+    _seq_a = _seq_b;
+    _seq_b = symbol;
+    return prev_a;
+}
+
 static PlayerActionType intent_to_action(PlayerIntention i) {
     switch (i) {
     case PlayerIntention::ATTACK: return PlayerActionType::ATTACK;
@@ -125,6 +138,32 @@ int boss_arm_for_intent(PlayerIntention i) {
 int boss_arm_for_action(PlayerActionType t) {
     return boss_arm_for_intent(intention_from_action(t));
 }
+// M4.4: 在线类型级近似符号 — observe_actual 只有 PlayerActionType, 无 skill_id/combo_stage 细节
+// SKILL→SKILL_0, ATTACK→COMBO_1 (连招起点近似); MOVE 在线无方向 → 不进入战术链
+int type_level_symbol(PlayerActionType t) {
+    switch (t) {
+    case PlayerActionType::SKILL:  return (int)TacticalSymbol::SKILL_0;
+    case PlayerActionType::ATTACK: return (int)TacticalSymbol::COMBO_1;
+    default:                       return -1;
+    }
+}
+// M4.4: 战术符号 → 玩家意图 (供战术链层仲裁)
+PlayerIntention intention_from_chain_symbol(int s) {
+    switch ((TacticalSymbol)s) {
+    case TacticalSymbol::SKILL_0:
+    case TacticalSymbol::SKILL_1:
+    case TacticalSymbol::SKILL_2:
+    case TacticalSymbol::SKILL_3: return PlayerIntention::SKILL;
+    case TacticalSymbol::MOVE_L:
+    case TacticalSymbol::MOVE_R:   return PlayerIntention::ADVANCE;
+    case TacticalSymbol::MOVE_U:
+    case TacticalSymbol::MOVE_D:   return PlayerIntention::RETREAT;
+    case TacticalSymbol::COMBO_1:
+    case TacticalSymbol::COMBO_2:
+    case TacticalSymbol::COMBO_3: return PlayerIntention::ATTACK;
+    default: return PlayerIntention::IDLE;
+    }
+}
 }  // namespace
 
 int MirrorAgent::recommend_action(const MirrorBattleState& st) {
@@ -135,6 +174,19 @@ int MirrorAgent::recommend_action(const MirrorBattleState& st) {
         if (arm >= 0) {
             _debug_stats->on_arbitrate(false, true);   // 验收: ML 仲裁
             return _record_arm(arm, st);
+        }
+    }
+    // M4.4: 战术链层仲裁 — 预测玩家下一步战术符号 → 意图 → 应对臂
+    if (_chain && _seq_b >= 0 && _seq_a >= 0) {
+        ChainPrediction cp = _chain->predict(_seq_a, _seq_b);
+        if (cp.level < 0) cp = _chain->predict_fuzzy2(_seq_b);
+        if (cp.level >= 0 && cp.confidence > clone_confidence_threshold()) {
+            PlayerIntention it = intention_from_chain_symbol(cp.best);
+            int arm = boss_arm_for_intent(it);
+            if (arm >= 0) {
+                _debug_stats->on_arbitrate(true, false);   // 验收: 战术链仲裁
+                return _record_arm(arm, st);
+            }
         }
     }
     // M3: 克隆层仲裁 — 置信度>门槛 时克隆意图驱动 Boss 臂 (M4: 漂移大则门槛上浮)
@@ -219,6 +271,9 @@ void MirrorAgent::on_prediction(PlayerActionType predicted, float dist_tiles,
 void MirrorAgent::observe_actual(PlayerActionType actual) {
     if (!is_decision_action(actual)) return;
     _observed_actions++;
+    // M4.4: 滚动战术符号缓冲 (在线仅类型级近似符号; 缺 skill_id/combo 细节 → 自然降级)
+    int sym = type_level_symbol(actual);
+    if (sym >= 0) _recent_tactical(sym);
     switch (actual) {
     case PlayerActionType::ATTACK: _obs_attack++; break;
     case PlayerActionType::SKILL:  _obs_skill++;  break;

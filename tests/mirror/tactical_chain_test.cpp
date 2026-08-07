@@ -1,6 +1,7 @@
 // M4.4: TacticalChainTable — 战术链 n-gram 序列记忆
 #include <gtest/gtest.h>
 #include "ai/mirror/tactical_chain_table.h"
+#include "ai/mirror/mirror_agent.h"
 #include "ai/player_behavior/player_action.h"
 
 namespace {
@@ -71,6 +72,30 @@ TEST(TacticalChain, EmptyStreamSafe) {
     std::vector<PlayerAction> h;
     t.build(h);
     EXPECT_EQ(t.entries(), 0);
+}
+
+// M4.4: 战术链仲裁 — 高置信 3-gram 驱动应对臂
+// 在线只提供 PlayerActionType → 类型级近似符号 (SKILL→SKILL_0, ATTACK→COMBO_0=COMBO_1)
+TEST(TacticalChainArbitration, ChainLayerDrivesArm) {
+    PlayerHabitProfile prof;
+    MirrorAgent agent;
+    agent.init(prof);
+    agent.set_phase(2);
+    auto chain = std::make_unique<TacticalChainTable>();
+    // 玩家固定模式: 技能0 → 连招1 → 连招2 (重复 4 次) → (SKILL_0,COMBO_1)↗COMBO_2 高置信
+    std::vector<PlayerAction> h;
+    for (int i = 0; i < 4; i++) {
+        h.push_back(MakeAction(PlayerActionType::SKILL, 0, 0, -1, -1));
+        h.push_back(MakeAction(PlayerActionType::ATTACK, 0, -1, 2, 0));
+        h.push_back(MakeAction(PlayerActionType::ATTACK, 0, -1, 2, 1));
+    }
+    chain->build(h);
+    agent.set_chain_table(std::move(chain));
+    // 在线观察 技能 → 普攻 → buffer (SKILL_0, COMBO_1)
+    agent.observe_actual(PlayerActionType::SKILL);
+    agent.observe_actual(PlayerActionType::ATTACK);
+    int arm = agent.recommend_action(MirrorBattleState{});
+    EXPECT_EQ(arm, (int)MirrorAction::COMBO);   // 预测连招2 → ATTACK 意图 → 连招应对臂
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 #include "ai/mirror/rolling_accuracy.h"
 #include "ai/mirror/mirror_debug_stats.h"
 #include "ai/mirror/mirror_tuning.h"
+#include "ai/mirror/tactical_chain_table.h"
 #include <vector>
 #include <memory>
 #include <map>
@@ -68,6 +69,10 @@ public:
     void set_clone_table(std::unique_ptr<BehaviorCloneTable> t);
     const BehaviorCloneTable* clone_table() const { return _clone.get(); }
 
+    // ── M4.4: 战术链序列层 ──
+    void set_chain_table(std::unique_ptr<TacticalChainTable> t);
+    const TacticalChainTable* chain_table() const { return _chain.get(); }
+
     // ── During combat: recommend BossAI adjustments ──
     float recommend_distance() const;
     bool should_interrupt_skill(const MirrorBattleState& st) const;
@@ -123,6 +128,12 @@ private:
     int _last_action = -1;    // 最近一次决策的动作臂
     std::unique_ptr<BehaviorCloneTable> _clone;   // M1: 行为克隆层
     static float _rand01();   // [0,1) 均匀采样 (技能窗口探索用)
+
+    // M4.4: 战术链层 + 在线滚动符号缓冲 (最近 2 个战术符号)
+    std::unique_ptr<TacticalChainTable> _chain;
+    int _seq_a = -1;    // 最近战术符号 (前一个)
+    int _seq_b = -1;    // 最近战术符号 (当前)
+    int _recent_tactical(int symbol);   // 滚动更新 _seq_a/_seq_b, 返回旧 a
 
     // M2: 在线观察
     RollingAccuracy _rolling_accuracy;
