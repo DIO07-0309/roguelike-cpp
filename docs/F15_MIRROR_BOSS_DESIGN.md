@@ -241,8 +241,11 @@ F1-F14 行为采集 → PlayerAction → 分析器 → PlayerHabitProfile
 - 战斗中按战术状态切换: 远程消耗用远程武器 → 近战阶段切近战武器
 - 由画像 (武器计数) 决定主/副武器
 
-**M4.4 (后续) 序列学习 (Sequence Learning)**
-- 克隆表从单步 state→action 扩展 2-3 步序列 (时停→攻击 等), 玩家时停后接什么动作镜像反制
-- 数据稀疏规避: 序列表仅在高频路径建条目, 低频回落单步克隆
+**M4.4 序列学习 (Sequence Learning) — ✅ 已完成 (v0.9.23)**
+- **TacticalChainTable**: 12 战术符号的 3-gram 计数表 (技能×4/位移×4/连招段×3), 解析 玩家动作流离线 build (与克隆表同步, F15 enter 注入)
+- 采集层扩展: `PlayerAction` 加 `weapon_type`/`combo_stage`, `on_weapon_attack` 传连招段与武器类型
+- 降级链: 3-gram → 2-gram → 克隆表 → 规则; 仲裁链: ML → 战术链 → 克隆 → Thompson
+- 在线仲裁: `observe_actual` 维护最近 2 战术符号缓冲 (类型级近似), 高置信预测玩家下一步战术动作 → 意图 → 应对臂
+- 数据稀疏规避: 3-gram 样本 <3 或 2-gram <5 自动降级 (低频回落克隆/规则), 缺 skill_id/combo 细节自然降级, 不产生错误动作
 
 
