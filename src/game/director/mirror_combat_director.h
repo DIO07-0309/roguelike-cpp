@@ -58,6 +58,9 @@ public:
     // M4.1: 战术状态只读
     MirrorTactic tactic() const { return _tactic; }
     const char* tactic_name() const;
+    // M4.1 验证: 画像+态势 → 战术决策 (纯函数, 无副作用 — 便于单测三场景)
+    static MirrorTactic decide_tactic(const PlayerHabitProfile& profile,
+                                      float dist, float player_hp_pct);
     // ── M4.2: 镜像专属真冻结 — 玩家禁移动/攻击, Echo 可行动 ──
     // 冻结计时 (秒), >0 表示玩家被镜像时停冻结中; 在 tick() 内递减
     bool freeze_active() const { return _freeze_timer > 0.0f; }

@@ -180,5 +180,6 @@ add_roguelike_test(mirror_phase_test mirror/mirror_phase_test.cpp)
 add_roguelike_test(mirror_arb_test    mirror/mirror_arbitration_test.cpp)
 add_roguelike_test(mirror_acc_test    mirror/mirror_acc_test.cpp)
 add_roguelike_test(analyzer_test      mirror/player_behavior_analyzer_test.cpp)
+add_roguelike_test(mirror_tactic_test mirror/mirror_tactic_test.cpp)
 
 

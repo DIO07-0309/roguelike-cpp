@@ -26,37 +26,41 @@ const char* MirrorCombatDirector::tactic_name() const {
 void MirrorCombatDirector::_update_tactic(const PlayerHabitProfile& profile,
                                           float dist, float player_hp_pct) {
     if (_tactic_timer > 0) return;
-    MirrorTactic next = _tactic;
-    // 玩家低血: 主动压进终结
-    if (player_hp_pct < 0.30f) {
-        next = MirrorTactic::ENGAGE_MELEE;
-    } else if (profile.fight_back_rate > 0.6f) {
-        // M5 受压反击型: 打完就冲脸 → 镜像打完即拉走位, 拉扯耗其链路
-        next = MirrorTactic::KITE;
-    } else if (profile.fight_back_rate < 0.3f
-               && profile.face_enemy_rate > 0.7f) {
-        // M5 怂 + 单向癖: 只会单向逃 → 保持远程多角度封锁退路
-        next = MirrorTactic::OPEN_RANGED;
-    } else if (profile.face_enemy_rate > 0.0f
-               && profile.face_enemy_rate < 0.35f) {
-        // M5 四面转: 无固定退避轴 → 贴身缠斗使其难以稳定走位
-        next = MirrorTactic::ENGAGE_MELEE;
-    } else if (profile.style == PlayerStyle::SNIPER
-               || profile.average_distance > 260.0f) {
-        // 玩家爱远距离: 镜像保持距离远程消耗 + 玩家近身时拉扯
-        next = (dist < 4.0f * 32.0f) ? MirrorTactic::KITE
-                                     : MirrorTactic::OPEN_RANGED;
-    } else if (profile.aggression_score > 0.55f
-               || profile.predict_low_dodge) {
-        next = MirrorTactic::ENGAGE_MELEE;
-    } else {
-        next = MirrorTactic::ADAPTIVE;
-    }
+    MirrorTactic next = decide_tactic(profile, dist, player_hp_pct);
     if (next != _tactic) {
         _tactic = next;
         _tactic_timer = 3.0f;   // 3s 内不再切换
         LOG_INFO("[MIRROR] 战术切换 → %s", tactic_name());
     }
+}
+
+// ── M4.1 决策纯函数 (验证: 三场景可复现单测) ──
+MirrorTactic MirrorCombatDirector::decide_tactic(
+    const PlayerHabitProfile& profile, float dist, float player_hp_pct) {
+    if (player_hp_pct < 0.30f) {
+        return MirrorTactic::ENGAGE_MELEE;              // 低血终结
+    }
+    if (profile.fight_back_rate > 0.6f) {
+        return MirrorTactic::KITE;                      // 受压反击型
+    }
+    if (profile.fight_back_rate < 0.3f
+        && profile.face_enemy_rate > 0.7f) {
+        return MirrorTactic::OPEN_RANGED;               // 怂+单向癖
+    }
+    if (profile.face_enemy_rate > 0.0f
+        && profile.face_enemy_rate < 0.35f) {
+        return MirrorTactic::ENGAGE_MELEE;              // 四面转
+    }
+    if (profile.style == PlayerStyle::SNIPER
+        || profile.average_distance > 260.0f) {
+        return (dist < 4.0f * 32.0f) ? MirrorTactic::KITE
+                                     : MirrorTactic::OPEN_RANGED;
+    }
+    if (profile.aggression_score > 0.55f
+        || profile.predict_low_dodge) {
+        return MirrorTactic::ENGAGE_MELEE;
+    }
+    return MirrorTactic::ADAPTIVE;   // 无匹配 → 平衡 (与原行为一致)
 }
 
 // ── M4.1: 按战术挑选技能 (替代循环轮转: 远程消耗优先弹幕/AOE, 压进优先近战/时停) ──
