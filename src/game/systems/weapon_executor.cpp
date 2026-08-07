@@ -221,7 +221,8 @@ std::vector<WeaponAttackResult> WeaponExecutor::execute(
     g_behavior.on_weapon_attack(weapon_type_name(def->type),
         (float)game_time, 0,  // floor set by game_scene
         player->entity.rect.x + player->entity.rect.width/2,
-        player->entity.rect.y + player->entity.rect.height/2);
+        player->entity.rect.y + player->entity.rect.height/2,
+        (int)def->type, stage_before);
     if (audio) {
         const char* sfx = stage.sfx_name.empty() ? "melee" : stage.sfx_name.c_str();
         audio->play_sfx(sfx);

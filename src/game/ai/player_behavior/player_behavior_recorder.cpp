@@ -61,11 +61,13 @@ void PlayerBehaviorRecorder::clear() { _history.clear(); _data.reset(); }
 // ══════════════════════════════════════════════════════
 
 void PlayerBehaviorRecorder::on_weapon_attack(const char* wt_name, float time,
-    int floor, float px, float py) {
+    int floor, float px, float py, int weapon_type, int combo_stage) {
     PlayerAction a;
     a.type = PlayerActionType::ATTACK;
     a.timestamp = time; a.floor = floor; a.pos_x = px; a.pos_y = py;
     a.weapon_name = wt_name;
+    a.weapon_type = weapon_type;
+    a.combo_stage = combo_stage;
     record(a);
 }
 

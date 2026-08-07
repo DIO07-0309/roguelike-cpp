@@ -43,4 +43,7 @@ struct PlayerAction {
     // M5: 条件维度 — 朝向 (Direction 枚举: 0=下 1=上 2=左 3=右, -1=无) + 近 1s 内受击 (受压态势)
     int  facing_dir = -1;
     int  hit_in_1s = 0;        // 0=无受压, >0=刚被打 (理解"被打后行为变化")
+    // M4.4: 战术链符号素材 — 武器类型 + 连招段 (仅 ATTACK 有效)
+    int  weapon_type = -1;     // WeaponType 枚举 int, -1=未知
+    int  combo_stage = -1;     // 0/1/2 连招段, -1=未知
 };

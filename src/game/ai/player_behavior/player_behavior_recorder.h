@@ -25,8 +25,8 @@ public:
     void set_battle_context(int facing_dir, int hit_in_1s);
 
     // ── Convenience hooks ──
-    void on_weapon_attack(const char* wt_name, float time, int floor,
-                          float px, float py);
+void on_weapon_attack(const char* wt_name, float time, int floor,
+        float px, float py, int weapon_type, int combo_stage);
     void on_skill_use(const char* skill_id, float time, int floor,
                       float px, float py);
     void on_move_state_change(float time, int floor, float px, float py,
