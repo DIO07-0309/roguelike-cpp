@@ -57,9 +57,19 @@ PlayerHabitProfile PlayerBehaviorAnalyzer::analyze(
         if (a.type == PlayerActionType::MOVE && a.value == 2) retreat++;
     if (total_dir > 0) p.retreat_rate = (float)retreat / (float)total_dir;
 
-    // Average damage per floor
-    if (p.total_actions > 0)
-        p.avg_damage_taken = dmg > 0 ? (float)atk / (float)dmg : 0.0f; // dmg per attack ratio
+    // Average combat distance to nearest enemy (pixels) — 修复: 此前从未计算 (恒0)
+    float dist_sum = 0.0f; int dist_n = 0;
+    for (auto& a : history)
+        if (a.enemy_dist >= 0.0f) { dist_sum += a.enemy_dist; dist_n++; }
+    if (dist_n > 0) p.average_distance = dist_sum / (float)dist_n * 32.0f;
+
+    // Average damage taken per floor — 修正: 原为 atk/dmg 计数比率, 语义错误 (应为伤害量)
+    if (dmg > 0 && history.back().floor > 0) {
+        float dmg_sum = 0.0f;
+        for (auto& a : history)
+            if (a.type == PlayerActionType::TAKE_DAMAGE) dmg_sum += (float)a.value;
+        p.avg_damage_taken = dmg_sum / (float)history.back().floor;
+    }
 
     // Style classification
     if (p.attack_frequency > 0.8f && p.dodge_rate < 0.15f)
