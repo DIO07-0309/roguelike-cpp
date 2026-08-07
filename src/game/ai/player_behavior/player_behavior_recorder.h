@@ -21,6 +21,8 @@ public:
 
     // M1: per-frame context snapshot — attached to every recorded action
     void set_context(float hp_pct, float enemy_dist, int skill_ready_mask);
+    // M5: 条件维度上下文 — 朝向 + 近1s受击计数 (供"受压反击"等模式学习)
+    void set_battle_context(int facing_dir, int hit_in_1s);
 
     // ── Convenience hooks ──
     void on_weapon_attack(const char* wt_name, float time, int floor,
@@ -54,6 +56,8 @@ private:
     float _ctx_hp = -1.0f;
     float _ctx_dist = -1.0f;
     int   _ctx_mask = 0;
+    int   _ctx_facing = -1;   // M5
+    int   _ctx_hits = 0;      // M5
 };
 
 #define g_behavior PlayerBehaviorRecorder::inst()

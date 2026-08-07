@@ -41,6 +41,14 @@ struct PlayerHabitProfile {
     bool   predict_panic_heal    = false;  // heals at high HP = waste, punish during heal
     float  hp_counter_threshold  = 35.0f;  // HP% where player usually heals
 
+    // ── M5: 条件维度 (从方向/受击上下文提取的真实习惯) ──
+    // 被打后 1s 内的反击占比: >0.6 = 硬刚反击型, <0.3 = 被打就怂/后撤型
+    float  fight_back_rate      = 0.0f;    // 受击窗口内攻击+技能动作 / 受击总数
+    // 朝向稳定度: 主朝向占比 0.25~1.0 — 高=单向癖/退避轴可预测, 低=四面转/难以封锁
+    float  face_enemy_rate      = 0.5f;
+    // 攻击节奏方差: 相邻攻击间隔 stddev (秒) — 小=固定连段, 大=乱节奏难猜
+    float  attack_rhythm_var    = 0.0f;
+
     const char* style_name() const;
     const char* counter_strategy_text() const;
 };

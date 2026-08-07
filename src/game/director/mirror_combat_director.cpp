@@ -30,6 +30,17 @@ void MirrorCombatDirector::_update_tactic(const PlayerHabitProfile& profile,
     // 玩家低血: 主动压进终结
     if (player_hp_pct < 0.30f) {
         next = MirrorTactic::ENGAGE_MELEE;
+    } else if (profile.fight_back_rate > 0.6f) {
+        // M5 受压反击型: 打完就冲脸 → 镜像打完即拉走位, 拉扯耗其链路
+        next = MirrorTactic::KITE;
+    } else if (profile.fight_back_rate < 0.3f
+               && profile.face_enemy_rate > 0.7f) {
+        // M5 怂 + 单向癖: 只会单向逃 → 保持远程多角度封锁退路
+        next = MirrorTactic::OPEN_RANGED;
+    } else if (profile.face_enemy_rate > 0.0f
+               && profile.face_enemy_rate < 0.35f) {
+        // M5 四面转: 无固定退避轴 → 贴身缠斗使其难以稳定走位
+        next = MirrorTactic::ENGAGE_MELEE;
     } else if (profile.style == PlayerStyle::SNIPER
                || profile.average_distance > 260.0f) {
         // 玩家爱远距离: 镜像保持距离远程消耗 + 玩家近身时拉扯

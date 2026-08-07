@@ -12,16 +12,21 @@ const char* PlayerHabitProfile::style_name() const {
 }
 
 const char* PlayerHabitProfile::counter_strategy_text() const {
-    static char buf[256];
+    static char buf[320];
+    const char* counter = fight_back_rate > 0.6f ? "retaliator"
+                       : (fight_back_rate > 0.0f && fight_back_rate < 0.3f
+                          ? "panicker" : "normal");
     snprintf(buf, sizeof(buf),
-        "Style: %s | Fav skill: %d | "
-        "Attack: %s | Skill spam: %s | Dodge: %s | Heal: %s",
+        "Style: %s | Attack: %s | Skill: %s | Dodge: %s | Heal: %s | "
+        "Counter: %s | Face: %.0f%% | Rhythm: %.1fs",
         style_name(),
-        predicted_fav_skill,
-        predict_attack_heavy  ? "bait" : "normal",
-        predict_skill_spam    ? "interrupt" : "normal",
-        predict_low_dodge     ? "pressure" : "respect",
-        predict_panic_heal    ? "punish" : "normal"
+        predict_attack_heavy ? "bait" : "normal",
+        predict_skill_spam   ? "interrupt" : "normal",
+        predict_low_dodge    ? "pressure" : "respect",
+        predict_panic_heal   ? "punish" : "normal",
+        counter,
+        face_enemy_rate * 100.0f,
+        attack_rhythm_var
     );
     return buf;
 }

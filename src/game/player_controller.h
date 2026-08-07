@@ -30,6 +30,10 @@ public:
 private:
     GameScene* _scene = nullptr;
 
+    // M5: 受击窗口追踪 — 上帧 HP 与窗口倒计时 (供受压反击学习)
+    int   _last_seen_hp = -1;
+    float _hit_window = 0.0f;   // >0 表示近 1s 内被打过
+
     // G9: weapon-driven attack helpers
     void _weapon_attack(GameScene& gs, Player& p);
     void _apply_attack_feedback(GameScene& gs, Player& p,

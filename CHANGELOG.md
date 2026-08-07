@@ -24,6 +24,21 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
+# v0.9.22 — M5 条件维度: 镜像读懂受压反击/朝向/节奏 (2026-08-07)
+
+## M5 条件维度 (采集 → 统计 → 执行闭环)
+- **采集层**: `PlayerAction` 新增 `facing_dir` (朝向) + `hit_in_1s` (近1s受击窗口);
+  recorder 新增 `set_battle_context()`, PlayerController 以 HP diff 追踪 1s 受击窗口
+- **统计层**: analyzer 新增 3 个真实习惯维度 —
+  - `fight_back_rate` 受压反击率 (被打后 1s 内反击占比, 0.6+ 硬刚 / 0.3- 怂包)
+  - `face_enemy_rate` 朝向稳定度 (主朝向占比, 高=单向癖可预测退避轴)
+  - `attack_rhythm_var` 攻击节奏方差 (相邻攻击间隔 stddev, 小=固定连段可挡)
+  - 修正 `player_action.h` 朝向注释 (Direction: 0=下 1=上 2=左 3=右)
+- **执行绑定**: M4.1 战术层消费新维度 — 反击型→KITE 拉扯耗链路; 怂+单向癖→
+  远程多角度封锁退路; 四面转→贴身缠斗; HUD 画像摘要新增 Counter/Face/Rhythm
+- 新增 5 个 analyzer 单测 (反击率/无受击/朝向稳定/节奏方差/少样本安全), 全量 **31/31 绿**
+- 克隆表**不加**条件维度: 80 桶已稀疏, 加维度会稀释 (M5 维度走执行层, 不走意图预测)
+
 # v0.9.21 — M4.1/M4.2/M4.3 镜像战术层 (2026-08-06)
 
 ## M4.1 战术脚本层

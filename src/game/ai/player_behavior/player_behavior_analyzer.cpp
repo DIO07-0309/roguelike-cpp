@@ -82,7 +82,47 @@ PlayerHabitProfile PlayerBehaviorAnalyzer::analyze(
         p.style = PlayerStyle::MAGE;
 
     generate_counter_hints(p);
+
+    // M5: 条件维度统计 — 受压反击率/朝向稳定度/攻击节奏方差
+    compute_condition_dimensions(history, p);
     return p;
+}
+
+// ── M5: 从方向/受击上下文计算真实习惯 ──
+void PlayerBehaviorAnalyzer::compute_condition_dimensions(
+    const std::vector<PlayerAction>& history, PlayerHabitProfile& p) {
+    int dmg_n = 0, retaliate_n = 0;   // 受压反击率: 被打后1s内立刻反击动作占比
+    for (auto& a : history) {
+        if (a.type == PlayerActionType::TAKE_DAMAGE) { dmg_n++; continue; }
+        if (a.hit_in_1s > 0 &&
+            (a.type == PlayerActionType::ATTACK || a.type == PlayerActionType::SKILL))
+            retaliate_n++;
+    }
+    if (dmg_n > 0) p.fight_back_rate = (float)retaliate_n / (float)dmg_n;
+
+    int faces[4] = {}; int fn = 0;   // 朝向稳定度: 主朝向占比, 高=退避轴可预测
+    for (auto& a : history)
+        if (a.facing_dir >= 0 && a.facing_dir < 4) { faces[a.facing_dir]++; fn++; }
+    if (fn > 0) {
+        int best = faces[0];
+        for (int i = 1; i < 4; i++) if (faces[i] > best) best = faces[i];
+        p.face_enemy_rate = (float)best / (float)fn;
+    }
+    std::vector<float> gaps;          // 攻击节奏方差: 相邻攻击间隔 stddev
+    float last_ts = -1.0f;
+    for (auto& a : history) {
+        if (a.type != PlayerActionType::ATTACK) continue;
+        if (last_ts >= 0.0f) gaps.push_back(a.timestamp - last_ts);
+        last_ts = a.timestamp;
+    }
+    if (gaps.size() >= 3) {
+        float mean = 0.0f;
+        for (float g : gaps) mean += g;
+        mean /= (float)gaps.size();
+        float var = 0.0f;
+        for (float g : gaps) var += (g - mean) * (g - mean);
+        p.attack_rhythm_var = std::sqrt(var / (float)gaps.size());
+    }
 }
 
 void PlayerBehaviorAnalyzer::generate_counter_hints(PlayerHabitProfile& p) {

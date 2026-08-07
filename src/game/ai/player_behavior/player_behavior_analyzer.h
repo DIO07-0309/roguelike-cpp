@@ -19,4 +19,7 @@ public:
 
 private:
     static int count_type(const std::vector<PlayerAction>& h, PlayerActionType t);
+    // M5: 条件维度统计 — 受压反击率/朝向稳定度/攻击节奏方差
+    static void compute_condition_dimensions(
+        const std::vector<PlayerAction>& history, PlayerHabitProfile& p);
 };

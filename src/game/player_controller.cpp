@@ -41,6 +41,14 @@ void PlayerController::tick(float dt) {
             if (c.player->skills.active_skills[i]->remaining_cooldown(c.game_time) <= 0.0f)
                 mask |= 1 << (int)i;
         g_behavior.set_context(hp, nearest > 900.0f ? -1.0f : nearest, mask);
+        // M5: 条件维度 — 朝向 (Direction 枚举) + 近1s受击窗口 (供受压反击学习)
+        int hp_now = c.player->combat.current_hp;
+        if (_last_seen_hp >= 0 && hp_now < _last_seen_hp) _hit_window = 1.0f;
+        _last_seen_hp = hp_now;
+        if (_hit_window > 0) _hit_window -= dt;
+        if (_hit_window < 0.0f) _hit_window = 0.0f;
+        int facing = (int)c.player->direction;
+        g_behavior.set_battle_context(facing, _hit_window > 0 ? 1 : 0);
     }
 
     // ── 移动 ──

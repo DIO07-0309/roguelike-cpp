@@ -40,4 +40,7 @@ struct PlayerAction {
     float hp = -1.0f;          // player HP ratio [0,1], -1 = unknown (legacy stream)
     float enemy_dist = -1.0f;  // distance to nearest alive enemy in tiles, -1 = unknown
     int skill_ready_mask = 0;  // bit i = skill i cooldown ready (bit 0 = slash)
+    // M5: 条件维度 — 朝向 (Direction 枚举: 0=下 1=上 2=左 3=右, -1=无) + 近 1s 内受击 (受压态势)
+    int  facing_dir = -1;
+    int  hit_in_1s = 0;        // 0=无受压, >0=刚被打 (理解"被打后行为变化")
 };

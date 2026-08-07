@@ -19,12 +19,19 @@ void PlayerBehaviorRecorder::set_context(float hp_pct, float enemy_dist,
     _ctx_mask = skill_ready_mask;
 }
 
+void PlayerBehaviorRecorder::set_battle_context(int facing_dir, int hit_in_1s) {
+    _ctx_facing = facing_dir;
+    _ctx_hits = hit_in_1s;
+}
+
 void PlayerBehaviorRecorder::record(const PlayerAction& action) {
     if (action.type == PlayerActionType::NONE) return;
     PlayerAction a = action;
     if (a.hp < 0) a.hp = _ctx_hp;
     if (a.enemy_dist < 0) a.enemy_dist = _ctx_dist;
     a.skill_ready_mask = _ctx_mask;
+    if (a.facing_dir < 0) a.facing_dir = _ctx_facing;
+    if (a.hit_in_1s <= 0) a.hit_in_1s  = _ctx_hits;
     _history.push_back(a);
 
     // ── Update aggregate data in real time ──
