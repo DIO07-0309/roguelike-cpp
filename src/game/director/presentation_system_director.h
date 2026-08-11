@@ -85,6 +85,10 @@ public:
     void  trigger_freeze(float duration);
     bool  is_frozen() const { return freeze_timer > 0.0f; }
 
+    // ── Q4.7: 玩家受击红屏 ──
+    float hit_flash_timer = 0.0f;
+    void  trigger_hit_flash(float duration = 0.18f);
+
     // ── Room Message ──
     std::string room_msg;
     float room_msg_timer = 0.0f;

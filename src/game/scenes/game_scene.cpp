@@ -1461,6 +1461,14 @@ void GameScene::_render() {
 
     _cam_x = saved_cx; _cam_y = saved_cy;  // 恢复
 
+    // Q4.7: 玩家受击红屏 — 全屏叠加主题 hit_flash_tint (alpha 随计时衰减)
+    if (_presentation.hit_flash_timer > 0 && g_font_loaded) {
+        Color ft = _presentation.get_theme().screen.hit_flash_tint;
+        float fade = _presentation.hit_flash_timer / 0.18f;
+        DrawRectangle(0, 0, sw, sh,
+            {ft.r, ft.g, ft.b, (unsigned char)(ft.a * fade * 0.35f)});
+    }
+
     // F15.5.1: Build echo mirror panel data
     CharacterPanelData echo_panel_data;
     bool is_echo = (boss_floor == 15 && _boss._behavior_type == "mirror");

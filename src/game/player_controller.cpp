@@ -102,6 +102,7 @@ void PlayerController::tick(float dt) {
                 gs._presentation.trigger_shake(shake);
                 if (dmg_taken >= 20) gs._presentation.trigger_freeze(0.05f);
                 gs.get_tree()->get_audio()->play_sfx("hurt", 0.6f);  // Q4.4
+                gs._presentation.trigger_hit_flash();  // Q4.7: 受击红屏
             }
         }
         return;
@@ -160,6 +161,7 @@ void PlayerController::tick(float dt) {
                 gs._presentation.trigger_shake(shake);
                 if (dmg_taken >= 20) gs._presentation.trigger_freeze(0.05f);
                 gs.get_tree()->get_audio()->play_sfx("hurt", 0.6f);  // Q4.4
+                gs._presentation.trigger_hit_flash();  // Q4.7: 受击红屏
             }
             gs._check_floor_transition();
         }
@@ -247,7 +249,8 @@ void PlayerController::handle_input(const InputMap& input) {
             }
         }
     }
-    else if (gs._is_action_just_pressed(input,"inventory")) { gs.inventory_open = true; gs.inventory_cursor = 0; }
+    else if (gs._is_action_just_pressed(input,"inventory")) { gs.inventory_open = true; gs.inventory_cursor = 0;
+        gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f); }  // Q4.5
     else if (gs._is_action_just_pressed(input,"skill_1")) use_skill(0);
     else if (gs._is_action_just_pressed(input,"skill_2")) use_skill(1);
     else if (gs._is_action_just_pressed(input,"skill_3")) use_skill(2);

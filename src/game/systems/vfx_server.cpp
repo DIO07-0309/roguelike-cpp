@@ -1,5 +1,9 @@
 #include "vfx_server.h"
 #include "data/vfx_recipe.h"  // G5.8.5
+#include "core/service_locator.h"      // Q4.6: 间接访问 Audio/Presentation
+#include "core/scene_tree.h"
+#include "audio/audio_server.h"
+#include "director/presentation_system_director.h"
 #include <cmath>
 #include <algorithm>
 
@@ -162,6 +166,16 @@ void VFXServer::play_recipe(const char* recipe_id, float cx, float cy,
         slash_arc(cx, cy, dir, 56.0f, {255, 80, 80, 200});
         spark_burst(cx, cy, 6, {255, 120, 80, 255}, 0.30f);
         return;
+    }
+
+    // Q4.6: 消费 recipe 的 sfx / camera_shake 字段
+    if (!recipe->sfx.empty()) {
+        auto* tree = ServiceLocator::get<SceneTree>();
+        if (tree) tree->get_audio()->play_sfx(recipe->sfx.c_str(), 0.6f);
+    }
+    if (recipe->camera_shake > 0) {
+        auto* pres = ServiceLocator::get<PresentationSystemDirector>();
+        if (pres) pres->trigger_shake(recipe->camera_shake * 0.8f);
     }
 
     for (auto& step : recipe->steps) {

@@ -118,6 +118,62 @@ static Sound _compile_monster_atk() {
     return _vec_to_sound(mx);
 }
 
+// Q4.6: 冰裂 — 高频碎冰 (短促叠加)
+static Sound _compile_ice_crack() {
+    float dur = 0.25f; int n = (int)(SR * dur);
+    std::vector<short> result(n, 0);
+    float cents[] = {2400.0f, 3000.0f, 3600.0f, 2100.0f};
+    for (int j = 0; j < 4; j++) {
+        int start = (int)(SR * j * 0.05f);
+        auto chunk = square_wave((int)(SR * 0.12f), [=](float){return cents[j];}, decay(0.35f, 0.12f));
+        for (int i = 0; i < (int)chunk.size() && start + i < n; i++)
+            result[start + i] = (short)std::max(-MAX_AMP, std::min(MAX_AMP-1, (int)result[start+i] + chunk[i]));
+    }
+    auto ns = noise_wave(n, spike(0.3f, 0.005f, dur));
+    auto mx = mix({&result, &ns});
+    return _vec_to_sound(mx);
+}
+
+// Q4.6: 闪电 — 高频噼啪 (噪声 burst 快速衰减)
+static Sound _compile_lightning() {
+    float dur = 0.35f; int n = (int)(SR * dur);
+    auto ns = noise_wave(n, spike(0.55f, 0.002f, dur*0.5f));
+    auto hi = sine_wave(n, [=](float t){return 1800.0f + 400.0f * sinf(t * 40.0f);}, decay(0.3f, dur*0.6f));
+    auto mx = mix({&ns, &hi});
+    return _vec_to_sound(mx);
+}
+
+// Q4.6: 召唤 — 上升共鸣 (正弦滑升)
+static Sound _compile_summon() {
+    float dur = 0.6f; int n = (int)(SR * dur);
+    auto up = sine_wave(n, [=](float t){return 200.0f + 500.0f * (t/dur) + 100.0f * sinf(t * 6.0f);},
+                        decay(0.4f, dur));
+    auto pad = sine_wave(n, [=](float){return 98.0f;}, decay(0.25f, dur));
+    auto mx = mix({&up, &pad});
+    return _vec_to_sound(mx);
+}
+
+// Q4.5: UI 点击 — 短促清脆 (高频短音)
+static Sound _compile_ui_click() {
+    float dur = 0.06f; int n = (int)(SR * dur);
+    auto tick = square_wave(n, [=](float){return 1400.0f;}, spike(0.4f, 0.002f, dur));
+    return _vec_to_sound(tick);
+}
+
+// Q4.5: UI 确认 — 双音上行 (确认/进入)
+static Sound _compile_ui_confirm() {
+    float dur = 0.16f; int n = (int)(SR * dur);
+    std::vector<short> result(n, 0);
+    float notes[] = {784.0f, 1046.5f};
+    for (int j = 0; j < 2; j++) {
+        int start = (int)(SR * j * 0.07f);
+        auto chunk = sine_wave((int)(SR * 0.1f), [=](float){return notes[j];}, decay(0.4f, 0.1f));
+        for (int i = 0; i < (int)chunk.size() && start + i < n; i++)
+            result[start + i] = (short)std::max(-MAX_AMP, std::min(MAX_AMP-1, (int)result[start+i] + chunk[i]));
+    }
+    return _vec_to_sound(result);
+}
+
 static Sound _compile_levelup() {
     float dur = 0.5f; int n = (int)(SR * dur);
     std::vector<short> result(n, 0);
@@ -185,6 +241,11 @@ void AudioServer::init() {
     _sfx["victory"] = _compile_victory();
     _sfx["hurt"]        = _compile_hurt();         // Q4.4: 玩家受击
     _sfx["monster_atk"] = _compile_monster_atk();  // Q4.4: 怪物攻击
+    _sfx["ice_crack"]   = _compile_ice_crack();    // Q4.6: recipe 音效
+    _sfx["lightning"]   = _compile_lightning();    // Q4.6: recipe 音效
+    _sfx["summon"]      = _compile_summon();       // Q4.6: recipe 音效
+    _sfx["ui_click"]    = _compile_ui_click();     // Q4.5: UI 点击
+    _sfx["ui_confirm"]  = _compile_ui_confirm();   // Q4.5: UI 确认
 
     // timestop: 优先外部 MP3
     const char* mp3 = "assets/jojo_timestop.mp3";

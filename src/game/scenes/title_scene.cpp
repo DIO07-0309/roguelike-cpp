@@ -3,6 +3,7 @@
 #include "tutorial_scene.h"
 #include "game_scene.h"
 #include "scene_tree.h"
+#include "audio/audio_server.h"
 #include "config.h"
 #include "save/save_manager.h"
 #include "core/logger.h"
@@ -10,6 +11,73 @@
 
 extern Font g_font, g_font_small;
 extern bool g_font_loaded;
+
+// Q4.5: 键盘/鼠标共用动作分发 — 单一职责
+bool TitleScene::_activate(const std::string& action) {
+    auto* tree = get_tree();
+    if (!tree) return false;
+    tree->get_audio()->play_sfx("ui_confirm", 0.5f);
+
+    if (action == "new") {
+        auto gs = std::make_shared<GameScene>();
+        gs->name = "GameScene";
+        gs->new_game();
+        tree->change_scene(gs);
+        LOG_INFO("开始新游戏");
+        return true;
+    }
+    if (action == "continue" && has_save) {
+        auto* data = SaveManager::load_save();
+        if (data) {
+            auto gs = std::make_shared<GameScene>();
+            gs->name = "GameScene";
+            int floor = data->current_floor;
+            int maxf = data->max_unlocked_floor;
+            if (data->player) {
+                gs->load_saved_game(floor, maxf, std::move(data->player),
+                                    data->dungeon_seed, data->special_triggered,
+                                    data->special_discovered, data->rule_counters,
+                                    data->quest_states, data->unlocked_endings);
+            } else {
+                auto p = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
+                    PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
+                gs->load_saved_game(floor, maxf, std::move(p),
+                                    data->dungeon_seed, data->special_triggered,
+                                    data->special_discovered, data->rule_counters,
+                                    data->quest_states, data->unlocked_endings);
+            }
+            gs->set_mirror_memory(data->mirror_prior_alpha,
+                                  data->mirror_prior_beta);
+            delete data;
+            tree->change_scene(gs);
+            LOG_INFO("继续游戏: 第%d层", floor);
+        }
+        return true;
+    }
+    if (action == "select") {
+        auto fs = std::make_shared<FloorSelectScene>();
+        fs->name = "FloorSelectScene";
+        fs->max_unlocked = max_floor;
+        tree->change_scene(fs);
+        return true;
+    }
+    if (action == "tutorial") {
+        auto ts = std::make_shared<TutorialScene>();
+        ts->name = "TutorialScene";
+        tree->change_scene(ts);
+        LOG_INFO("进入教程");
+        return true;
+    }
+    if (action == "fullscreen") {
+        ToggleFullscreen();
+        return true;
+    }
+    if (action == "quit") {
+        tree->quit();
+        return true;
+    }
+    return false;
+}
 
 void TitleScene::_enter_tree() {
     // 每次进入标题画面时重新检测存档状态
@@ -88,20 +156,38 @@ void TitleScene::_render() {
     }
     y += 25;
 
-    // 菜单项
-    for (auto& mi : items) {
+    // 菜单项 (Q4.5: 鼠标悬停高亮 + hover 音效)
+    Vector2 mouse = GetMousePosition();
+    int new_hover = -1;
+    for (int i = 0; i < (int)items.size(); i++) {
+        auto& mi = items[i];
         Color c = mi.color;
         if (mi.action == "continue" && !has_save) c = {80, 80, 80, 255};
         if (mi.action == "select" && !has_save) c = {80, 80, 80, 255};
 
+        Rectangle item_rect = {(float)(pr.x + 40), y, pw - 80, 32};
+        if (CheckCollisionPointRec(mouse, item_rect)
+            && !(mi.action == "continue" && !has_save)
+            && !(mi.action == "select" && !has_save)) {
+            new_hover = i;
+            DrawRectangleRounded(item_rect, 0.2f, 6, {60, 60, 110, 140});
+            DrawRectangleRoundedLines(item_rect, 0.2f, 6, 1, {160, 160, 220, 200});
+            c = {255, 255, 255, 255};
+        }
+
         if (g_font_loaded) {
             std::string txt = "[" + mi.key + "] " + mi.label;
-            DrawTextEx(g_font_small, txt.c_str(), {(float)(pr.x + 60), y}, 16, 1, c);
+            DrawTextEx(g_font_small, txt.c_str(), {(float)(pr.x + 60), y + 6}, 16, 1, c);
         } else {
             std::string txt = "[" + mi.key + "] " + mi.action;
-            DrawText(txt.c_str(), (int)(pr.x + 60), (int)y, 16, c);
+            DrawText(txt.c_str(), (int)(pr.x + 60), (int)y + 6, 16, c);
         }
         y += 36;
+    }
+    if (new_hover != hover_index) {
+        if (new_hover >= 0 && get_tree())
+            get_tree()->get_audio()->play_sfx("ui_click", 0.4f);
+        hover_index = new_hover;
     }
 
     // B12.5: 操作说明 (右侧, 半透明方块)
@@ -147,49 +233,16 @@ void TitleScene::_input(const InputMap& input) {
         tree->quit();  // 标题画面Esc = 退出游戏
         return;
     }
-    if (IsKeyPressed(KEY_N)) {
-        auto gs = std::make_shared<GameScene>();
-        gs->name = "GameScene";
-        gs->new_game();
-        tree->change_scene(gs);
-        LOG_INFO("开始新游戏");
-    } else if (IsKeyPressed(KEY_C) && has_save) {
-        auto* data = SaveManager::load_save();
-        if (data) {
-            auto gs = std::make_shared<GameScene>();
-            gs->name = "GameScene";
-            int floor = data->current_floor;
-            int maxf = data->max_unlocked_floor;
-            // 传递存档中的 player (如果有的话)
-            if (data->player) {
-                gs->load_saved_game(floor, maxf, std::move(data->player),
-                                    data->dungeon_seed, data->special_triggered,
-                                    data->special_discovered, data->rule_counters,
-                                    data->quest_states, data->unlocked_endings);
-            } else {
-                auto p = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
-                    PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
-                gs->load_saved_game(floor, maxf, std::move(p),
-                                    data->dungeon_seed, data->special_triggered,
-                                    data->special_discovered, data->rule_counters,
-                                    data->quest_states, data->unlocked_endings);
-            }
-            // M4e: 跨对局镜像记忆
-            gs->set_mirror_memory(data->mirror_prior_alpha,
-                                  data->mirror_prior_beta);
-            delete data;
-            tree->change_scene(gs);
-            LOG_INFO("继续游戏: 第%d层", floor);
-        }
-    } else if (IsKeyPressed(KEY_F)) {
-        auto fs = std::make_shared<FloorSelectScene>();
-        fs->name = "FloorSelectScene";
-        fs->max_unlocked = max_floor;
-        tree->change_scene(fs);
-    } else if (IsKeyPressed(KEY_T)) {
-        auto ts = std::make_shared<TutorialScene>();
-        ts->name = "TutorialScene";
-        tree->change_scene(ts);
-        LOG_INFO("进入教程");
+    // Q4.5: 键盘 → 动作分发 (鼠标点击复用同一路径)
+    if (IsKeyPressed(KEY_N)) { _activate("new"); return; }
+    if (IsKeyPressed(KEY_C)) { if (has_save) _activate("continue"); return; }
+    if (IsKeyPressed(KEY_F)) { _activate("select"); return; }
+    if (IsKeyPressed(KEY_T)) { _activate("tutorial"); return; }
+    if (IsKeyPressed(KEY_F11)) { _activate("fullscreen"); return; }
+
+    // Q4.5: 鼠标点击菜单项
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hover_index >= 0
+        && hover_index < (int)items.size()) {
+        _activate(items[hover_index].action);
     }
 }

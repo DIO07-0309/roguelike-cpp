@@ -12,6 +12,7 @@ public:
     bool has_save = false;
     int max_floor = 1;
     float anim_time = 0;
+    int hover_index = -1;  // Q4.5: 鼠标悬停菜单项
     std::vector<MenuItem> items;
 
     void _enter_tree() override;
@@ -20,4 +21,7 @@ public:
     void _render() override;
     void _input(const InputMap& input) override;
     const char* get_bgm_name() const override { return "title"; }
+
+private:
+    bool _activate(const std::string& action);  // Q4.5: 键盘/鼠标共用动作分发
 };

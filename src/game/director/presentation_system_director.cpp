@@ -56,6 +56,10 @@ void PresentationSystemDirector::trigger_freeze(float duration) {
     freeze_timer = duration;
 }
 
+void PresentationSystemDirector::trigger_hit_flash(float duration) {
+    hit_flash_timer = duration;
+}
+
 void PresentationSystemDirector::show_message(const char* text, float duration) {
     room_msg = text;
     room_msg_timer = duration;
@@ -201,6 +205,8 @@ void PresentationSystemDirector::tick(float dt) {
     if (shake_timer > 0) shake_timer -= dt;
     // Freeze decay
     if (freeze_timer > 0) { freeze_timer -= dt; if (freeze_timer <= 0) freeze_timer = 0; }
+    // Q4.7: Hit flash decay
+    if (hit_flash_timer > 0) { hit_flash_timer -= dt; if (hit_flash_timer <= 0) hit_flash_timer = 0; }
     // Room message
     if (room_msg_timer > 0) room_msg_timer -= dt;
 

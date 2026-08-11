@@ -4,6 +4,7 @@
 #include "config.h"
 #include "combat_system.h"
 #include "scene_tree.h"
+#include "audio/audio_server.h"
 #include "save/save_manager.h"
 #include "core/logger.h"
 #include "event_system.h"
@@ -32,11 +33,14 @@ void GameSceneInput::handle_input(const InputMap& input) {
     if (IsKeyPressed(KEY_Q)) {
         _s._quest_log_open = !_s._quest_log_open;
         if (_s._quest_log_open) _s.inventory_open = false;
+        tree->get_audio()->play_sfx("ui_click", 0.35f);  // Q4.5
         return;
     }
     if (_s._quest_log_open) {
-        if (IsKeyPressed(KEY_Q) || _s._is_action_just_pressed(input,"cancel"))
+        if (IsKeyPressed(KEY_Q) || _s._is_action_just_pressed(input,"cancel")) {
             _s._quest_log_open = false;
+            tree->get_audio()->play_sfx("ui_click", 0.35f);  // Q4.5
+        }
         return;
     }
 
@@ -102,7 +106,10 @@ auto* boss = boss_factory_create(btype, _s.stairs_pos.first, _s.stairs_pos.secon
 
     if (_s.state != GameState::PLAYING) return;
 
-    if (IsKeyPressed(KEY_R)) _s._show_relic_panel = !_s._show_relic_panel;
+    if (IsKeyPressed(KEY_R)) {
+        _s._show_relic_panel = !_s._show_relic_panel;
+        tree->get_audio()->play_sfx("ui_click", 0.35f);  // Q4.5
+    }
 
 #ifdef _DEBUG
     handle_debug_keys();
