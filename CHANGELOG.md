@@ -24,6 +24,31 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
+# v0.9.25 — Q4 品质打磨批1: 打击感与音频补全 (2026-08-11)
+
+## Q4.1 HitStop 修复 (隐藏全局短板)
+- `freeze_timer` 原只递减不消费 — 所有 trigger_freeze 调用形同虚设
+- `PresentationSystemDirector::is_frozen()` + GameScene 主循环接入:
+  冻结期跳过世界模拟 (怪物/弹幕/Buff/玩家), 仅表现层计时器推进
+- 打击感三件套 (HitStop/震屏/飘字) 至此全部真正生效
+
+## Q4.2 BGM 循环 + stop 修复
+- `BGMEngine::stop()` 原停的是 `_cache.begin()` (第一首) 而非当前曲 — 已修
+- 新增 `BGMEngine::update()`: 曲目播放结束后自动重播 (Sound 无自带 loop)
+- `AudioServer::update()` 接入 SceneTree 主循环 (process_frame 每帧驱动)
+- 地牢/Boss BGM 不再每 30 秒静音
+
+## Q4.3 拾取反馈 (音效+特效)
+- 拾取物品: `play_sfx("pickup")` + ring+spark 闪光 (圣物金色/普通暖色)
+- 拾取不再无声无息 (此前仅教程场景有拾取音)
+
+## Q4.4 受击/攻击音效补全
+- 新增合成音: `hurt` (玩家受击闷响) + `monster_atk` (怪物攻击嘶吼)
+- 玩家受击 2 处 (弹幕/近战) 播放 hurt
+- 怪物攻击 (近战/远程) 经 `MONSTER_ATTACK` 事件解耦 — AI 层不持音频引用
+- `SceneTree` 注册进 ServiceLocator (事件回调访问音频)
+- 新增 `GameEventType::MONSTER_ATTACK`
+
 # v0.9.24 — M4.5 战术链跨场景预测 + M4.4 E2E 验证 (2026-08-07)
 
 ## M4.5 跨场景预测 (战术链不再只驱动应付臂)

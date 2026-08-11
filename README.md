@@ -396,3 +396,7 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | M5 | 条件维度: 采集朝向/受击窗口 → 统计受压反击率·朝向稳定度·节奏方差 → 战术层消费 (反击型→KITE, 单向癖→远程封锁, 四面转→缠斗) | ✅ |
 | M4.4 | 战术链序列记忆: 12符号 n-gram 学习玩家 技能→位移→连招 套路, 仲裁链 ML→战术链→克隆→Thompson | ✅ |
 | M4.5 | 战术链跨场景: predict_next_action 链优先 (SKILL/ATTACK) + 链预测技能提前打断; E2E 真实采集链验证 | ✅ |
+| Q4.1 | HitStop 修复: freeze_timer 接入主循环, 冻结期世界暂停 (打击感三件套真正生效) | ✅ |
+| Q4.2 | BGM 循环重播 + stop 修 bug (停错曲目), AudioServer::update 接入主循环 | ✅ |
+| Q4.3 | 拾取反馈: pickup 音效 + ring/spark 闪光 (圣物金色) | ✅ |
+| Q4.4 | 受击/攻击音效: hurt + monster_atk 合成音, MONSTER_ATTACK 事件解耦 (AI 层无音频引用) | ✅ |
