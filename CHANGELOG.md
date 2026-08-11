@@ -24,6 +24,19 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
+# v0.9.24 — M4.5 战术链跨场景预测 + M4.4 E2E 验证 (2026-08-07)
+
+## M4.5 跨场景预测 (战术链不再只驱动应付臂)
+- `predict_next_action`: 战术链层优先于克隆层 — 预测玩家下一步动作类型
+  (SKILL_*→SKILL, COMBO_*→ATTACK); 链 miss 才回落克隆/规则
+- `should_interrupt_skill`: 链预测玩家将放技能 (高置信) → 提前进入打断准备
+- 新增 `chain_symbol_to_action`/`chain_predict_action` (静态, 单一职责)
+
+## M4.4 E2E 真机路径验证
+- `sequence_e2e_test`: 走真实采集链 (PlayerBehaviorRecorder API) → 画像 → 克隆 +
+  战术链注入 → 在线观察 → 仲裁/预测/打断, 3 用例 (含技能连发套路)
+- 全量 **34/34 绿**
+
 # v0.9.23 — M4.4 战术链序列记忆: 镜像学习玩家战术套路 (2026-08-07)
 
 ## M4.4 Tactical Sequence Memory

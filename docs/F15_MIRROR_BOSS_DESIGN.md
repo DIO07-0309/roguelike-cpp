@@ -248,4 +248,10 @@ F1-F14 行为采集 → PlayerAction → 分析器 → PlayerHabitProfile
 - 在线仲裁: `observe_actual` 维护最近 2 战术符号缓冲 (类型级近似), 高置信预测玩家下一步战术动作 → 意图 → 应对臂
 - 数据稀疏规避: 3-gram 样本 <3 或 2-gram <5 自动降级 (低频回落克隆/规则), 缺 skill_id/combo 细节自然降级, 不产生错误动作
 
+**M4.5 跨场景预测 — ✅ 已完成 (v0.9.24)**
+- `predict_next_action` 战术链层优先: SKILL_*→SKILL, COMBO_*→ATTACK, 链 miss 回落克隆/规则
+- `should_interrupt_skill` 链预测 SKILL 高置信 → 提前打断准备 (不依赖玩家当前施法状态)
+- `chain_symbol_to_action`/`chain_predict_action` 静态辅助, 与应付臂仲裁共用同一条降级链
+- E2E 验证: sequence_e2e_test 走真实 recorder 采集 → 画像/克隆/链注入 → 在线观察 → 预测/打断 (34/34 绿)
+
 
