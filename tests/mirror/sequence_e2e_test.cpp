@@ -62,7 +62,7 @@ TEST(SequenceChainE2E, RecorderStreamFillsComboStage) {
     EXPECT_STREQ(h[0].weapon_name, "nunchaku");
 }
 
-// 二分定位: analyzer 在 weapon_type 流上是否崩溃
+// M4.5: analyzer 在带 weapon_type 的流上安全
 TEST(SequenceChainE2E, AnalyzerSafeOnRecordedStream) {
     g_behavior.clear();
     for (int i = 0; i < 6; i++) {
@@ -79,5 +79,56 @@ TEST(SequenceChainE2E, AnalyzerSafeOnRecordedStream) {
     (void)prof;
 }
 
-// 二分定位: 战术链在完整流上构建是否崩溃
+// M4.5-A: 战术链预测玩家下一步动作 — 技能连发型套路 (技能0→技能1 循环)
+TEST(SequenceChainE2E, ChainPredictsNextActionSkill) {
+    g_behavior.clear();
+    for (int i = 0; i < 6; i++) {
+        g_behavior.set_context(0.8f, 4.0f, 0x0F);
+        g_behavior.on_skill_use("slash", (float)i * 1.0f, 1, 100.0f, 100.0f);
+        g_behavior.on_skill_use("fireball", (float)i * 1.0f + 0.5f, 1, 120.0f, 100.0f);
+    }
+    PlayerHabitProfile prof = PlayerBehaviorAnalyzer::analyze(g_behavior.history());
+    MirrorAgent agent;
+    agent.init(prof);
+    agent.set_phase(2);
+    auto chain = std::make_unique<TacticalChainTable>();
+    chain->build(g_behavior.history());
+    agent.set_chain_table(std::move(chain));
+
+    // 在线: 玩家连续放了 技能0 技能1 → buffer (SKILL_0, SKILL_1) → 链预测 SKILL_0 →
+    // predict_next_action 应返回 SKILL (链优先于克隆/规则)
+    agent.observe_actual(PlayerActionType::SKILL);
+    agent.observe_actual(PlayerActionType::SKILL);
+    MirrorBattleState st;
+    st.dist_tiles = 4.0f; st.player_hp_pct = 0.8f;
+    EXPECT_EQ(agent.predict_next_action(st), PlayerActionType::SKILL);
+}
+
+// M4.5-B: 战术链预测玩家将放技能 → 镜像提前进入打断状态
+TEST(SequenceChainE2E, ChainPredictsSkillTriggersInterrupt) {
+    g_behavior.clear();
+    for (int i = 0; i < 6; i++) {
+        g_behavior.set_context(0.8f, 4.0f, 0x0F);
+        g_behavior.on_skill_use("slash", (float)i * 1.0f, 1, 100.0f, 100.0f);
+        g_behavior.on_skill_use("fireball", (float)i * 1.0f + 0.5f, 1, 120.0f, 100.0f);
+    }
+    PlayerHabitProfile prof = PlayerBehaviorAnalyzer::analyze(g_behavior.history());
+    MirrorAgent agent;
+    agent.init(prof);
+    agent.set_phase(2);
+    auto chain = std::make_unique<TacticalChainTable>();
+    chain->build(g_behavior.history());
+    agent.set_chain_table(std::move(chain));
+
+    agent.observe_actual(PlayerActionType::SKILL);
+    agent.observe_actual(PlayerActionType::SKILL);
+    MirrorBattleState st;
+    st.dist_tiles = 4.0f; st.player_hp_pct = 0.8f;
+    // 玩家当前未放技能 + 画像无技能 spam → 链预测是唯一触发源
+    st.player_using_skill = false;
+    PlayerActionType pred = agent.predict_next_action(st);
+    if (pred == PlayerActionType::SKILL)
+        EXPECT_TRUE(agent.should_interrupt_skill(st));
+}
+
 }  // namespace

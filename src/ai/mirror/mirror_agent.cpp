@@ -4,6 +4,9 @@
 #include <algorithm>
 #include <cstdio>
 
+// M4.5: 战术链符号 → 玩家动作类型 (定义在匿名命名空间, 供 should_interrupt_skill 前置使用)
+static PlayerActionType chain_symbol_to_action(int s);
+
 MirrorAgent::MirrorAgent()
     : _debug_stats(std::make_unique<MirrorDebugStats>()) {}
 
@@ -51,7 +54,18 @@ float MirrorAgent::recommend_distance() const {
 bool MirrorAgent::should_interrupt_skill(const MirrorBattleState& st) const {
     if (_phase < 2) return false;
     // M4e: 玩家正在施放技能 → 立即打断; 或按画像预判技能流
-    return st.player_using_skill || _profile.predict_skill_spam;
+    if (st.player_using_skill || _profile.predict_skill_spam) return true;
+    // M4.5-B: 战术链预测玩家将放技能 → 提前进入打断准备 (需链命中且高置信)
+    if (_seq_b >= 0 && _seq_a >= 0) {
+        ChainPrediction cp = _chain ? _chain->predict(_seq_a, _seq_b)
+                                    : ChainPrediction{};
+        if (cp.level < 0 && _chain)
+            cp = _chain->predict_fuzzy2(_seq_b);
+        if (cp.level >= 0 && cp.confidence > clone_confidence_threshold()
+            && chain_symbol_to_action(cp.best) == PlayerActionType::SKILL)
+            return true;
+    }
+    return false;
 }
 
 bool MirrorAgent::should_pressure_close(const MirrorBattleState& st) const {
@@ -93,9 +107,43 @@ static PlayerActionType intent_to_action(PlayerIntention i) {
     }
 }
 
+// M4.5-A: 战术链符号 → 玩家动作类型 (SKILL_*→SKILL, COMBO_*→ATTACK; MOVE 非决策动作→NONE)
+static PlayerActionType chain_symbol_to_action(int s) {
+    switch ((TacticalSymbol)s) {
+    case TacticalSymbol::SKILL_0:
+    case TacticalSymbol::SKILL_1:
+    case TacticalSymbol::SKILL_2:
+    case TacticalSymbol::SKILL_3: return PlayerActionType::SKILL;
+    case TacticalSymbol::COMBO_1:
+    case TacticalSymbol::COMBO_2:
+    case TacticalSymbol::COMBO_3: return PlayerActionType::ATTACK;
+    default:                      return PlayerActionType::NONE;
+    }
+}
+
+// M4.5-A: 战术链预测 — 缓冲 ≥2 符号 + 高置信 → 玩家下一步动作类型 (链优先于克隆/规则)
+static PlayerActionType chain_predict_action(const TacticalChainTable* chain,
+                                             int seq_a, int seq_b,
+                                             float confidence_threshold) {
+    if (!chain || seq_a < 0 || seq_b < 0) return PlayerActionType::NONE;
+    ChainPrediction cp = chain->predict(seq_a, seq_b);
+    if (cp.level < 0) cp = chain->predict_fuzzy2(seq_b);
+    if (cp.level < 0 || cp.confidence <= confidence_threshold)
+        return PlayerActionType::NONE;
+    return chain_symbol_to_action(cp.best);
+}
+
 PlayerActionType MirrorAgent::predict_next_action(
     const MirrorBattleState& st) const {
-    // M1: behavior-clone layer first (exact/fuzzy/profile), rules as fallback
+    // M4.5-A: 战术链层先行 — 预测玩家下一步战术动作 (网型序列优于单步克隆)
+    PlayerActionType chain_act =
+        chain_predict_action(_chain.get(), _seq_a, _seq_b,
+                             clone_confidence_threshold());
+    if (chain_act != PlayerActionType::NONE) {
+        _debug_stats->on_predict(0);   // 验收: 战术链命中 (与克隆层级共统计)
+        return chain_act;
+    }
+    // M1: behavior-clone layer (exact/fuzzy/profile), rules as fallback
     if (_phase >= 2 && _clone) {
         ClonePrediction p = _clone->predict(st.dist_tiles, st.player_hp_pct,
                                             st.player_skills_ready);
