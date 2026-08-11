@@ -6,6 +6,8 @@
 #include "vfx_server.h"
 #include "systems/projectile_factory.h"  // D2
 #include "systems/team_coordinator.h"   // G2.2
+#include "core/event_bus.h"             // Q4.4: 怪物攻击事件
+#include "core/event_types.h"
 #include <cmath>
 
 // Forward declarations for functions defined later in this file
@@ -239,6 +241,7 @@ void MonsterAI::_execute_attack(Monster* self, Player* player, double gt,
             (WarningLevel)self->projectile_warning_level);
         self->projectiles_ptr->push_back(p);
         self->last_attack_time = (float)gt;
+        EventBus::inst().emit(GameEventType::MONSTER_ATTACK, self, 1, 0.0f, nullptr);  // Q4.4
         // Warning VFX at firing source
         if (effects) {
             VFXServer vfx;
@@ -252,6 +255,7 @@ void MonsterAI::_execute_attack(Monster* self, Player* player, double gt,
 
     // Original melee instant-attack
     self->attack_target(player, gt);
+    EventBus::inst().emit(GameEventType::MONSTER_ATTACK, self, 0, 0.0f, nullptr);  // Q4.4
     if (effects) {
         VFXServer vfx;
         vfx.monster_attack(

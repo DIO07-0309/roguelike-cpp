@@ -205,6 +205,8 @@ void BGMEngine::init() {
 void BGMEngine::close() { for (auto& [_, s] : _cache) UnloadSound(s); _cache.clear(); }
 void BGMEngine::play(const std::string& name, float vol) {
     stop();
+    _current = name;
+    _volume = vol;
     // G6.1/G8.1: lazy-compile biome BGM variants on first use
     if (_cache.find(name) == _cache.end()) {
         // Reuse dungeon chords/melody, vary by BPM+waveform+drums
@@ -214,4 +216,22 @@ void BGMEngine::play(const std::string& name, float vol) {
     auto it = _cache.find(name);
     if (it != _cache.end()) { SetSoundVolume(it->second, vol); PlaySound(it->second); _playing = true; }
 }
-void BGMEngine::stop() { if (_playing) { StopSound(_cache.begin()->second); _playing = false; } }
+void BGMEngine::stop() {
+    if (!_playing) return;
+    auto it = _cache.find(_current);
+    if (it != _cache.end()) StopSound(it->second);
+    _playing = false;
+    _current.clear();
+}
+
+// Q4.2: BGM 循环 — 曲目播放结束后自动重播 (Raylib Sound 无自带 loop)
+void BGMEngine::update(float dt) {
+    (void)dt;
+    if (!_playing) return;
+    auto it = _cache.find(_current);
+    if (it == _cache.end()) return;
+    if (!IsSoundPlaying(it->second)) {
+        SetSoundVolume(it->second, _volume);
+        PlaySound(it->second);
+    }
+}

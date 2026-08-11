@@ -183,6 +183,7 @@ int main(int argc, char** argv) {
     InitAudioDevice();
 
     SceneTree tree(WINDOW_WIDTH, WINDOW_HEIGHT, "Roguelike - C++ Edition");
+    ServiceLocator::provide(&tree);  // Q4.4: 事件回调访问音频
     LOG_INFO("窗口创建");
 
     // ═══ G4.1: RegistryBuilder — Provider 驱动加载 ─═

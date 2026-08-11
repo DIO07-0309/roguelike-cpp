@@ -17,6 +17,7 @@ enum class GameEventType {
     // ── 怪物 ──
     MONSTER_SPAWN,
     MONSTER_DIED,
+    MONSTER_ATTACK,  // Q4.4: 怪物攻击 (近战/远程) — 驱动攻击音效
 
     // ── Boss ──
     BOSS_SPAWN,

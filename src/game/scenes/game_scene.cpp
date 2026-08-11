@@ -425,6 +425,12 @@ void GameScene::_process(double delta) {
     }
 
     if (state != GameState::PLAYING) return;
+
+    // Q4.1: HitStop — 冻结期间只推表现层, 世界模拟暂停 (打击感)
+    if (_presentation.is_frozen()) {
+        _presentation.tick(dt);
+        return;
+    }
     game_time += dt;
 
     // M4a-fix: 兜底受击日志 — 只报未记账来源的玩家掉血 (标签源已调 mark_damage_logged)
@@ -587,6 +593,12 @@ void GameScene::_process(double delta) {
                 [](const GameEvent& e) { _elem_events.push_back(e); }, "_elem");
             EventBus::inst().subscribe(GameEventType::ELEMENT_LEVEL_UP,
                 [](const GameEvent& e) { _elem_events.push_back(e); }, "_elem");
+            // Q4.4: 怪物攻击音效 (AI 层通过事件解耦音频访问)
+            EventBus::inst().subscribe(GameEventType::MONSTER_ATTACK,
+                [](const GameEvent& e) {
+                    auto* tree = ServiceLocator::get<SceneTree>();
+                    if (tree) tree->get_audio()->play_sfx("monster_atk", 0.45f);
+                }, "_elem");
             _subscribed = true;
         }
         // Process queued element events this frame

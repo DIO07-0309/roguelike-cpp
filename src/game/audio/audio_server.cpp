@@ -100,6 +100,24 @@ static Sound _compile_pickup() {
     return _vec_to_sound(mx);
 }
 
+// Q4.4: 玩家受击 — 低沉闷响 + 短促噪声
+static Sound _compile_hurt() {
+    float dur = 0.22f; int n = (int)(SR * dur);
+    auto th = sine_wave(n, [=](float t){return 70.0f - 25.0f * (t/dur);}, spike(0.85f, 0.005f, dur));
+    auto ns = noise_wave(n, spike(0.35f, 0.01f, dur*0.6f));
+    auto mx = mix({&th, &ns});
+    return _vec_to_sound(mx);
+}
+
+// Q4.4: 怪物攻击 — 低频嘶吼 (方波下滑 + 噪声)
+static Sound _compile_monster_atk() {
+    float dur = 0.28f; int n = (int)(SR * dur);
+    auto sw = square_wave(n, [=](float t){return 180.0f - 90.0f * (t/dur);}, spike(0.5f, 0.01f, dur));
+    auto ns = noise_wave(n, spike(0.25f, 0.02f, dur*0.7f));
+    auto mx = mix({&sw, &ns});
+    return _vec_to_sound(mx);
+}
+
 static Sound _compile_levelup() {
     float dur = 0.5f; int n = (int)(SR * dur);
     std::vector<short> result(n, 0);
@@ -165,6 +183,8 @@ void AudioServer::init() {
     _sfx["pickup"]  = _compile_pickup();
     _sfx["levelup"] = _compile_levelup();
     _sfx["victory"] = _compile_victory();
+    _sfx["hurt"]        = _compile_hurt();         // Q4.4: 玩家受击
+    _sfx["monster_atk"] = _compile_monster_atk();  // Q4.4: 怪物攻击
 
     // timestop: 优先外部 MP3
     const char* mp3 = "assets/jojo_timestop.mp3";
@@ -197,3 +217,5 @@ void AudioServer::play_sfx(const std::string& name, float vol) {
     auto it = _sfx.find(name);
     if (it != _sfx.end()) { SetSoundVolume(it->second, vol); PlaySound(it->second); }
 }
+
+void AudioServer::update(float dt) { _bgm.update(dt); }

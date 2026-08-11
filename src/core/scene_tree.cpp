@@ -55,6 +55,7 @@ void SceneTree::process_frame(double delta) {
     }
 
     if (_root) _root->_propagate_process(delta);
+    _audio->update((float)delta);  // Q4.2: BGM 循环重播检测
     _time += delta;
 }
 

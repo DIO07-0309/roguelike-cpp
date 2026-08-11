@@ -101,6 +101,7 @@ void PlayerController::tick(float dt) {
                 float shake = dmg_taken >= 30 ? 12.0f : dmg_taken > 15 ? 5.0f : 2.0f;
                 gs._presentation.trigger_shake(shake);
                 if (dmg_taken >= 20) gs._presentation.trigger_freeze(0.05f);
+                gs.get_tree()->get_audio()->play_sfx("hurt", 0.6f);  // Q4.4
             }
         }
         return;
@@ -158,6 +159,7 @@ void PlayerController::tick(float dt) {
                 float shake = dmg_taken >= 30 ? 12.0f : dmg_taken > 15 ? 5.0f : 2.0f;
                 gs._presentation.trigger_shake(shake);
                 if (dmg_taken >= 20) gs._presentation.trigger_freeze(0.05f);
+                gs.get_tree()->get_audio()->play_sfx("hurt", 0.6f);  // Q4.4
             }
             gs._check_floor_transition();
         }
@@ -223,6 +225,16 @@ void PlayerController::handle_input(const InputMap& input) {
             bool is_relic = (result.find("圣物") != std::string::npos);
             gs._presentation.room_msg = result;
             gs._presentation.room_msg_timer = is_relic ? 3.5f : 2.5f;
+            // Q4.3: 拾取音效 + 拾取闪光
+            if (result.find("拾取: ") == 0) {
+                gs.get_tree()->get_audio()->play_sfx("pickup", 0.55f);
+                float px = gs.player->entity.rect.x + gs.player->entity.rect.width/2;
+                float py = gs.player->entity.rect.y + gs.player->entity.rect.height/2;
+                VFXServer vfx;
+                vfx.ring(px, py, 22.0f, is_relic ? Color{255,220,80,220} : Color{255,200,120,200}, 2, 0.35f);
+                vfx.spark_burst(px, py, 8, is_relic ? Color{255,240,140,230} : Color{255,220,160,210}, 0.30f);
+                for (auto& e : vfx.effects) gs.active_effects.push_back(e);
+            }
             // D9: 获得圣物 — shake+freeze 仪式感
             if (is_relic && gs._presentation.combat_juice_on) {
                 gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_LIGHT);

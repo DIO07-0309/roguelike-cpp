@@ -11,6 +11,7 @@ public:
     void play_bgm(const std::string& name, float vol = 0.4f);
     void stop_bgm(float = 0.4f);
     void play_sfx(const std::string& name, float vol = 0.6f);
+    void update(float dt);
 
 private:
     BGMEngine _bgm;

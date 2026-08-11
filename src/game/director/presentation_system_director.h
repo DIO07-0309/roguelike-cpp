@@ -83,6 +83,7 @@ public:
     // ── Frame Freeze ──
     float freeze_timer = 0.0f;
     void  trigger_freeze(float duration);
+    bool  is_frozen() const { return freeze_timer > 0.0f; }
 
     // ── Room Message ──
     std::string room_msg;
