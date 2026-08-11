@@ -400,3 +400,6 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | Q4.2 | BGM 循环重播 + stop 修 bug (停错曲目), AudioServer::update 接入主循环 | ✅ |
 | Q4.3 | 拾取反馈: pickup 音效 + ring/spark 闪光 (圣物金色) | ✅ |
 | Q4.4 | 受击/攻击音效: hurt + monster_atk 合成音, MONSTER_ATTACK 事件解耦 (AI 层无音频引用) | ✅ |
+| Q4.5 | UI 音效 (ui_click/ui_confirm) + 标题菜单悬停高亮/点击, _activate 统一动作分发 | ✅ |
+| Q4.6 | VFX recipe 消费 sfx/camera_shake 字段 (28 处死数据激活), 补 ice_crack/lightning/summon | ✅ |
+| Q4.7 | 玩家受击红屏: 全屏主题 hit_flash_tint 衰减叠加 | ✅ |

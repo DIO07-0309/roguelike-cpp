@@ -24,6 +24,23 @@
 
 # v0.9.1 — Boss Combat Hardening + Online Adaptive Mirror AI (2026-08-04)
 
+# v0.9.26 — Q4 品质打磨批2: 反馈补全 (2026-08-11)
+
+## Q4.7 玩家受击红屏
+- `trigger_hit_flash()` + `hit_flash_timer`: 全屏主题 hit_flash_tint 叠加, alpha 随计时衰减
+- 受击两处 (弹幕路径/近战路径) 同步触发 — 视觉反馈闭环
+
+## Q4.6 VFX recipe 消费 sfx/camera_shake 字段
+- `play_recipe` 现消费 recipe 的 `sfx`/`camera_shake` — 此前 28 处配置全部死数据
+- 补 3 个缺失合成音: `ice_crack`/`lightning`/`summon`
+- 经 ServiceLocator 间接访问 (VFXServer 值对象不持引用, 模块边界不变)
+
+## Q4.5 UI 音效 + 标题菜单高亮
+- 新增合成音: `ui_click` (短促)/`ui_confirm` (双音上行)
+- 标题菜单: 鼠标悬停高亮 (禁灰项不可悬停) + hover 切换音效 + 左键点击激活
+- `TitleScene::_activate()`: 键盘/鼠标共用动作分发 (单一职责)
+- 游戏内面板开关 (背包/圣物/任务日志) 播放 ui_click
+
 # v0.9.25 — Q4 品质打磨批1: 打击感与音频补全 (2026-08-11)
 
 ## Q4.1 HitStop 修复 (隐藏全局短板)
