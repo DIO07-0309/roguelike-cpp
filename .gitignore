@@ -12,6 +12,8 @@ __pycache__/
 crash.log
 game.log
 saves/save.json
+saves/meta_save.json
+reports/
 build_mingw/
 build_test/
 

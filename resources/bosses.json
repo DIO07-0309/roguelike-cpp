@@ -8,7 +8,7 @@
     "floor": 5,
     "is_summoner": false,
     "is_defender": false,
-    "hp": 900, "atk": 15, "pdef": 10, "mdef": 4,
+    "hp": 260, "atk": 12, "pdef": 7, "mdef": 4,
     "phase2_hp_threshold": 0.50,
     "phase2_pause": 0.50,
     "phase2_speed_mult": 1.50,
@@ -95,7 +95,7 @@
     "floor": 10,
     "is_summoner": false,
     "is_defender": false,
-    "hp": 500, "atk": 24, "pdef": 14, "mdef": 8,
+    "hp": 380, "atk": 20, "pdef": 10, "mdef": 7,
     "phase2_hp_threshold": 0.50,
     "phase2_pause": 0.50,
     "phase2_speed_mult": 1.50,
@@ -133,7 +133,7 @@
     "floor": 15,
     "is_summoner": false,
     "is_defender": false,
-    "hp": 900, "atk": 35, "pdef": 22, "mdef": 14,
+    "hp": 620, "atk": 26, "pdef": 15, "mdef": 11,
     "phase2_hp_threshold": 0.50,
     "phase2_pause": 0.50,
     "phase2_speed_mult": 1.50,
@@ -151,3 +151,4 @@
     "arena": {"danger_type": "void_crack", "spawn_interval": 6.0, "max_zones": 8, "zone_duration": 3.5, "spawn_radius": 140}
   }
 ]
+

@@ -5,10 +5,12 @@
 // ============================================================
 #include "raylib.h"
 #include "core/scene_tree.h"
+#include "game/audio/audio_server.h"   // Q3.1: --sim 静音
 #include "core/logger.h"
 #include "scenes/game_scene.h"
 #include "scenes/title_scene.h"
 #include "save/save_manager.h"
+#include "meta_progression.h"   // Q3.1: --sim 只读保护
 #include "systems/combat_system.h"
 #include "resources/resource_manager.h"
 #include "core/service_locator.h"
@@ -174,6 +176,9 @@ int main(int argc, char** argv) {
             sim_cfg.fixed_build = true;
             sim_cfg.fixed_build_id = sim_build;
         }
+        AudioServer::g_muted = true;  // Q3.1: headless 静音
+        SaveManager::g_sim_readonly = true;   // Q3.1: sim 不覆盖玩家存档
+        g_meta.g_readonly = true;             // Q3.1: sim 不写 meta 存档
         auto& sr = SimRunner::inst();
         if (GameScene::g_sim_all_builds) sr.set_all_builds(true);
         sr.begin(sim_cfg);
@@ -293,6 +298,26 @@ int main(int argc, char** argv) {
     bool has_save = SaveManager::save_exists();
     if (has_save) { auto* d = SaveManager::load_save(); delete d; }
     LOG_INFO(has_save ? "存档存在" : "暂无存档");
+
+    // G5.6: sim 模式直接进 GameScene, 跳过标题画面
+    if (GameScene::g_sim_mode) {
+        auto gs = std::make_shared<GameScene>();
+        gs->name = "GameScene";
+        gs->new_game();
+        tree.change_scene(gs);
+        // Q3.1: headless 加速 — 隐藏窗口 + 定步长驱动, 无渲染/输入开销
+        SetWindowState(FLAG_WINDOW_HIDDEN);
+        double dt = 1.0 / 60.0;
+        while (tree.is_running() && !WindowShouldClose()) {
+            tree.process_input();
+            tree.process_frame(dt);
+        }
+        ServiceLocator::remove_all();
+        ResourceManager::inst().unload_all();
+        CloseAudioDevice();
+        Logger::inst().close();
+        return 0;
+    }
 
     auto title = std::make_shared<TitleScene>();
     title->name = "TitleScene";

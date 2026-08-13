@@ -47,6 +47,9 @@ public:
     static SaveData* load_save();
     static void delete_save();
 
+    // Q3.1: --sim 模式禁止覆盖玩家存档
+    static bool g_sim_readonly;
+
 private:
     static std::string _save_dir();
     static std::string _save_path();

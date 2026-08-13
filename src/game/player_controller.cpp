@@ -110,6 +110,19 @@ void PlayerController::tick(float dt) {
 
     if (!gs.inventory_open && !gs._is_event_running() && !gs._dialogue.active && !gs._quest_log_open) {
         Vector2 move = gs.player->handle_input(gs.get_tree()->get_input());
+        if (gs._sim_mode) {
+            // Q3.1: headless 无真实键盘 — SimAI 决定移动方向与朝向
+            InputMap& sm = gs.get_tree()->get_input();
+            move.x = gs._is_action_just_pressed(sm, "move_left") ? -1.0f
+                   : gs._is_action_just_pressed(sm, "move_right") ? 1.0f : 0.0f;
+            move.y = gs._is_action_just_pressed(sm, "move_up") ? -1.0f
+                   : gs._is_action_just_pressed(sm, "move_down") ? 1.0f : 0.0f;
+            if (move.y < 0) gs.player->direction = Direction::UP;
+            else if (move.y > 0) gs.player->direction = Direction::DOWN;
+            else if (move.x < 0) gs.player->direction = Direction::LEFT;
+            else if (move.x > 0) gs.player->direction = Direction::RIGHT;
+            gs.player->is_moving = (move.x != 0 || move.y != 0);
+        }
         auto& e = gs.player->entity;
         _record_move(move.x, move.y);
         float speed_mul = (gs._tw_speed_boost > 0) ? 1.25f : 1.0f;

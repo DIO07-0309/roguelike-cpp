@@ -13,6 +13,9 @@ public:
     void play_sfx(const std::string& name, float vol = 0.6f);
     void update(float dt);
 
+    // Q3.1: --sim 静音模式 (跳过音频合成与播放)
+    static bool g_muted;
+
 private:
     BGMEngine _bgm;
     std::unordered_map<std::string, Sound> _sfx;

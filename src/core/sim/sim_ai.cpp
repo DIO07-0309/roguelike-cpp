@@ -1,6 +1,7 @@
 #include "sim_ai.h"
 #include "player.h"
 #include "monster.h"
+#include "boss.h"           // Q3.2: BossAI windup 状态读取 (闪避判定)
 #include "game_map.h"
 #include "combat_system.h"  // rng
 #include "build_score.h"    // BuildType, calculate_build
@@ -9,6 +10,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <queue>
 
 bool DecisionAgent::g_use_mcts = false;
 int  DecisionAgent::g_mcts_iters = 100;
@@ -127,7 +129,10 @@ void DecisionAgent::_resolve_profile(const Player* player) {
     }
 }
 
-void DecisionAgent::tick() { _frame++; }
+void DecisionAgent::tick() {
+    _frame++;
+    _cached_frame = -1;  // Q3.1: 强制下一查询重算 (世界已变)
+}
 
 // ═══════════════════════════════════════════════════════════
 //  G7.4: Action evaluators
@@ -137,9 +142,9 @@ float DecisionAgent::_evaluate_attack(const Player* p,
     const std::vector<Monster*>& monsters) const {
     auto* t = _find_nearest(p, monsters);
     if (!t) return 0;
-    float d = hypotf(t->entity.rect.x - p->entity.rect.x,
-                     t->entity.rect.y - p->entity.rect.y);
-    if (d > 2.0f * 32.0f) return 0; // out of range — no score
+    float d = hypotf(t->entity.rect.x + t->entity.rect.width/2 - (p->entity.rect.x + p->entity.rect.width/2),
+                     t->entity.rect.y + t->entity.rect.height/2 - (p->entity.rect.y + p->entity.rect.height/2));
+    if (d > 1.5f * 32.0f) return 0; // out of range — no score
     // Melee builds score higher for attacking
     float base = 1.0f - _prefer_range; // range=0 → score 1.0
     return base * (1.0f - d / (3.0f * 32.0f)); // closer = better
@@ -148,49 +153,299 @@ float DecisionAgent::_evaluate_attack(const Player* p,
 float DecisionAgent::_evaluate_skill(int slot, const Player* p,
     const std::vector<Monster*>& monsters) const {
     if (slot < 0 || slot >= 4) return 0;
+    // Q3.2: 槽位越界/技能空/冷却中 → 不得给分 (否则站桩按CD技能挨打)
+    if (slot >= (int)p->skills.active_skills.size()) return 0;
+    auto& sk = p->skills.active_skills[slot];
+    if (!sk || !sk->can_use(_game_time)) return 0;
     int n = _count_in_range(p, monsters, 5.0f * 32.0f);
     if (n <= 0) return 0;
     float aoe_bonus = _prefer_aoe * (n > 1 ? 1.0f : 0.3f);
     return _prefer_skill * (0.5f + aoe_bonus);
 }
 
-float DecisionAgent::_evaluate_move(int dir, const Player* p,
-    const std::vector<Monster*>& monsters, const GameMap* map) const {
-    auto* t = _find_nearest(p, monsters);
-    float px = p->entity.rect.x / 32.0f;
-    float py = p->entity.rect.y / 32.0f;
+static const int kBfsDx[4] = {0, 0, -1, 1};  // up, down, left, right
+static const int kBfsDy[4] = {-1, 1, 0, 0};
 
-    // Direction offsets (0=up,1=down,2=left,3=right)
-    float dx = 0, dy = 0;
-    if (dir == 0) dy = -1; else if (dir == 1) dy = 1;
-    else if (dir == 2) dx = -1; else if (dir == 3) dx = 1;
-
-    // Check walkable
-    int tx = (int)(px + dx), ty = (int)(py + dy);
-    if (map && !map->is_walkable(tx, ty)) return -999; // blocked
-
-    if (!t) return 0.1f; // no enemies → neutral
-
-    float ex = t->entity.rect.x / 32.0f;
-    float ey = t->entity.rect.y / 32.0f;
-    float cur_dist = hypotf(ex - px, ey - py);
-    float new_dist = hypotf(ex - (px + dx), ey - (py + dy));
-
-    // Ranged builds: move AWAY from enemies. Melee: move TOWARD.
-    float ideal_dist = 1.5f + _prefer_range * 4.0f; // melee=1.5, range=5.5
-    float cur_diff = fabsf(cur_dist - ideal_dist);
-    float new_diff = fabsf(new_dist - ideal_dist);
-
-    return (cur_diff - new_diff) * _aggro_bias * 2.0f; // positive = improvement
+// Q3.2: Boss 蓄力判定 — 任一技能处于 windup 阶段即视为"即将出招"
+static bool _boss_winding_up(const Monster* m) {
+    const auto* bai = dynamic_cast<const BossAI*>(m->ai);
+    if (!bai) return false;
+    if (bai->_charge    && bai->_charge->windup_left    > 0.0f) return true;
+    if (bai->_shockwave && bai->_shockwave->windup_left > 0.0f) return true;
+    if (bai->_whirlwind && bai->_whirlwind->windup_left > 0.0f) return true;
+    if (bai->_laser     && bai->_laser->windup_left     > 0.0f) return true;
+    if (bai->_cone      && bai->_cone->windup_left      > 0.0f) return true;
+    if (bai->_blink     && bai->_blink->windup_left     > 0.0f) return true;
+    if (bai->_barrage   && bai->_barrage->windup_left   > 0.0f) return true;
+    return false;
 }
 
-float DecisionAgent::_evaluate_pickup(const Player* p, const GameMap* map) const {
-    if (!map) return 0;
+// Q3.2: tile 级 rect 碰撞判定 — BFS 与真实移动(rect)对齐, 防 tile可行走但玩家进不去导致的卡墙
+static bool _tile_rect_walkable(const GameMap* map, int tx, int ty) {
+    if (!map) return false;
+    Rectangle r = { (float)(tx * 32), (float)(ty * 32), 32.0f, 32.0f };
+    return map->is_rect_walkable(r);
+}
+
+// Q3.2: 危险视野 — 活性毒池/尖刺圈 (伤害圈 1.2 格 + 缓冲 = 1.5 格)
+bool DecisionAgent::_is_hazard_near(float px, float py, const GameMap* map) const {
+    if (!map) return false;
+    for (auto& ao : map->arena_objects) {
+        if (!ao.active) continue;
+        if (ao.type != ArenaObjectType::POISON_POOL &&
+            ao.type != ArenaObjectType::SPIKE) continue;
+        float ax = ao.tile_x * 32.0f + 16.0f;
+        float ay = ao.tile_y * 32.0f + 16.0f;
+        if (hypotf(px - ax, py - ay) <= 1.5f * 32.0f) return true;
+    }
+    return false;
+}
+
+// Q3.2: 残血且无可用自愈 → 需要找泉水/祭坛回血
+bool DecisionAgent::_needs_recovery(const Player* p) const {
+    if (!p) return false;
+    if (_hp_ratio(p) >= 0.50f) return false;
+    for (auto& s : p->skills.active_skills)
+        if (dynamic_cast<SelfHealSkill*>(s.get()) && s->can_use(_game_time))
+            return false;
+    return true;
+}
+
+// Q3.2: BFS 至最近未触发的特殊房 — 战斗间隙搜刮资源 (圣物/装备/泉水)
+int DecisionAgent::_bfs_toward_room(const Player* p, const GameMap* map) const {
+    if (!map || !p) return -1;
+    int w = map->width, h = map->height;
+    auto [sx, sy] = map->pixel_to_tile(
+        p->entity.rect.x + p->entity.rect.width/2,
+        p->entity.rect.y + p->entity.rect.height/2);
+    const int N = w * h;
+    std::vector<char> is_target((size_t)N, 0);
+    size_t pending = 0;
     for (auto& sr : map->special_rooms) {
+        if (sr.triggered) continue;
+        is_target[sr.cy * w + sr.cx] = 1;
+        pending++;
+    }
+    if (pending == 0) return -1;
+    std::vector<int> first((size_t)N, -2);
+    std::queue<int> q;
+    first[sy * w + sx] = -1;
+    q.push(sy * w + sx);
+    while (!q.empty()) {
+        int cur = q.front(); q.pop();
+        int cx = cur % w, cy = cur / w;
+        if (is_target[cur]) return (first[cur] >= 0) ? first[cur] : -1;
+        for (int d = 0; d < 4; d++) {
+            int nx = cx + kBfsDx[d], ny = cy + kBfsDy[d];
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+            int ni = ny * w + nx;
+            if (first[ni] != -2 || !_tile_rect_walkable(map, nx, ny)) continue;
+            first[ni] = (cur == sy * w + sx) ? d : first[cur];
+            q.push(ni);
+        }
+    }
+    return -1;
+}
+
+// Q3.2: BFS 寻路 — 从玩家所在格出发, 找最近可达的存活怪物, 返回第一步方向 (0-3, -1=不可达)
+int DecisionAgent::_bfs_toward(const Player* p,
+    const std::vector<Monster*>& monsters, const GameMap* map, bool avoid_hazard) const {
+    if (!map || !p) return -1;
+    int w = map->width, h = map->height;
+    auto [sx, sy] = map->pixel_to_tile(
+        p->entity.rect.x + p->entity.rect.width/2,
+        p->entity.rect.y + p->entity.rect.height/2);
+    const int N = w * h;
+    std::vector<char> is_target((size_t)N, 0);
+    for (auto* m : monsters) {
+        if (!m || !m->combat.is_alive) continue;
+        auto [tx, ty] = map->pixel_to_tile(
+            m->entity.rect.x + m->entity.rect.width/2,
+            m->entity.rect.y + m->entity.rect.height/2);
+        is_target[ty * w + tx] = 1;
+    }
+    std::vector<int> first((size_t)N, -2);  // 从起点出发的第一步方向, -1=起点, -2=未访问
+    std::queue<int> q;
+    first[sy * w + sx] = -1;
+    q.push(sy * w + sx);
+    while (!q.empty()) {
+        int cur = q.front(); q.pop();
+        int cx = cur % w, cy = cur / w;
+        if (is_target[cur]) return (first[cur] >= 0) ? first[cur] : -1;
+        for (int d = 0; d < 4; d++) {
+            int nx = cx + kBfsDx[d], ny = cy + kBfsDy[d];
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+            int ni = ny * w + nx;
+            if (first[ni] != -2 || !_tile_rect_walkable(map, nx, ny)) continue;
+            // Q3.2: 避开危险瓦片中心圈 (毒池/尖刺)
+            if (avoid_hazard && _is_hazard_near(nx * 32.0f + 16.0f, ny * 32.0f + 16.0f, map)) continue;
+            first[ni] = (cur == sy * w + sx) ? d : first[cur];
+            q.push(ni);
+        }
+    }
+    return -1;
+}
+
+// Q3.2: BFS 远离 — 从目标怪所在格 BFS 整图, 返回玩家 4 邻居中距怪最远的方向 (0-3, -1=全堵)
+int DecisionAgent::_bfs_away(const Player* p, const Monster* t,
+    const GameMap* map, bool avoid_hazard) const {
+    if (!map || !p || !t) return -1;
+    int w = map->width, h = map->height;
+    auto [mx, my] = map->pixel_to_tile(
+        t->entity.rect.x + t->entity.rect.width/2,
+        t->entity.rect.y + t->entity.rect.height/2);
+    auto [sx, sy] = map->pixel_to_tile(
+        p->entity.rect.x + p->entity.rect.width/2,
+        p->entity.rect.y + p->entity.rect.height/2);
+    const int N = w * h;
+    std::vector<int> dist((size_t)N, -1);
+    std::queue<int> q;
+    dist[my * w + mx] = 0;
+    q.push(my * w + mx);
+    while (!q.empty()) {
+        int cur = q.front(); q.pop();
+        int cx = cur % w, cy = cur / w;
+        for (int d = 0; d < 4; d++) {
+            int nx = cx + kBfsDx[d], ny = cy + kBfsDy[d];
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+            int ni = ny * w + nx;
+            if (dist[ni] >= 0 || !_tile_rect_walkable(map, nx, ny)) continue;
+            if (avoid_hazard && _is_hazard_near(nx * 32.0f + 16.0f, ny * 32.0f + 16.0f, map)) continue;
+            dist[ni] = dist[cur] + 1;
+            q.push(ni);
+        }
+    }
+    int best = -1, best_dist = -1;
+    for (int d = 0; d < 4; d++) {
+        int nx = sx + kBfsDx[d], ny = sy + kBfsDy[d];
+        if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+        if (!_tile_rect_walkable(map, nx, ny)) continue;
+        if (avoid_hazard && _is_hazard_near(nx * 32.0f + 16.0f, ny * 32.0f + 16.0f, map)) continue;
+        if (dist[ny * w + nx] > best_dist) { best_dist = dist[ny * w + nx]; best = d; }
+    }
+    return best;
+}
+
+// Q3.2: 轴贪心兜底 — BFS 无路时按主轴直行, 用真实rect校验, 每步避开毒池
+int DecisionAgent::_greedy_step(const Player* p, const Monster* t,
+                                const GameMap* map) const {
+    if (!p || !t || !map) return -1;
+    float px = p->entity.rect.x + p->entity.rect.width/2;
+    float py = p->entity.rect.y + p->entity.rect.height/2;
+    float tx = t->entity.rect.x + t->entity.rect.width/2;
+    float ty = t->entity.rect.y + t->entity.rect.height/2;
+    int dx = (tx > px) ? 3 : 2;
+    int dy = (ty > py) ? 1 : 0;
+    int cand[4] = {dx, dy, (dx == 2) ? 3 : 2, (dy == 0) ? 1 : 0};
+    for (int i = 0; i < 4; i++) {
+        float mdx = (cand[i] == 2) ? -32.0f : (cand[i] == 3) ? 32.0f : 0.0f;
+        float mdy = (cand[i] == 0) ? -32.0f : (cand[i] == 1) ? 32.0f : 0.0f;
+        Rectangle r = p->entity.rect;
+        r.x += mdx; r.y += mdy;
+        if (!map->is_rect_walkable(r)) continue;
+        if (_is_hazard_near(r.x + r.width/2, r.y + r.height/2, map)) continue;
+        return cand[i];
+    }
+    return -1;
+}
+
+float DecisionAgent::_evaluate_move(int dir, const Player* p,
+    const std::vector<Monster*>& monsters, const GameMap* map) const {
+    if (!p) return -999;
+    float dx = (dir == 2) ? -1.0f : (dir == 3) ? 1.0f : 0.0f;
+    float dy = (dir == 0) ? -1.0f : (dir == 1) ? 1.0f : 0.0f;
+    // Check walkable (Q3.1: 用 rect 判定对齐真实移动, 避免 tile 级误判撞墙)
+    Rectangle target_rect = p->entity.rect;
+    target_rect.x += dx * 32.0f;
+    target_rect.y += dy * 32.0f;
+    if (map && !map->is_rect_walkable(target_rect)) return -999; // blocked
+
+    float px = p->entity.rect.x + p->entity.rect.width/2;
+    float py = p->entity.rect.y + p->entity.rect.height/2;
+    // Q3.2: 落脚点进入毒池/尖刺圈 → 重罚 (绝不踩毒)
+    if (map && _is_hazard_near(target_rect.x + target_rect.width/2,
+                               target_rect.y + target_rect.height/2, map))
+        return -999;
+
+    auto* t = _find_nearest(p, monsters);
+    if (!t) return 0.1f; // 全图无存活怪 → 中性
+
+    float ex = t->entity.rect.x + t->entity.rect.width/2;
+    float ey = t->entity.rect.y + t->entity.rect.height/2;
+    float d = hypotf(ex - px, ey - py);
+
+    // Q3.2: Boss 蓄力闪避 — 起手瞬间脱离 (1.4 > 攻击 1.0, 躲招优先于换血)
+    if (t->is_boss && _boss_winding_up(t) && d < 220.0f) {
+        int away = _bfs_away(p, t, map, true);
+        if (away < 0) return 1.4f;  // 无安全路径 → 任意方向裸躲
+        return (dir == away) ? 1.4f : 0.0f;
+    }
+
+    // Q3.2: 站在毒池里 → 任何安全方向优先逃离 (1.2 > 攻击上限 1.0)
+    if (map && _is_hazard_near(px, py, map)) return 1.2f;
+
+    // Q3.2: 战斗间隙搜刮 — 最近怪 >5 格(160px)时走向最近未触发特殊房 (圣物/装备/泉水)
+    // 交战圈内(≤ideal)先打; rect级BFS保证路径真实可达, 不会卡墙
+    if (d > 160.0f && map) {
+        int room_step = _bfs_toward_room(p, map);
+        if (room_step >= 0) return (dir == room_step) ? 0.6f : 0.0f;
+    }
+
+    // Q3.1: 理想距离按玩家真实武器判定 — 近战FIST不可风筝(火系profile会抖动挨打)
+    float atk_range = (p->weapon.weapon_type() != WeaponType::FIST) ? 2.5f : 1.5f;
+    float ideal_dist = atk_range + _prefer_range * 2.0f; // 近战=1.5, 远程=2.5~4.5
+
+    // Q3.2: 已到攻击圈内 → 站桩攻击/放技能, 不移动
+    if (d <= ideal_dist * 32.0f) return 0;
+
+    // Q3.2: 远程且过近 → BFS 拉开距离 (优先安全路径)
+    if (_prefer_range > 0 && d < ideal_dist * 32.0f * 0.6f) {
+        int away = _bfs_away(p, t, map, true);
+        if (away < 0) away = _bfs_away(p, t, map, false);
+        return (dir == away) ? 0.4f : 0.0f;
+    }
+
+    // Q3.2: 太远 → BFS 寻路接近 (绕墙+绕毒, 无路时轴贪心兜底)
+    int step = _bfs_toward(p, monsters, map, true);
+    if (step < 0) step = _bfs_toward(p, monsters, map, false);
+    if (step < 0) step = _greedy_step(p, t, map);
+    if (step < 0) return 0.0f;
+
+    // Q3.2: 路径记忆 — 同一目标沿用上次实际走的步, 消除 BFS 等权震荡
+    if (_mem_target == (const void*)t && _mem_step >= 0) {
+        float mdx = (_mem_step == 2) ? -32.0f : (_mem_step == 3) ? 32.0f : 0.0f;
+        float mdy = (_mem_step == 0) ? -32.0f : (_mem_step == 1) ? 32.0f : 0.0f;
+        Rectangle mr = p->entity.rect;
+        mr.x += mdx; mr.y += mdy;
+        float nd = hypotf(ex - (px + mdx), ey - (py + mdy));
+        if (map->is_rect_walkable(mr) && nd < d)
+            return (dir == _mem_step) ? 0.8f : 0.0f;
+    }
+    return (dir == step) ? 0.6f : 0.0f;
+}
+
+float DecisionAgent::_evaluate_pickup(const Player* p, const GameMap* map,
+    const std::vector<Monster*>& monsters) const {
+    if (!map) return 0;
+    float threat = 0.0f;
+    for (auto* m : monsters) {
+        if (!m || !m->combat.is_alive) continue;
+        float md = hypotf(m->entity.rect.x + m->entity.rect.width/2 - (p->entity.rect.x + p->entity.rect.width/2),
+                          m->entity.rect.y + m->entity.rect.height/2 - (p->entity.rect.y + p->entity.rect.height/2));
+        threat = std::max(threat, 1.0f - md / (6.0f * 32.0f));
+    }
+    for (auto& sr : map->special_rooms) {
+        if (sr.triggered) continue; // Q3.2: 已拾取房间不再给分 — 否则 loot 完站桩等死
         float dx = p->entity.rect.x + p->entity.rect.width/2 - (sr.cx * 32 + 16);
         float dy = p->entity.rect.y + p->entity.rect.height/2 - (sr.cy * 32 + 16);
-        if (sqrtf(dx*dx+dy*dy) < 3.0f * 32.0f)
-            return 1.5f; // always high priority near room
+        // Q3.1: 只有站在房间上(≤1格)才给分 — 且随最近威胁衰减, 被围殴时不得锁死拾取
+        // Q3.2: 残血时给 2.0 保底分 (泉水满血优先), 威胁权重减半
+        if (sqrtf(dx*dx+dy*dy) < 1.0f * 32.0f) {
+            // Q3.1: 只有站在房间上(≤1格)才给分 — 且随最近威胁衰减, 被围殴时不得锁死拾取
+            float threat_w = threat;
+            float base_w  = 1.5f;
+            return base_w * (1.0f - threat_w);
+        }
     }
     return 0;
 }
@@ -217,6 +472,35 @@ std::string DecisionAgent::best_action(const Player* player,
         }
     }
 
+    // Q3.2: 卡死逃脱 — 原地 ≥2s 且无近距怪 → 直线脱困 (先于一切评分)
+    // 有 HP 交换(换血战) → 重置计时, 不触发逃脱; 纹丝不动才是真卡
+    if (player && map) {
+        int pt0 = (int)(player->entity.rect.x + 16) / 32;
+        int pt1 = (int)(player->entity.rect.y + 16) / 32;
+        if (pt0 != (int)_last_px || pt1 != (int)_last_py) { _stuck_since = -1; _escape_dir = -1; }
+        else {
+            float own = player->combat.current_hp, mon = 0;
+            for (const Monster* m : monsters) if (m->combat.is_alive) mon += m->combat.current_hp;
+            if (own != _last_hp_sum || mon != _last_mon_sum) { _stuck_since = -1; _escape_dir = -1; }
+            _last_hp_sum = own; _last_mon_sum = mon;
+            if (_stuck_since < 0) _stuck_since = (float)_game_time;
+            else if ((float)_game_time - _stuck_since > 2.0f &&
+                     _count_in_range(player, monsters, 1.6f * 32.0f) == 0) {
+                if (_escape_dir < 0) _escape_dir = 0;
+                float mdx = (_escape_dir == 2) ? -1.0f : (_escape_dir == 3) ? 1.0f : 0.0f;
+                float mdy = (_escape_dir == 0) ? -1.0f : (_escape_dir == 1) ? 1.0f : 0.0f;
+                Rectangle er = player->entity.rect;
+                er.x += mdx * 32; er.y += mdy * 32;
+                if (!map->is_rect_walkable(er) ||
+                    _is_hazard_near(er.x + er.width/2, er.y + er.height/2, map))
+                    _escape_dir = (_escape_dir + 1) % 4;
+                const char* esc[] = {"move_up","move_down","move_left","move_right"};
+                return esc[_escape_dir];
+            }
+        }
+        _last_px = (float)pt0; _last_py = (float)pt1;
+    }
+
     float best_score = 0;
     std::string best = "";
 
@@ -238,17 +522,19 @@ std::string DecisionAgent::best_action(const Player* player,
     if (_hp_ratio(player) < _prefer_heal) {
         for (int si = 0; si < 4; si++) {
             int slot = _skill_priority[si];
-            // SelfHealSkills map to skill index — approximate by slot
-            // skill_3 is often heal slot
-            if (slot == 2 && _evaluate_skill(slot, player, monsters) > 0.1f) {
+            // Q3.1: 只有真·治疗槽才触发 — 火系玩家初始无自愈时不得锁死 skill_3
+            // Q3.2: 冷却中不得锁死 — 否则站桩等CD被环境伤害磨死
+            if (slot < (int)player->skills.active_skills.size() &&
+                dynamic_cast<SelfHealSkill*>(player->skills.active_skills[slot].get()) &&
+                player->skills.active_skills[slot]->can_use(_game_time)) {
                 best_score = 3.0f; // override other actions
-                best = "skill_3";
+                best = "skill_" + std::to_string(slot + 1);
             }
         }
     }
 
     // Pickup
-    float pu_score = _evaluate_pickup(player, map);
+    float pu_score = _evaluate_pickup(player, map, monsters);
     if (pu_score > best_score) { best_score = pu_score; best = "pickup"; }
 
     // Movement (pick best direction)
@@ -258,9 +544,16 @@ std::string DecisionAgent::best_action(const Player* player,
     int best_dir = 0;
     for (int d = 1; d < 4; d++)
         if (move_scores[d] > move_scores[best_dir]) best_dir = d;
+    // Q3.2: 方向迟滞 — 当前方向仍接近最优(±0.03)时保持, 避免对角逼近时逐帧翻转抖动
+    if (_current_dir >= 0 && move_scores[_current_dir] >= move_scores[best_dir] - 0.03f)
+        best_dir = _current_dir;
     if (move_scores[best_dir] > best_score) {
         const char* dirs[] = {"move_up","move_down","move_left","move_right"};
         best = dirs[best_dir];
+        _current_dir = best_dir;
+        // Q3.2: 记录路径记忆 (与 _evaluate_move 的等权震荡消解配合)
+        _mem_step = best_dir;
+        _mem_target = (const void*)_find_nearest(player, monsters);
     }
 
     // If nothing better — move randomly
@@ -307,9 +600,12 @@ bool DecisionAgent::is_action_just_pressed(const char* action_name,
     const GameMap* map, bool stairs_active, bool boss_intro_active) {
     if (!player) return false;
 
-    std::string best = best_action(player, monsters, map, stairs_active, boss_intro_active);
-    if (best.empty()) return false;
-    return best == action_name;
+    // Q3.1: 同帧内所有动作名查询共享同一次 best_action 结果
+    if (_cached_frame != _frame) {
+        _cached_best = best_action(player, monsters, map, stairs_active, boss_intro_active);
+        _cached_frame = _frame;
+    }
+    return !_cached_best.empty() && _cached_best == action_name;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -337,7 +633,8 @@ int DecisionAgent::_count_in_range(const Player* player,
     float py = player->entity.rect.y + player->entity.rect.height/2;
     for (auto* m : monsters) {
         if (!m || !m->combat.is_alive) continue;
-        float d = hypotf(m->entity.rect.x - px, m->entity.rect.y - py);
+        float d = hypotf(m->entity.rect.x + m->entity.rect.width/2 - px,
+                         m->entity.rect.y + m->entity.rect.height/2 - py);
         if (d < range_px) n++;
     }
     return n;

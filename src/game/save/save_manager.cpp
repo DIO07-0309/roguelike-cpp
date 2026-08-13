@@ -20,6 +20,8 @@
 std::string SaveManager::_save_dir() { return "saves"; }
 std::string SaveManager::_save_path() { return _save_dir() + "/save.json"; }
 
+bool SaveManager::g_sim_readonly = false;  // Q3.1: --sim 只读
+
 bool SaveManager::save_exists() {
     FILE* f = fopen(_save_path().c_str(), "r");
     if (!f) return false; fclose(f); return true;
@@ -45,6 +47,7 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
                               const std::vector<int>& unlocked_endings,
                               const std::vector<float>& mirror_prior_alpha,
                               const std::vector<float>& mirror_prior_beta) {
+    if (g_sim_readonly) return false;  // Q3.1: sim 模式不写玩家存档
     mkdir_impl(_save_dir().c_str());
     FILE* f = fopen(_save_path().c_str(), "w");
     if (!f) { LOG_ERROR("存档无法写入"); return false; }

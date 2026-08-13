@@ -34,6 +34,7 @@
 #include "ai/mirror/mirror_agent.h"                       // F15.5
 #include <cmath>
 #include <algorithm>
+#include <unordered_map>
 #include <cstdio>
 #include <cstring>
 #include "resource_manager.h"                 // M4f: NPC 精灵加载
@@ -148,10 +149,16 @@ void GameScene::new_game() {
 
     // G10.1: Element select on first-ever game
     if (!player->element.initialized) {
-        element_select_active = true;
-        element_select_cursor = 0;
-        state = GameState::TITLE;
-        return;
+        if (g_sim_mode) {
+            // G5.6: sim 模式跳过元素选择, 固定火系
+            player->element.select(ElementType::FIRE);
+            element_select_active = false;
+        } else {
+            element_select_active = true;
+            element_select_cursor = 0;
+            state = GameState::TITLE;
+            return;
+        }
     }
 
     auto sk = random_active_skill({}, true);  // G9: first skill always base 4
@@ -285,6 +292,14 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     game_map = gen.generate(_dungeon_seed, fcfg->special_room_count, fcfg->arena_density);
     auto rooms = gen.get_room_centers();
 
+    // D9-rest: 休息层保证 1 个泉水房 — 50% landmark 替换可能吞掉治疗资源
+    if (fcfg->is_rest_floor && !game_map->special_rooms.empty()) {
+        bool has_fountain = false;
+        for (auto& sr : game_map->special_rooms)
+            if (sr.type == SpecialRoomType::FOUNTAIN) { has_fountain = true; break; }
+        if (!has_fountain) game_map->special_rooms[0].type = SpecialRoomType::FOUNTAIN;
+    }
+
     // M4f: biome palette → 地图 (程序化像素纹理基色)
     const BiomeDef* biome = get_biome_for_floor(floor);
     game_map->set_palette(biome ? &biome->palette : nullptr);
@@ -355,6 +370,7 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
 
     // B11: blood_charm — 进入新楼层时使用有效最大生命
     player->combat.current_hp = get_effective_max_hp(player.get());
+    if (_sim_mode) _sim_hp_prev = player->combat.current_hp; // Q3.2: 入场回满不计入治疗统计
     player->reset_attack_timers();
 
     // D8: soul_lantern — 进入新楼层获得 attack_up + heal 10
@@ -432,6 +448,31 @@ void GameScene::_process(double delta) {
         return;
     }
     game_time += dt;
+    if (_sim_ai) _sim_ai->set_time(game_time); // Q3.2: AI 技能冷却判定需要当前时间
+
+    // Q3.2: sim 真实伤害统计 — 玩家 HP 下降累计 (含毒池等环境伤害)
+    if (_sim_mode && player) {
+        int hp = player->combat.current_hp;
+        if (_sim_hp_prev < 0) {
+            _sim_hp_prev = hp;
+        } else if (hp < _sim_hp_prev) {
+            _sim_dmg_taken += _sim_hp_prev - hp;
+        } else if (hp > _sim_hp_prev) {
+            _sim_heal_total += hp - _sim_hp_prev; // 泉水/药水/吸血等所有治疗
+        }
+        _sim_hp_prev = hp;
+        for (auto& m : monsters) {
+            if (!m) continue;
+            intptr_t key = (intptr_t)m.get();
+            auto it = _sim_mon_hp.find(key);
+            if (it == _sim_mon_hp.end()) {
+                _sim_mon_hp[key] = m->combat.current_hp;
+            } else if (m->combat.current_hp < it->second) {
+                _sim_dmg_dealt += it->second - m->combat.current_hp;
+                it->second = m->combat.current_hp;
+            }
+        }
+    }
 
     // M4a-fix: 兜底受击日志 — 只报未记账来源的玩家掉血 (标签源已调 mark_damage_logged)
     {
@@ -795,9 +836,19 @@ void GameScene::_process(double delta) {
     // D3 Step3: TW E3 speed boost tick
     if (_tw_speed_boost > 0) _tw_speed_boost -= dt;
 
+    // Q3.2: sim 单局时间上限 — 防止罕见卡死拖死整个批量 (正常对局 ~50s, 上限 900s)
+    if (_sim_mode && game_time > 900.0f) {
+        LOG_INFO("[SIM] 单局超时 t=%.0f 第%d层 — 强制结算", game_time, current_floor);
+        _collect_sim_stats();
+        return;
+    }
+
     if (!player->combat.is_alive) {
-        // G5.6: collect sim stats before death flow
-        if (_sim_mode) _collect_sim_stats();
+        // G5.6: sim 模式短路死亡流程 — _collect_sim_stats 内部已处理重启/退出
+        if (_sim_mode) {
+            _collect_sim_stats();
+            return;
+        }
         LOG_INFO("玩家死亡! 第%d层 Lv%d - 存档已保留", current_floor, player->level);
         _gameplay.on_player_dead(current_floor, player->level, player.get());
         g_meta.end_run(_gameplay.run_stats);
@@ -807,6 +858,23 @@ void GameScene::_process(double delta) {
 
     // D6 Step7: 玩家移动/交互/怪物AI — 委托给 PlayerController
     _player_ctrl.tick(dt);
+
+    // Q3.2: sim 自动装备 — 搜刮到的武器/护甲直接换上 (总值更高才换)
+    if (_sim_mode && player && !player->inventory.items.empty()) {
+        for (int i = 0; i < (int)player->inventory.items.size(); i++) {
+            auto* eq = dynamic_cast<EquipmentItem*>(player->inventory.items[i].get());
+            if (!eq) continue;
+            auto cur = player->inventory.equipped.find(eq->slot);
+            // Q3.2-fix: equipped 槽位可能为 nullptr (构造预置) — 空槽视为直接换上
+            bool better = true;
+            if (cur != player->inventory.equipped.end() && cur->second) {
+                better = (eq->atk_bonus + eq->pdef_bonus + eq->mdef_bonus) >
+                         (cur->second->atk_bonus + cur->second->pdef_bonus
+                          + cur->second->mdef_bonus);
+            }
+            if (better) player->inventory.equip(i, player.get());
+        }
+    }
 
     // VFX 更新
     for (auto& fx : active_effects) fx.elapsed += dt;
@@ -1016,6 +1084,11 @@ void GameScene::start_replay(const std::string& path) {
 bool GameScene::_is_action_just_pressed(const InputMap& input, const char* name) {
     // G5.6/G8.1: SimAI / BTAgent drives the player
     if (_sim_mode) {
+        // Q3.1: 模态 UI 优先 — 事件/对话由 AI 直接确认推进, 避免死锁
+        if (_is_event_running())
+            return strcmp(name, "confirm") == 0;
+        if (_dialogue.active)
+            return strcmp(name, "confirm") == 0 || strcmp(name, "attack") == 0;
         std::vector<Monster*> mlist;
         for (auto& m : monsters) mlist.push_back(m.get());
         bool boss_intro = (state == GameState::BOSS_INTRO);
@@ -1097,18 +1170,28 @@ void GameScene::_collect_sim_stats() {
     s.victory = (current_floor >= MAX_FLOORS);
     s.floor_reached = current_floor;
     s.turns = (int)(game_time * 60); // approximate frames → turns
-    s.damage_dealt = _gameplay.run_stats.total_kills * 10; // rough estimate
-    s.damage_taken = 0; // tracked per-hit, simplified for now
+    s.damage_dealt = (int)_sim_dmg_dealt;  // Q3.2: 真实累计 (替代 kills*10 估算)
+    s.damage_taken = (int)_sim_dmg_taken;  // Q3.2: 真实累计 (含毒池环境伤害)
+    s.heal_total = (int)_sim_heal_total;   // 泉水/药水/吸血等治疗量
     s.enemies_killed = _gameplay.run_stats.total_kills;
     s.elite_kills = _gameplay.run_stats.elite_kills;
     s.bosses_killed = _gameplay.run_stats.bosses_killed;
     s.relics_collected = (int)player->relics.size();
+    s.equipment_count = (int)std::count_if(player->inventory.equipped.begin(),
+        player->inventory.equipped.end(), [](const auto& kv) { return kv.second != nullptr; });
     s.build_type = (int)calculate_build(player.get()).identify();
     s.build_name = calculate_build(player.get()).build_name();
     for (auto& r : player->relics) s.relics_picked.push_back(r.id);
 
     auto& sim = SimRunner::inst();
     sim.record_run(s);
+
+    // Q3.2: 重置统计, 供下一局使用
+    _sim_hp_prev = -1;
+    _sim_dmg_taken = 0;
+    _sim_dmg_dealt = 0;
+    _sim_heal_total = 0;
+    _sim_mon_hp.clear();
 
     if (sim.should_restart()) {
         // G7.4: all-builds rotation
@@ -1138,8 +1221,48 @@ void GameScene::_update_monsters(float dt) {
     for (auto& m : monsters) mlist.push_back(m.get());
     // D2: Pass projectiles vector to monsters for ranged attacks
     for (auto& m : monsters) m->projectiles_ptr = &projectiles;
+    _unstuck_wedged_monsters(game_time);
     for (auto& m : monsters)
         m->update_ai(player.get(), game_map.get(), dt, game_time, &mlist, &active_effects);
+}
+
+// Q3.2: 怪物脱卡 — 存活非boss怪 ≥5s 未位移 → 拉到玩家周边可行走格 (消除贴墙/口袋钉子户软锁)
+void GameScene::_unstuck_wedged_monsters(double gt) {
+    static std::unordered_map<const Monster*, std::pair<int, int>> last_pos;
+    static std::unordered_map<const Monster*, double> stuck_since;
+    for (auto& m : monsters) {
+        if (!m || !m->combat.is_alive) { last_pos.erase(m.get()); stuck_since.erase(m.get()); continue; }
+        int mt0 = (int)(m->entity.rect.x + 16) / 32;
+        int mt1 = (int)(m->entity.rect.y + 16) / 32;
+        auto it = last_pos.find(m.get());
+        if (it == last_pos.end() || it->second.first != mt0 || it->second.second != mt1) {
+            last_pos[m.get()] = {mt0, mt1};
+            stuck_since[m.get()] = gt;
+            continue;
+        }
+        bool placed = false;
+        int ptx = (int)(player->entity.rect.x + 16) / 32;
+        int pty = (int)(player->entity.rect.y + 16) / 32;
+        bool far_away = abs(mt0 - ptx) > 38 || abs(mt1 - pty) > 38;   // 远距怪: 强制吸引
+        double idle_need = m->is_boss ? 12.0 : 5.0;
+        if (!far_away && gt - stuck_since[m.get()] < idle_need) continue;
+        for (int r = 3; r <= 6 && !placed; r++)
+            for (int a = 0; a < 8 && !placed; a++) {
+                int tx = ptx + (int)(cosf(a * 0.785398f) * r);
+                int ty = pty + (int)(sinf(a * 0.785398f) * r);
+                Rectangle rr = { (float)(tx * 32), (float)(ty * 32),
+                                 m->entity.rect.width, m->entity.rect.height };
+                if (game_map->is_rect_walkable(rr)) {
+                    m->entity.position.x = tx * 32.0f;
+                    m->entity.position.y = ty * 32.0f;
+                    m->entity.sync_rect();
+                    LOG_INFO("[FIX] 脱卡: %s → tile(%d,%d)", m->name.c_str(), tx, ty);
+                    last_pos[m.get()] = {m->entity.rect.x, m->entity.rect.y};
+                    stuck_since[m.get()] = gt;
+                    placed = true;
+                }
+            }
+    }
 }
 
 void GameScene::_on_monster_killed(Monster* m)  { _combat.on_monster_killed(m); }
@@ -1189,9 +1312,16 @@ void GameScene::_activate_stairs() {
 
 void GameScene::_check_floor_transition() {
     if (!stairs_active) return;
-    int next = FloorManager::check_floor_transition(get_tree()->get_input(),
-        current_floor, game_map.get(), player.get(), stairs_pos);
-    if (next < 0) return;  // 不下楼
+    // Q3.1: sim 模式下楼梯判定走 SimAI (headless 无真实按键)
+    InputMap& sim_in = get_tree()->get_input();
+    if (_sim_mode) {
+        if (!_is_action_just_pressed(sim_in, "descend")) return;
+    } else {
+        int next_manual = FloorManager::check_floor_transition(sim_in,
+            current_floor, game_map.get(), player.get(), stairs_pos);
+        if (next_manual < 0) return;  // 不下楼
+    }
+    int next = current_floor + 1;
 
     if (next > MAX_FLOORS) {
         // G5.6: sim stats on game clear

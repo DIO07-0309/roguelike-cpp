@@ -28,6 +28,8 @@ public:
     int get_height() const { return height(); }
 
     void process_frame(double delta);
+    bool is_running() const { return _running; }  // Q3.1: headless sim 循环
+    void process_input() { _handle_input(); }    // Q3.1: headless sim 输入分发
 
 private:
     void _handle_input();

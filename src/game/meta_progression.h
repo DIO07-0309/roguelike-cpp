@@ -84,6 +84,9 @@ public:
     bool load();
     const MetaSave& data() const { return _save; }
 
+    // Q3.1: --sim 模式禁止写 meta 存档
+    static bool g_readonly;
+
 private:
     MetaSave _save;
     MetaNode _nodes[10];  // 10个节点

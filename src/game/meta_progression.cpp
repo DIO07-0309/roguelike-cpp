@@ -112,7 +112,10 @@ void MetaSystem::reward_from_ending(const char* name, int soul, int knowledge,
 void MetaSystem::clear_reward_log() { _reward_log.clear(); }
 
 // ---- JSON save ----
+bool MetaSystem::g_readonly = false;  // Q3.1: --sim 只读
+
 bool MetaSystem::save() const {
+    if (g_readonly) return false;  // Q3.1: sim 模式不写 meta 存档
     FILE* f = fopen("saves/meta_save.json", "w");
     if (!f) return false;
     fprintf(f, "{\n");

@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <map>
+#include <cstdint>
 #include "node.h"
 #include "player.h"
 #include "monster.h"
@@ -188,6 +190,7 @@ private:
     void _player_attack();
     void _use_skill(int index);
     void _update_monsters(float dt);
+    void _unstuck_wedged_monsters(double gt);   // Q3.2: 怪物脱卡 (贴墙钉子户软锁修复)
     void _on_monster_killed(Monster* m);
     void _check_floor_clear();
     void _cleanup_dead_monsters();
@@ -280,4 +283,11 @@ private:
     bool _sim_mode = false;
     bool _use_bt_agent = false;        // G8.1: true = BT, false = DecisionAgent
     void _collect_sim_stats();
+
+    // Q3.2: sim 真实伤害统计 — HP 差值累计 (毒池/怪伤全计入, 替代 kills*10 估算)
+    int _sim_hp_prev = -1;
+    double _sim_dmg_taken = 0;
+    double _sim_dmg_dealt = 0;
+    double _sim_heal_total = 0;
+    std::map<intptr_t, int> _sim_mon_hp;
 };

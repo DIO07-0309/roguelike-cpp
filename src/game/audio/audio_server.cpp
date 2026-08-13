@@ -229,7 +229,10 @@ static Sound _compile_victory() {
 // ============================================================
 // AudioServer
 // ============================================================
+bool AudioServer::g_muted = false;  // Q3.1: --sim 静音
+
 void AudioServer::init() {
+    if (g_muted) return;  // Q3.1: sim 模式跳过音频合成
     LOG_INFO("音频: 初始化SFX...");
     _sfx["melee"]   = _compile_melee();
     _sfx["hit"]     = _compile_hit();
@@ -263,18 +266,24 @@ void AudioServer::init() {
 }
 
 void AudioServer::close() {
+    if (g_muted) return;  // Q3.1
     for (auto& [_, snd] : _sfx) UnloadSound(snd);
     _sfx.clear();
     _bgm.close();
 }
 
 void AudioServer::play_bgm(const std::string& name, float vol) {
+    if (g_muted) return;  // Q3.1
     LOG_DEBUG("BGM -> %s (vol:%.2f)", name.c_str(), vol);
     _bgm.play(name, vol);
 }
-void AudioServer::stop_bgm(float) { _bgm.stop(); }
+void AudioServer::stop_bgm(float) {
+    if (g_muted) return;  // Q3.1
+    _bgm.stop();
+}
 
 void AudioServer::play_sfx(const std::string& name, float vol) {
+    if (g_muted) return;  // Q3.1
     auto it = _sfx.find(name);
     if (it != _sfx.end()) { SetSoundVolume(it->second, vol); PlaySound(it->second); }
 }

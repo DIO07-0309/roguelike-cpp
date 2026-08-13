@@ -403,3 +403,5 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | Q4.5 | UI 音效 (ui_click/ui_confirm) + 标题菜单悬停高亮/点击, _activate 统一动作分发 | ✅ |
 | Q4.6 | VFX recipe 消费 sfx/camera_shake 字段 (28 处死数据激活), 补 ice_crack/lightning/summon | ✅ |
 | Q4.7 | 玩家受击红屏: 全屏主题 hit_flash_tint 衰减叠加 | ✅ |
+| Q3.1 | 模拟器卡墙修复: BFS 全量 rect 级碰撞判定 + 搜刮重启 (圣物 5 个/50 局) | ✅ |
+| Q3.2 | 模拟器卡死根治: 玩家 2s 无位移+tile 级检测→直线逃脱 + 换血保护; 怪物 5s/12s 未动自动脱卡 (boss 12s); 远距怪 (>38格) 强制吸引; 50 局批量 0 超时 | ✅ |

@@ -47,10 +47,10 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
         _s.player->level++; leveled = true;
         _s.player->xp -= _s.player->xp_to_next;
         _s.player->xp_to_next = Player::calc_xp_for_level(_s.player->level + 1);
-        _s.player->combat.attack += 1;
+        _s.player->combat.attack += 2;   // Q3.2 平衡: +1→+2 (无构筑前期DPS不足)
         _s.player->combat.physical_defense += 1;
         _s.player->combat.magical_defense += 1;
-        _s.player->combat.max_hp += 7;
+        _s.player->combat.max_hp += 10;  // Q3.2 平衡: +7→+10
         _s.player->combat.current_hp = get_effective_max_hp(_s.player.get());
         _s.get_tree()->get_audio()->play_sfx("levelup");
         // D9: 升级反馈 — shake + freeze + message

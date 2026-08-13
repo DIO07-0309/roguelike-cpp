@@ -25,10 +25,12 @@ struct RunResult {
     int turns = 0;
     int damage_dealt = 0;
     int damage_taken = 0;
+    int heal_total = 0;
     int enemies_killed = 0;
     int bosses_killed = 0;
     int elite_kills = 0;
     int relics_collected = 0;
+    int equipment_count = 0;   // Q3.2: 自动装备数量 (已穿上的装备)
     int build_type = 0;
     std::string build_name;
     std::vector<std::string> relics_picked;
@@ -71,7 +73,9 @@ struct BalanceReport {
     int avg_turns = 0;
     int avg_damage_dealt = 0;
     int avg_damage_taken = 0;
+    int avg_heal = 0;
     int avg_relics = 0;
+    int avg_equipment = 0;   // Q3.2: 平均每局自动装备数
     int boss_kill_count[3] = {0};          // F5, F10, F15 counts
     int death_floor_dist[16] = {0};        // floor 1-15
     int build_count[13] = {0};             // 12 BuildType counts (index 0 unused)
