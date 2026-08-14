@@ -178,12 +178,12 @@ std::shared_ptr<Item> generate_random_item() {
         else if (d.category == "potion") potions.push_back(&d);
         else if (d.category == "charm") charms.push_back(&d);
     }
-    // Q3.2 平衡: 装备权重 75% (武器/护甲各37.5%), 药水/护符各12.5% — 提升搜刮收益 (原四类等权)
+    // Q3.3 平衡: 装备权重 71% (武/甲各35.7%), 药水/护符各14.3% — 装备为主但保留续航 (原四类等权)
     std::vector<int> cats;
-    if (!weapons.empty()) cats.insert(cats.end(), 3, 0);
-    if (!armors.empty())  cats.insert(cats.end(), 3, 1);
-    if (!potions.empty()) cats.insert(cats.end(), 1, 2);
-    if (!charms.empty())  cats.insert(cats.end(), 1, 3);
+    if (!weapons.empty()) cats.insert(cats.end(), 5, 0);
+    if (!armors.empty())  cats.insert(cats.end(), 5, 1);
+    if (!potions.empty()) cats.insert(cats.end(), 2, 2);
+    if (!charms.empty())  cats.insert(cats.end(), 2, 3);
     if (cats.empty()) return nullptr;
     int cat = cats[rng() % cats.size()];
 

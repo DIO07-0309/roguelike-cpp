@@ -876,6 +876,18 @@ void GameScene::_process(double delta) {
         }
     }
 
+    // Q3.3: sim 喝药 — 决策为 use_potion 时消耗背包首个治疗药水 (真玩家战斗中喝药模拟)
+    if (_sim_mode && player && _sim_ai &&
+        _sim_ai->last_best_action() == "use_potion") {
+        for (int i = 0; i < (int)player->inventory.items.size(); i++) {
+            auto* c = dynamic_cast<ConsumableItem*>(player->inventory.items[i].get());
+            if (c && c->effect_type == "heal") {
+                player->inventory.use_item(i, player.get());
+                break;
+            }
+        }
+    }
+
     // VFX 更新
     for (auto& fx : active_effects) fx.elapsed += dt;
     active_effects.erase(std::remove_if(active_effects.begin(), active_effects.end(),
@@ -1245,7 +1257,17 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
         int pty = (int)(player->entity.rect.y + 16) / 32;
         bool far_away = abs(mt0 - ptx) > 38 || abs(mt1 - pty) > 38;   // 远距怪: 强制吸引
         double idle_need = m->is_boss ? 12.0 : 5.0;
-        if (!far_away && gt - stuck_since[m.get()] < idle_need) continue;
+        if (!far_away) {
+            // Q3.3: 战斗中不脱卡 — 怪在自身攻击射程内即换血/狙击 (传送会打断战局 → 无限循环)
+            float mdx = m->entity.rect.x + m->entity.rect.width/2
+                      - (player->entity.rect.x + player->entity.rect.width/2);
+            float mdy = m->entity.rect.y + m->entity.rect.height/2
+                      - (player->entity.rect.y + player->entity.rect.height/2);
+            float atk_px = (m->ai ? m->ai->attack_range : 1.5f) * 32.0f;
+            if (atk_px < 1.6f * 32.0f) atk_px = 1.6f * 32.0f;
+            if (sqrtf(mdx*mdx + mdy*mdy) < atk_px) continue;
+            if (gt - stuck_since[m.get()] < idle_need) continue;
+        }
         // Q3.2: 吸引放远环 (8-12格) — 不打断搜刮 (160px loot 门), 仍可被 BFS 寻到
         for (int r = (far_away ? 8 : 3); r <= (far_away ? 12 : 6) && !placed; r++)
             for (int a = 0; a < 8 && !placed; a++) {
@@ -1258,7 +1280,7 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
                     m->entity.position.y = ty * 32.0f;
                     m->entity.sync_rect();
                     LOG_INFO("[FIX] 脱卡: %s → tile(%d,%d)", m->name.c_str(), tx, ty);
-                    last_pos[m.get()] = {m->entity.rect.x, m->entity.rect.y};
+                    last_pos[m.get()] = {mt0, mt1};
                     stuck_since[m.get()] = gt;
                     placed = true;
                 }

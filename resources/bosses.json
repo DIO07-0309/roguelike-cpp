@@ -95,7 +95,7 @@
     "floor": 10,
     "is_summoner": false,
     "is_defender": false,
-    "hp": 380, "atk": 20, "pdef": 10, "mdef": 7,
+    "hp": 320, "atk": 16, "pdef": 10, "mdef": 7,
     "phase2_hp_threshold": 0.50,
     "phase2_pause": 0.50,
     "phase2_speed_mult": 1.50,

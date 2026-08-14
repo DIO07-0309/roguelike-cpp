@@ -99,6 +99,8 @@ private:
     mutable int _loot_last_tx = -999, _loot_last_ty = -999;     // 搜刮卡死看门狗
     mutable float _loot_stuck_since = -1.0f;
     mutable int _escape_dir = -1;
+    // Q3.3: 药水决策冷却 — 防止残血时逐帧连喝清空背包
+    mutable double _last_potion_time = -999.0;
     // Q3.2: 危险视野 — 活性毒池/尖刺圈内判定 (半径 1.5 格)
     bool _is_hazard_near(float px, float py, const GameMap* map) const;
     // Q3.2: 残血且无可用自愈 → 需去找泉水/祭坛回血
@@ -110,6 +112,9 @@ public:
     // ── G8.3: MCTS integration ──
     static bool g_use_mcts;       // --sim-ai mcts flag
     static int  g_mcts_iters;    // iterations per search (default 100)
+
+    // ── Q3.3: 本帧决策结果 (game_scene 消费 use_potion 用) ──
+    std::string last_best_action() const { return _cached_best; }
 
     // ── G8.3: Build SimulationState from game state ──
     static mcts::SimulationState build_sim_state(

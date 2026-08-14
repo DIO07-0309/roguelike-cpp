@@ -49,7 +49,7 @@ inline constexpr int FLOOR_MONSTER_COUNT[] = {
 // ---- 玩家 ----
 inline constexpr float PLAYER_SPEED = 200.0f;
 inline constexpr int PLAYER_MAX_HP = 120;
-inline constexpr int PLAYER_ATTACK = 11;   // Q3.2 平衡: 10→11 (无构筑f4换血差主因)
+inline constexpr int PLAYER_ATTACK = 12;   // Q3.3 平衡: 11→12 (F10 换血差仍大, 裸装DPS再抬一档)
 inline constexpr int PLAYER_PDEF = 4;
 inline constexpr int PLAYER_MDEF = 2;
 inline constexpr float PLAYER_ATTACK_RANGE = 1.5f;

@@ -570,6 +570,18 @@ std::string DecisionAgent::best_action(const Player* player,
         }
     }
 
+    // Q3.3: 药水 — 残血且本帧无可发自愈技能 → 喝治疗药水 (1s CD 防连灌)
+    if ((best.empty() || best[0] != 's') && _hp_ratio(player) < _prefer_heal &&
+        _game_time - _last_potion_time > 1.0f) {
+        for (const auto& it : player->inventory.items) {
+            const auto* c = dynamic_cast<const ConsumableItem*>(it.get());
+            if (c && c->effect_type == "heal") {
+                _last_potion_time = _game_time;
+                return "use_potion";
+            }
+        }
+    }
+
     // Pickup
     float pu_score = _evaluate_pickup(player, map, monsters);
     if (pu_score > best_score) { best_score = pu_score; best = "pickup"; }
