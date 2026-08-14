@@ -1246,7 +1246,8 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
         bool far_away = abs(mt0 - ptx) > 38 || abs(mt1 - pty) > 38;   // 远距怪: 强制吸引
         double idle_need = m->is_boss ? 12.0 : 5.0;
         if (!far_away && gt - stuck_since[m.get()] < idle_need) continue;
-        for (int r = 3; r <= 6 && !placed; r++)
+        // Q3.2: 吸引放远环 (8-12格) — 不打断搜刮 (160px loot 门), 仍可被 BFS 寻到
+        for (int r = (far_away ? 8 : 3); r <= (far_away ? 12 : 6) && !placed; r++)
             for (int a = 0; a < 8 && !placed; a++) {
                 int tx = ptx + (int)(cosf(a * 0.785398f) * r);
                 int ty = pty + (int)(sinf(a * 0.785398f) * r);

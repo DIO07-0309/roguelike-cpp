@@ -460,7 +460,44 @@ std::string DecisionAgent::best_action(const Player* player,
     if (!player) return "";
 
     if (boss_intro_active) return "confirm";
-    if (stairs_active)      return "descend";
+    if (stairs_active) {
+        // Q3.2: 清层后先搜刮未触发特殊房 (原逻辑直接下楼 → 整层资源全丢)
+        bool can_move = false;
+        std::string move_act;
+        if (map) {
+            for (auto& sr : map->special_rooms) {
+                if (sr.triggered) continue;
+                float ddx = player->entity.rect.x + player->entity.rect.width/2 - (sr.cx * 32 + 16);
+                float ddy = player->entity.rect.y + player->entity.rect.height/2 - (sr.cy * 32 + 16);
+                if (sqrtf(ddx*ddx + ddy*ddy) < 1.0f * 32.0f) return "pickup";
+            }
+            int rs = _bfs_toward_room(player, map);
+            if (rs >= 0) {
+                const char* dl[] = {"move_up","move_down","move_left","move_right"};
+                float mdxs[4] = {0,0,-32,32}, mdys[4] = {-32,32,0,0};
+                for (int try_d = 0; try_d < 4; try_d++) {
+                    int d2 = (try_d == 0) ? rs : (rs + try_d) % 4;
+                    Rectangle er = player->entity.rect;
+                    er.x += mdxs[d2]; er.y += mdys[d2];
+                    if (map->is_rect_walkable(er)) { can_move = true; move_act = dl[d2]; break; }
+                }
+            }
+        }
+        if (can_move) {
+            // Q3.2-fix: 搜刮被半格偏移卡死 → 原地 ≥2s 放弃搜刮直接下楼
+            int ct0 = (int)(player->entity.rect.x + 16) / 32;
+            int ct1 = (int)(player->entity.rect.y + 16) / 32;
+            if (abs(ct0 - _loot_last_tx) + abs(ct1 - _loot_last_ty) >= 2) {
+                _loot_last_tx = ct0; _loot_last_ty = ct1; _loot_stuck_since = -1;
+            } else if (_loot_stuck_since < 0) {
+                _loot_stuck_since = (float)_game_time;
+            } else if ((float)_game_time - _loot_stuck_since > 2.0f) {
+                return "descend";
+            }
+            return move_act;
+        }
+        return "descend";
+    }
 
     // ── G8.3: MCTS path (combat-only, enemies present) ──
     if (g_use_mcts && !monsters.empty()) {

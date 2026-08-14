@@ -204,6 +204,17 @@ std::string BalanceReport::to_json() const {
     }
     j["enemies"] = earr;
 
+    json runarr = json::array();
+    for (const auto& r : runs) {
+        json rj; rj["floor"]=r.floor_reached; rj["turns"]=r.turns; rj["victory"]=r.victory;
+        rj["damage_dealt"]=r.damage_dealt; rj["damage_taken"]=r.damage_taken;
+        rj["heal_total"]=r.heal_total; rj["kills"]=r.enemies_killed;
+        rj["bosses"]=r.bosses_killed; rj["equip"]=r.equipment_count;
+        rj["relics"]=r.relics_collected; rj["build"]=r.build_name;
+        runarr.push_back(rj);
+    }
+    j["runs"] = runarr;
+
     return j.dump(2);
 }
 
