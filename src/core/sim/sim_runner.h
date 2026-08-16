@@ -102,6 +102,8 @@ public:
     int  total_runs() const { return _cfg.runs; }
     bool should_restart() const;
     uint32_t next_seed() const;
+    // Q3.5: 当前局种子 (run 1 的 new_game 需要在 enter_floor 前播种 rng)
+    uint32_t current_seed() const { return _cfg.seed_start + (uint32_t)_current_run * 1234567u; }
     // G7.4: all-builds rotation
     bool all_builds() const { return _all_builds; }
     void set_all_builds(bool v) { _all_builds = v; }

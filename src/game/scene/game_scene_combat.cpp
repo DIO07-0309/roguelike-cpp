@@ -218,8 +218,14 @@ void GameSceneCombat::cleanup_dead_monsters() {
 }
 
 void GameSceneCombat::apply_pending_damage() {
+    // Q3.5: UAF 修复 — 挂起伤害的裸指针可能指向已被 612 行清理释放的怪
+    // (清理先于结算 → 解引用已释放内存 → 堆损坏 0xC0000374 间歇崩溃)
     for (auto& [m, dmg] : _s.pending_damage) {
-        if (m && m->combat.is_alive) m->combat.take_damage(dmg);
+        if (!m) continue;
+        bool valid = false;
+        for (auto& mm : _s.monsters)
+            if (mm.get() == m) { valid = mm->combat.is_alive; break; }
+        if (valid) m->combat.take_damage(dmg);
     }
     auto it = _s.monsters.begin();
     while (it != _s.monsters.end()) {

@@ -90,7 +90,7 @@ struct DroppedItem {
 const char* item_icon_key(const Item* item);
 
 // 工厂
-extern std::mt19937 rng;
+extern CountingRng rng;
 Rarity random_rarity();
 std::shared_ptr<Item> generate_random_item();
 std::shared_ptr<CharmItem> generate_charm_for_skill(const std::string& skill_class, Rarity r = Rarity::COMMON);

@@ -40,6 +40,10 @@ class Monster {
 public:
     Entity entity;
     CombatStats combat;
+    // Q3.9: 稳定实例ID (构造时递增分配, 创建顺序确定性 → 同种子同ID)
+    // 替代裸指针作为统计键 — 跨进程堆地址不同 → 指针键统计必然非确定性
+    uint64_t instance_id = 0;
+    static uint64_t _next_instance_id;
     std::vector<BuffInstance> active_buffs;   // 当前施加的 buff
     std::string name;
     Color color{200, 80, 80, 255};

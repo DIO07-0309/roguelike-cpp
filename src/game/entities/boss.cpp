@@ -24,7 +24,7 @@ ChargeSkill::ChargeSkill() : BossSkill("冲锋", 6.0f) {
 }
 
 std::string ChargeSkill::execute(Monster* boss, Player* player,
-                                  std::vector<Monster*>&, GameMap* map, double) {
+                                 std::vector<Monster*>&, GameMap* map, double gt) {
     if (windup_left > 0) {
         // 蓄力中：身体变红预警
         boss->color = Color{255, 60, 40, 255};
@@ -54,7 +54,7 @@ std::string ChargeSkill::execute(Monster* boss, Player* player,
                     player->combat.get_effective_defense(AttackType::PHYSICAL));
                 player->combat.take_damage(dmg);
                 dash_duration = 0;
-                mark_used(GetTime());
+                mark_used(gt);
                 boss->color = Color{200, 40, 40, 255};
                 return "Boss 冲锋命中！造成 " + std::to_string(dmg) + " 伤害";
             }
@@ -72,7 +72,7 @@ ShockwaveSkill::ShockwaveSkill() : BossSkill("冲击波", 8.0f) {
 }
 
 std::string ShockwaveSkill::execute(Monster* boss, Player* player,
-                                     std::vector<Monster*>&, GameMap*, double) {
+                                    std::vector<Monster*>&, GameMap*, double gt) {
     if (windup_left > 0) {
         // 蓄力中：闪烁
         float flicker = sinf((float)GetTime() * 20);
@@ -85,7 +85,7 @@ std::string ShockwaveSkill::execute(Monster* boss, Player* player,
     float dy = (player->entity.rect.y + player->entity.rect.height/2)
              - (boss->entity.rect.y + boss->entity.rect.height/2);
     float dist = sqrtf(dx*dx + dy*dy);
-    mark_used(GetTime());
+    mark_used(gt);
     boss->color = Color{200, 40, 40, 255};
     if (dist > fx_radius) return "Boss 释放冲击波，但你躲开了";
     int dmg = calculate_damage(
@@ -105,7 +105,7 @@ SummonMinions::SummonMinions() : BossSkill("召唤手下", 12.0f) {
 
 std::string SummonMinions::execute(Monster* boss, Player*,
                                     std::vector<Monster*>& monsters,
-                                    GameMap* map, double) {
+                                    GameMap* map, double gt) {
     int count = 0;
     for (int i = 0; i < 3; i++) {
         int off_x = (int)(rng() % 7) - 3;
@@ -119,7 +119,7 @@ std::string SummonMinions::execute(Monster* boss, Player*,
             if (m) { monsters.push_back(m); count++; }
         }
     }
-    mark_used(GetTime());
+    mark_used(gt);
     if (count > 0)
         return "Boss 召唤了 " + std::to_string(count) + " 只手下！";
     return "Boss 召唤失败（无空间）";
@@ -132,7 +132,7 @@ WhirlwindSkill::WhirlwindSkill() : BossSkill("旋风斩", 10.0f) {
     fx_kind = "circle"; fx_radius = 140; fx_color = {180, 20, 200, 255};
 }
 std::string WhirlwindSkill::execute(Monster* boss, Player* player,
-    std::vector<Monster*>&, GameMap*, double) {
+                                    std::vector<Monster*>&, GameMap*, double gt) {
     if (spin_duration <= 0) return "";
     // M4a-fix: 旋风斩仅近身命中 (原为全图必中 — 玩家逃离仍掉血)
     float bx = boss->entity.rect.x + boss->entity.rect.width/2;
@@ -140,8 +140,8 @@ std::string WhirlwindSkill::execute(Monster* boss, Player* player,
     float px = player->entity.rect.x + player->entity.rect.width/2;
     float py = player->entity.rect.y + player->entity.rect.height/2;
     float dist = sqrtf((px - bx) * (px - bx) + (py - by) * (py - by));
-    if (dist <= fx_radius && GetTime() - last_hit_time >= 0.5) {
-        last_hit_time = GetTime();
+    if (dist <= fx_radius && gt - last_hit_time >= 0.5) {
+        last_hit_time = (float)gt;
         int dmg = calculate_damage((int)(boss->combat.get_effective_attack() * 1.6),
             player->combat.get_effective_defense(AttackType::PHYSICAL));
         player->combat.take_damage(dmg);
@@ -150,7 +150,7 @@ std::string WhirlwindSkill::execute(Monster* boss, Player* player,
         LOG_INFO("[DMG] 旋风斩命中玩家 造成 %d 伤害", dmg);
     }
     if (spin_duration <= 0.3f) {
-        mark_used(GetTime());
+        mark_used(gt);
         return "旋风斩结束! " + std::to_string(spin_hit_count) + " hits";
     }
     return "";
@@ -179,7 +179,7 @@ LaserBarrageSkill::LaserBarrageSkill() : BossSkill("炼狱激光", 9.0f) {
     fx_kind = "cone"; fx_radius = 200; fx_color = {255, 100, 20, 255};
 }
 std::string LaserBarrageSkill::execute(Monster* boss, Player* player,
-    std::vector<Monster*>&, GameMap*, double) {
+                                       std::vector<Monster*>&, GameMap*, double gt) {
     if (windup_left > 0) { return ""; } // 蓄力中
     float bx = boss->entity.rect.x + boss->entity.rect.width/2;
     float by = boss->entity.rect.y + boss->entity.rect.height/2;
@@ -200,7 +200,7 @@ std::string LaserBarrageSkill::execute(Monster* boss, Player* player,
             player->combat.take_damage(dmg); total += dmg;
         }
     }
-    mark_used(GetTime());
+    mark_used(gt);
     return total > 0 ? "激光弹幕 造成 " + std::to_string(total) + " 伤害" : "激光未命中";
 }
 
@@ -211,7 +211,7 @@ BarrageSkill::BarrageSkill() : BossSkill("弹幕", 7.0f) {
     fx_kind = "cone"; fx_radius = 200; fx_color = {150, 80, 255, 255};
 }
 std::string BarrageSkill::execute(Monster* boss, Player* player,
-    std::vector<Monster*>&, GameMap* map, double) {
+                                  std::vector<Monster*>&, GameMap* map, double gt) {
     if (windup_left > 0) {
         boss->color = Color{180, 60, 60, 255};
         return "";
@@ -253,7 +253,7 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
         }
         if (dead) it = shots.erase(it); else ++it;
     }
-    if (fired && shots.empty()) { finished = true; mark_used(GetTime()); }
+    if (fired && shots.empty()) { finished = true; mark_used(gt); }
     return "";
 }
 
@@ -283,7 +283,7 @@ ConeAttackSkill::ConeAttackSkill() : BossSkill("扇形斩", 6.0f) {
     fx_kind = "cone"; fx_radius = 96; fx_color = {140, 240, 80, 255};
 }
 std::string ConeAttackSkill::execute(Monster* boss, Player* player,
-    std::vector<Monster*>&, GameMap*, double) {
+                                     std::vector<Monster*>&, GameMap*, double gt) {
     if (windup_left > 0) {
         boss->color = Color{160, 220, 90, 255};
         return "";
@@ -294,7 +294,7 @@ std::string ConeAttackSkill::execute(Monster* boss, Player* player,
     float py = player->entity.rect.y + player->entity.rect.height/2;
     float dx = px - bx, dy = py - by;
     float dist = sqrtf(dx * dx + dy * dy);
-    mark_used(GetTime());
+    mark_used(gt);
     boss->color = Color{200, 40, 40, 255};
     if (dist > reach) return "扇形斩落空";
     int dmg = calculate_damage(
@@ -354,7 +354,7 @@ void BlinkSkill::plan_destination(Monster* boss, Player* player, GameMap* map) {
     if (!placed) { pending_x = px; pending_y = py; }
 }
 std::string BlinkSkill::execute(Monster* boss, Player* player,
-    std::vector<Monster*>&, GameMap*, double) {
+                                std::vector<Monster*>&, GameMap*, double gt) {
     if (windup_left > 0) {
         boss->color = Color{170, 110, 255, 255};
         return "";
@@ -363,7 +363,7 @@ std::string BlinkSkill::execute(Monster* boss, Player* player,
     boss->entity.position = {pending_x, pending_y};
     boss->entity.sync_rect();
     blinked = true;
-    mark_used(GetTime());
+    mark_used(gt);
     return "暗影骑士瞬移了！";
 }
 void BlinkSkill::draw(float cam_x, float cam_y) const {

@@ -16,6 +16,10 @@ saves/meta_save.json
 reports/
 build_mingw/
 build_test/
+sim_*.txt
+probe_*.txt
+sim_*.json
+desktop_smoke.txt
 
 
 Testing/

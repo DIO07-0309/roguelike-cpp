@@ -85,7 +85,7 @@ public:
     // M4.2: 镜像冻结透传 (GameScene 只读)
     bool mirror_freeze_active() const { return _mirror_combat.freeze_active(); }
     float mirror_freeze_remaining() const { return _mirror_combat.freeze_remaining(); }
-    void tick(float dt, Monster* boss, Player* player, int floor,
+    void tick(float dt, Monster* boss, Player* player, int floor, float game_time,
               const WorldState& ws, const RelationshipSystem& rels,
               StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters,
               std::vector<Effect>* effects = nullptr);

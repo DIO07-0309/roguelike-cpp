@@ -54,7 +54,7 @@ inline constexpr int PLAYER_PDEF = 4;
 inline constexpr int PLAYER_MDEF = 2;
 inline constexpr float PLAYER_ATTACK_RANGE = 1.5f;
 inline constexpr int INVENTORY_MAX = 16;
-inline constexpr float LOOT_DROP_CHANCE = 0.5f;
+inline constexpr float LOOT_DROP_CHANCE = 0.65f;  // Q3.7: 0.5→0.65 提升装备获取, 破 F5 装备墙
 inline constexpr float PICKUP_RANGE = 2.0f;
 
 // ---- 怪物 ----

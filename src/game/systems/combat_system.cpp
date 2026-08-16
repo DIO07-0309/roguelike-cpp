@@ -15,7 +15,7 @@
 #include <ctime>
 
 // D9: MinGW std::random_device 确定性修复 — 混合时间戳
-std::mt19937 rng(std::random_device{}() ^ (uint32_t)time(nullptr));
+CountingRng rng;  // Q3.9: CountingRng 带掷骰计数 (构造种子由首次 seed_rng 覆盖)
 
 // G4.5: deterministic RNG seed for replay
 void seed_rng(uint32_t seed) { rng.seed(seed); }

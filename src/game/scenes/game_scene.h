@@ -283,11 +283,17 @@ private:
     bool _sim_mode = false;
     bool _use_bt_agent = false;        // G8.1: true = BT, false = DecisionAgent
     void _collect_sim_stats();
+    double _sim_wall_start = 0;        // Q3.10: 墙钟兜底超时 (game_time 可能被时停稀释)
 
     // Q3.2: sim 真实伤害统计 — HP 差值累计 (毒池/怪伤全计入, 替代 kills*10 估算)
     int _sim_hp_prev = -1;
     double _sim_dmg_taken = 0;
     double _sim_dmg_dealt = 0;
     double _sim_heal_total = 0;
-    std::map<intptr_t, int> _sim_mon_hp;
+    // Q3.9: 按稳定 instance_id 记账 (原 intptr_t 指针键: 跨进程堆地址不同 + 地址复用 → 假伤害/非确定性)
+    std::map<uint64_t, int> _sim_mon_hp;
+
+    // Q3.8: 怪物脱卡状态 — 实例成员 (原 static: 指针键跨对局残留 → 地址复用怪秒传 → 批次非确定性)
+    std::unordered_map<const Monster*, std::pair<int, int>> _unstuck_last_pos;
+    std::unordered_map<const Monster*, double> _unstuck_since;
 };

@@ -17,7 +17,14 @@ class GameMap;
 // ============================================================
 // CombatSystem — 战斗公式 + Buff 管理
 // ============================================================
-extern std::mt19937 rng;
+// Q3.9: CountingRng — 全局 rng 带掷骰计数器 (确定性诊断用)
+// 全部调用点用 operator() → 自动计数; seed() 清零
+struct CountingRng : std::mt19937 {
+    uint64_t draws = 0;
+    uint32_t operator()() { ++draws; return std::mt19937::operator()(); }
+    void seed(uint32_t s) { draws = 0; std::mt19937::seed(s); }
+};
+extern CountingRng rng;
 void seed_rng(uint32_t seed);  // G4.5: deterministic RNG for replay
 
 // ---- 伤害公式 ----

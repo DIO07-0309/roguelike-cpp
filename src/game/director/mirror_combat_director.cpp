@@ -388,9 +388,9 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
         break;
     }
     case 2: { // self_heal — 真正回血
-        int heal_amt = boss->combat.max_hp / 5;  // 20% max HP
-        boss->combat.heal(heal_amt);
-        LOG_INFO("[MIRROR] 镜像自愈 [%s]: +%d HP", ms.name.c_str(), heal_amt);
+    int heal_amt = boss->combat.max_hp / 15;  // Q3.10: 20%→12.5%→10%→6.7% max HP (10% 仍太频, 每2-3击+120)
+    boss->combat.heal(heal_amt);
+    LOG_INFO("[MIRROR] 镜像自愈 [%s]: +%d HP", ms.name.c_str(), heal_amt);
         if (_agent) _agent->report_outcome(true, 0.0f);   // 验收: 执行成功正反馈
         break;
     }
@@ -412,7 +412,7 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
             apply_buff(player, "slow", 4);
             LOG_INFO("[MIRROR] 镜像时停 [%s]: 观察期仅减速", ms.name.c_str());
         } else {
-            _freeze_timer = 3.0f;   // 冻结 3 秒
+            _freeze_timer = 1.5f;   // Q3.10: 冻结 3s→1.5s (原 3s 占战斗一半时长, 免费输出窗口过大)
             LOG_INFO("[MIRROR] 镜像时停 [%s]: 玩家冻结 3s", ms.name.c_str());
         }
         if (_agent) {

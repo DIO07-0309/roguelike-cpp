@@ -65,6 +65,8 @@ public:
     // 冻结计时 (秒), >0 表示玩家被镜像时停冻结中; 在 tick() 内递减
     bool freeze_active() const { return _freeze_timer > 0.0f; }
     float freeze_remaining() const { return _freeze_timer; }
+    // Q3.9: 新对局重置 — 防 F15 冻结计时跨局泄漏 (无 boss 时 tick 不跑 → 永远冻结)
+    void reset_run() { _freeze_timer = 0.0f; }
     // ── M4.3: 当前武器槽只读 ──
     const char* active_weapon_name() const;
   

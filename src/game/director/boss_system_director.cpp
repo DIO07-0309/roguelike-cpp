@@ -50,6 +50,8 @@ void BossSystemDirector::reset() {
     _arena_cfg = nullptr;        // G2.3
     _arena_phase = 0;            // M4b
     _arena_spawn_mult = 1.0f;    // M4b
+    // Q3.9: 镜像冻结计时归零 — F15 冻结中死亡后, 无 boss 的楼层 tick 不再递减 → 跨局泄漏
+    _mirror_combat.reset_run();
 }
 
 void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
@@ -187,15 +189,16 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
     LOG_INFO("[MIRROR] ChainTable built: %zu triples from %zu actions",
              _mirror_agent->chain_table()->entries(), history.size());
 
-    // ── 数值: HP=玩家×5, ATK≥玩家PDEF×0.8 (保证破防) ──
+    // ── 数值: HP=玩家×2.5, ATK=玩家×0.85 (Q3.10: 原 ×5/×1.2 → ×3/×1.0 仍不可胜,
+    //   自愈 10% 太频 + 单段 135 太高 → 再削) ──
     int p_hp = get_effective_max_hp(player);
     int p_atk = player->combat.get_effective_attack();
     int p_pdef = player->combat.get_effective_defense(AttackType::PHYSICAL);
-    boss->combat.max_hp   = p_hp * 5;
+    boss->combat.max_hp   = (int)(p_hp * 2.5f);
     boss->combat.current_hp = boss->combat.max_hp;
-    // ATK = max(玩家ATK×1.2, 玩家PDEF×0.85) — 确保 calculate_damage 不归1
+    // ATK = max(玩家ATK×0.85, 玩家PDEF×0.85) — 确保 calculate_damage 不归1
     int min_atk = (int)(p_pdef * 0.85f);
-    boss->combat.attack   = std::max((int)(p_atk * 1.2f), min_atk);
+    boss->combat.attack   = std::max((int)(p_atk * 0.85f), min_atk);
     boss->combat.physical_defense = player->combat.physical_defense + 5;
     boss->combat.magical_defense  = player->combat.magical_defense + 3;
     boss->attack_cooldown = 1.2f;  // 镜像攻击间隔
@@ -251,7 +254,7 @@ void BossSystemDirector::inject_mirror_memory(
 }
 
 void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
-    const WorldState& ws, const RelationshipSystem& rels,
+    float game_time, const WorldState& ws, const RelationshipSystem& rels,
     StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters,
     std::vector<Effect>* effects) {
     if (!boss || !boss->is_boss) return;
@@ -318,7 +321,7 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
         mst.player_hp_pct = player->combat.max_hp > 0
             ? (float)player->combat.current_hp / player->combat.max_hp : 1.0f;
         _mirror_agent->tick_phase(dt, mst);
-        _mirror_combat.tick(dt, boss, player, GetTime(), _mirror_agent.get(),
+        _mirror_combat.tick(dt, boss, player, game_time, _mirror_agent.get(),
                             effects);   // F15-fix: 传递特效通道 — 镜像攻击可见
         // 验收: 战斗结束导出 AI 调用链统计 (任一阵亡, 只记一次)
         if (!_mirror_stats_logged &&

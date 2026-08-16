@@ -21,9 +21,9 @@ struct FloorNarrative {
 };
 
 struct NarrativeState {
-    bool floor_intro_played[15];    // 每层入场已播
-    int  last_narration_idx;        // 上次旁白索引 (防重复)
-    float narration_timer;           // 旁白计时器
+    bool floor_intro_played[15] = {};  // 每层入场已播
+    int  last_narration_idx = 0;       // 上次旁白索引 (防重复)
+    float narration_timer = 0.0f;      // 旁白计时器
 };
 
 // ---- 查询 ----

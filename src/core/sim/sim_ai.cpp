@@ -5,6 +5,7 @@
 #include "game_map.h"
 #include "combat_system.h"  // rng
 #include "build_score.h"    // BuildType, calculate_build
+#include "core/logger.h"
 #include "ai/mcts/mcts_search.h"
 #include "ai/mcts/action.h"
 #include <cmath>
@@ -165,6 +166,56 @@ float DecisionAgent::_evaluate_skill(int slot, const Player* p,
 
 static const int kBfsDx[4] = {0, 0, -1, 1};  // up, down, left, right
 static const int kBfsDy[4] = {-1, 1, 0, 0};
+
+// Q3.10: 口袋兜底 — 卡死≥8s(四向逃脱均失败)时传送玩家至最近存活怪相邻可行走格
+// 破口袋/48-51px 隔墙死局: 传送后玩家必能普攻到该怪, 战斗恢复, 楼层推进
+static bool _teleport_player_to_nearest(Player* p,
+    const std::vector<Monster*>& monsters, const GameMap* map) {
+    if (!p || !map) return false;
+    const Monster* t = nullptr;
+    float bd = 1e9f;
+    for (const Monster* m : monsters) {
+        if (!m || !m->combat.is_alive) continue;
+        float d = hypotf(m->entity.rect.x - p->entity.rect.x,
+                         m->entity.rect.y - p->entity.rect.y);
+        if (d < bd) { bd = d; t = m; }
+    }
+    if (!t) return false;
+    int tx = (int)(t->entity.rect.x + t->entity.rect.width/2) / 32;
+    int ty = (int)(t->entity.rect.y + t->entity.rect.height/2) / 32;
+    // Q3.10: 仅 r=1 (32px ≤ 近战48px) — r=2(64px) 传送后仍在攻击距离外 → 8s 循环重卡
+    for (int r = 1; r <= 1; r++)
+        for (int a = 0; a < 8; a++) {
+            int x = tx + (int)(cosf(a * 0.785398f) * r);
+            int y = ty + (int)(sinf(a * 0.785398f) * r);
+            if (x == tx && y == ty) continue;
+            Rectangle rr = { (float)(x * 32), (float)(y * 32),
+                             p->entity.rect.width, p->entity.rect.height };
+            if (!map->is_rect_walkable(rr)) continue;
+            p->entity.position.x = (float)(x * 32);
+            p->entity.position.y = (float)(y * 32);
+            p->entity.sync_rect();   // Q3.10: 传送只改 position 不同步 rect → 攻击判定用旧 rect
+                                     // → 近战距离算错(以为怪在远处) → 8s 循环重传送 (v7 (6,22)×92)
+            LOG_INFO("[PLAYER-FIX] 口袋传送 → tile(%d,%d)", x, y);
+            return true;
+    }
+    // Q3.10: 第二遍 — 目标格全为毒池/尖刺 (熔岩层) 时放宽毒池限制, 仍须可行走
+    for (int r = 1; r <= 1; r++)
+        for (int a = 0; a < 8; a++) {
+            int x = tx + (int)(cosf(a * 0.785398f) * r);
+            int y = ty + (int)(sinf(a * 0.785398f) * r);
+            if (x == tx && y == ty) continue;
+            Rectangle rr = { (float)(x * 32), (float)(y * 32),
+                             p->entity.rect.width, p->entity.rect.height };
+            if (!map->is_rect_walkable(rr)) continue;
+            p->entity.position.x = (float)(x * 32);
+            p->entity.position.y = (float)(y * 32);
+            p->entity.sync_rect();   // Q3.10: 同上 — 两遍传送都必须同步 rect
+            LOG_INFO("[PLAYER-FIX] 口袋传送(毒池) → tile(%d,%d)", x, y);
+            return true;
+        }
+    return false;
+}
 
 // Q3.2: Boss 蓄力判定 — 任一技能处于 windup 阶段即视为"即将出招"
 static bool _boss_winding_up(const Monster* m) {
@@ -362,10 +413,10 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
 
     float px = p->entity.rect.x + p->entity.rect.width/2;
     float py = p->entity.rect.y + p->entity.rect.height/2;
-    // Q3.2: 落脚点进入毒池/尖刺圈 → 重罚 (绝不踩毒)
+    // Q3.2: 落脚点进入毒池/尖刺圈 → 重罚 (Q3.10: -999→-1.0, 全图无安全路径时允许踩毒渡河)
     if (map && _is_hazard_near(target_rect.x + target_rect.width/2,
                                target_rect.y + target_rect.height/2, map))
-        return -999;
+        return -1.0f;
 
     auto* t = _find_nearest(p, monsters);
     if (!t) return 0.1f; // 全图无存活怪 → 中性
@@ -510,19 +561,26 @@ std::string DecisionAgent::best_action(const Player* player,
     }
 
     // Q3.2: 卡死逃脱 — 原地 ≥2s 且无近距怪 → 直线脱困 (先于一切评分)
-    // 有 HP 交换(换血战) → 重置计时, 不触发逃脱; 纹丝不动才是真卡
+    // Q3.10: 仅怪物血量总和变动视为战斗 (毒/环境只影响自身HP, 不得掩盖卡死)
     if (player && map) {
         int pt0 = (int)(player->entity.rect.x + 16) / 32;
         int pt1 = (int)(player->entity.rect.y + 16) / 32;
         if (pt0 != (int)_last_px || pt1 != (int)_last_py) { _stuck_since = -1; _escape_dir = -1; }
         else {
-            float own = player->combat.current_hp, mon = 0;
+            float mon = 0;
             for (const Monster* m : monsters) if (m->combat.is_alive) mon += m->combat.current_hp;
-            if (own != _last_hp_sum || mon != _last_mon_sum) { _stuck_since = -1; _escape_dir = -1; }
-            _last_hp_sum = own; _last_mon_sum = mon;
+            if (mon != _last_mon_sum) { _stuck_since = -1; _escape_dir = -1; }
+            _last_mon_sum = mon;
             if (_stuck_since < 0) _stuck_since = (float)_game_time;
+            else if ((float)_game_time - _stuck_since > 8.0f) {
+                // Q3.10: ≥8s 未离格 → 兜底传送 (口袋/毒池/隔墙死局, 不依赖怪距)
+                if (_teleport_player_to_nearest(const_cast<Player*>(player), monsters, map)) {
+                    _stuck_since = -1; _escape_dir = -1;
+                }
+                return "none";
+            }
             else if ((float)_game_time - _stuck_since > 2.0f &&
-                     _count_in_range(player, monsters, 1.6f * 32.0f) == 0) {
+                     _count_in_range(player, monsters, 1.5f * 32.0f) == 0) {
                 if (_escape_dir < 0) _escape_dir = 0;
                 float mdx = (_escape_dir == 2) ? -1.0f : (_escape_dir == 3) ? 1.0f : 0.0f;
                 float mdy = (_escape_dir == 0) ? -1.0f : (_escape_dir == 1) ? 1.0f : 0.0f;
@@ -610,7 +668,6 @@ std::string DecisionAgent::best_action(const Player* player,
         const char* rand_dirs[] = {"move_up","move_down","move_left","move_right"};
         best = rand_dirs[rng() % 4];
     }
-
     return best;
 }
 

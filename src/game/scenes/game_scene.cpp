@@ -147,6 +147,12 @@ void GameScene::new_game() {
     player = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
         PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
 
+    // Q3.10: 初始携带 2 瓶治疗药水 — 无自愈系开局遇毒/环境伤害无解 (F1 掉血死)
+    player->inventory.items.push_back(
+        std::make_shared<ConsumableItem>("治疗药水", Rarity::COMMON, "heal", 30));
+    player->inventory.items.push_back(
+        std::make_shared<ConsumableItem>("治疗药水", Rarity::COMMON, "heal", 30));
+
     // G10.1: Element select on first-ever game
     if (!player->element.initialized) {
         if (g_sim_mode) {
@@ -159,6 +165,17 @@ void GameScene::new_game() {
             state = GameState::TITLE;
             return;
         }
+    }
+
+    // Q3.5: sim run 1 在 enter_floor 前播种 rng — 否则楼层种子从
+    // random_device^time 初始态抽取 → 同种子不可重放 (F5 boss 每进程随机)
+    if (g_sim_mode) {
+        _dungeon_seed = SimRunner::inst().current_seed();
+        seed_rng(_dungeon_seed);
+        // Q3.8: 清空上一局的脱卡状态 — static 改实例成员后跨局残留的指针键必须清零
+        _unstuck_last_pos.clear();
+        _unstuck_since.clear();
+        _sim_wall_start = GetTime();   // Q3.10: 本局墙钟起点 (兜底超时)
     }
 
     auto sk = random_active_skill({}, true);  // G9: first skill always base 4
@@ -422,6 +439,14 @@ void GameScene::_process(double delta) {
     if (!player) return;
     float dt = (float)delta;
 
+    // Q3.10: 墙钟兜底置顶 — 任何状态(BOSS_CINEMATIC/事件/对话/非PLAYING)都可能卡死
+    // 原置尾 870 行: state!=PLAYING 提前 return → 10min 墙钟永不触发 (v11 r8 进F14后静默150min)
+    if (_sim_mode && GetTime() - _sim_wall_start > 600.0) {
+        LOG_INFO("[SIM] 墙钟超时 第%d层 — 强制结算", current_floor);
+        _collect_sim_stats();
+        return;
+    }
+
     if (state == GameState::BOSS_CINEMATIC) {
         // B15: Boss登场 — 玩家冻结, Boss暂停, 2秒后启动
         if (_boss_entrance_timer > 0) {
@@ -443,7 +468,8 @@ void GameScene::_process(double delta) {
     if (state != GameState::PLAYING) return;
 
     // Q4.1: HitStop — 冻结期间只推表现层, 世界模拟暂停 (打击感)
-    if (_presentation.is_frozen()) {
+    // Q3.10: sim 模式跳过 — 表现层冻结使 game_time 变慢, 900s 超时被稀释成数十分钟
+    if (!_sim_mode && _presentation.is_frozen()) {
         _presentation.tick(dt);
         return;
     }
@@ -461,12 +487,18 @@ void GameScene::_process(double delta) {
             _sim_heal_total += hp - _sim_hp_prev; // 泉水/药水/吸血等所有治疗
         }
         _sim_hp_prev = hp;
+        // Q3.9: 清除已不在场的怪记录 — instance_id 唯一且不复用, 仅做内存回收
+        for (auto it = _sim_mon_hp.begin(); it != _sim_mon_hp.end(); ) {
+            bool alive_now = false;
+            for (auto& m : monsters)
+                if (m->instance_id == it->first) { alive_now = true; break; }
+            if (alive_now) ++it; else it = _sim_mon_hp.erase(it);
+        }
         for (auto& m : monsters) {
             if (!m) continue;
-            intptr_t key = (intptr_t)m.get();
-            auto it = _sim_mon_hp.find(key);
+            auto it = _sim_mon_hp.find(m->instance_id);
             if (it == _sim_mon_hp.end()) {
-                _sim_mon_hp[key] = m->combat.current_hp;
+                _sim_mon_hp[m->instance_id] = m->combat.current_hp;
             } else if (m->combat.current_hp < it->second) {
                 _sim_dmg_dealt += it->second - m->combat.current_hp;
                 it->second = m->combat.current_hp;
@@ -522,7 +554,8 @@ void GameScene::_process(double delta) {
         auto* boss = _get_boss();
         if (boss && boss->is_boss && time_stop_remaining <= 0) {
             _boss._weak_point_pool = &monsters;  // F10.2: pass pool for core spawn
-            _boss.tick(dt, boss, player.get(), current_floor, _gameplay.world_state,
+            _boss.tick(dt, boss, player.get(), current_floor, game_time,
+                       _gameplay.world_state,
                        _gameplay.rels, _gameplay.story.stage(), monsters,
                        &active_effects);  // F15-fix: 镜像战特效通道
 
@@ -1179,7 +1212,7 @@ void GameScene::_input(const InputMap& input) {
 void GameScene::_collect_sim_stats() {
     RunResult s;
     s.seed = _dungeon_seed;
-    s.victory = (current_floor >= MAX_FLOORS);
+    s.victory = (current_floor >= MAX_FLOORS) && player->combat.is_alive;  // Q3.7: 死在F15不算通关
     s.floor_reached = current_floor;
     s.turns = (int)(game_time * 60); // approximate frames → turns
     s.damage_dealt = (int)_sim_dmg_dealt;  // Q3.2: 真实累计 (替代 kills*10 估算)
@@ -1240,8 +1273,8 @@ void GameScene::_update_monsters(float dt) {
 
 // Q3.2: 怪物脱卡 — 存活非boss怪 ≥5s 未位移 → 拉到玩家周边可行走格 (消除贴墙/口袋钉子户软锁)
 void GameScene::_unstuck_wedged_monsters(double gt) {
-    static std::unordered_map<const Monster*, std::pair<int, int>> last_pos;
-    static std::unordered_map<const Monster*, double> stuck_since;
+    auto& last_pos = _unstuck_last_pos;
+    auto& stuck_since = _unstuck_since;
     for (auto& m : monsters) {
         if (!m || !m->combat.is_alive) { last_pos.erase(m.get()); stuck_since.erase(m.get()); continue; }
         int mt0 = (int)(m->entity.rect.x + 16) / 32;
@@ -1268,11 +1301,15 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
             if (sqrtf(mdx*mdx + mdy*mdy) < atk_px) continue;
             if (gt - stuck_since[m.get()] < idle_need) continue;
         }
-        // Q3.2: 吸引放远环 (8-12格) — 不打断搜刮 (160px loot 门), 仍可被 BFS 寻到
-        for (int r = (far_away ? 8 : 3); r <= (far_away ? 12 : 6) && !placed; r++)
+        // Q3.10: 近距环仅 1 格 — r=2(64px) 超出玩家近战48px, 怪仍够不着 → 追打循环拖死
+        // 1 格(32px) 落点必在玩家近战内 → 战斗立即恢复 (Q3.2: 远距吸引放远环 8-12格 不变)
+        for (int r = (far_away ? 8 : 1); r <= (far_away ? 12 : 1) && !placed; r++)
             for (int a = 0; a < 8 && !placed; a++) {
                 int tx = ptx + (int)(cosf(a * 0.785398f) * r);
                 int ty = pty + (int)(sinf(a * 0.785398f) * r);
+                // Q3.5: 禁止原地传送 — 环内首个可行走格常等于怪当前格 (堆叠/口袋)
+                // → 每 5s 传送回原格 → 900s 死锁 (v38 F11 4怪同格循环)
+                if (tx == mt0 && ty == mt1) continue;
                 Rectangle rr = { (float)(tx * 32), (float)(ty * 32),
                                  m->entity.rect.width, m->entity.rect.height };
                 if (game_map->is_rect_walkable(rr)) {
@@ -1280,7 +1317,7 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
                     m->entity.position.y = ty * 32.0f;
                     m->entity.sync_rect();
                     LOG_INFO("[FIX] 脱卡: %s → tile(%d,%d)", m->name.c_str(), tx, ty);
-                    last_pos[m.get()] = {mt0, mt1};
+                    last_pos[m.get()] = {tx, ty};
                     stuck_since[m.get()] = gt;
                     placed = true;
                 }
@@ -1348,7 +1385,13 @@ void GameScene::_check_floor_transition() {
 
     if (next > MAX_FLOORS) {
         // G5.6: sim stats on game clear
-        if (_sim_mode) _collect_sim_stats();
+        if (_sim_mode) {
+            // Q3.11: sim 通关 — _collect_sim_stats 内部已处理重启(new_game)/退出(finalize)
+            // 不能再执行下面的 VictoryScene 流程, 否则批次挂在 VictoryScene 永不退出
+            // (v13/v14 "批次冻结" 实为此 bug: 镜像削弱后出胜局 → 误入胜利画面 → 主循环不退出)
+            _collect_sim_stats();
+            return;
+        }
         LOG_INFO("通关! 最终第%d层 Lv%d", current_floor, player->level);
         // D6 Step6: 通关 — 委托给 FlowDirector (ending → VictoryScene → Credits)
         _gameplay.on_game_clear(current_floor, player->level, player.get(),

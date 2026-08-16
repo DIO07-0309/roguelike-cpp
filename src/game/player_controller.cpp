@@ -210,7 +210,30 @@ void PlayerController::handle_input(const InputMap& input) {
     // M4.2: 镜像冻结期间禁攻击/技能/拾取/交互
     if (gs.player_frozen_by_mirror()) return;
 
-    if (gs._is_action_just_pressed(input,"attack")) player_attack();
+    if (gs._is_action_just_pressed(input,"attack")) {
+        if (gs._sim_mode) {
+            // Q3.10: 武器命中形状朝前 (长枪矩形/扇形) — 攻击前须面向最近目标, 否则原地空挥
+            // 实锤: sim 自动装备长枪后 F1 被围, 朝旧方向空挥 180s, 怪血量纹丝不动
+            float px = gs.player->entity.rect.x + gs.player->entity.rect.width/2;
+            float py = gs.player->entity.rect.y + gs.player->entity.rect.height/2;
+            float bd = 1e18f;
+            Direction fd = gs.player->direction;
+            for (auto& m : gs.monsters) {
+                if (!m || !m->combat.is_alive) continue;
+                float dx = m->entity.rect.x + m->entity.rect.width/2 - px;
+                float dy = m->entity.rect.y + m->entity.rect.height/2 - py;
+                float dd = dx*dx + dy*dy;
+                if (dd < bd) {
+                    bd = dd;
+                    fd = (fabsf(dx) > fabsf(dy))
+                         ? (dx > 0 ? Direction::RIGHT : Direction::LEFT)
+                         : (dy > 0 ? Direction::DOWN : Direction::UP);
+                }
+            }
+            gs.player->direction = fd;
+        }
+        player_attack();
+    }
     else if (gs._is_action_just_pressed(input,"pickup")) {
         // D4 Step4: NPC交互 + D4 Step1: 事件交互 + B8: 特殊房间
         {

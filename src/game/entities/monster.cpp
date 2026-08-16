@@ -137,10 +137,14 @@ static Rectangle _draw_monster_body(const Rectangle& dr, Color color,
     return dr;
 }
 
+// Q3.9: 实例ID递增分配 — 同种子下创建顺序确定 → ID 序列确定
+uint64_t Monster::_next_instance_id = 1;
+
 Monster::Monster(float x, float y, const std::string& n, int hp, int atk,
                  int pdef, int mdef, Color c, MonsterAI* a)
     : entity(x, y, 28, 28), combat(hp, atk, pdef, mdef), name(n), color(c) {
     color.a = 255;
+    instance_id = _next_instance_id++;
     ai = a ? a : new MonsterAI();
 }
 
