@@ -588,7 +588,8 @@ static void _spawn_boss_vfx(Monster* self, const std::string& kind,
 void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
                                double dt, double gt,
                                std::vector<Monster*>* all, std::vector<Effect>* effects) {
-    static std::vector<Monster*> _empty_monsters;
+    // Q3.13: static→局部 — SummonMinions push 的裸指针跨帧累积成悬垂 (泄漏+定时炸弹)
+    std::vector<Monster*> empty_slots;
     switch (boss_state) {
     case BossState::IDLE: {
         // 基础 AI (追逐/巡逻)
@@ -833,7 +834,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             break;
         }
         _whirlwind->spin_duration -= (float)dt;
-        _whirlwind->execute(self, player, _empty_monsters, map, gt);
+        _whirlwind->execute(self, player, empty_slots, map, gt);
         // boss slowly moves toward player while spinning
         float dx = player->entity.rect.x + player->entity.rect.width/2
                  - self->entity.rect.x - self->entity.rect.width/2;
@@ -852,7 +853,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             _laser->windup_left -= (float)dt;
             _spawn_boss_vfx(self, "shockwave", effects); // 蓄力预警
             if (_laser->windup_left <= 0) {
-                _laser->execute(self, player, _empty_monsters, map, gt);
+                _laser->execute(self, player, empty_slots, map, gt);
                 _spawn_boss_vfx(self, "shockwave", effects);
                 boss_state = BossState::ATTACK;
                 _combo_on_skill_end();
@@ -877,7 +878,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             }
             break;
         }
-        std::string msg = _barrage->execute(self, player, _empty_monsters, map, gt);
+        std::string msg = _barrage->execute(self, player, empty_slots, map, gt);
         if (!msg.empty() && effects) {
             // M4a-fx: 发射爆点 (紫色波纹 + 火花)
             VFXServer v;
@@ -918,7 +919,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             }
             break;
         }
-        _cone->execute(self, player, _empty_monsters, map, gt);
+        _cone->execute(self, player, empty_slots, map, gt);
         boss_state = BossState::ATTACK;
         _combo_on_skill_end();
         break;
@@ -937,7 +938,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             }
             break;
         }
-        _blink->execute(self, player, _empty_monsters, map, gt);
+        _blink->execute(self, player, empty_slots, map, gt);
         if (_blink->blinked) {
             boss_state = BossState::ATTACK;
             _combo_on_skill_end();
@@ -962,7 +963,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         if (_gravity_timer > 0.8f) {
             _gravity_timer = 0;
             _shockwave->fx_radius *= 1.5f;
-            _shockwave->execute(self, player, _empty_monsters, map, gt);
+            _shockwave->execute(self, player, empty_slots, map, gt);
             _shockwave->fx_radius /= 1.5f;
             _shockwave->mark_used(gt);
             _spawn_boss_vfx(self, "shockwave", effects);

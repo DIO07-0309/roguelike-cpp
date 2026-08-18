@@ -269,11 +269,16 @@ int DecisionAgent::_bfs_toward_room(const Player* p, const GameMap* map) const {
     auto [sx, sy] = map->pixel_to_tile(
         p->entity.rect.x + p->entity.rect.width/2,
         p->entity.rect.y + p->entity.rect.height/2);
+    // Q3.13: 钳制玩家瓦片 — 否则 first[] 越界写堆损坏
+    if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
+    if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
     const int N = w * h;
     std::vector<char> is_target((size_t)N, 0);
     size_t pending = 0;
     for (auto& sr : map->special_rooms) {
         if (sr.triggered) continue;
+        // Q3.13: 房间坐标越界保护 (数据驱动异常时不得写堆)
+        if (sr.cx < 0 || sr.cx >= w || sr.cy < 0 || sr.cy >= h) continue;
         is_target[sr.cy * w + sr.cx] = 1;
         pending++;
     }
@@ -306,6 +311,9 @@ int DecisionAgent::_bfs_toward(const Player* p,
     auto [sx, sy] = map->pixel_to_tile(
         p->entity.rect.x + p->entity.rect.width/2,
         p->entity.rect.y + p->entity.rect.height/2);
+    // Q3.13: 钳制玩家瓦片 — 位置可能出图(边缘传送), 否则 first[] 越界写堆损坏
+    if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
+    if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
     const int N = w * h;
     std::vector<char> is_target((size_t)N, 0);
     for (auto* m : monsters) {
@@ -313,6 +321,8 @@ int DecisionAgent::_bfs_toward(const Player* p,
         auto [tx, ty] = map->pixel_to_tile(
             m->entity.rect.x + m->entity.rect.width/2,
             m->entity.rect.y + m->entity.rect.height/2);
+        // Q3.13: 越界怪跳过 — 击退/传送可使位置出图, 否则 is_target 越界写堆损坏
+        if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
         is_target[ty * w + tx] = 1;
     }
     std::vector<int> first((size_t)N, -2);  // 从起点出发的第一步方向, -1=起点, -2=未访问
@@ -348,6 +358,11 @@ int DecisionAgent::_bfs_away(const Player* p, const Monster* t,
     auto [sx, sy] = map->pixel_to_tile(
         p->entity.rect.x + p->entity.rect.width/2,
         p->entity.rect.y + p->entity.rect.height/2);
+    // Q3.13: 钳制怪物/玩家瓦片 — 否则 dist[] 越界写堆损坏
+    if (mx < 0) mx = 0; else if (mx >= w) mx = w - 1;
+    if (my < 0) my = 0; else if (my >= h) my = h - 1;
+    if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
+    if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
     const int N = w * h;
     std::vector<int> dist((size_t)N, -1);
     std::queue<int> q;

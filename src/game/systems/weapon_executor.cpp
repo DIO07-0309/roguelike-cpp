@@ -395,8 +395,12 @@ std::vector<WeaponAttackResult> WeaponExecutor::tick_specials(
 
     if (wt == WeaponType::NUNCHAKU) {
         // Auto-track: hit the tracked target with auto-aim
+        // Q3.13: 校验 tracked 仍在本帧存活怪物列表中 (指针值比较, 不解引用)
+        // — 防跨帧悬垂: 目标死亡后被 _cleanup_dead_monsters 释放, 裸指针复用/UAF
         Monster* trg = (Monster*)sp.tracked;
-        if (trg && trg->combat.is_alive) {
+        bool trg_tracked_alive = trg &&
+            std::find(targets.begin(), targets.end(), trg) != targets.end();
+        if (trg_tracked_alive && trg->combat.is_alive) {
             Vector2 hp = { trg->entity.rect.x + trg->entity.rect.width / 2,
                            trg->entity.rect.y + trg->entity.rect.height / 2 };
             auto ar = _resolve_one(player, trg, hp, mult);
