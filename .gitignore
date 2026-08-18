@@ -24,3 +24,7 @@ desktop_smoke.txt
 
 Testing/
 build_sym/
+baseline_*
+nerf_verify_*
+repro_*
+
