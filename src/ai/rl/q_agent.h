@@ -43,6 +43,7 @@ public:
     double alpha() const { return _alpha; }
     double gamma() const { return _gamma; }
     double epsilon() const { return _epsilon; }
+    void set_epsilon(double e) { _epsilon = e; }  // v0.9.29: 训练退火
 
 private:
     std::string _make_key(const std::string& obs_key, int action_id) const;

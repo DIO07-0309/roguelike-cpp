@@ -1,6 +1,8 @@
 // G8.4/F15.4: RL standalone runner — called from main.cpp before engine init.
 // Runs CombatEnvironment + RandomAgent/QAgent without GameScene.
 // F15.4: run_rl_mirror_mode() trains QAgent against 4 player styles.
+// v0.9.28: Q 表持久化 (saves/rl_qtable.json + rl_mirror_q_<STYLE>.json), 续训
+// v0.9.29: epsilon 退火 0.12 → 0.005, 末段 10% 低探索胜率统计
 #include "ai/rl/environment.h"
 #include "ai/rl/random_agent.h"
 #include "ai/rl/q_agent.h"
@@ -8,6 +10,11 @@
 #include "ai/mcts/action.h"
 #include "ai/mirror/mirror_agent.h"
 #include <cstdio>
+#include <string>
+
+// epsilon 退火: 训练进度 i/n 从 EPS_START 线性降到 EPS_END
+static const double EPS_START = 0.12;
+static const double EPS_END = 0.005;
 
 void run_rl_mode(int test_episodes, int train_episodes) {
     using namespace rl;
@@ -56,15 +63,18 @@ void run_rl_mode(int test_episodes, int train_episodes) {
                total_reward/test_episodes, (double)total_steps/test_episodes);
     }
 
-    // ── Train mode: Q-learning (Q 表持久化, 支持续训) ──
+    // ── Train mode: Q-learning (Q 表持久化, 支持续训, epsilon 退火) ──
     if (train_episodes > 0) {
         QAgent q_agent(0.1, 0.9, 0.1);
         const char* qpath = "saves/rl_qtable.json";
         size_t loaded = q_agent.load(qpath) ? q_agent.table_size() : 0;
         printf("═══ RL TRAIN: %d episodes (QAgent) ═══\n", train_episodes);
         if (loaded > 0) printf("  [load] %s: %zu entries — 继续训练\n", qpath, loaded);
-        int wins = 0;
+        int wins = 0; int tail_wins = 0;
+        int tail_start = train_episodes - train_episodes / 10;  // 末段 10% 低探索统计
         for (int i = 0; i < train_episodes; i++) {
+            // v0.9.29: epsilon 退火 — 后期低探索收敛 (突破 95%)
+            q_agent.set_epsilon(EPS_START - (EPS_START - EPS_END) * (double)i / train_episodes);
             auto initial = make_scenario();
             initial.rng.seed = seed + i * 7919u;
             auto obs = env.reset(initial);
@@ -75,12 +85,15 @@ void run_rl_mode(int test_episodes, int train_episodes) {
                 q_agent.update(obs, a, sr.reward, sr.observation);
                 obs = sr.observation;
             }
-            if (env.state().victory) wins++;
+            if (env.state().victory) { wins++; if (i >= tail_start) tail_wins++; }
             if (train_episodes >= 10 && (i+1) % (train_episodes/10) == 0)
                 printf("  [%d/%d] wins=%d Q-table=%zu\n", i+1, train_episodes, wins, q_agent.table_size());
         }
         printf("QAgent after training: %d/%d wins (%.1f%%), Q-table size=%zu\n",
                wins, train_episodes, wins*100.0/train_episodes, q_agent.table_size());
+        printf("  [tail %d eps] %d/%d wins (%.1f%%) — 低探索收敛水平\n",
+               train_episodes - tail_start, tail_wins, train_episodes - tail_start,
+               tail_wins*100.0/(train_episodes - tail_start));
         if (q_agent.save(qpath))
             printf("  [save] %s: %zu entries\n", qpath, q_agent.table_size());
         else
@@ -139,11 +152,15 @@ void run_rl_mirror_mode(int episodes) {
                             profiles[style_i].style_name() + ".json";
         size_t loaded = q_agent.load(qpath) ? q_agent.table_size() : 0;
         int wins = 0; double total_r = 0;
+        int tail_wins = 0;
+        int tail_start = episodes - episodes / 10;  // 末段 10% 低探索统计
         const auto& profile = profiles[style_i];
         if (loaded > 0)
             printf("  [load] %s: %zu entries — 继续训练\n", qpath.c_str(), loaded);
 
         for (int i = 0; i < episodes; i++) {
+            // v0.9.29: epsilon 退火 — 后期低探索收敛
+            q_agent.set_epsilon(EPS_START - (EPS_START - EPS_END) * (double)i / episodes);
             auto initial = make_scenario_with_style(style_i);
             initial.rng.seed = seed + style_i * 7919u + i * 7331u;
             auto obs = env.reset(initial);
@@ -161,12 +178,15 @@ void run_rl_mirror_mode(int episodes) {
                 obs = sr.observation;
                 total_r += base + mirror_bonus;
             }
-            if (env.state().victory) wins++;
+            if (env.state().victory) { wins++; if (i >= tail_start) tail_wins++; }
         }
         printf("  [%s] %d/%d wins (%.1f%%), avg_r=%.1f, Q=%zu\n",
             profiles[style_i].style_name(),
             wins, episodes, wins*100.0/episodes,
             total_r/episodes, q_agent.table_size());
+        printf("  [tail %d eps] %d/%d wins (%.1f%%) — 低探索收敛水平\n",
+               episodes - tail_start, tail_wins, episodes - tail_start,
+               tail_wins*100.0/(episodes - tail_start));
         if (q_agent.save(qpath))
             printf("  [save] %s: %zu entries\n", qpath.c_str(), q_agent.table_size());
         else
