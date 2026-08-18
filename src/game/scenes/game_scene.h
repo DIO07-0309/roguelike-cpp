@@ -293,7 +293,7 @@ private:
     // Q3.9: 按稳定 instance_id 记账 (原 intptr_t 指针键: 跨进程堆地址不同 + 地址复用 → 假伤害/非确定性)
     std::map<uint64_t, int> _sim_mon_hp;
 
-    // Q3.8: 怪物脱卡状态 — 实例成员 (原 static: 指针键跨对局残留 → 地址复用怪秒传 → 批次非确定性)
-    std::unordered_map<const Monster*, std::pair<int, int>> _unstuck_last_pos;
-    std::unordered_map<const Monster*, double> _unstuck_since;
+    // Q3.8: 怪物脱卡状态 — instance_id 键 (原指针键: 跨进程堆地址不同 + 地址复用 → 残留污染/非确定性)
+    std::unordered_map<uint64_t, std::pair<int, int>> _unstuck_last_pos;
+    std::unordered_map<uint64_t, double> _unstuck_since;
 };

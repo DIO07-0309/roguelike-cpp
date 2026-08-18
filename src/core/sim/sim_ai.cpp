@@ -482,7 +482,7 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
     if (step < 0) return 0.0f;
 
     // Q3.2: 路径记忆 — 同一目标沿用上次实际走的步, 消除 BFS 等权震荡
-    if (_mem_target == (const void*)t && _mem_step >= 0) {
+    if (t && _mem_target == t->instance_id && _mem_step >= 0) {
         float mdx = (_mem_step == 2) ? -32.0f : (_mem_step == 3) ? 32.0f : 0.0f;
         float mdy = (_mem_step == 0) ? -32.0f : (_mem_step == 1) ? 32.0f : 0.0f;
         Rectangle mr = p->entity.rect;
@@ -685,7 +685,8 @@ std::string DecisionAgent::best_action(const Player* player,
         _current_dir = best_dir;
         // Q3.2: 记录路径记忆 (与 _evaluate_move 的等权震荡消解配合)
         _mem_step = best_dir;
-        _mem_target = (const void*)_find_nearest(player, monsters);
+        auto* mem_t = _find_nearest(player, monsters);
+        _mem_target = mem_t ? mem_t->instance_id : 0;
     }
 
     // If nothing better — move randomly

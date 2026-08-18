@@ -4,6 +4,7 @@
 // ============================================================
 #include <string>
 #include <vector>
+#include <cstdint>
 #include "raylib.h"
 #include "entity.h"  // Direction enum
 
@@ -180,7 +181,7 @@ struct WeaponSpecialState {
     int max_hits = 0;
     float base_mult = 1.0f;
     float mult_growth = 1.0f;   // ×1.2 for nunchaku, ×1.0 for spear
-    void* tracked = nullptr;    // Monster* for nunchaku auto-track
+    uint64_t tracked_instance = 0;  // nunchaku auto-track target (Monster::instance_id, 指针跨层残留会进程间分叉)
     float range_px = 0.0f;
     float width_param = 0.0f;
     int hit_shape = 0;          // stored HitShape as int

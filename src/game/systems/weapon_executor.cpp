@@ -134,7 +134,7 @@ float WeaponSpecialState::current_multiplier() const {
     return m;
 }
 
-void WeaponSpecialState::reset() { active = false; timer = 0.0f; hit_count = 0; tracked = nullptr; }
+void WeaponSpecialState::reset() { active = false; timer = 0.0f; hit_count = 0; tracked_instance = 0; }
 
 // ═══════════════════════════════════════════════════════════════
 // Forward decls for stage-3 special initiations
@@ -237,7 +237,6 @@ static bool _try_nunchaku_special(Player* p, const AttackStageDef& st,
     Vector2 origin = _player_origin(p);
     auto hits = hit_detect_by_shape((int)st.hit_shape, origin,
         p->direction, rpx, wp, rt);
-    void* tracked = hits.empty() ? nullptr : (void*)hits[0].target;
     auto& sp = p->weapon.runtime().special;
     const WeaponDef* def = p->weapon.current_def();
     int total_hits = 5;
@@ -246,7 +245,7 @@ static bool _try_nunchaku_special(Player* p, const AttackStageDef& st,
     // Affix: damage_ramp — extra growth per hit
     float growth = 1.20f + (def ? def->affix.value : 0.0f);
     sp.start(total_hits, 0.08f, 0.80f, growth);
-    sp.tracked = tracked;
+    sp.tracked_instance = hits.empty() ? 0 : hits[0].target->instance_id;
     sp.range_px = rpx * 1.5f;
     sp.hit_shape = (int)HitShape::CIRCLE;
     sp.direction = p->direction;
@@ -395,12 +394,16 @@ std::vector<WeaponAttackResult> WeaponExecutor::tick_specials(
 
     if (wt == WeaponType::NUNCHAKU) {
         // Auto-track: hit the tracked target with auto-aim
-        // Q3.13: 校验 tracked 仍在本帧存活怪物列表中 (指针值比较, 不解引用)
-        // — 防跨帧悬垂: 目标死亡后被 _cleanup_dead_monsters 释放, 裸指针复用/UAF
-        Monster* trg = (Monster*)sp.tracked;
-        bool trg_tracked_alive = trg &&
-            std::find(targets.begin(), targets.end(), trg) != targets.end();
-        if (trg_tracked_alive && trg->combat.is_alive) {
+        // Q3.13: 校验 tracked 仍在本帧存活怪物列表中 (instance_id 查找, 跨层残留安全)
+        Monster* trg = nullptr;
+        if (sp.tracked_instance != 0) {
+            auto it = std::find_if(targets.begin(), targets.end(),
+                [id = sp.tracked_instance](Monster* m) {
+                    return m && m->instance_id == id;
+                });
+            if (it != targets.end() && (*it)->combat.is_alive) trg = *it;
+        }
+        if (trg) {
             Vector2 hp = { trg->entity.rect.x + trg->entity.rect.width / 2,
                            trg->entity.rect.y + trg->entity.rect.height / 2 };
             auto ar = _resolve_one(player, trg, hp, mult);
@@ -410,7 +413,7 @@ std::vector<WeaponAttackResult> WeaponExecutor::tick_specials(
             // Re-acquire nearest target
             auto hits = hit_detect_circle(origin, sp.range_px, rt);
             if (!hits.empty()) {
-                sp.tracked = (void*)hits[0].target;
+                sp.tracked_instance = hits[0].target->instance_id;
                 auto ar = _resolve_one(player, hits[0].target, hits[0].hit_point, mult);
                 ar.from_special = true;
                 results.push_back(ar);

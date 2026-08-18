@@ -90,8 +90,9 @@ private:
     // Q3.2: 轴贪心兜底 — BFS 无路时直行逼近 (精确rect校验+避毒)
     int _greedy_step(const Player* p, const Monster* t, const GameMap* map) const;
     // Q3.2: 路径记忆 — 同一目标持续沿上一步走, 消除 BFS 等权震荡
+    // (instance_id 键: 原指针键跨进程堆地址不同 + 地址复用 → 旧记忆污染新怪 → 决策分叉)
     mutable int _mem_step = -1;
-    mutable const void* _mem_target = nullptr;
+    mutable uint64_t _mem_target = 0;
     // Q3.2: 卡死逃脱 — 原地 ≥2s 且无近距怪 → 直线脱困 (口袋/贴墙钉子户)
     mutable float _stuck_since = -1.0f;
     mutable float _last_px = -1.0f, _last_py = -1.0f;

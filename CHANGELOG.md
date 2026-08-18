@@ -1,3 +1,30 @@
+# v0.9.27 — Sim 确定性修复: 指针键/跨层残留三连 (2026-08-18)
+
+## 背景: 同种子双进程评估结果逐字节不一致 (可复现性回归)
+- 症状: `--sim N --sim-seed S` 两次运行日志在运行中间帧分叉, 报告随机不同 (胜率 5%~15% 抖动)
+- 排查: 对拍 (RNGDBG 打点 + rng.draws 轨迹) 缩小到 F5 f=4 帧内击杀分叉 — 状态全同却一只史莱姆死亡
+- 根因定位: 三处裸指针跨进程不确定 (堆地址不同) + 跨层/跨局残留 (地址复用 → 污染新对象)
+
+## 根因 #1: 怪物脱卡状态指针键
+- `_unstuck_last_pos/_unstuck_since` 以 `const Monster*` 为键 — 换层后旧怪释放, 新怪 malloc 地址复用 → 残留键把新怪当成"卡住已久"秒传送
+- 修复: 键改 `uint64_t instance_id` (monster.cpp 静态递增计数器), enter_floor 时清空两 map
+
+## 根因 #2: SimAI 路径记忆指针键
+- `_mem_target` 以 `const void*` 记录上一目标 — 同内存地址的新怪沿用旧路径记忆 → 决策分叉
+- 修复: 改 `uint64_t` + 空指针判 `mem_t ? mem_t->instance_id : 0`
+
+## 根因 #3: 双节棍连击自动追踪裸指针 (主凶)
+- `WeaponSpecialState::tracked` 存 `Monster*`: 激活于 F1 (第3段连击), 跨 ~3700 帧残留到 F5 仍 active
+- 换层后地址复用: 一个进程的 tracked 恰好指向史莱姆 (打死, hp 35→0), 另一进程指向别的怪 → 帧内击杀分叉 (该帧 rng 消耗 13 vs 6)
+- 修复: 改 `uint64_t tracked_instance`, tick_specials 用 `std::find_if` 按 instance_id 查找 + is_alive 校验, re-acquire 时同步更新
+
+## 验证
+- 三种子 (500/1000/2000) × 20 局 × 2 批: 全部逐字节一致 (130万行级对拍)
+- 评估基准 (修复后确定性): seed2000 5% / seed1000 15% / seed500 10%
+- 34/34 单元测试通过
+
+---
+
 # v0.8.0 — Architecture Freeze
 
 ## Release Metadata

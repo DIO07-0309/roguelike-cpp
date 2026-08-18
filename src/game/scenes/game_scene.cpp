@@ -266,8 +266,6 @@ void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
 }
 
 void GameScene::enter_floor(int floor, uint32_t seed) {
-    if (g_sim_mode)
-        LOG_INFO("[RNGDBG] enter_floor(F=%d) draws=%u seed_in=%u", floor, rng.draws, seed);
     current_floor = floor;
     game_time = 0;
     ground_items.clear();
@@ -297,6 +295,10 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     _boss.arena.clear();  // D5 Step4: 新楼层清除Arena
 
     // B8: seed=0 → 新楼层随机生成; seed!=0 → 读档恢复
+    // 换层清空脱卡状态 — Monster* 键在换层后地址可复用, 残留键污染新怪 (进程间不确定)
+    _unstuck_last_pos.clear();
+    _unstuck_since.clear();
+
     if (seed != 0) {
         _dungeon_seed = seed;
     } else {
@@ -477,10 +479,6 @@ void GameScene::_process(double delta) {
     }
     game_time += dt;
     if (_sim_ai) _sim_ai->set_time(game_time); // Q3.2: AI 技能冷却判定需要当前时间
-    if (g_sim_mode && boss_floor == current_floor)
-        LOG_INFO("[RNGDBG-F] gt=%.2f draws=%u px=%d py=%d", game_time, rng.draws,
-                 (int)(player->entity.rect.x + 16) / 32,
-                 (int)(player->entity.rect.y + 16) / 32);
 
     // Q3.2: sim 真实伤害统计 — 玩家 HP 下降累计 (含毒池等环境伤害)
     if (_sim_mode && player) {
@@ -1282,13 +1280,13 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
     auto& last_pos = _unstuck_last_pos;
     auto& stuck_since = _unstuck_since;
     for (auto& m : monsters) {
-        if (!m || !m->combat.is_alive) { last_pos.erase(m.get()); stuck_since.erase(m.get()); continue; }
+        if (!m || !m->combat.is_alive) { last_pos.erase(m->instance_id); stuck_since.erase(m->instance_id); continue; }
         int mt0 = (int)(m->entity.rect.x + 16) / 32;
         int mt1 = (int)(m->entity.rect.y + 16) / 32;
-        auto it = last_pos.find(m.get());
+        auto it = last_pos.find(m->instance_id);
         if (it == last_pos.end() || it->second.first != mt0 || it->second.second != mt1) {
-            last_pos[m.get()] = {mt0, mt1};
-            stuck_since[m.get()] = gt;
+            last_pos[m->instance_id] = {mt0, mt1};
+            stuck_since[m->instance_id] = gt;
             continue;
         }
         bool placed = false;
@@ -1305,7 +1303,7 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
             float atk_px = (m->ai ? m->ai->attack_range : 1.5f) * 32.0f;
             if (atk_px < 1.6f * 32.0f) atk_px = 1.6f * 32.0f;
             if (sqrtf(mdx*mdx + mdy*mdy) < atk_px) continue;
-            if (gt - stuck_since[m.get()] < idle_need) continue;
+            if (gt - stuck_since[m->instance_id] < idle_need) continue;
         }
         // Q3.10: 近距环仅 1 格 — r=2(64px) 超出玩家近战48px, 怪仍够不着 → 追打循环拖死
         // 1 格(32px) 落点必在玩家近战内 → 战斗立即恢复 (Q3.2: 远距吸引放远环 8-12格 不变)
@@ -1323,8 +1321,8 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
                     m->entity.position.y = ty * 32.0f;
                     m->entity.sync_rect();
                     LOG_INFO("[FIX] 脱卡: %s → tile(%d,%d)", m->name.c_str(), tx, ty);
-                    last_pos[m.get()] = {tx, ty};
-                    stuck_since[m.get()] = gt;
+                    last_pos[m->instance_id] = {tx, ty};
+                    stuck_since[m->instance_id] = gt;
                     placed = true;
                 }
             }
