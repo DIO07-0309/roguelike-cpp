@@ -148,6 +148,7 @@ void BossSystemDirector::init_on_spawn(Monster* boss, int floor,
                 domain_cycle_duration = def->domain_config.cycle_time;
                 _vulnerable_dmg_mult  = def->domain_config.damage_multiplier;
                 _vulnerable_duration  = def->domain_config.vulnerable_duration;
+                _mechanic_duration    = def->domain_config.mechanic_duration;  // M4b
                 // F10.3-fix: 数据驱动弱点元素 — 克制元素提升对核心伤害
                 _weakness_dmg_mult = 1.0f;
                 if (player && player->element.initialized) {
@@ -295,8 +296,10 @@ void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor
     // Behavior→Command
     current_cmd = boss_decision_to_command((int)behavior.current);
 
-    // Encounter tick
+    // Encounter tick + M4b: 注入遭遇阶段 (驱动连招模板切换)
     encounter.tick(dt, ctx.hp_pct);
+    if (auto* bai = dynamic_cast<BossAI*>(boss->ai))
+        bai->set_encounter_phase(encounter.phase());
 
     // Cinematic tick
     cinematic.tick(dt);
@@ -385,18 +388,22 @@ void BossSystemDirector::_tick_domain_state(float dt, Monster* boss) {
         }
         break;
 
+    case BossArenaState::MECHANIC_PHASE:   // M4b: 弹幕演出段
+        _tick_mechanic_phase(dt, boss);
+        break;
+
     default: break;
     }
 }
 
-// ── M4d-fix: 核心阶段共用逻辑 (DOMAIN/ENRAGED): 核心破坏→弱点; 超时强转 ──
+// ── M4d-fix: 核心阶段共用逻辑 (DOMAIN/ENRAGED): 核心破坏→演出; 超时强转 ──
 void BossSystemDirector::_tick_core_phase(float dt, Monster* boss,
                                           float max_duration) {
-    // 核心被破坏 (普攻: 本帧检测; DOT: cleanup 前置钩子置 null) → 进入弱点阶段
+    // 核心被破坏 (普攻: 本帧检测; DOT: cleanup 前置钩子置 null) → 进入弹幕演出
     if (_active_core && !_active_core->combat.is_alive)
         _active_core = nullptr;
     if (!_active_core) {
-        _enter_vulnerable_phase(boss, true);
+        _enter_mechanic_phase(boss);   // M4b: 破坏→演出段
         return;
     }
     domain_timer += dt;
@@ -404,22 +411,53 @@ void BossSystemDirector::_tick_core_phase(float dt, Monster* boss,
         domain_timer = 0.0f;
         _active_core->combat.is_alive = false;
         _active_core = nullptr;
-        _enter_vulnerable_phase(boss, false);
+        _enter_vulnerable_phase(boss);
     }
 }
 
+// ── M4b: 进入弹幕演出段 (核心破坏奖励: 无敌弹幕风暴 → 易伤) ──
+void BossSystemDirector::_enter_mechanic_phase(Monster* boss) {
+    _active_core = nullptr;
+    domain_timer = 0.0f;
+    _mechanic_timer = _enraged ? _mechanic_duration * 0.5f : _mechanic_duration;
+    _mechanic_barrage_timer = 0.4f;   // 首波快速起手
+    arena_state = BossArenaState::MECHANIC_PHASE;
+    boss_invulnerable = true;
+    EventBus::inst().emit(GameEventType::WEAK_POINT_BREAK,
+        boss, domain_cycle_count, 0.0f, "core_destroyed");
+}
+
+// ── M4b: 演出段 tick — 密集弹幕 + 倒计时 → 易伤 ──
+void BossSystemDirector::_tick_mechanic_phase(float dt, Monster* boss) {
+    _mechanic_timer -= dt;
+    _mechanic_barrage_timer -= dt;
+    if (_mechanic_barrage_timer <= 0.0f) {
+        _force_barrage(boss);
+        _mechanic_barrage_timer = 1.0f;
+    }
+    if (_mechanic_timer <= 0.0f)
+        _enter_vulnerable_phase(boss);
+}
+
+// ── M4b: 演出弹幕 — 快速蓄力释放一波 (插入式, 不打断连招队列) ──
+void BossSystemDirector::_force_barrage(Monster* boss) {
+    auto* bai = dynamic_cast<BossAI*>(boss->ai);
+    if (!bai || !bai->_barrage) return;
+    bai->_barrage->windup_left = 0.2f;
+    bai->_barrage->reset_waves();
+    bai->_barrage->fired = false;
+    bai->_barrage->finished = false;
+    bai->boss_state = BossState::RANGED_BARRAGE;
+}
+
 // ── M4d-fix: 统一进入弱点阶段 (核心破坏/超时共用) ──
-void BossSystemDirector::_enter_vulnerable_phase(Monster* boss,
-                                                 bool core_destroyed) {
+void BossSystemDirector::_enter_vulnerable_phase(Monster* boss) {
     _active_core = nullptr;
     domain_timer = 0.0f;
     arena_state = BossArenaState::VULNERABLE_PHASE;
     boss_invulnerable = false;
     boss->combat.vulnerable_dmg_mult = _vulnerable_dmg_mult;
     domain_cycle_count++;
-    if (core_destroyed)
-        EventBus::inst().emit(GameEventType::WEAK_POINT_BREAK,
-            boss, domain_cycle_count, 0.0f, "core_destroyed");
     EventBus::inst().emit(GameEventType::BOSS_VULNERABLE_ENTER,
         boss, domain_cycle_count, _vulnerable_dmg_mult, "vulnerable_enter");
 }

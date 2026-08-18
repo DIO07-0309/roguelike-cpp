@@ -23,6 +23,11 @@ static BossSkillDef _parse_skill(const json& j) {
     if (j.contains("damage_mult"))  sk.damage_mult = j["damage_mult"].get<float>();
     if (j.contains("windup"))       sk.windup = j["windup"].get<float>();
     if (j.contains("range"))        sk.range = j["range"].get<float>();
+    if (j.contains("pattern"))      sk.pattern = j["pattern"].get<int>();
+    if (j.contains("shot_count"))   sk.shot_count = j["shot_count"].get<int>();
+    if (j.contains("waves"))        sk.waves = j["waves"].get<int>();
+    if (j.contains("wave_interval")) sk.wave_interval = j["wave_interval"].get<float>();
+    if (j.contains("spiral_turn_deg")) sk.spiral_turn_deg = j["spiral_turn_deg"].get<float>();
     return sk;
 }
 
@@ -61,6 +66,7 @@ static BossDef _parse_boss(const json& j) {
         def.domain_config.cycle_time = dc.value("cycle_time", 30.0f);
         def.domain_config.vulnerable_duration = dc.value("vulnerable_duration", 10.0f);
         def.domain_config.damage_multiplier  = dc.value("damage_multiplier", 2.0f);
+        def.domain_config.mechanic_duration  = dc.value("mechanic_duration", 3.5f);
         if (dc.contains("weak_points") && dc["weak_points"].is_array()
             && !dc["weak_points"].empty()) {
             auto& wp = dc["weak_points"][0];
@@ -97,6 +103,14 @@ static BossDef _parse_boss(const json& j) {
         def.arena.max_zones       = a.value("max_zones", 6);
         def.arena.zone_duration   = a.value("zone_duration", 3.0f);
         def.arena.spawn_radius    = a.value("spawn_radius", 120.0f);
+        // M4b: Boss 房机制地形 (可选)
+        if (a.contains("terrain") && a["terrain"].is_object()) {
+            auto& t = a["terrain"];
+            def.arena.terrain.enabled        = t.value("enabled", false);
+            def.arena.terrain.safe_radius    = t.value("safe_radius", 3);
+            def.arena.terrain.lava_band      = t.value("lava_band", 1);
+            def.arena.terrain.clear_objects  = t.value("clear_objects", true);
+        }
     }
 
     return def;

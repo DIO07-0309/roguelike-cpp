@@ -210,6 +210,9 @@ private:
     // 楼层 (委托给 FloorManager)
     void _activate_stairs();
     void _check_floor_transition();
+    // M4b: Boss 房机制地形 (熔岩环带安全区)
+    void _setup_boss_arena_terrain(const class DungeonGenerator& gen, int floor);
+    float _lava_tick_timer = 0.0f;   // M4b: 熔岩灼烧 0.5s 节拍
 
     // 特殊房间 (委托给 InteractionHandler)
 

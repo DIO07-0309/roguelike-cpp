@@ -105,9 +105,16 @@ private:
     void _spawn_domain_core(Monster* boss);             // F10.2
     bool _enraged = false;                              // M4d-fix: 狂暴领域标记
     void _tick_core_phase(float dt, Monster* boss, float max_duration);  // M4d-fix
-    void _enter_vulnerable_phase(Monster* boss, bool core_destroyed);    // M4d-fix
+    void _enter_vulnerable_phase(Monster* boss);    // M4d-fix
     float _enraged_cycle_duration() const;      // M4d-fix: 狂暴时核心周期减半
     float _enraged_vulnerable_duration() const; // M4d-fix: 狂暴时弱点窗口减半
+    // M4b: 机制阶段 — 核心破坏后弹幕演出段 (Boss 无敌, 密集弹幕, 结束→易伤)
+    float _mechanic_duration = 3.5f;            // 数据驱动 (domain_config.mechanic_duration)
+    float _mechanic_timer = 0.0f;               // 演出剩余时间
+    float _mechanic_barrage_timer = 0.0f;       // 演出弹幕间隔计时
+    void _enter_mechanic_phase(Monster* boss);  // 核心破坏→演出
+    void _tick_mechanic_phase(float dt, Monster* boss);
+    void _force_barrage(Monster* boss);         // 演出弹幕 (快速蓄力释放)
 
 public:
     // ── 查询接口 ──

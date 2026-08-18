@@ -12,11 +12,17 @@
 
 // ── Boss 技能参数 (cooldown / damage_mult / windup / range) ──
 struct BossSkillDef {
-    std::string id;             // "charge" | "shockwave" | "summon"
+    std::string id;             // "charge" | "shockwave" | "summon" | "barrage" | ...
     float cooldown = 6.0f;
     float damage_mult = 1.0f;   // 伤害倍率 (charge:2.5, shockwave:1.6)
     float windup = 0.6f;        // 蓄力时间 (s)
-    float range = 100.0f;       // AOE 范围 (shockwave)
+    float range = 100.0f;       // AOE 范围 (shockwave) / 扇形总角度 (barrage)
+    // M4b: 弹幕图案参数 (barrage only)
+    int   pattern = 0;          // 0=扇形 1=环形 2=螺旋
+    int   shot_count = 4;       // 每波弹数
+    int   waves = 1;            // 总波数 (环形/螺旋多波)
+    float wave_interval = 0.25f;// 波间隔 (s)
+    float spiral_turn_deg = 25.0f; // 螺旋每波偏转角
 };
 
 // ── G2.3: BossArenaDef — Boss 战场配置 (Boss 知道自己战场用什么) ──
@@ -26,6 +32,13 @@ struct BossArenaDef {
     int   max_zones = 6;                       // 最大同时zone数
     float zone_duration = 3.0f;                // 单个zone持续(秒)
     float spawn_radius = 120.0f;               // 生成范围(距Boss像素)
+    // M4b: Boss 房机制地形 (F10 熔岩环带安全区)
+    struct {
+        bool enabled = false;        // 是否改造 Boss 房地形
+        int  safe_radius = 3;        // 中央安全区半径 (tiles)
+        int  lava_band = 1;          // 安全区外熔岩带宽度 (tiles)
+        bool clear_objects = true;   // 清空房内随机 ArenaObject
+    } terrain;
 };
 
 // ── M4a: ComboDef — 连招模板 (一条 JSON 记录) ──
@@ -80,6 +93,7 @@ struct BossDef {
         float cycle_time = 30.0f;
         float vulnerable_duration = 10.0f;
         float damage_multiplier = 2.0f;
+        float mechanic_duration = 3.5f;   // M4b: 核心破坏后的弹幕演出时长
         std::string weakness_element;
         float weakness_bonus = 0.0f;
     } domain_config;

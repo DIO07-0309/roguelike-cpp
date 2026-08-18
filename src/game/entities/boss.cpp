@@ -216,23 +216,26 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
         boss->color = Color{180, 60, 60, 255};
         return "";
     }
+    float dt = 0.016f;
     if (!fired) {
-        float bx = boss->entity.rect.x + boss->entity.rect.width/2;
-        float by = boss->entity.rect.y + boss->entity.rect.height/2;
-        float tx = player->entity.rect.x + player->entity.rect.width/2;
-        float ty = player->entity.rect.y + player->entity.rect.height/2;
-        float base = atan2f(ty - by, tx - bx);
-        float total = spread_deg * 3.14159f / 180.0f;
-        float half = total / 2.0f;
-        float step = (shot_count > 1) ? total / (float)(shot_count - 1) : 0.0f;
-        for (int i = 0; i < shot_count; i++) {
-            float ang = base - half + step * (float)i;
-            shots.push_back({bx, by, cosf(ang) * speed, sinf(ang) * speed, 3.5f});
-        }
         fired = true;
-        return "暗影骑士释放弹幕！";
+        _last_tick_time = gt;
+    } else {
+        dt = (float)(gt - _last_tick_time);
+        _last_tick_time = gt;
+        if (dt <= 0.0f || dt > 0.1f) dt = 0.016f;  // 防抖兜底
     }
-    for (auto& s : shots) { s.x += s.vx * 0.016f; s.y += s.vy * 0.016f; s.life -= 0.016f; }
+    std::string first_msg;
+    if (_wave_fired < waves) {
+        _wave_timer -= dt;
+        if (_wave_fired == 0 || _wave_timer <= 0.0f) {
+            _fire_wave(boss, player);
+            _wave_fired++;
+            _wave_timer = wave_interval;
+            if (_wave_fired == 1) first_msg = "地狱火魔释放弹幕！";
+        }
+    }
+    for (auto& s : shots) { s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; }
     for (auto it = shots.begin(); it != shots.end();) {
         bool dead = it->life <= 0.0f;
         // M4a-fix: 弹丸撞墙消失 (原为穿墙 770px 追击)
@@ -253,8 +256,34 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
         }
         if (dead) it = shots.erase(it); else ++it;
     }
-    if (fired && shots.empty()) { finished = true; mark_used(gt); }
-    return "";
+    if (_wave_fired >= waves && shots.empty()) { finished = true; mark_used(gt); }
+    return first_msg;
+}
+
+void BarrageSkill::_fire_wave(Monster* boss, Player* player) {
+    float bx = boss->entity.rect.x + boss->entity.rect.width/2;
+    float by = boss->entity.rect.y + boss->entity.rect.height/2;
+    float tx = player->entity.rect.x + player->entity.rect.width/2;
+    float ty = player->entity.rect.y + player->entity.rect.height/2;
+    const float pi = 3.14159f;
+    if (pattern == 1) {  // 环形 360° 等分
+        float step = 2.0f * pi / (float)shot_count;
+        for (int i = 0; i < shot_count; i++) {
+            float ang = step * (float)i;
+            shots.push_back({bx, by, cosf(ang) * speed, sinf(ang) * speed, 3.5f});
+        }
+        return;
+    }
+    float base = atan2f(ty - by, tx - bx);
+    if (pattern == 2)  // 螺旋: 每波整环偏转
+        base += (float)_wave_fired * spiral_turn_deg * pi / 180.0f;
+    float total = spread_deg * pi / 180.0f;
+    float half = total / 2.0f;
+    float step = (shot_count > 1) ? total / (float)(shot_count - 1) : 0.0f;
+    for (int i = 0; i < shot_count; i++) {
+        float ang = base - half + step * (float)i;
+        shots.push_back({bx, by, cosf(ang) * speed, sinf(ang) * speed, 3.5f});
+    }
 }
 
 void BarrageSkill::draw(float cam_x, float cam_y) const {
@@ -423,9 +452,16 @@ BossCommand BossAI::_command_from_str(const std::string& s) {
 void BossAI::_select_combo() {
     if (!_combos || _combos->empty()) return;
     const ComboDef* target = nullptr;
-    for (auto& c : *_combos) {
-        if ((phase2 && c.id == "rage") || (!phase2 && c.id == "probe")) { target = &c; break; }
+    // M4b: 遭遇阶段驱动模板 — CONTROL→press, LAST_STAND→rage, 其余 probe/rage(phase2)
+    const char* want = nullptr;
+    switch (_encounter_phase) {
+        case EncounterPhase::CONTROL:    want = "press"; break;
+        case EncounterPhase::LAST_STAND: want = "rage";  break;
+        default: want = phase2 ? "rage" : "probe"; break;
     }
+    for (auto& c : *_combos) if (want && c.id == want) { target = &c; break; }
+    if (!target) for (auto& c : *_combos)
+        if ((phase2 && c.id == "rage") || (!phase2 && c.id == "probe")) { target = &c; break; }
     if (!target) target = &(*_combos)[0];
     _combo_id = target->id;
     _combo_current_end_delay = target->end_delay;
@@ -435,8 +471,8 @@ void BossAI::_select_combo() {
     _combo_queue.start();
     _combo_timer = 0.0f;
     normal_attack_count = 0;
-    LOG_INFO("[COMBO] BOSS 启动连招「%s」(%d 段)", target->id.c_str(),
-             (int)target->commands.size());
+    LOG_INFO("[COMBO] BOSS 启动连招「%s」(%d 段) phase=%d", target->id.c_str(),
+             (int)target->commands.size(), (int)_encounter_phase);
 }
 
 void BossAI::_combo_advance() {
@@ -503,6 +539,7 @@ void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
         _barrage->shots.clear();
         _barrage->fired = false;
         _barrage->finished = false;
+        _barrage->reset_waves();      // M4b: 波次复位
         _spawn_boss_vfx(self, "charge", effects);
         break;
     case BossCommand::CONE:
@@ -1116,6 +1153,11 @@ Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
             ai->_barrage->damage_mult = sk.damage_mult;
             ai->_barrage->windup_time = sk.windup;
             ai->_barrage->spread_deg  = sk.range;
+            ai->_barrage->shot_count  = sk.shot_count;
+            ai->_barrage->pattern     = sk.pattern;
+            ai->_barrage->waves       = sk.waves;
+            ai->_barrage->wave_interval = sk.wave_interval;
+            ai->_barrage->spiral_turn_deg = sk.spiral_turn_deg;
         } else if (sk.id == "cone") {
             ai->_cone->cooldown    = sk.cooldown;
             ai->_cone->damage_mult = sk.damage_mult;

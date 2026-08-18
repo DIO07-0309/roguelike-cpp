@@ -3,6 +3,7 @@
 #include <string>
 #include <random>
 #include <memory>
+#include <tuple>
 #include "game_map.h"
 #include "config.h"
 #include "special_room.h"
@@ -40,6 +41,10 @@ public:
                                      const std::string& biome_id = "");
     std::vector<std::pair<int,int>> get_room_centers() const;
     std::vector<SpecialRoom> get_special_rooms() const { return _special_rooms; }
+    // M4b: Boss 房矩形 (rooms.back()), 无房间时返回 {0,0,0,0}
+    std::tuple<int,int,int,int> get_boss_room_rect() const {
+        return _rooms.empty() ? std::make_tuple(0, 0, 0, 0) : _rooms.back();
+    }
 
 private:
     int _w, _h, _ts, _min_part, _min_room, _margin;

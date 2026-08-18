@@ -311,6 +311,7 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     // 生成地牢 (B8: seed 驱动; D1: special_room_count 从配置读)
     DungeonGenerator gen(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
     game_map = gen.generate(_dungeon_seed, fcfg->special_room_count, fcfg->arena_density);
+    _setup_boss_arena_terrain(gen, floor);   // M4b: Boss 房机制地形
     auto rooms = gen.get_room_centers();
 
     // D9-rest: 休息层保证 1 个泉水房 — 50% landmark 替换可能吞掉治疗资源
@@ -584,8 +585,9 @@ void GameScene::_process(double delta) {
                     _presentation.trigger_freeze(0.08f);
                     break;
                 case BossArenaState::MECHANIC_PHASE:
-                    _presentation.show_message("【核心破坏!】Boss失去了领域保护", 2.0f);
+                    _presentation.show_message("【核心粉碎!】弹幕风暴降临 — 躲避!", 2.2f);
                     _presentation.trigger_shake(8.0f);
+                    _presentation.trigger_freeze(0.06f);
                     break;
                 default: break;
                 }
@@ -823,6 +825,32 @@ void GameScene::_process(double delta) {
                 break;
             }
             default: break;
+            }
+        }
+    }
+
+    // M4b: 熔岩地砖灼烧 (0.5s 节拍, Boss 免疫, 时停冻结)
+    if (game_map && time_stop_remaining <= 0) {
+        float px = player->entity.rect.x + player->entity.rect.width/2;
+        float py = player->entity.rect.y + player->entity.rect.height/2;
+        _lava_tick_timer += dt;
+        if (_lava_tick_timer >= 0.5f) {
+            _lava_tick_timer = 0.0f;
+            auto [tx, ty] = game_map->pixel_to_tile(px, py);
+            if (game_map->tile_at(tx, ty) == TileType::LAVA) {
+                int ld = (int)(3 * g_growth.arena_scale(current_floor));
+                player->combat.take_damage(ld);
+                player->combat.mark_damage_logged();
+                LOG_INFO("[DMG] 熔岩灼烧 造成 %d 伤害 → 玩家", ld);
+                _presentation.damage_floats.push_back({px, py-8, 0.4f, ld, {255, 90, 30, 255}});
+            }
+            for (auto& m : monsters) {
+                if (!m->combat.is_alive || m->is_boss) continue;
+                auto [mtx, mty] = game_map->pixel_to_tile(
+                    m->entity.rect.x + m->entity.rect.width/2,
+                    m->entity.rect.y + m->entity.rect.height/2);
+                if (game_map->tile_at(mtx, mty) == TileType::LAVA)
+                    m->combat.take_damage((int)(4 * g_growth.arena_scale(current_floor)));
             }
         }
     }
@@ -1330,6 +1358,37 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
 }
 
 void GameScene::_on_monster_killed(Monster* m)  { _combat.on_monster_killed(m); }
+
+// ── M4b: Boss 房机制地形 — F10 熔岩环带安全区 (茶杯头式竞技场) ──
+void GameScene::_setup_boss_arena_terrain(const DungeonGenerator& gen, int floor) {
+    if (!game_map || floor != 10) return;
+    const BossDef* def = get_boss_def_for_floor(floor);
+    if (!def || !def->arena.terrain.enabled) return;
+    auto [rx, ry, rw, rh] = gen.get_boss_room_rect();
+    if (rw <= 0 || rh <= 0) return;
+    if (def->arena.terrain.clear_objects) {
+        auto& objs = game_map->arena_objects;
+        objs.erase(std::remove_if(objs.begin(), objs.end(),
+            [rx, ry, rw, rh](const ArenaObject& o) {
+                return o.tile_x >= rx && o.tile_x < rx + rw
+                    && o.tile_y >= ry && o.tile_y < ry + rh;
+            }), objs.end());
+    }
+    int cx = rx + rw / 2, cy = ry + rh / 2;
+    int safe = def->arena.terrain.safe_radius;
+    int band = def->arena.terrain.lava_band;
+    int max_safe = std::min(rw, rh) / 2 - band - 1;
+    if (safe > max_safe) safe = std::max(1, max_safe);
+    for (int y = ry; y < ry + rh; y++)
+        for (int x = rx; x < rx + rw; x++) {
+            int d = (int)hypotf((float)(x - cx), (float)(y - cy));
+            if (d > safe && d <= safe + band)
+                game_map->set_tile(x, y, TileType::LAVA);
+        }
+    LOG_INFO("[M4b] F10 Boss 房地形: 安全区 r=%d 熔岩带 %d 格 (房间 %d,%d %dx%d)",
+             safe, band, rx, ry, rw, rh);
+}
+
 void GameScene::_cleanup_dead_monsters() {
     _boss.on_core_maybe_erased();   // F10.2-fix: UAF guard — DOT 击杀核心先解除引用
     _combat.cleanup_dead_monsters();

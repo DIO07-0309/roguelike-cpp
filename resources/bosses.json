@@ -109,6 +109,7 @@
       "cycle_time": 30,
       "vulnerable_duration": 10,
       "damage_multiplier": 2.0,
+      "mechanic_duration": 4.0,
       "weak_points": [
         {"id": "fire_core", "count": 1, "hp": 200,
          "spawn_pattern": "center",
@@ -120,9 +121,19 @@
     "skills": [
       {"id": "charge",   "cooldown": 6.0, "damage_mult": 2.5, "windup": 0.6, "range": 120},
       {"id": "shockwave","cooldown": 8.0, "damage_mult": 1.6, "windup": 0.7, "range": 100},
-      {"id": "summon",   "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 80}
+      {"id": "summon",   "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.0, "range": 80},
+      {"id": "barrage",  "cooldown": 9.0, "damage_mult": 0.5, "windup": 0.7, "range": 60,
+       "pattern": 2, "shot_count": 12, "waves": 5, "wave_interval": 0.22, "spiral_turn_deg": 30},
+      {"id": "cone",     "cooldown": 6.0, "damage_mult": 1.3, "windup": 0.5, "range": 110},
+      {"id": "blink",    "cooldown": 12.0,"damage_mult": 1.0, "windup": 0.35, "range": 150}
     ],
-    "arena": {"danger_type": "lava", "spawn_interval": 8.0, "max_zones": 6, "zone_duration": 2.5, "spawn_radius": 120}
+    "combos": [
+      {"id": "probe", "commands": ["barrage","cone","normal","normal"], "interval": 0.7, "end_delay": 1.0},
+      {"id": "press", "commands": ["blink","barrage","cone","barrage","summon","normal"], "interval": 0.55, "end_delay": 1.1},
+      {"id": "rage",  "commands": ["charge","barrage","blink","barrage","shockwave","barrage","summon"], "interval": 0.5, "end_delay": 1.2}
+    ],
+    "arena": {"danger_type": "lava", "spawn_interval": 8.0, "max_zones": 6, "zone_duration": 2.5, "spawn_radius": 120,
+     "terrain": {"enabled": true, "safe_radius": 3, "lava_band": 1, "clear_objects": true}}
   },
   {
     "id": "demon_lord",

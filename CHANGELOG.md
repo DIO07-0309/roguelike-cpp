@@ -1,3 +1,28 @@
+# v0.9.31 — M4b: 地狱火魔领域作战 (弹幕演出 + 机制阶段 + Boss 房地形) (2026-08-19)
+
+## M4b.1 弹幕图案化 (茶杯头式)
+- `BarrageSkill` 图案化: `pattern` 0=扇形 1=环形 2=螺旋多波; `waves/wave_interval` 波次发射; `spiral_turn_deg` 每波偏转
+- 弹丸飞行从硬编码 0.016f 步进改为帧间时间差 (修复帧率相关弹速)
+- fire_demon 接入连招路径: probe/press/rage 三模板 (含 5 波螺旋弹幕), 数据驱动 (`BossSkillDef` 扩展)
+- `BossEncounterController::phase()` 接线 `_select_combo`: OPENING/PRESSURE→probe, CONTROL→press, LAST_STAND→rage
+
+## M4b.2 机制阶段激活 (MECHANIC_PHASE)
+- 核心破坏 → 弹幕演出段 (Boss 无敌, 每 1s 强制快速弹幕风暴, 演出 4s) → 易伤窗口 (奖励节奏)
+- 核心超时 → 直接易伤 (不变); 狂暴期演出减半; `domain_cycle_count` 双计数修复
+- `domain_config.mechanic_duration` 数据驱动; 播报文案 + 冻结演出增强
+
+## M4b.3 Boss 房机制地形 (熔岩环带安全区)
+- `TileType::LAVA`: 可走地砖 + 橙红脉动绘制 + 0.5s 灼烧 (玩家/非 Boss 怪物, Boss 免疫)
+- F10 Boss 房: 清空随机 ArenaObject + 中央安全区 + 外圈熔岩带 (欧式圆环, 自适应房间尺寸)
+- `BossArenaDef.terrain` 数据驱动 (enabled/safe_radius/lava_band/clear_objects); `DungeonGenerator::get_boss_room_rect()`
+- SimAI 危险视野感知熔岩 (3x3 邻格), BFS 可穿越
+
+## 验证
+- 500 局评估: 7.0% (s7 9% / s500 5% / s1000 6% / s2000 11% / s9999 4%) — 在 6-10% 目标区间, 较 RL 基线 6.6% 微升 (Boss 强化)
+- 34/34 单元测试 + World Validator 通过
+
+---
+
 # v0.9.30 — RL 决策层接入镜像 Boss (F15 实战) (2026-08-18)
 
 ## RL 训练产物 → 运行时决策 (闭环打通)

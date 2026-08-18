@@ -209,6 +209,15 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                 DrawRectangle(dx, dy, tile_size, tile_size, {50, 40, 20, 255});
                 DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4, {255, 200, 50, 255});
                 DrawText(">", dx + 10, dy + 6, 20, {255, 220, 100, 255});
+            } else if (t.type == TileType::LAVA) {
+                // M4b: 熔岩地砖 — 橙红脉动 (Boss 房机制地形)
+                float pulse = 0.7f + 0.3f * sinf((float)GetTime() * 4.0f);
+                Color lc = { (unsigned char)(200 + 40 * pulse), 60, 15, 255 };
+                DrawRectangle(dx, dy, tile_size, tile_size, lc);
+                DrawRectangleLines(dx, dy, tile_size, tile_size,
+                                   {255, 120, 40, (unsigned char)(160 * pulse)});
+                DrawCircle(dx + tile_size/2, dy + tile_size/2, 5.0f * pulse + 2.0f,
+                           {255, 160, 60, (unsigned char)(120 + 80 * pulse)});
             }
 
             // D4 Step1: 事件房间中心绘制标记

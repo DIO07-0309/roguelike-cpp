@@ -113,6 +113,7 @@ public:
 };
 
 // M4a: 弹幕 — 蓄力后向玩家扇形发射多颗弹, 命中减速
+// M4b: 图案化 — pattern 0=扇形 1=环形 2=螺旋多波, waves/wave_interval 波次发射
 class BarrageSkill : public BossSkill {
 public:
     BarrageSkill();
@@ -124,13 +125,24 @@ public:
     int   shot_count = 4;
     float spread_deg = 40.0f;   // 扇形总角度 (度)
     float speed = 220.0f;
+    // M4b: 弹幕图案
+    int   pattern = 0;          // 0=fan 扇形, 1=ring 环形 360°, 2=spiral 螺旋多波
+    int   waves = 1;            // 总波数
+    float wave_interval = 0.25f;// 波间隔 (s)
+    float spiral_turn_deg = 25.0f; // 螺旋每波偏转角
     struct Shot { float x = 0, y = 0, vx = 0, vy = 0, life = 0; };
     std::vector<Shot> shots;
     // M4a-fx: 本帧命中位置 (场景读取后生成爆炸特效)
     std::vector<std::pair<float, float>> hit_fx;
     bool fired = false;
     bool finished = false;
+    void reset_waves() { _wave_fired = 0; _wave_timer = 0.0f; _last_tick_time = 0.0; }
     void draw(float cam_x, float cam_y) const;
+private:
+    void _fire_wave(Monster* boss, Player* player);
+    int   _wave_fired = 0;      // 已发射波数
+    float _wave_timer = 0.0f;   // 下一波倒计时
+    double _last_tick_time = 0.0; // 上一 tick 时间 (compute dt)
 };
 
 // M4a: 扇形斩 — 蓄力后向玩家方向扇形挥击, 命中中毒 2s
@@ -219,6 +231,9 @@ public:
     float _combo_current_end_delay = 0.8f;
     std::string _combo_id;
     const std::vector<ComboDef>* _combos = nullptr;   // 来自 BossDef (factory 设置)
+    // M4b: 遭遇阶段 (director 每帧注入) — 驱动连招模板切换
+    EncounterPhase _encounter_phase = EncounterPhase::OPENING;
+    void set_encounter_phase(EncounterPhase p) { _encounter_phase = p; }
 
     const char* _boss_id = nullptr;   // G5.4: 当前 Boss ID 用于 phase2 行为分支
     float _gravity_timer = 0.0f;      // GRAVITY_PULL 拉拽计时 (成员, 原 static 跨实例共享)

@@ -245,6 +245,11 @@ static bool _tile_rect_walkable(const GameMap* map, int tx, int ty) {
 // Q3.2: 危险视野 — 活性毒池/尖刺圈 (伤害圈 1.2 格 + 缓冲 = 1.5 格)
 bool DecisionAgent::_is_hazard_near(float px, float py, const GameMap* map) const {
     if (!map) return false;
+    // M4b: 熔岩地砖 (脚下 + 邻格缓冲)
+    auto [tx, ty] = map->pixel_to_tile(px, py);
+    for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+            if (map->tile_at(tx + dx, ty + dy) == TileType::LAVA) return true;
     for (auto& ao : map->arena_objects) {
         if (!ao.active) continue;
         if (ao.type != ArenaObjectType::POISON_POOL &&

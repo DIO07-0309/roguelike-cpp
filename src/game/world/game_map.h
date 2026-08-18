@@ -24,7 +24,7 @@ struct ArenaObject {
 // ============================================================
 // Tile / GameMap — 地图数据结构
 // ============================================================
-enum class TileType { FLOOR, WALL, STAIRS_DOWN };
+enum class TileType { FLOOR, WALL, STAIRS_DOWN, LAVA };  // M4b: LAVA — 可走但灼烧
 
 struct Tile {
     TileType type = TileType::WALL;
@@ -33,6 +33,7 @@ struct Tile {
     static Tile floor()  { return {TileType::FLOOR, true}; }
     static Tile wall()   { return {TileType::WALL, false}; }
     static Tile stairs() { return {TileType::STAIRS_DOWN, true}; }
+    static Tile lava()   { return {TileType::LAVA, true}; }   // M4b
 };
 
 class GameMap {
@@ -47,6 +48,9 @@ public:
 
     bool is_walkable(int tx, int ty) const;
     bool is_rect_walkable(Rectangle rect) const;
+    TileType tile_at(int tx, int ty) const {  // M4b: tile 类型查询 (lava 感知)
+        return (_in_bounds(tx, ty)) ? _tiles[ty][tx].type : TileType::WALL;
+    }
 
     // 特殊房间 (B8)
     std::vector<SpecialRoom> special_rooms;
