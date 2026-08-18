@@ -20,6 +20,8 @@ void MirrorDebugStats::on_arbitrate(bool clone_used, bool ml_used) {
     else _s.thompson_used++;
 }
 
+void MirrorDebugStats::on_rl() { _s.rl_used++; }
+
 void MirrorDebugStats::on_interrupt(bool success) {
     _s.interrupt_attempt++;
     if (success) _s.interrupt_success++;
@@ -50,10 +52,10 @@ std::string MirrorDebugStats::summary() const {
         ? 100.0f * (s.rule_fallback + s.default_fallback) / s.predict_count : 0.0f;
     char buf[256];
     snprintf(buf, sizeof(buf),
-        "Predict:%d CloneHit:%.0f%%(ex%d/fz%d) Rule:%.0f%% 仲裁[Clone:%d ML:%d Tho:%d] "
+        "Predict:%d CloneHit:%.0f%%(ex%d/fz%d) Rule:%.0f%% 仲裁[Clone:%d ML:%d RL:%d Tho:%d] "
         "打断%d/%d 行为(A%d/S%d/R%d/App%d) Phase[s:%.0f/%.0f/%.0f]",
         s.predict_count, clone_pct, s.clone_exact, s.clone_fuzzy, rule_pct,
-        s.clone_arbitrate, s.ml_slot_used, s.thompson_used,
+        s.clone_arbitrate, s.ml_slot_used, s.rl_used, s.thompson_used,
         s.interrupt_success, s.interrupt_attempt,
         s.behavior_attack, s.behavior_skill, s.behavior_retreat, s.behavior_approach,
         s.phase_seconds[0], s.phase_seconds[1], s.phase_seconds[2]);

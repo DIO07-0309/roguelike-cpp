@@ -15,6 +15,7 @@
 
 class Monster;
 class Player;
+namespace rl { class QAgent; }  // v0.9.30: RL 决策层 (前向声明, 避免头文件耦合)
 
 // ============================================================
 // F15.3: MirrorAgent — analysis layer, NOT a control layer
@@ -37,6 +38,7 @@ struct MirrorBattleState {
 class MirrorAgent {
 public:
     MirrorAgent();
+    ~MirrorAgent();   // v0.9.30: 完整类型析构 (unique_ptr<rl::QAgent>)
 
     // ── Initialize from player behavior data (called on F15 enter) ──
     void init(const PlayerHabitProfile& profile);
@@ -72,6 +74,10 @@ public:
     // ── M4.4: 战术链序列层 ──
     void set_chain_table(std::unique_ptr<TacticalChainTable> t);
     const TacticalChainTable* chain_table() const { return _chain.get(); }
+
+    // ── v0.9.30: RL 决策层 (F15.4 离线训练 Q 表, 仲裁链插入克隆层之前) ──
+    void set_rl_policy(std::unique_ptr<rl::QAgent> q);
+    bool has_rl_policy() const { return _rl_policy != nullptr; }
 
     // ── During combat: recommend BossAI adjustments ──
     float recommend_distance() const;
@@ -126,6 +132,9 @@ private:
     std::unique_ptr<OnlineAdaptivePolicy> _policy;
     int _last_bucket = -1;    // 最近一次决策的上下文桶
     int _last_action = -1;    // 最近一次决策的动作臂
+    // v0.9.30: RL Q 表决策层 (观察期不启用, 仲裁链在克隆层之前)
+    std::unique_ptr<rl::QAgent> _rl_policy;
+    int _rl_arm(const MirrorBattleState& st) const;   // 返回 MirrorAction 或 -1 (不接管)
     std::unique_ptr<BehaviorCloneTable> _clone;   // M1: 行为克隆层
     static float _rand01();   // [0,1) 均匀采样 (技能窗口探索用)
 

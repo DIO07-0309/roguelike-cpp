@@ -39,6 +39,9 @@ public:
     bool save(const std::string& path) const;
     bool load(const std::string& path);
 
+    // v0.9.30: 纯 exploit 决策 (镜像运行时用, 无需 SimulationState)
+    int exploit_action(const Observation& obs) const;
+
     // Hyperparameters
     double alpha() const { return _alpha; }
     double gamma() const { return _gamma; }

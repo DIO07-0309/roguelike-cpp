@@ -15,6 +15,7 @@
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.3
 #include "ai/player_behavior/player_behavior_analyzer.h"  // F15.3
 #include "ai/mirror/mirror_agent.h"                       // F15.3
+#include "ai/rl/q_agent.h"                                // v0.9.30: RL 镜像决策层
 #include "core/logger.h"   // M4: [MIRROR-ACC] 战斗统计进 game.log
 
 // ============================================================
@@ -188,6 +189,20 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
     _mirror_agent->set_chain_table(std::move(chain));
     LOG_INFO("[MIRROR] ChainTable built: %zu triples from %zu actions",
              _mirror_agent->chain_table()->entries(), history.size());
+
+    // v0.9.30: RL 决策层 — 按玩家风格加载离线训练 Q 表 (F15.4 RL self-play 产物)
+    // 文件缺失 → 不注入 (降级现有仲裁链, 安全)
+    auto rl_q = std::make_unique<rl::QAgent>();
+    std::string rl_path = std::string("saves/rl_mirror_q_") +
+                          profile.style_name() + ".json";
+    if (rl_q->load(rl_path)) {
+        size_t rl_entries = rl_q->table_size();
+        _mirror_agent->set_rl_policy(std::move(rl_q));
+        LOG_INFO("[MIRROR] RL policy loaded: %s (%zu entries)",
+                 rl_path.c_str(), rl_entries);
+    } else {
+        LOG_INFO("[MIRROR] RL policy missing (skip): %s", rl_path.c_str());
+    }
 
     // ── 数值: HP=玩家×2.5, ATK=玩家×0.85 (Q3.10: 原 ×5/×1.2 → ×3/×1.0 仍不可胜,
     //   自愈 10% 太频 + 单段 135 太高 → 再削) ──

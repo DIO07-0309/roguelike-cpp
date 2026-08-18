@@ -34,6 +34,16 @@ mcts::CombatAction QAgent::_best_action(const std::string& obs_key) const {
     return best;
 }
 
+int QAgent::exploit_action(const Observation& obs) const {
+    std::string key = obs.to_key();
+    bool known = false;
+    for (int i = 0; i < (int)mcts::CombatAction::COUNT; i++) {
+        if (_q.find(_make_key(key, i)) != _q.end()) { known = true; break; }
+    }
+    if (!known) return -1;   // 未见过该状态 → 不下接管 (镜像仲裁链落下级层)
+    return (int)_best_action(key);
+}
+
 mcts::CombatAction QAgent::select(const mcts::SimulationState& state, uint32_t& seed) {
     auto actions = mcts::get_possible_actions(state);
     if (actions.empty()) return mcts::CombatAction::WAIT;

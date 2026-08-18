@@ -1,4 +1,6 @@
 #include "ai/mirror/mirror_agent.h"
+#include "ai/rl/q_agent.h"        // v0.9.30: RL 决策层
+#include "ai/rl/observation.h"
 #include "core/logger.h"
 #include "combat_system.h"   // rng()
 #include <algorithm>
@@ -7,8 +9,41 @@
 // M4.5: 战术链符号 → 玩家动作类型 (定义在匿名命名空间, 供 should_interrupt_skill 前置使用)
 static PlayerActionType chain_symbol_to_action(int s);
 
+// v0.9.30: RL 适配 — MirrorBattleState → 训练观测 (字段与 rl_runner make_scenario 对齐)
+static rl::Observation mirror_state_to_obs(const MirrorBattleState& st, int style) {
+    rl::Observation o;
+    o.player_hp_ratio = st.player_hp_pct;
+    o.player_attack = 10.0f;          // 训练常量 (rl_runner 玩家攻击=10)
+    o.enemy_count = 1.0f;             // 单 Boss 战
+    o.nearest_enemy_dist = st.dist_tiles;
+    o.strongest_hp_ratio = st.boss_hp_pct;
+    o.boss_present = 1.0f;
+    o.buff_count = 0;
+    o.player_style = (float)style;
+    return o;
+}
+
+// v0.9.30: RL 映射 — 玩家视角最优动作 → 镜像反制臂 (镜像语义: 用玩家学到的最优策略反打)
+static int combat_action_to_arm(int action_id, float dist_tiles) {
+    switch ((mcts::CombatAction)action_id) {
+    case mcts::CombatAction::ATTACK: return (int)MirrorAction::COMBO;
+    case mcts::CombatAction::SKILL_1:
+    case mcts::CombatAction::SKILL_2:
+    case mcts::CombatAction::SKILL_3:
+    case mcts::CombatAction::SKILL_4: return (int)MirrorAction::SKILL;
+    case mcts::CombatAction::MOVE_UP:
+    case mcts::CombatAction::MOVE_DOWN:
+    case mcts::CombatAction::MOVE_LEFT:
+    case mcts::CombatAction::MOVE_RIGHT:
+        return dist_tiles < 3.0f ? (int)MirrorAction::RETREAT : (int)MirrorAction::APPROACH;
+    default: return (int)MirrorAction::RETREAT;   // WAIT → 拉扯
+    }
+}
+
 MirrorAgent::MirrorAgent()
     : _debug_stats(std::make_unique<MirrorDebugStats>()) {}
+
+MirrorAgent::~MirrorAgent() = default;
 
 void MirrorAgent::init(const PlayerHabitProfile& profile) {
     _profile = profile;
@@ -237,6 +272,14 @@ int MirrorAgent::recommend_action(const MirrorBattleState& st) {
             }
         }
     }
+    // v0.9.30: RL 层仲裁 — 离线训练 Q 表 (全局最优策略经验, 优先于个体克隆)
+    if (_rl_policy) {
+        int arm = _rl_arm(st);
+        if (arm >= 0) {
+            _debug_stats->on_rl();   // 验收: RL 仲裁
+            return _record_arm(arm, st);
+        }
+    }
     // M3: 克隆层仲裁 — 置信度>门槛 时克隆意图驱动 Boss 臂 (M4: 漂移大则门槛上浮)
     if (_clone) {
         ClonePrediction p = _clone->predict(st.dist_tiles, st.player_hp_pct,
@@ -262,6 +305,19 @@ int MirrorAgent::recommend_action(const MirrorBattleState& st) {
         _phase, _last_bucket, _last_action, dist_px,
         st.player_hp_pct * 100.0f);
     return _last_action;
+}
+
+// v0.9.30: RL 决策 — 观测适配 → exploit → 反制臂映射; 无 Q 值条目返回 -1 (落下级链)
+int MirrorAgent::_rl_arm(const MirrorBattleState& st) const {
+    if (!_rl_policy) return -1;
+    int style = MirrorAgent::style_to_int(_profile.style);
+    rl::Observation obs = mirror_state_to_obs(st, style);
+    int act = _rl_policy->exploit_action(obs);
+    return combat_action_to_arm(act, st.dist_tiles);
+}
+
+void MirrorAgent::set_rl_policy(std::unique_ptr<rl::QAgent> q) {
+    _rl_policy = std::move(q);
 }
 
 void MirrorAgent::report_outcome(bool hit, float damage) {
