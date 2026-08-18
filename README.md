@@ -211,6 +211,7 @@ build/roguelike_cpp --sim-ai mcts
 # Q-learning 训练
 build/roguelike_cpp --rl-train 1000
 ```
+Q 表持久化: `saves/rl_qtable.json` / `saves/rl_mirror_q_<STYLE>.json`, 再次运行自动续训; `--rl-train` 与 `--rl-mirror` 可同跑。
 
 ---
 

@@ -56,10 +56,13 @@ void run_rl_mode(int test_episodes, int train_episodes) {
                total_reward/test_episodes, (double)total_steps/test_episodes);
     }
 
-    // ── Train mode: Q-learning ──
+    // ── Train mode: Q-learning (Q 表持久化, 支持续训) ──
     if (train_episodes > 0) {
         QAgent q_agent(0.1, 0.9, 0.1);
+        const char* qpath = "saves/rl_qtable.json";
+        size_t loaded = q_agent.load(qpath) ? q_agent.table_size() : 0;
         printf("═══ RL TRAIN: %d episodes (QAgent) ═══\n", train_episodes);
+        if (loaded > 0) printf("  [load] %s: %zu entries — 继续训练\n", qpath, loaded);
         int wins = 0;
         for (int i = 0; i < train_episodes; i++) {
             auto initial = make_scenario();
@@ -78,6 +81,10 @@ void run_rl_mode(int test_episodes, int train_episodes) {
         }
         printf("QAgent after training: %d/%d wins (%.1f%%), Q-table size=%zu\n",
                wins, train_episodes, wins*100.0/train_episodes, q_agent.table_size());
+        if (q_agent.save(qpath))
+            printf("  [save] %s: %zu entries\n", qpath, q_agent.table_size());
+        else
+            printf("  [save] FAILED: %s\n", qpath);
         auto dist = q_agent.action_distribution();
         printf("Action Q-values:\n");
         for (auto& d : dist)
@@ -128,8 +135,13 @@ void run_rl_mirror_mode(int episodes) {
     printf("═══ RL MIRROR: %d episodes × 4 styles ═══\n", episodes);
     for (int style_i = 0; style_i < 4; style_i++) {
         QAgent q_agent(0.15, 0.9, 0.12);
+        std::string qpath = std::string("saves/rl_mirror_q_") +
+                            profiles[style_i].style_name() + ".json";
+        size_t loaded = q_agent.load(qpath) ? q_agent.table_size() : 0;
         int wins = 0; double total_r = 0;
         const auto& profile = profiles[style_i];
+        if (loaded > 0)
+            printf("  [load] %s: %zu entries — 继续训练\n", qpath.c_str(), loaded);
 
         for (int i = 0; i < episodes; i++) {
             auto initial = make_scenario_with_style(style_i);
@@ -155,6 +167,10 @@ void run_rl_mirror_mode(int episodes) {
             profiles[style_i].style_name(),
             wins, episodes, wins*100.0/episodes,
             total_r/episodes, q_agent.table_size());
+        if (q_agent.save(qpath))
+            printf("  [save] %s: %zu entries\n", qpath.c_str(), q_agent.table_size());
+        else
+            printf("  [save] FAILED: %s\n", qpath.c_str());
     }
     printf("Mirror RL complete.\n");
 }

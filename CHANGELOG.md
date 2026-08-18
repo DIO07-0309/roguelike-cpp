@@ -1,3 +1,22 @@
+# v0.9.28 — RL 训练管线: 入口合并 + Q 表持久化续训 (2026-08-18)
+
+## Q 表持久化
+- `QAgent::save(path)` / `QAgent::load(path)`: JSON 格式 (`{"q": {obs|action: value}}`), 目录自动创建, 损坏/缺文件安全返回 false
+- `--rl-train N`: 训练前自动加载 `saves/rl_qtable.json` (存在则继续训练), 训练后保存
+- `--rl-mirror N`: 4 风格各独立 Q 表 `saves/rl_mirror_q_<STYLE>.json`, 同样支持续训
+- 训练产物不纳入版本库 (gitignore 新增)
+
+## 命令行入口合并
+- 原 `--rl-train` 分支提前 `return 0` → `--rl-mirror` 永远不可达 (死路径)
+- 改为顺序执行: `run_rl_mode` → `run_rl_mirror_mode` → 统一退出, 两参数可同跑
+
+## 验证
+- `--rl-train 100 --rl-mirror 50` 同跑正常, 第二次运行 `[load] ... entries — 继续训练` 生效
+- 实测续训: 镜像 4 风格 200+50 局 (AGGRESSIVE 2078→2369 条目), 单风格胜率 48-86%
+- 34/34 单元测试通过
+
+---
+
 # v0.9.27 — Sim 确定性修复: 指针键/跨层残留三连 (2026-08-18)
 
 ## 背景: 同种子双进程评估结果逐字节不一致 (可复现性回归)

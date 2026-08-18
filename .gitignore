@@ -13,6 +13,8 @@ crash.log
 game.log
 saves/save.json
 saves/meta_save.json
+saves/rl_qtable.json
+saves/rl_mirror_q_*.json
 reports/
 build_mingw/
 build_test/

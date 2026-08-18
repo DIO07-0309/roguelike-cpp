@@ -2,6 +2,16 @@
 #include "ai/rl/q_agent.h"
 #include <limits>
 #include <algorithm>
+#include <cstdio>
+#include "nlohmann/json.hpp"
+
+#ifdef _WIN32
+#include <direct.h>
+#define rl_mkdir_impl(p) _mkdir(p)
+#else
+#include <sys/stat.h>
+#define rl_mkdir_impl(p) mkdir(p, 0755)
+#endif
 
 namespace rl {
 
@@ -81,6 +91,40 @@ std::vector<QActionStats> QAgent::action_distribution() const {
         stats.push_back(s);
     }
     return stats;
+}
+
+bool QAgent::save(const std::string& path) const {
+    std::string dir = path;
+    size_t pos = dir.find_last_of("/\\");
+    if (pos != std::string::npos) {
+        dir = dir.substr(0, pos);
+        if (!dir.empty()) rl_mkdir_impl(dir.c_str());
+    }
+    nlohmann::json j;
+    for (auto& [key, qv] : _q) j["q"][key] = qv;
+    FILE* f = fopen(path.c_str(), "w");
+    if (!f) return false;
+    fputs(j.dump(1).c_str(), f);
+    fclose(f);
+    return true;
+}
+
+bool QAgent::load(const std::string& path) {
+    FILE* f = fopen(path.c_str(), "r");
+    if (!f) return false;
+    std::string text;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), f)) > 0) text.append(buf, n);
+    fclose(f);
+    try {
+        auto j = nlohmann::json::parse(text);
+        if (!j.contains("q") || !j["q"].is_object()) return false;
+        _q.clear();
+        for (auto it = j["q"].begin(); it != j["q"].end(); ++it)
+            _q[it.key()] = it.value().get<double>();
+    } catch (...) { return false; }
+    return true;
 }
 
 } // namespace rl

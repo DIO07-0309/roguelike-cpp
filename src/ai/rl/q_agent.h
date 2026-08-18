@@ -35,6 +35,10 @@ public:
     size_t table_size() const { return _q.size(); }
     std::vector<QActionStats> action_distribution() const;
 
+    // Q 表持久化 (JSON, 训练结果落盘供下次续训)
+    bool save(const std::string& path) const;
+    bool load(const std::string& path);
+
     // Hyperparameters
     double alpha() const { return _alpha; }
     double gamma() const { return _gamma; }

@@ -282,16 +282,16 @@ int main(int argc, char** argv) {
     ServiceLocator::provide(&EventBus::inst());
     LOG_INFO("ServiceLocator: 全局服务已注册");
 
-    // G8.4: RL test/train mode (standalone, before engine)
+    // G8.4/F15.4: RL train/test + mirror (standalone, before engine)
     if (GameScene::g_rl_test_episodes > 0 || GameScene::g_rl_train_episodes > 0) {
         run_rl_mode(GameScene::g_rl_test_episodes, GameScene::g_rl_train_episodes);
-        printf("[RL] Done. Exiting.\n");
-        return 0;
     }
-    // F15.4: Mirror self-play training
     if (GameScene::g_rl_mirror_episodes > 0) {
         run_rl_mirror_mode(GameScene::g_rl_mirror_episodes);
-        printf("[RL Mirror] Done. Exiting.\n");
+    }
+    if (GameScene::g_rl_test_episodes > 0 || GameScene::g_rl_train_episodes > 0 ||
+        GameScene::g_rl_mirror_episodes > 0) {
+        printf("[RL] Done. Exiting.\n");
         return 0;
     }
 
