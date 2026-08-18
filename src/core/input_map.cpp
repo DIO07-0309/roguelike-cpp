@@ -50,13 +50,15 @@ void InputMap::setup_defaults() {
     add_action("move_right", KEY_D);    add_action("move_right", KEY_RIGHT);
     add_action("attack",     KEY_SPACE);
     add_action("pickup",     KEY_E);
-    add_action("inventory",  KEY_I);
+    add_action("inventory",  KEY_B);
     add_action("skill_1",    KEY_ONE);  add_action("skill_2", KEY_TWO);
     add_action("skill_3",    KEY_THREE); add_action("skill_4", KEY_FOUR);
-    add_action("descend",    KEY_PERIOD);
+    add_action("skill_1",    KEY_KP_1); add_action("skill_2", KEY_KP_2);
+    add_action("skill_3",    KEY_KP_3); add_action("skill_4", KEY_KP_4);
+    add_action("descend",    KEY_E);
     add_action("confirm",    KEY_ENTER); add_action("confirm", KEY_KP_ENTER);
     add_action("cancel",     KEY_ESCAPE);
-    add_action("fullscreen", KEY_F11);
+    add_action("fullscreen", KEY_G);
 }
 
 std::string InputMap::_key_name(KeyboardKey k) {
@@ -67,8 +69,8 @@ std::string InputMap::_key_name(KeyboardKey k) {
     if (k == KEY_ESCAPE) return "Esc";
     if (k == KEY_UP) return "↑";
     if (k == KEY_DOWN) return "↓";
-    if (k == KEY_LEFT) return "←";
+if (k == KEY_LEFT) return "←";
+    if (k == KEY_DOWN) return "↓";
     if (k == KEY_RIGHT) return "→";
-    if (k == KEY_PERIOD) return ">";
     return "?";
 }

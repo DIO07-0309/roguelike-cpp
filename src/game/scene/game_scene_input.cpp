@@ -29,15 +29,15 @@ void GameSceneInput::handle_input(const InputMap& input) {
     if (_s._is_event_running()) { handle_event_input(input); return; }
     // D4 Step4: dialogue UI intercept
     if (_s._dialogue.active) { handle_dialogue_input(input); return; }
-    // D4 Step4: Quest log (Q key)
-    if (IsKeyPressed(KEY_Q)) {
+    // D4 Step4: Quest log (F1 key)
+    if (IsKeyPressed(KEY_F1)) {
         _s._quest_log_open = !_s._quest_log_open;
         if (_s._quest_log_open) _s.inventory_open = false;
         tree->get_audio()->play_sfx("ui_click", 0.35f);  // Q4.5
         return;
     }
     if (_s._quest_log_open) {
-        if (IsKeyPressed(KEY_Q) || _s._is_action_just_pressed(input,"cancel")) {
+        if (IsKeyPressed(KEY_F1) || _s._is_action_just_pressed(input,"cancel")) {
             _s._quest_log_open = false;
             tree->get_audio()->play_sfx("ui_click", 0.35f);  // Q4.5
         }
@@ -166,7 +166,7 @@ void GameSceneInput::handle_dialogue_input(const InputMap& input) {
     auto& d = _s._dialogue;
     if (!d.active) return;
 
-    if (_s._is_action_just_pressed(input,"confirm") || _s._is_action_just_pressed(input,"attack")) {
+    if (_s._is_action_just_pressed(input,"confirm")) {
         d.page++;
         d.timer = 0.0f;
         if (d.page >= (int)d.pages.size()) {
@@ -207,7 +207,7 @@ void GameSceneInput::handle_dialogue_input(const InputMap& input) {
 // ============================================================
 void GameSceneInput::handle_debug_keys() {
     if (!_s.player) return;
-    if (IsKeyPressed(KEY_F1))
+    if (IsKeyPressed(KEY_F7))
         apply_buff(_s.player.get(), "attack_up", 1);
     if (IsKeyPressed(KEY_F2))
         apply_buff(_s.player.get(), "slow", 1);

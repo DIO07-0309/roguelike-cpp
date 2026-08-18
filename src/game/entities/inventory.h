@@ -16,6 +16,7 @@ public:
     std::vector<std::shared_ptr<Item>> items;
     std::unordered_map<std::string, std::shared_ptr<EquipmentItem>> equipped;
     int max_size = 16;
+    static constexpr int kPageSize = 10;
 
     Inventory(int capacity = 16);
 

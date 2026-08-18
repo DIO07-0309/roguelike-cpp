@@ -97,7 +97,7 @@ void TitleScene::_ready() {
         {"C", "继续游戏", "continue", {100, 200, 100, 255}},
         {"F", "选关", "select", {100, 180, 255, 255}},
         {"T", "新手教程", "tutorial", {200, 180, 120, 255}},
-        {"F11", "全屏切换", "fullscreen", {160, 160, 200, 255}},
+        {"G", "全屏切换", "fullscreen", {160, 160, 200, 255}},
         {"Esc", "退出", "quit", {200, 100, 100, 255}},
     };
 }
@@ -196,7 +196,8 @@ void TitleScene::_render() {
             "操作说明",
             "WASD/方向键 - 移动",
             "J - 攻击   K - 技能",
-            "E - 交互   I - 背包",
+            "E - 交互   B - 背包   F1 - 日志",
+            "R - 圣物   G - 全屏",
             "R - 查看圣物",
             "ESC - 保存并返回",
         };
@@ -238,7 +239,6 @@ void TitleScene::_input(const InputMap& input) {
     if (IsKeyPressed(KEY_C)) { if (has_save) _activate("continue"); return; }
     if (IsKeyPressed(KEY_F)) { _activate("select"); return; }
     if (IsKeyPressed(KEY_T)) { _activate("tutorial"); return; }
-    if (IsKeyPressed(KEY_F11)) { _activate("fullscreen"); return; }
 
     // Q4.5: 鼠标点击菜单项
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && hover_index >= 0

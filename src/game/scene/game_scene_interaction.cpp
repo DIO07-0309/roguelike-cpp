@@ -266,7 +266,7 @@ void GameSceneInteraction::draw_quest_log(int sw, int sh) {
     Rectangle pr = {sw/2.0f - pw/2, sh/2.0f - ph/2, pw, ph};
     auto& quests = _s._gameplay.quest_mgr.all_quests();
     int done = _s._gameplay.quest_mgr.completed_count(), total = (int)quests.size();
-    GameRenderer::draw_panel(pr, "任务日志  Q关闭", {20,20,40,230});
+    GameRenderer::draw_panel(pr, "任务日志  F1关闭", {20,20,40,230});
 
     if (quests.empty()) {
         DrawTextEx(g_font_small, "暂无任务。", {pr.x+30, pr.y+60}, 16, 1, {160,160,180,200});

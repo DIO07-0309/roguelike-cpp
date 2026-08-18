@@ -161,7 +161,11 @@ float DecisionAgent::_evaluate_skill(int slot, const Player* p,
     int n = _count_in_range(p, monsters, 5.0f * 32.0f);
     if (n <= 0) return 0;
     float aoe_bonus = _prefer_aoe * (n > 1 ? 1.0f : 0.3f);
-    return _prefer_skill * (0.5f + aoe_bonus);
+    float score = _prefer_skill * (0.5f + aoe_bonus);
+    // M4.4: 单体Boss战 — 伤害技能冷却好就放 (补足普攻DPS缺口, 对冲Boss自愈)
+    auto* t = _find_nearest(p, monsters);
+    if (t && t->is_boss && !dynamic_cast<SelfHealSkill*>(sk.get())) score += 0.9f;
+    return score;
 }
 
 static const int kBfsDx[4] = {0, 0, -1, 1};  // up, down, left, right
@@ -644,8 +648,14 @@ std::string DecisionAgent::best_action(const Player* player,
     }
 
     // Q3.3: 药水 — 残血且本帧无可发自愈技能 → 喝治疗药水 (1s CD 防连灌)
-    if ((best.empty() || best[0] != 's') && _hp_ratio(player) < _prefer_heal &&
-        _game_time - _last_potion_time > 1.0f) {
+    // M4.4: Boss战阈值 0.35→0.55 (冻结 1.5s 后血量会被秒杀, 必须提前喝)
+    // M4.4: Boss蓄力瞬间不喝 — 优先 _evaluate_move 的躲招 (1.4 分 > 药水收益)
+    float potion_line = _prefer_heal;
+    auto* boss = _find_nearest(player, monsters);
+    if (boss && boss->is_boss) potion_line = 0.55f;
+    if ((best.empty() || best[0] != 's') && _hp_ratio(player) < potion_line &&
+        _game_time - _last_potion_time > 1.0f &&
+        !(boss && boss->is_boss && _boss_winding_up(boss))) {
         for (const auto& it : player->inventory.items) {
             const auto* c = dynamic_cast<const ConsumableItem*>(it.get());
             if (c && c->effect_type == "heal") {

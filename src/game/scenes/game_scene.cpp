@@ -266,6 +266,8 @@ void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
 }
 
 void GameScene::enter_floor(int floor, uint32_t seed) {
+    if (g_sim_mode)
+        LOG_INFO("[RNGDBG] enter_floor(F=%d) draws=%u seed_in=%u", floor, rng.draws, seed);
     current_floor = floor;
     game_time = 0;
     ground_items.clear();
@@ -475,6 +477,10 @@ void GameScene::_process(double delta) {
     }
     game_time += dt;
     if (_sim_ai) _sim_ai->set_time(game_time); // Q3.2: AI 技能冷却判定需要当前时间
+    if (g_sim_mode && boss_floor == current_floor)
+        LOG_INFO("[RNGDBG-F] gt=%.2f draws=%u px=%d py=%d", game_time, rng.draws,
+                 (int)(player->entity.rect.x + 16) / 32,
+                 (int)(player->entity.rect.y + 16) / 32);
 
     // Q3.2: sim 真实伤害统计 — 玩家 HP 下降累计 (含毒池等环境伤害)
     if (_sim_mode && player) {
@@ -1165,9 +1171,9 @@ void GameScene::_tick_replay_hash() {
 void GameScene::_input(const InputMap& input) {
     // G10.1: Element select input
     if (element_select_active) {
-        if (input.is_action_just_pressed("move_up"))
+        if (input.is_action_just_pressed("move_left"))
             element_select_cursor = (element_select_cursor + 2) % 3;
-        if (input.is_action_just_pressed("move_down"))
+        if (input.is_action_just_pressed("move_right"))
             element_select_cursor = (element_select_cursor + 1) % 3;
         if (input.is_action_just_pressed("attack") || input.is_action_just_pressed("pickup")) {
             static const ElementType choices[] = {
@@ -1372,6 +1378,8 @@ void GameScene::_activate_stairs() {
 
 void GameScene::_check_floor_transition() {
     if (!stairs_active) return;
+    // E 键同时用于交互 — 对话/事件/背包/日志打开时不得误下楼
+    if (_dialogue.active || _is_event_running() || inventory_open || _quest_log_open) return;
     // Q3.1: sim 模式下楼梯判定走 SimAI (headless 无真实按键)
     InputMap& sim_in = get_tree()->get_input();
     if (_sim_mode) {
@@ -1497,8 +1505,8 @@ void GameScene::_render() {
             }
 
             if (selected) {
-                DrawTextEx(g_font_small, "[空格/E 确认]",
-                    {cx + card_w/2 - 60, cy + card_h - 35}, 14, 1, {255,255,180,220});
+                DrawTextEx(g_font_small, "[←/→选择] [空格/E 确认]",
+                    {cx + card_w/2 - 110, cy + card_h - 35}, 14, 1, {255,255,180,220});
             }
         }
         const char* ft = "选择后永久绑定，本局及以后所有存档不可更改";

@@ -281,6 +281,36 @@ void GameRenderer::draw_skill_bar(const Player* player, float game_time) {
     }
 }
 
+// 文本折行绘制: 超宽时按 UTF-8 码点折行, 返回行数
+static int _draw_wrapped_text(const std::string& text, float x, float y,
+                              float max_w, int font_size, float line_h, Color c) {
+    if (MeasureTextEx(g_font_small, text.c_str(), font_size, 1).x <= max_w) {
+        DrawTextEx(g_font_small, text.c_str(), {x, y}, font_size, 1, c);
+        return 1;
+    }
+    std::string cur;
+    int lines = 0;
+    for (size_t i = 0; i < text.size(); ) {
+        unsigned char ch = (unsigned char)text[i];
+        size_t len = (ch < 0x80) ? 1 : (ch < 0xE0) ? 2 : (ch < 0xF0) ? 3 : 4;
+        if (i + len > text.size()) break;
+        std::string nxt = cur + text.substr(i, len);
+        if (!cur.empty() && MeasureTextEx(g_font_small, nxt.c_str(), font_size, 1).x > max_w) {
+            DrawTextEx(g_font_small, cur.c_str(), {x, y + lines * line_h}, font_size, 1, c);
+            lines++;
+            cur = text.substr(i, len);
+        } else {
+            cur = nxt;
+        }
+        i += len;
+    }
+    if (!cur.empty()) {
+        DrawTextEx(g_font_small, cur.c_str(), {x, y + lines * line_h}, font_size, 1, c);
+        lines++;
+    }
+    return lines;
+}
+
 // C1: Buff icon mapping
 static const char* _buff_icon(const std::string& id) {
     if (id == "attack_up") return "攻";
@@ -433,23 +463,37 @@ void GameRenderer::draw_monster_buffs(const Monster& m, float draw_x, float draw
 
 void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw, int sh) {
     DrawRectangle(0, 0, sw, sh, {0, 0, 0, 180});
-    float pw = 440, ph = 480;
+    float pw = 500, ph = 480;
     Rectangle pr = {sw / 2.0f - pw / 2, sh / 2.0f - ph / 2, pw, ph};
-    draw_panel(pr, "背包 I关闭");
+    draw_panel(pr, "背包 B关闭");
 
     auto& inv = player->inventory;
-    float y0 = pr.y + 40;
+    float x0 = pr.x + 30;
+    float max_w = pw - 60.0f;
+    float y = pr.y + 40;
 
-    std::string eq = "装备: weapon:";
-    eq += inv.equipped.at("weapon") ? inv.equipped.at("weapon")->get_description() : "空";
-    eq += " armor:";
-    eq += inv.equipped.at("armor") ? inv.equipped.at("armor")->get_description() : "空";
-    if (g_font_loaded)
-        DrawTextEx(g_font_small, eq.c_str(), {pr.x + 30, y0}, 18, 1, {255, 200, 50, 255});
-    DrawLine(pr.x + 30, y0 + 26, pr.x + pw - 30, y0 + 26, {60, 60, 90, 255});
+    if (g_font_loaded) {
+        std::string wdesc = "武器: " + (inv.equipped.at("weapon")
+            ? inv.equipped.at("weapon")->get_description() : std::string("空"));
+        y += _draw_wrapped_text(wdesc, x0, y, max_w, 18, 20.0f, {255, 200, 50, 255}) * 20.0f;
+        std::string adesc = "防具: " + (inv.equipped.at("armor")
+            ? inv.equipped.at("armor")->get_description() : std::string("空"));
+        y += _draw_wrapped_text(adesc, x0, y, max_w, 18, 20.0f, {255, 200, 50, 255}) * 20.0f;
+    } else {
+        y += 40.0f;
+    }
+    y += 12.0f;
+    DrawLine(x0, y, pr.x + pw - 30, y, {60, 60, 90, 255});
 
-    for (int i = 0; i < (int)inv.items.size(); i++) {
-        float ry = y0 + 38 + i * 30;
+    const int kPage = Inventory::kPageSize;
+    int item_count = (int)inv.items.size();
+    int max_page = std::max(0, (item_count + kPage - 1) / kPage - 1);
+    int page = cursor / kPage;
+    int start = page * kPage;
+    int end = std::min(start + kPage, item_count);
+    float bottom_limit = pr.y + ph - 58.0f;
+    float iy = y + 14.0f;
+    for (int i = start; i < end; i++) {
         std::string mk = (i == cursor) ? ">" : " ";
         char idx[4]; snprintf(idx, sizeof(idx), "%2d", i + 1);
         std::string txt = mk + " [" + idx + "] " + inv.items[i]->get_description();
@@ -459,14 +503,25 @@ void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw
             SpriteDef xd;
             Texture2D itex = ResourceManager::inst().sprite_by_key(ikey, xd);
             if (itex.id > 0)
-                SpriteRenderer::draw_sprite(itex, xd, 0, {pr.x + 8, ry + 1, 20, 20});
+                SpriteRenderer::draw_sprite(itex, xd, 0, {pr.x + 8, iy + 1, 20, 20});
         }
-        if (g_font_loaded)
-            DrawTextEx(g_font_small, txt.c_str(), {pr.x + 34, ry}, 18, 1, inv.items[i]->color);
+        if (g_font_loaded) {
+            int n = _draw_wrapped_text(txt, pr.x + 34, iy, pw - 64.0f, 18, 22.0f, inv.items[i]->color);
+            iy += n * 22.0f;
+            if (iy > bottom_limit) break;
+        } else {
+            iy += 30.0f;
+        }
     }
     if (g_font_loaded) {
-        DrawTextEx(g_font_small, "^v择 X装 U用 D丢 I关",
-                   {pr.x + (pw - 220) / 2, pr.y + ph - 30}, 16, 1, {140, 140, 140, 255});
+        if (max_page > 0) {
+            char page_buf[32];
+            snprintf(page_buf, sizeof(page_buf), "第 %d/%d 页 (←→翻页)", page + 1, max_page + 1);
+            DrawTextEx(g_font_small, page_buf,
+                       {pr.x + 30, pr.y + ph - 52}, 14, 1, {160, 160, 200, 255});
+        }
+        DrawTextEx(g_font_small, "^v选择 X装备 U使用 D丢弃 B关闭",
+                   {pr.x + (pw - 260) / 2, pr.y + ph - 30}, 16, 1, {140, 140, 140, 255});
     }
 }
 
@@ -718,7 +773,7 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
 
     // Key hints
     if (g_font_loaded) {
-        const char* hint = "[R]圣物  [I]背包  [ESC]保存";
+        const char* hint = "[R]圣物  [B]背包  [F1]日志  [ESC]保存";
         float hw = MeasureTextEx(g_font_small, hint, 12, 1).x;
         DrawTextEx(g_font_small, hint,
                    {screen_w - hw - 14.0f, (float)screen_h - 26.0f},

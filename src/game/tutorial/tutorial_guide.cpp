@@ -18,7 +18,7 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
         return {
             "欢迎来到 Roguelike 新手教程！",
             "",
-            "WASD 移动  空格 攻击  E 交互  I 背包",
+            "WASD 移动  空格 攻击  E 交互  B 背包",
             "1-4 技能  X 装备  U 使用  D 丢弃",
             "T/Esc 退出教程",
             "",
@@ -44,13 +44,13 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
     case TutorialStage::INVENTORY:
         return {
             "第4步：背包与使用物品",
-            "按 I 打开背包 → 上下选择药水",
+            "按 B 打开背包 → 上下选择药水",
             "→ 按 U 使用它来回复血量！"
         };
     case TutorialStage::EQUIP:
         return {
             "第5步：装备武器",
-            "按 I 打开背包 → 选中武器",
+            "按 B 打开背包 → 选中武器",
             "→ 按 X 装备它！",
             "装备后左上角 ATK/DEF 会变化"
         };
@@ -64,7 +64,7 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
         return {
             "恭喜完成所有训练！",
             "WASD移动 | 空格攻击 | 1-4技能",
-            "E交互 | I背包 | X装备 | U使用",
+            "E交互 | B背包 | X装备 | U使用",
             "",
             "按 Enter 返回标题，开始冒险！"
         };
