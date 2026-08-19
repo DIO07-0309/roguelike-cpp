@@ -15,13 +15,23 @@
 
 ## 快速开始
 
+### 方式一：即玩包（推荐，无需任何环境）
+
+GitHub Releases 下载 **`roguelike-cpp-v1.0.0.zip`**（[Release 页](https://github.com/DIO07-0309/roguelike-cpp/releases)）→ 解压 → 双击 `roguelike_cpp.exe` 直接游玩（exe + 全部素材/配置已打包）。
+
+### 方式二：源码构建（第三方库已入库，clone 即可编译）
+
 ```bash
+git clone https://github.com/DIO07-0309/roguelike-cpp.git
+cd roguelike-cpp
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 build/roguelike_cpp.exe
 ```
 
-桌面版直接双击 `Roguelike-CPP版/roguelike_cpp.exe`。
+环境要求：CMake 3.16+ + MinGW-w64 工具链（UTF-8 编译标志已内置于 CMakeLists）。`vendor/`（raylib 5.0 + nlohmann/json）已随仓库提供，无需额外下载。
+
+> 本地开发目录同样适用：`C:\Demo\roguelike_cpp` 构建产物位于 `build/`。
 
 ---
 
