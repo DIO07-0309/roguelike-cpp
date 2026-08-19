@@ -285,49 +285,196 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 
 ```
 src/                                    # 281 源文件（127 cpp + 154 h）
-├── main.cpp                            # 入口 + CLI（--sim / --sim-ai / --rl-train / --rl-mirror / --record / --replay / --sim-build / --mods）
+├── main.cpp                            # 入口：CLI 解析 / Registry+Mod 构建 / sim 前置 / 场景树启动
 │
-├── core/                    (25)       # 引擎框架 + 模拟器 + 回放 + Mod 管线
-│   ├── 框架            node.cpp · node.h · object.h · scene_tree.cpp · scene_tree.h
-│   ├── 输入/日志        input_map.cpp · input_map.h（按键唯一来源）· logger.cpp · logger.h · seh_handler.cpp · win_center.cpp · win_center.h
-│   ├── 字体            font_codepoints.h
-│   ├── Mod 管线        mod_manager.cpp · mod_manager.h · mod_dependency.cpp · mod_dependency.h · mod_provider.cpp · mod_provider.h · builtin_provider.cpp · builtin_provider.h · registry_builder.cpp · registry_builder.h · registry_provider.h · merge_patch.h
-│   ├── sim/    (4)     sim_ai.cpp · sim_ai.h（DecisionAgent）· sim_runner.cpp · sim_runner.h
-│   └── replay/ (8)     recorder.cpp · recorder.h · player.cpp · player.h · replay_file.cpp · replay_file.h · state_hash.cpp · state_hash.h（确定性 hash 链）
+├── core/                               # 引擎框架 + 模拟器 + 回放 + Mod 管线（25）
+│   ├── object.h                        # 引擎对象基类
+│   ├── node.cpp · node.h               # 场景树节点（process/render 生命周期）
+│   ├── scene_tree.cpp · scene_tree.h   # 场景树：节点挂载/卸载/逐帧驱动
+│   ├── input_map.cpp · input_map.h     # 按键映射唯一来源（WASD/空格/E/B/1-4/G/Enter/Esc）
+│   ├── logger.cpp · logger.h           # 分级日志（game.log）
+│   ├── seh_handler.cpp                 # Windows SEH 异常捕获 → crash.log
+│   ├── win_center.cpp · win_center.h   # 窗口居中
+│   ├── font_codepoints.h               # 中文字体码点表（1769 码点）
+│   ├── registry_provider.h             # IRegistryProvider 接口 + MergeMode{Skip/Replace/MergePatch} + BuildRecord
+│   ├── registry_builder.cpp · registry_builder.h   # 注册表构建：模块注册 / build_all / validate
+│   ├── builtin_provider.cpp · builtin_provider.h   # 内置数据源（resources/ 路径，priority 0）
+│   ├── mod_provider.cpp · mod_provider.h           # Mod 数据源（priority 来自 mod.json，默认 100）
+│   ├── mod_manager.cpp · mod_manager.h             # Mod 扫描/启用/禁用（mods/config.json）
+│   ├── mod_dependency.cpp · mod_dependency.h       # Mod 依赖拓扑排序 + 循环检测
+│   ├── merge_patch.h                               # MergePatch 字段级递归合并（__patch 标记）
+│   ├── sim/
+│   │   ├── sim_ai.cpp · sim_ai.h       # DecisionAgent 评分决策（--sim-ai decision）+ BFS 危险避让
+│   │   └── sim_runner.cpp · sim_runner.h           # 批量模拟：RunResult / BalanceReport / 种子公式
+│   └── replay/
+│       ├── recorder.cpp · recorder.h   # 回放录制（--record）
+│       ├── player.cpp · player.h       # 回放播放（--replay）
+│       ├── replay_file.cpp · replay_file.h         # 回放文件读写格式
+│       └── state_hash.cpp · state_hash.h           # 状态 hash 链（compute/verify_hash_chain）
 │
-├── data/                    (22)       # Def 加载器（JSON → 不可变配置；buff/relic 注册于 registry_builder）
-│   ├── boss_defs.cpp · boss_defs.h · enemy_defs.cpp · enemy_defs.h · skill_defs.cpp · skill_defs.h
-│   ├── item_defs.cpp · item_defs.h · weapon_defs.cpp · weapon_defs.h · element_defs.cpp · element_defs.h
-│   ├── quest_defs.cpp · quest_defs.h · ending_defs.cpp · ending_defs.h · dialogue_defs.cpp · dialogue_defs.h
-│   └── meta_node_defs.cpp · meta_node_defs.h · vfx_recipe.cpp · vfx_recipe.h
+├── data/                               # Def 加载器：JSON → 不可变配置（22）
+│   ├── boss_defs.cpp · boss_defs.h     # Boss 配置（HP/ATK/Phase2 参数/技能变体）
+│   ├── enemy_defs.cpp · enemy_defs.h   # 敌人配置（30 种：属性/AI 原型/掉落）
+│   ├── skill_defs.cpp · skill_defs.h   # 技能配置（22 条：伤害/冷却/3 级进化）
+│   ├── item_defs.cpp · item_defs.h     # 物品配置（31 模板：装备/消耗品/护符）
+│   ├── weapon_defs.cpp · weapon_defs.h # 武器配置（21 条：三连击/命中形状/特技）
+│   ├── element_defs.cpp · element_defs.h           # 元素配置（火/冰/毒：成长曲线）
+│   ├── quest_defs.cpp · quest_defs.h   # 任务配置（12 条：条件/奖励/自动解锁）
+│   ├── ending_defs.cpp · ending_defs.h # 结局配置（5 结局）
+│   ├── dialogue_defs.cpp · dialogue_defs.h         # 对话配置（34 条：Boss 自适应条件）
+│   ├── meta_node_defs.cpp · meta_node_defs.h       # 局外成长节点（10 天赋）
+│   └── vfx_recipe.cpp · vfx_recipe.h   # VFX 特效配方（13 kind / 17 color）
 │
-├── game/                    (178)      # 游戏逻辑
-│   ├── 顶层    (15)     player_controller.cpp · player_controller.h · meta_progression.cpp · meta_progression.h · relic_progression.cpp · relic_progression.h · ending_director.cpp · ending_director.h · build_score.cpp · build_score.h · config.cpp · config.h · build_tag.h · camera_director.h · combat_feel.h
-│   ├── scenes/ (14)     title_scene.cpp · title_scene.h · game_scene.cpp · game_scene.h（主场景 2000+ 行）· floor_select_scene.cpp · floor_select_scene.h · tutorial_scene.cpp · tutorial_scene.h · death_scene.cpp · death_scene.h · victory_scene.cpp · victory_scene.h · credits_scene.cpp · credits_scene.h
-│   ├── scene/   (6)     game_scene_input.cpp · game_scene_input.h · game_scene_combat.cpp · game_scene_combat.h · game_scene_interaction.cpp · game_scene_interaction.h
-│   ├── director/ (10)   boss_system_director.cpp · boss_system_director.h · gameplay_system_director.cpp · gameplay_system_director.h · presentation_system_director.cpp · presentation_system_director.h · game_flow_director.cpp · game_flow_director.h · mirror_combat_director.cpp · mirror_combat_director.h
-│   ├── entities/ (18)   entity.cpp · entity.h · player.cpp · player.h · monster.cpp · monster.h · boss.cpp · boss.h · item.cpp · item.h · skill.cpp · skill.h · inventory.cpp · inventory.h · combat_stats.cpp · combat_stats.h · ai.cpp · ai.h（MonsterAI + 9 原型）
-│   ├── systems/ (27)    combat_system.cpp · combat_system.h · combat_coordinator.cpp · combat_coordinator.h · hit_detection.cpp · hit_detection.h · weapon_executor.cpp · weapon_executor.h · weapon_component.cpp · weapon_component.h · projectile_factory.cpp · projectile_factory.h · vfx_server.cpp · vfx_server.h · game_renderer.cpp · game_renderer.h · floor_manager.cpp · floor_manager.h · team_coordinator.cpp · team_coordinator.h · attack_evolution.cpp · attack_evolution.h · attack_evolution_state.h · skill_evolution.cpp · skill_evolution.h · interaction_handler.cpp · interaction_handler.h
-│   ├── world/   (34)    dungeon_generator.cpp · dungeon_generator.h（BSP）· game_map.cpp · game_map.h · biome.cpp · biome.h · landmark.cpp · landmark.h · encounter.cpp · encounter.h · special_room.cpp · special_room.h · quest_manager.cpp · quest_manager.h · npc_system.cpp · npc_system.h · relationship_system.cpp · relationship_system.h · rule_chain.cpp · rule_chain.h · event_system.cpp · event_system.h · world_state.cpp · world_state.h · flow_director.cpp · flow_director.h · floor_config.cpp · floor_config.h · floor_narrative.cpp · floor_narrative.h · growth_curve.cpp · growth_curve.h · world_reaction.cpp · world_reaction.h
-│   ├── boss/   (18)     boss_behavior.cpp · boss_behavior.h · boss_evolution.cpp · boss_evolution.h · boss_narrative.cpp · boss_narrative.h · boss_cinematic.cpp · boss_cinematic.h · boss_encounter.cpp · boss_encounter.h · boss_replay.cpp · boss_replay.h · boss_timeline.cpp · boss_timeline.h · boss_command.cpp · boss_command.h · arena_manager.cpp · arena_manager.h
-│   ├── combat/  (2)     element_resolver.cpp · element_resolver.h
-│   ├── components/ (2)  element_component.cpp · element_component.h
-│   ├── core/    (4)     event_bus.cpp · event_bus.h · event_types.h（45 事件）· service_locator.h
-│   ├── rendering/ (2)   sprite_renderer.cpp · sprite_renderer.h（atlas + 程序化像素）
-│   ├── resources/ (2)   resource_manager.cpp · resource_manager.h（字体/纹理/JSON 缓存）
-│   ├── audio/   (6)     wave_synth.cpp · wave_synth.h（程序化合成）· bgm_engine.cpp · bgm_engine.h · audio_server.cpp · audio_server.h
-│   ├── save/    (2)     save_manager.cpp · save_manager.h（v3 文本格式）
-│   ├── ai/player_behavior/ (8)  player_action.h · player_behavior_recorder.cpp · player_behavior_recorder.h · player_behavior_analyzer.cpp · player_behavior_analyzer.h · player_habit_profile.cpp · player_habit_profile.h · player_behavior_data.h
-│   ├── types/   (6)     combat_types.h · boss_types.h · weapon_types.h · meta_types.h · story_types.h · world_types.h
-│   └── tutorial/ (2)    tutorial_guide.cpp · tutorial_guide.h
+├── game/                               # 游戏逻辑（178）
+│   ├── 顶层
+│   │   ├── player_controller.cpp · player_controller.h     # 玩家输入集中：移动/攻击/技能/拾取/背包
+│   │   ├── meta_progression.cpp · meta_progression.h       # 局外成长 g_meta（10 节点/souls/knowledge）
+│   │   ├── relic_progression.cpp · relic_progression.h     # 跨局圣物收藏 g_relic_archive（mastery/套装）
+│   │   ├── ending_director.cpp · ending_director.h         # 五结局判定（C++ 优先级链）
+│   │   ├── build_score.cpp · build_score.h                 # Build 流派评分（12 流派）
+│   │   ├── build_tag.h                    # BuildTag 19 标签定义
+│   │   ├── config.cpp · config.h          # 全局配置
+│   │   ├── camera_director.h              # 镜头常量（HITSTOP/SHAKE/INTRO_FREEZE）
+│   │   └── combat_feel.h                  # 打击感常量（Freeze/Shake 档位）
+│   ├── scenes/                            # 7 场景（14）
+│   │   ├── title_scene.cpp · title_scene.h               # 标题画面（粒子背景 + 菜单 N·C·F·T）
+│   │   ├── game_scene.cpp · game_scene.h                 # 主场景：组合 5 Director + 帧循环（2000+ 行）
+│   │   ├── floor_select_scene.cpp · floor_select_scene.h # 选关界面（F）
+│   │   ├── tutorial_scene.cpp · tutorial_scene.h         # 教程（7 阶段 + P 跳过）
+│   │   ├── death_scene.cpp · death_scene.h               # 死亡结算
+│   │   ├── victory_scene.cpp · victory_scene.h           # 通关结算
+│   │   └── credits_scene.cpp · credits_scene.h           # 片尾
+│   ├── scene/                             # GameScene 拆分（6）
+│   │   ├── game_scene_input.cpp · game_scene_input.h     # 输入路由（键盘/事件/圣物 R 面板）
+│   │   ├── game_scene_combat.cpp · game_scene_combat.h   # 战斗结算拆分
+│   │   └── game_scene_interaction.cpp · game_scene_interaction.h  # 交互/拾取/特殊房间
+│   ├── director/                          # 5 Director（10）
+│   │   ├── boss_system_director.cpp · boss_system_director.h     # Boss 12 子系统编排 + F10 领域 + F15 镜像
+│   │   ├── gameplay_system_director.cpp · gameplay_system_director.h  # world_state/story/rels/quest/ending/run_stats
+│   │   ├── presentation_system_director.cpp · presentation_system_director.h  # shake/freeze/伤害数字/BuildTheme/intro
+│   │   ├── game_flow_director.cpp · game_flow_director.h  # 12 态生命周期状态机
+│   │   └── mirror_combat_director.cpp · mirror_combat_director.h  # F15 镜像战斗仲裁
+│   ├── entities/                          # 运行时实体（18）
+│   │   ├── entity.cpp · entity.h          # 实体基类（rect/pos/speed/direction）
+│   │   ├── player.cpp · player.h          # 玩家组合体（Entity+CombatStats+Inventory+Skill+Element）
+│   │   ├── monster.cpp · monster.h        # 怪物组合体（+ instance_id/TeamRole）
+│   │   ├── boss.cpp · boss.h              # Boss（BossAI 12 态 + 8 技能 + 连招队列 + 工厂）
+│   │   ├── item.cpp · item.h              # 物品（装备/消耗品/护符 + 工厂）
+│   │   ├── skill.cpp · skill.h            # 技能基类（execute + 冷却 + 进化）
+│   │   ├── inventory.cpp · inventory.h    # 背包（装备/使用/丢弃）
+│   │   ├── combat_stats.cpp · combat_stats.h  # 属性/伤害计算
+│   │   └── ai.cpp · ai.h                  # MonsterAI 状态机（IDLE/CHASE/ATTACK + 9 原型）
+│   ├── systems/                           # 无状态系统（27）
+│   │   ├── combat_system.cpp · combat_system.h         # 伤害结算 + CountingRng
+│   │   ├── combat_coordinator.cpp · combat_coordinator.h  # 连击系统
+│   │   ├── hit_detection.cpp · hit_detection.h         # 命中判定（5 种形状）
+│   │   ├── weapon_executor.cpp · weapon_executor.h     # 6 武器 × 3 段连击执行
+│   │   ├── weapon_component.cpp · weapon_component.h   # 武器组件
+│   │   ├── projectile_factory.cpp · projectile_factory.h  # 投射物工厂（连弩/弹幕）
+│   │   ├── vfx_server.cpp · vfx_server.h               # VFX 10 基础图元 + recipe 派发
+│   │   ├── game_renderer.cpp · game_renderer.h         # HUD/面板/物品栏渲染
+│   │   ├── floor_manager.cpp · floor_manager.h         # 楼层推进（清怪→下楼→Boss）
+│   │   ├── team_coordinator.cpp · team_coordinator.h   # 怪物队伍协同
+│   │   ├── attack_evolution.cpp · attack_evolution.h   # 普攻进化管理器（Lv1→Lv3）
+│   │   ├── attack_evolution_state.h                     # 普攻进化状态
+│   │   ├── skill_evolution.cpp · skill_evolution.h     # 技能进化（使用次数驱动）
+│   │   └── interaction_handler.cpp · interaction_handler.h  # 拾取/交互结果解析
+│   ├── world/                             # 世界生成与规则（34）
+│   │   ├── dungeon_generator.cpp · dungeon_generator.h # BSP 二分划分地图生成
+│   │   ├── game_map.cpp · game_map.h     # 瓦片地图（碰撞/特殊房/熔岩/木桶）
+│   │   ├── biome.cpp · biome.h           # 三章生态（Prison/Volcano/Abyss）
+│   │   ├── landmark.cpp · landmark.h     # 地标（9 个）
+│   │   ├── encounter.cpp · encounter.h   # 遭遇框架（9 个：NPC/事件）
+│   │   ├── special_room.cpp · special_room.h           # 10 类特殊房间
+│   │   ├── quest_manager.cpp · quest_manager.h         # 任务管理（12 任务）
+│   │   ├── npc_system.cpp · npc_system.h               # NPC 系统（6 NPC）
+│   │   ├── relationship_system.cpp · relationship_system.h  # 好感度
+│   │   ├── rule_chain.cpp · rule_chain.h               # Boss 死亡 → 规则链激活
+│   │   ├── event_system.cpp · event_system.h           # 世界事件（10 个）
+│   │   ├── world_state.cpp · world_state.h             # Flags + Counters
+│   │   ├── flow_director.cpp · flow_director.h         # 动态内容编排
+│   │   ├── floor_config.cpp · floor_config.h           # 楼层配置（倍率/特殊房/BGM）
+│   │   ├── floor_narrative.cpp · floor_narrative.h     # 15 层叙事
+│   │   ├── growth_curve.cpp · growth_curve.h           # 难度曲线
+│   │   └── world_reaction.cpp · world_reaction.h       # 全局色调反应
+│   ├── boss/                              # Boss 子系统（18）
+│   │   ├── boss_behavior.cpp · boss_behavior.h         # 决策/人格/记忆
+│   │   ├── boss_evolution.cpp · boss_evolution.h       # 技能变体 / LastStand
+│   │   ├── boss_narrative.cpp · boss_narrative.h       # 自适应对话查询
+│   │   ├── boss_cinematic.cpp · boss_cinematic.h       # intro/phase2/death 演出
+│   │   ├── boss_encounter.cpp · boss_encounter.h       # 阶段控制（遭遇→连招模板）
+│   │   ├── boss_replay.cpp · boss_replay.h             # 战斗记忆（学习/评估）
+│   │   ├── boss_timeline.cpp · boss_timeline.h         # 战斗时间线
+│   │   ├── boss_command.cpp · boss_command.h           # 决策 → 命令执行（含冷却判定）
+│   │   └── arena_manager.cpp · arena_manager.h         # 领域地形（DangerZone/熔岩环带）
+│   ├── combat/                            # 元素战斗（2）
+│   │   └── element_resolver.cpp · element_resolver.h   # 元素伤害结算（火暴击/冰冻结/毒 DOT）
+│   ├── components/                        # 组件（2）
+│   │   └── element_component.cpp · element_component.h # 元素等级/经验
+│   ├── core/                              # 引擎核心（4）
+│   │   ├── event_bus.cpp · event_bus.h    # 事件总线（45 事件）
+│   │   ├── event_types.h                  # 事件枚举 + GameEvent 载荷
+│   │   └── service_locator.h              # 服务定位
+│   ├── rendering/                         # 渲染（2）
+│   │   └── sprite_renderer.cpp · sprite_renderer.h     # sprite atlas + 程序化像素占位
+│   ├── resources/                         # 资源管理（2）
+│   │   └── resource_manager.cpp · resource_manager.h   # 字体/纹理/JSON 缓存
+│   ├── audio/                             # 音频（6）
+│   │   ├── wave_synth.cpp · wave_synth.h  # 程序化波形合成（零素材）
+│   │   ├── bgm_engine.cpp · bgm_engine.h  # 4 BGM 编译 + 交叉淡入 + Phase2 cue
+│   │   └── audio_server.cpp · audio_server.h           # SFX 播放/音量/静音
+│   ├── save/                              # 存档（2）
+│   │   └── save_manager.cpp · save_manager.h           # v3 key:value 存档（v1→v3 兼容）
+│   ├── ai/player_behavior/                # 玩家行为采集（8）
+│   │   ├── player_action.h                # 玩家动作定义
+│   │   ├── player_behavior_recorder.cpp · player_behavior_recorder.h  # 行为采集（镜像数据源）
+│   │   ├── player_behavior_analyzer.cpp · player_behavior_analyzer.h  # 行为分析（统计特征）
+│   │   ├── player_habit_profile.cpp · player_habit_profile.h          # 习惯画像（反击型/单向癖等）
+│   │   └── player_behavior_data.h         # 行为数据结构
+│   ├── types/                             # 共享类型（6）
+│   │   ├── combat_types.h                 # 战斗类型
+│   │   ├── boss_types.h                   # Boss 类型
+│   │   ├── weapon_types.h                 # 武器类型
+│   │   ├── meta_types.h                   # 局外成长类型
+│   │   ├── story_types.h                  # 剧情类型
+│   │   └── world_types.h                  # 世界类型
+│   └── tutorial/                          # 教程（2）
+│       └── tutorial_guide.cpp · tutorial_guide.h       # 7 阶段教程
 │
-├── ai/                      (43)       # AI 研究层
-│   ├── agents/         (3)  ai_agent.h · bt_agent.cpp · bt_agent.h
-│   ├── behavior_tree/  (8)  bt_node.h · bt_selector.h · bt_sequence.h · bt_condition.h · bt_action.h · bt_move_to_target.h · behavior_tree.h · blackboard.h
-│   ├── mcts/           (8)  mcts_node.h · mcts_search.cpp · mcts_search.h · simulation_state.cpp · simulation_state.h · combat_evaluator.cpp · combat_evaluator.h · action.h
-│   ├── rl/             (9)  environment.cpp · environment.h（Gym-like）· observation.cpp · observation.h（7 维）· q_agent.cpp · q_agent.h · random_agent.cpp · random_agent.h · rl_runner.cpp
-│   ├── mirror/         (13) mirror_agent.cpp · mirror_agent.h · behavior_clone_table.cpp · behavior_clone_table.h · tactical_chain_table.cpp · tactical_chain_table.h · online_adaptive_policy.cpp · online_adaptive_policy.h · rolling_accuracy.cpp · rolling_accuracy.h · mirror_tuning.h · mirror_debug_stats.cpp · mirror_debug_stats.h
-│   └── navigation/     (2)  pathfinder.cpp · pathfinder.h（A*）
+├── ai/                                   # AI 研究层（43）
+│   ├── agents/                            # 决策 Agent（3）
+│   │   ├── ai_agent.h                     # Agent 接口
+│   │   └── bt_agent.cpp · bt_agent.h      # 行为树驱动玩家（--sim-ai bt）
+│   ├── behavior_tree/                     # 行为树节点库（8）
+│   │   ├── bt_node.h                      # 节点基类
+│   │   ├── bt_selector.h · bt_sequence.h  # 组合节点（选择/序列）
+│   │   ├── bt_condition.h                 # 条件节点
+│   │   ├── bt_action.h                    # 动作节点
+│   │   ├── bt_move_to_target.h            # A* 移动节点
+│   │   ├── behavior_tree.h                # 树容器
+│   │   └── blackboard.h                   # 黑板（共享状态）
+│   ├── mcts/                              # 蒙特卡洛树搜索（8）
+│   │   ├── mcts_node.h                    # UCT 节点
+│   │   ├── mcts_search.cpp · mcts_search.h            # UCT 搜索主循环
+│   │   ├── simulation_state.cpp · simulation_state.h  # 对局深克隆模拟
+│   │   ├── combat_evaluator.cpp · combat_evaluator.h  # 终局评估（±1000）
+│   │   └── action.h                       # 动作空间
+│   ├── rl/                                # 强化学习（9）
+│   │   ├── environment.cpp · environment.h            # Gym-like 环境（reset/step/reward）
+│   │   ├── observation.cpp · observation.h            # 7 维观测
+│   │   ├── q_agent.cpp · q_agent.h        # Q 表 Agent（epsilon 退火）
+│   │   ├── random_agent.cpp · random_agent.h          # 随机基线
+│   │   └── rl_runner.cpp                  # 训练主循环（--rl-train/--rl-mirror）
+│   ├── mirror/                            # 镜像学习 Boss（13）
+│   │   ├── mirror_agent.cpp · mirror_agent.h          # 三阶段人格（观察/镜像/进化）
+│   │   ├── behavior_clone_table.cpp · behavior_clone_table.h  # 行为克隆（状态桶 d:h:s）
+│   │   ├── tactical_chain_table.cpp · tactical_chain_table.h  # 11 符号 n-gram 战术链
+│   │   ├── online_adaptive_policy.cpp · online_adaptive_policy.h  # Thompson 采样（Beta 后验）
+│   │   ├── rolling_accuracy.cpp · rolling_accuracy.h  # 滚动准确率
+│   │   ├── mirror_tuning.h                # 阶段进入参数（阈值/兜底）
+│   │   └── mirror_debug_stats.cpp · mirror_debug_stats.h  # 仲裁分布统计
+│   └── navigation/                        # 导航（2）
+│       └── pathfinder.cpp · pathfinder.h  # A* 寻路（priority_queue + Manhattan）
 
 tests/                      (34 条目)  # GoogleTest，按模块分目录
 resources/                             # 20+ JSON 配置（enemies/skills/relics/bosses/weapons/elements/biomes/encounters/dialogues/quests/endings/…）+ world/ 三章子目录
