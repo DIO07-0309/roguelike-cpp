@@ -7,7 +7,7 @@
 static float midi_freq(int midi) { return 440.0f * std::pow(2.0f, (midi - 69) / 12.0f); }
 static int note_midi(const char* n) {
     static const char* names[] = {"C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"};
-    char name[3] = {n[0], n[1] ? n[1] : 0, 0};
+    char name[3] = {(char)n[0], n[1] ? (char)n[1] : (char)0, (char)0};
     int oct = n[1] ? (n[2] ? n[2] : n[1]) : n[1];
     if (oct == 0 || oct < '0' || oct > '9') oct = 4;
     else oct = oct - '0';

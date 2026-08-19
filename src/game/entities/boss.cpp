@@ -504,6 +504,16 @@ bool BossAI::_tick_combo_attack(Monster* self, Player* player, GameMap* map,
     return false;
 }
 
+// 收官: 连招命令中技能冷却 → 该步退化为普攻 (保持连招节奏不空转)
+void BossAI::_combo_fallback_melee(Monster* self, Player* player, double gt,
+                                   std::vector<Effect>* effects) {
+    if (self->can_attack(gt)) {
+        self->attack_target(player, gt);
+        _spawn_boss_vfx(self, "charge", effects);
+    }
+    _combo_advance();
+}
+
 void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
                                 GameMap* map, double gt, std::vector<Effect>* effects) {
     switch (cmd) {
@@ -515,17 +525,21 @@ void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
         _combo_advance();
         break;
     case BossCommand::CHARGE:
+        // 收官: 冷却判定 — 冷却中退普攻
+        if (!_charge->can_use(gt)) { _combo_fallback_melee(self, player, gt, effects); break; }
         boss_state = BossState::CHARGE;
         _charge->windup_left = _charge->windup_time;
         _charge->dash_duration = 0.0f;
         _spawn_boss_vfx(self, "charge", effects);
         break;
     case BossCommand::SHOCKWAVE:
+        if (!_shockwave->can_use(gt)) { _combo_fallback_melee(self, player, gt, effects); break; }
         boss_state = BossState::SHOCKWAVE;
         _shockwave->windup_left = _shockwave->windup_time;
         _spawn_boss_vfx(self, "shockwave", effects);
         break;
     case BossCommand::SUMMON:
+        if (!_summon->can_use(gt)) { _combo_fallback_melee(self, player, gt, effects); break; }
         boss_state = BossState::SUMMON;
         _spawn_boss_vfx(self, "summon", effects);
         break;
@@ -534,6 +548,7 @@ void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
         _spawn_boss_vfx(self, "shockwave", effects);
         break;
     case BossCommand::RANGED:
+        if (!_barrage->can_use(gt)) { _combo_fallback_melee(self, player, gt, effects); break; }
         boss_state = BossState::RANGED_BARRAGE;
         _barrage->windup_left = _barrage->windup_time;
         _barrage->shots.clear();
@@ -543,11 +558,13 @@ void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
         _spawn_boss_vfx(self, "charge", effects);
         break;
     case BossCommand::CONE:
+        if (!_cone->can_use(gt)) { _combo_fallback_melee(self, player, gt, effects); break; }
         boss_state = BossState::CONE_ATTACK;
         _cone->windup_left = _cone->windup_time;
         _spawn_boss_vfx(self, "shockwave", effects);
         break;
     case BossCommand::BLINK:
+        if (!_blink->can_use(gt)) { _combo_fallback_melee(self, player, gt, effects); break; }
         boss_state = BossState::BLINK;
         _blink->windup_left = _blink->windup_time;
         _blink->blinked = false;
@@ -555,6 +572,7 @@ void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
         _spawn_boss_vfx(self, "summon", effects);
         break;
     case BossCommand::WHIRLWIND:
+        if (!_whirlwind->can_use(gt)) { _combo_fallback_melee(self, player, gt, effects); break; }
         boss_state = BossState::WHIRLWIND;
         _whirlwind->spin_duration = 0.0f;
         _spawn_boss_vfx(self, "charge", effects);
@@ -666,6 +684,13 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         // 普攻2次后 → 使用下个技能 (镜像跳过)
         if (!_is_mirror && normal_attack_count >= 2) {
             int sk = _next_cycle_skill();
+            // 收官: 冷却判定 — 冷却中的技能退回普攻
+            if (sk == 0 && !_charge->can_use(gt)) sk = -1;
+            else if (sk == 1 && !_shockwave->can_use(gt)) sk = -1;
+            else if (sk == 2 && !_summon->can_use(gt)) sk = -1;
+            else if (sk == 4 && !_whirlwind->can_use(gt)) sk = -1;
+            else if (sk == 5 && !_barrage->can_use(gt)) sk = -1;
+            else if (sk == 6 && !_shockwave->can_use(gt)) sk = -1;
             // ── G5.4: Phase2 signature skill injection ──
             if (phase2 && _boss_id) {
                 // Shadow Knight: every 3rd cycle → Whirlwind

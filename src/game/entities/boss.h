@@ -279,6 +279,8 @@ private:
     void _select_combo();
     void _combo_advance();
     void _combo_on_skill_end();
+    void _combo_fallback_melee(Monster* self, Player* player, double gt,
+                               std::vector<Effect>* effects);  // 收官: 技能冷却中退普攻
     static BossCommand _command_from_str(const std::string& s);
 };
 

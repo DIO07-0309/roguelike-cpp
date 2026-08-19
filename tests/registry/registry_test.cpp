@@ -10,7 +10,6 @@
 #include "data/item_defs.h"
 #include "biome.h"           // load_biome_defs / BiomeDef / get_biome_for_floor
 #include "landmark.h"        // load_landmark_defs / get_landmarks_for_biome
-#include "hazard.h"          // load_hazard_defs
 #include "encounter.h"       // load_encounter_defs
 
 // ── Loader Tests ────────────────────────────────────────────
@@ -25,7 +24,6 @@ TEST(RegistryLoad, ItemsLoad)   { EXPECT_TRUE(load_item_defs("resources/items.js
 TEST(RegistryLoad, WorldLayerAll) {
     EXPECT_TRUE(load_biome_defs("resources/biomes.json"));
     EXPECT_TRUE(load_landmark_defs("resources/landmarks.json"));
-    EXPECT_TRUE(load_hazard_defs("resources/hazards.json"));
     EXPECT_TRUE(load_encounter_defs("resources/encounters.json"));
 }
 

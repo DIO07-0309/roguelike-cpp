@@ -23,7 +23,6 @@
 // G6: World layer data
 #include "world/biome.h"
 #include "world/landmark.h"
-#include "world/hazard.h"
 #include "world/encounter.h"
 #include "data/vfx_recipe.h"
 #include "core/sim/sim_runner.h"      // G5.6
@@ -271,7 +270,6 @@ int main(int argc, char** argv) {
     // G6.1-G6.7: World layer data loading
     load_biome_defs("resources/biomes.json");
     load_landmark_defs("resources/landmarks.json");
-    load_hazard_defs("resources/hazards.json");
     load_encounter_defs("resources/encounters.json");
 
     // Font 通过 ResourceManager 加载

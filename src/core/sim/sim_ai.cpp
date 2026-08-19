@@ -242,7 +242,7 @@ static bool _tile_rect_walkable(const GameMap* map, int tx, int ty) {
     return map->is_rect_walkable(r);
 }
 
-// Q3.2: 危险视野 — 活性毒池/尖刺圈 (伤害圈 1.2 格 + 缓冲 = 1.5 格)
+// Q3.2: 危险视野 — 活性毒池/尖刺圈/木桶 (伤害圈 1.2 格 + 缓冲 = 1.5 格)
 bool DecisionAgent::_is_hazard_near(float px, float py, const GameMap* map) const {
     if (!map) return false;
     // M4b: 熔岩地砖 (脚下 + 邻格缓冲)
@@ -253,7 +253,8 @@ bool DecisionAgent::_is_hazard_near(float px, float py, const GameMap* map) cons
     for (auto& ao : map->arena_objects) {
         if (!ao.active) continue;
         if (ao.type != ArenaObjectType::POISON_POOL &&
-            ao.type != ArenaObjectType::SPIKE) continue;
+            ao.type != ArenaObjectType::SPIKE &&
+            ao.type != ArenaObjectType::EXPLOSIVE_BARREL) continue;  // 收官: 木桶可爆炸
         float ax = ao.tile_x * 32.0f + 16.0f;
         float ay = ao.tile_y * 32.0f + 16.0f;
         if (hypotf(px - ax, py - ay) <= 1.5f * 32.0f) return true;

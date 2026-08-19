@@ -309,6 +309,13 @@ void PlayerController::player_attack() {
 
     if (!p.combat.is_alive) return;
 
+    // 收官: 攻击范围内未点燃的木桶 → 点燃 (近战/武器攻击均可引爆)
+    Rectangle attack_zone = p.entity.rect;
+    attack_zone.x -= PLAYER_ATTACK_RANGE;       attack_zone.y -= PLAYER_ATTACK_RANGE;
+    attack_zone.width  += 2.0f * PLAYER_ATTACK_RANGE;
+    attack_zone.height += 2.0f * PLAYER_ATTACK_RANGE;
+    gs._try_trigger_barrel_near(attack_zone);
+
     // ── G9: Weapon-driven attack via WeaponExecutor ──
     if (p.weapon.current_def() && p.weapon.current_def()->type != WeaponType::FIST) {
         _weapon_attack(gs, p);

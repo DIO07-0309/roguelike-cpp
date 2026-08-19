@@ -233,7 +233,15 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
             if (arena) {
                 switch (arena->type) {
                 case ArenaObjectType::EXPLOSIVE_BARREL:
-                    DrawRectangle(dx+6, dy+6, tile_size-12, tile_size-12, {180, 100, 30, 255});
+                    // 收官: 点燃中 (timer>0) 红色脉动警告
+                    if (arena->timer > 0.0f) {
+                        float fuse = 0.5f + 0.5f * sinf((float)GetTime() * 14.0f);
+                        DrawRectangle(dx+4, dy+4, tile_size-8, tile_size-8, {220, 70, 30, 255});
+                        DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4,
+                                           {255, 90, 40, (unsigned char)(200 * fuse)});
+                    } else {
+                        DrawRectangle(dx+6, dy+6, tile_size-12, tile_size-12, {180, 100, 30, 255});
+                    }
                     DrawText("!", dx+12, dy+5, 18, {255, 200, 50, 255}); break;
                 case ArenaObjectType::HEALING_TOTEM:
                     DrawRectangle(dx+4, dy+4, tile_size-8, tile_size-8, {30, 140, 60, 255});

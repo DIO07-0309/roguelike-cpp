@@ -195,6 +195,9 @@ private:
     void _check_floor_clear();
     void _cleanup_dead_monsters();
     void _apply_pending_damage();
+    // 收官: EXPLOSIVE_BARREL 可交互闭环 (攻击触发→倒计时→AOE 爆炸)
+    void _try_trigger_barrel_near(const Rectangle& rect);
+    void _explode_barrel(const ArenaObject& ao);
     // D4.6 Debug flags (按F键切换的面板) — moved to presentation
     // D6 Step3: Boss全子系统
     BossSystemDirector _boss;

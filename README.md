@@ -420,3 +420,4 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | M4.6 | RL 决策层接入镜像 Boss: 离线训练 Q 表 (95%+ 收敛) 运行时加载, 仲裁链 ML→战术链→RL→克隆→Thompson, 实测 RL 完全接管仲裁 (Tho:0), 500 局胜率 8.6%→6.6% (Boss 变强, 区间内) | ✅ |
 | M4b | 第二章 Boss 领域作战 (地狱火魔): ① 弹幕图案化 (扇形/环形/螺旋多波, 波次发射, 帧率无关步进) ② 机制阶段 MECHANIC_PHASE 激活 (核心破坏→弹幕风暴演出→易伤, 遭遇阶段驱动连招模板) ③ Boss 房机制地形 (LAVA 地砖灼烧 + 中央安全区熔岩环带, 数据驱动); 500 局胜率 7.0% 区间内, 34/34 测试 | ✅ |
 | v1.0.0 | Release Standard 五项 Stable 冻结验收: API (对外契约 2+ 版冻结) / Save (v1→v3 兼容 + 3 验收测试 + 修复 elem 存档丢失 bug) / Mod (管线+测试) / Regression (确定性对拍 + 500 局 8.0%) / Performance (500 局并行 53s) — 报告 docs/V1_0_0_ACCEPTANCE.md | ✅ |
+| 收官体检 | 全仓代码体检修复: ① 删除 hazards.json 死链路 (零消费者) ② EXPLOSIVE_BARREL 最小闭环 (攻击/弹体点燃 → 0.6s 引信 → AOE 爆炸 → VFX → 销毁, 实测 38 次成对) ③ Boss 技能冷却恢复判定 (can_use 读端接入, 冷却中退普攻) ④ bgm 音符解析警告修复; 34/34 测试, validator 0 error, 500 局 10.0% 区间内 | ✅ |

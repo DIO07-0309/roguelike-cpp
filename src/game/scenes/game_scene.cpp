@@ -84,6 +84,10 @@ static Color _olddmg_color_for(int dmg, bool is_magic, bool is_poison) {
 // D2: 弹体命中判定半径 (宽容判定, 大于玩家碰撞盒)
 constexpr float kProjectileHitRadius = 16.0f;
 
+// 收官: 木桶参数 (引信 / 爆炸半径, 伤害 3×arena_scale 与尖刺同级)
+constexpr float kBarrelFuse = 0.6f;
+constexpr float kBarrelRadius = 2.0f * TILE_SIZE;
+
 // D2: 弹道预警预览线 — 沿飞行方向绘制, 遇墙截断
 static void _draw_projectile_preview(float sx, float sy, const Projectile& p,
                                      Color wc, float fade, float pulse,
@@ -789,7 +793,11 @@ void GameScene::_process(double delta) {
             float dist = hypotf(px - ax, py - ay);
             switch (ao.type) {
             case ArenaObjectType::EXPLOSIVE_BARREL:
-                ao.timer += dt;
+                // 收官: 点燃倒计时 → 到期爆炸销毁 (触发源: 玩家攻击/敌方投射物)
+                if (ao.timer > 0.0f) {
+                    ao.timer -= dt;
+                    if (ao.timer <= 0.0f) { ao.timer = 0; _explode_barrel(ao); ao.active = false; }
+                }
                 break;
             case ArenaObjectType::HEALING_TOTEM:
                 ao.timer += dt;
@@ -1025,6 +1033,17 @@ void GameScene::_process(double delta) {
         // D2: AOE 用 warning_radius, 点弹用宽容半径
         float hit_radius = (p.owner == (int)ProjectileOwner::ENVIRONMENT)
             ? p.warning_radius : kProjectileHitRadius;
+        // 收官: 敌方弹体命中木桶 → 点燃 (点弹销毁, AOE 弹体保留)
+        if (game_map) {
+            auto [btx, bty] = game_map->pixel_to_tile(p.pos.x, p.pos.y);
+            if (auto* ao = game_map->get_arena_at(btx, bty)) {
+                if (ao->active && ao->type == ArenaObjectType::EXPLOSIVE_BARREL && ao->timer <= 0.0f) {
+                    ao->timer = kBarrelFuse;
+                    if (!p.piercing) p.alive = false;
+                    continue;
+                }
+            }
+        }
         if (CheckCollisionCircleRec(p.pos, hit_radius, player->entity.rect)) {
             int dmg = calculate_damage(p.damage,
                 player->combat.get_effective_defense((AttackType)p.damage_type),
@@ -1291,6 +1310,50 @@ void GameScene::_collect_sim_stats() {
 // _player_attack / _use_skill — delegated to PlayerController (D6 Step7)
 void GameScene::_player_attack() { _player_ctrl.player_attack(); }
 void GameScene::_use_skill(int index) { _player_ctrl.use_skill(index); }
+
+// 收官: 木桶可交互闭环 — 攻击范围内未触发的桶 → 点燃 (倒计时由 arena tick 驱动)
+void GameScene::_try_trigger_barrel_near(const Rectangle& rect) {
+    if (!game_map) return;
+    for (auto& ao : game_map->arena_objects) {
+        if (!ao.active || ao.type != ArenaObjectType::EXPLOSIVE_BARREL) continue;
+        if (ao.timer > 0.0f) continue;  // 已点燃
+        Vector2 c = {(float)ao.tile_x * TILE_SIZE + TILE_SIZE / 2.0f,
+                     (float)ao.tile_y * TILE_SIZE + TILE_SIZE / 2.0f};
+        if (CheckCollisionCircleRec(c, TILE_SIZE, rect)) {
+            ao.timer = kBarrelFuse;
+            LOG_INFO("[BARREL] 点燃 (%d,%d)", ao.tile_x, ao.tile_y);
+        }
+    }
+}
+
+// 收官: 木桶爆炸 — AOE 伤害 (玩家 + 怪物) + 爆炸 VFX + 销毁
+void GameScene::_explode_barrel(const ArenaObject& ao) {
+    float cx = (float)ao.tile_x * TILE_SIZE + TILE_SIZE / 2.0f;
+    float cy = (float)ao.tile_y * TILE_SIZE + TILE_SIZE / 2.0f;
+    int dmg = (int)(3 * g_growth.arena_scale(current_floor));
+    LOG_INFO("[BARREL] 爆炸 (%d,%d) 伤害 %d", ao.tile_x, ao.tile_y, dmg);
+    VFXServer vfx;
+    vfx.explosion(cx, cy, kBarrelRadius, {255, 140, 40, 255}, 18, 0.5f);
+    vfx.shockwave(cx, cy, kBarrelRadius, {255, 180, 60, 255});
+    for (auto& e : vfx.effects) active_effects.push_back(e);
+    _presentation.trigger_shake(6.0f);
+    float px = player->entity.rect.x + player->entity.rect.width / 2.0f;
+    float py = player->entity.rect.y + player->entity.rect.height / 2.0f;
+    if (hypotf(px - cx, py - cy) <= kBarrelRadius) {
+        player->combat.take_damage(dmg);
+        player->combat.mark_damage_logged();
+        _presentation.damage_floats.push_back({px, py - 8, 0.4f, dmg, {255, 60, 40, 255}});
+    }
+    for (auto& m : monsters) {
+        if (!m->combat.is_alive) continue;
+        float mx = m->entity.rect.x + m->entity.rect.width / 2.0f;
+        float my = m->entity.rect.y + m->entity.rect.height / 2.0f;
+        if (hypotf(mx - cx, my - cy) <= kBarrelRadius) {
+            m->combat.take_damage(dmg);
+            _presentation.damage_floats.push_back({mx, my - 8, 0.4f, dmg, {255, 140, 40, 255}});
+        }
+    }
+}
 
 void GameScene::_update_monsters(float dt) {
     int hp_before = player->combat.current_hp;

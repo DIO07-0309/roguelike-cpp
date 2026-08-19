@@ -9,7 +9,6 @@
 #include "data/item_defs.h"
 #include "biome.h"
 #include "landmark.h"
-#include "hazard.h"
 #include "encounter.h"
 
 TEST(IntegrationBoot, GameplayRegistry) {
@@ -24,7 +23,6 @@ TEST(IntegrationBoot, GameplayRegistry) {
 TEST(IntegrationBoot, WorldRegistry) {
     EXPECT_TRUE(load_biome_defs("resources/biomes.json"));
     EXPECT_TRUE(load_landmark_defs("resources/landmarks.json"));
-    EXPECT_TRUE(load_hazard_defs("resources/hazards.json"));
     EXPECT_TRUE(load_encounter_defs("resources/encounters.json"));
 }
 
@@ -37,6 +35,5 @@ TEST(IntegrationBoot, FullBootstrapNoCrash) {
     EXPECT_TRUE(load_item_defs("resources/items.json"));
     EXPECT_TRUE(load_biome_defs("resources/biomes.json"));
     EXPECT_TRUE(load_landmark_defs("resources/landmarks.json"));
-    EXPECT_TRUE(load_hazard_defs("resources/hazards.json"));
     EXPECT_TRUE(load_encounter_defs("resources/encounters.json"));
 }

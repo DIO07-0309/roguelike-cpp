@@ -52,7 +52,6 @@ relics     = load_json("relics.json") or []
 items      = load_json("items.json") or []
 biomes     = load_json("biomes.json") or []
 landmarks  = load_json("landmarks.json") or []
-hazards    = load_json("hazards.json") or []
 encounters = load_json("encounters.json") or []
 bio_events = load_json("biome_events.json") or []
 vfx        = load_json("vfx_recipes.json") or {}
@@ -78,7 +77,6 @@ relic_ids     = ids_from(relics)
 item_ids      = ids_from(items)
 biome_ids     = ids_from(biomes)
 landmark_ids  = ids_from(landmarks)
-hazard_ids    = ids_from(hazards)
 encounter_ids = ids_from(encounters)
 vfx_recipes   = set(vfx.get("recipes", {}).keys()) if isinstance(vfx, dict) else set()
 
@@ -90,7 +88,7 @@ valid_risk_kinds = {"spawn","hp_loss","debuff","confuse","none"}
 
 print(f"  {len(enemy_ids)} enemies, {len(boss_ids)} bosses, {len(skill_ids)} skills, "
       f"{len(buff_ids)} buffs, {len(relic_ids)} relics, {len(item_ids)} items, "
-      f"{len(biome_ids)} biomes, {len(landmark_ids)} landmarks, {len(hazard_ids)} hazards, "
+      f"{len(biome_ids)} biomes, {len(landmark_ids)} landmarks, "
       f"{len(encounter_ids)} encounters")
 
 
@@ -105,11 +103,6 @@ for b in biomes:
 for lm in landmarks:
     ctx = f"landmarks.json [{lm['id']}]"
     check_ref(lm["biome"], biome_ids, f"{ctx} biome", ctx)
-
-for hz in hazards:
-    ctx = f"hazards.json [{hz['id']}]"
-    check_ref(hz["biome"], biome_ids, f"{ctx} biome", ctx)
-    check_ref(hz["landmark_id"], landmark_ids, f"{ctx} landmark_id", ctx)
 
 for enc in encounters:
     ctx = f"encounters.json [{enc['id']}]"
@@ -214,9 +207,6 @@ for wf_path, wf in world_files.items():
     b = wf.get("biome",{})
     if b.get("id","") not in biome_ids:
         err(f"BROKEN REF: {wf_path} biome.id '{b.get('id','')}'")
-    for hz in wf.get("hazards", []):
-        lm = hz.get("landmark", hz.get("landmark_id", ""))
-        if lm: check_ref(lm, landmark_ids, f"{wf_path} hazard landmark", wf_path)
 
 
 # ═══ Step 4: Coverage warnings ═══

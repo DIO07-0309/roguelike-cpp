@@ -30,7 +30,7 @@
 
 - `mod_mgr.scan("mods")` + `ModProvider` + `DependencyResolver` (mod_dependency.cpp) 全链路在
 - Merge 语义稳定: Skip/Replace/MergePatch (`__patch` 字段级合并)
-- registry_test 覆盖 6 类资源 (buff/relic/enemy/boss/skill/item) + 世界层 (biome/landmark/hazard/encounter) 加载 + 引用完整性 (15 层映射等)
+- registry_test 覆盖 6 类资源 (buff/relic/enemy/boss/skill/item) + 世界层 (biome/landmark/encounter) 加载 + 引用完整性 (15 层映射等)
 - Mod 目录缺失/空 → 正常降级 (boot 全流程含 sim 模式实测)
 
 ## ✅ Regression Stable — 回放测试通过
