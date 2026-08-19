@@ -1,8 +1,15 @@
 # 地牢肉鸽 — Roguelike C++
 
-> C++17 + Raylib 5.0 | CMake | ~260 源文件 | Windows / macOS / Linux
-> 
-> 随机生成 15 层地牢，击败 Boss「深渊之主·终焉」通关。
+> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **281 源文件** (127 cpp + 154 h) | Windows 实机验证
+>
+> 随机生成 15 层地牢，击败 Boss「终焉回响」通关。
+> 五项 Stable 冻结验收通过：**API / Save / Mod / Regression / Performance**（报告 `docs/V1_0_0_ACCEPTANCE.md`）
+
+本项目定位：
+
+1. **完整可玩的游戏** — 3 章 15 层、5 场 Boss 战、武器/技能/元素/圣物/局外成长全链路
+2. **数据驱动架构** — 20+ JSON 配置 → Registry → 运行时，Mod 可热插拔
+3. **游戏 AI 研究平台** — 行为树 / MCTS / Q-Learning / 镜像学习 Boss，`--sim` 批量评估
 
 ---
 
@@ -46,178 +53,162 @@ build/roguelike_cpp.exe
 
 ---
 
-## 武器系统 (G9)
+## Feature 总览
 
-6 种武器，各 3 段连击，5 种命中判定形状。品质越高伤害越高、特效越强，传奇武器有专属效果。
+### 核心循环（实时动作）
 
-| 武器 | 距离 | Stage 1 | Stage 2 | Stage 3 | 判定 |
-|------|------|---------|---------|---------|------|
-| **拳头** | 1× | 直拳 | — | — | 圆形 |
-| **匕首** | 1× | 横斩 | 竖劈 | 突刺 1.5× | 扇形→扇形→胶囊 |
-| **长剑** | 2× | 跳斩 | 横扫 | 震地+眩晕 | 矩形→扇形→胶囊 |
-| **双截棍** | 3~5× | 鞭击 | 反身抽 | 5-hit 自动追踪 | 胶囊 |
-| **连弩** | 10× | 单箭 | 三连箭 | 蓄力箭 穿墙 | 弹道 |
-| **长矛** | 6× | 突刺 | 挑击+击退 | 传锋 10-hit | 矩形→矩形→扇形 |
+即时制战斗：攻击间隔 0.5s，HitStop 打击感 + 震屏 + 冻结帧 + 连击评分；楼内清怪 → 下楼 → 强化 → Boss。死亡即重开（肉鸽），局外 MetaProgression 10 节点永久成长。
 
-### 品质命名
+### 地牢生成
 
-| 品质 | Dagger | Sword | Nunchaku | Crossbow | Spear |
-|------|--------|-------|----------|----------|-------|
-| 普通 | 匕首 | 长剑 | 双截棍 | 连弩 | 长矛 |
-| 稀有 | 暗影猎手/血牙 | 破军剑/苍炎剑 | 铁流双节/玄木双棍 | 迅影弩/寒星弩 | 追风枪/烈阳枪 |
-| 史诗 | 夜魔之刃/深渊獠牙 | 天罡剑/赤霄 | 雷鸣双节/破风棍 | 天机弩/破晓弩 | 苍龙枪/破军长矛 |
-| 传说 | **恶魔之爪** | **倚天剑** | **李小龙** | **东风破** | **惊破天** |
+BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗深渊 / F11-15 虚空深渊），F4/9/14 休整层、F5/10/15 Boss 层。10 类特殊房间（祭坛/宝箱/泉水/商店/铁匠/图书馆/赌徒/神殿/隐藏密室/地标）+ ArenaObject 战场元素（毒池/尖刺/图腾/**木桶 — 攻击或弹体点燃 → 0.6s 引信 → AOE 爆炸**）。F10 地狱火魔 Boss 房含机制地形（LAVA 灼烧 + 中央安全区熔岩环带）。
 
-### 传奇效果
+### 战斗系统
 
-- **倚天剑** — 震地冲击波范围 ×1.3
-- **恶魔之爪** — Stage-3 100% 附加中毒
-- **李小龙** — 连击次数 +2 (5→7)
-- **东风破** — 蓄力箭伤害 ×1.5
-- **惊破天** — 传锋次数 +2 (10→12)
+- **武器 (G9)** — 6 种 × 3 段连击 × 5 命中判定（拳头/匕首/长剑/双截棍/连弩/长矛），21 条 JSON 配置，传奇特效 + 攻击标签联动
+- **技能** — 22 条：16 主动（4 基础：斩击/神罚/自愈/The World + 12 变体）+ 6 被动，每技能 3 级进化（使用次数驱动）
+- **元素核心 (G10)** — 开局永久三选一：火焰暴击 / 冰霜冻结 / 剧毒 DOT，独立成长 + VFX
+- **Boss** — 5 场（F5 三选一）：暗影骑士 / 亡灵法师 / 血族伯爵 / **地狱火魔(F10)** — 弹幕图案化（扇形/环形/螺旋多波）+ 机制阶段（核心破坏→弹幕风暴→易伤）+ 领域地形 / **终焉回响(F15)** — 镜像学习 Boss
+- **敌人** — 30 种，9 类 AI（含 SNIPER/CONTROLLER/AMBUSH/GUARDIAN 原型），全数据驱动
 
-### Boss 掉落
+### 内容规模
 
-| 楼层 | Boss | 掉落 |
-|------|------|------|
-| F5 | 暗影骑士 | 惊破天 |
-| F10 | 地狱火魔 | 东风破 |
-| F15 | 深渊之主·终焉 | 倚天剑 |
+| 类别 | 数量 | 类别 | 数量 |
+|------|------|------|------|
+| 敌人 | 30 | 圣物 | 60 |
+| Boss | 5 | 物品 | 31 |
+| 技能 | 22 (16 主动 + 6 被动) | 任务 | 12 |
+| 武器 | 21 | 结局 | 5 |
+| 对话 | 34 (Boss 自适应) | 遭遇 | 9 |
+| 配置 JSON | 20+ | 中文字体码点 | 1769 (1663 CJK) |
 
----
+### 系统能力
 
-## 技能
-
-共 20 个主动技能（4 基础 + 16 变体），6 个被动技能。
-
-### 基础技能
-
-| 技能 | CD | 效果 |
-|------|-----|------|
-| **斩击** | 2s | 前方锥形近战 |
-| **神罚** | 5s | 远程 AOE + 减速 |
-| **自愈** | 8s | 回血 + 攻击提升 |
-| **The World** | 20s | 时停 |
-
-新游戏首技能必为以上之一，后续升级随机学习变体。
+- **存档 v3** — 跨版本兼容（v1→v3 + 增量字段），SaveStable 3 验收测试
+- **Mod 系统** — `mods/` 扫描 + 依赖解析 + MergeMode{Skip/Replace/MergePatch} 字段级合并
+- **中文 UI** — 生成字体图集全中文渲染，`tools/extract_chars.py` 自动维护码点
+- **音频** — 程序化合成（wave_synth）：8 SFX + 4 BGM + 交叉淡入 + Boss Phase2 cue
+- **回放/确定性** — Replay 录制 + hash 链逐帧校验（`--record/--replay`）
+- **批量评估** — `--sim N` headless 模拟 + 平衡报告（`reports/balance_report.json`）
 
 ---
 
-## 元素核心系统 (G10)
+## AI 架构
 
-新玩家首次创建角色时选择永久元素核心，选后不可更改。
+### 玩家侧决策（模拟器驱动）
 
-### 三种元素
+| 系统 | 说明 |
+|------|------|
+| **DecisionAgent** | 评分式决策（`src/core/sim/sim_ai.cpp`）：attack/skill/move/pickup/heal 计分取最大，BuildType 12 流派感知 |
+| **BTAgent** | 行为树（`src/ai/agents/bt_agent.cpp`）：根 Selector 8 子节点优先序 — BossIntro→确认 / Stairs→下楼 / 低血→自愈 / BossNear→攻击 / AoE / EnemyNear / 拾取 / Wander 兜底 |
+| **MCTS** | `--sim-ai mcts`：UCT 搜索 C=1.414，100 次迭代，深度上限 10，回溯折扣 0.95，终局 ±1000 |
+| **Q-Learning** | `--sim-ai decision` 内的 RL 环境（G8.4）：7 维观测 → Q 表离散化 |
 
-| 元素 | 机制 | Lv1 数值 | Lv20 数值 |
-|------|------|----------|-----------|
-| **🔥 火焰** | 攻击概率暴击，伤害×1.5 | 暴击率 15% | 暴击率 ~30% |
-| **❄ 冰霜** | 每击附加减速，层数满或概率触发冻结(1秒) | 冻结率 10% | 冻结率 ~100% |
-| **☠ 剧毒** | 每击附加毒伤，DOT = 本次伤害×比例 | 毒伤 5% | 毒伤 ~15% |
+### 仲裁链（镜像 Boss 决策，五层）
 
-### 元素 VFX
-
-| 效果 | 火 | 冰 | 毒 |
-|------|-----|-----|-----|
-| 普通攻击 | 橙红爆炸 + 火花 + `[火]` 标签 | 蓝色光束 + 三层冰圈 + `[缓]` 标签 | 绿色光束 + 毒雾 + `[毒]` 标签 |
-| 暴击/冻结 | 大爆炸 + 冲击波 + 震屏 + `[暴击!]` | 蓝白闪光 + 冲击波 + 冻结帧 + `[冻!]` | — |
-| DOT 跳伤 | — | — | 毒环 + 绿色粒子 |
-
-### 其他 G10 优化
-
-- Boss 掉落的圣物**不会在换层时被清除**，跟随玩家进入后续关卡
-- 圣物刷新房间**靠近玩家出生点**，开局即可获取
-- 敌方头顶显示 **buff 标签**（毒/缓/冻/血/燃/晕/惧/雷/防），14px 彩色大字加阴影
-- 元素选择界面**每张卡片内含详细机制说明和成长数据**
-- 伤害类型系统：武器用 PHYSICAL，长矛传锋用 MAGICAL，未来 TRUE 可穿透防御
-
----
-
-## 敌人
-
-31 种敌人，9 类 AI。Boss 有专属技能 + 狂暴机制。
-
-| 楼层 | 主题 | 池 |
-|------|------|-----|
-| F1–5 | 遗忘监狱 | 骷髅弓手/骨兵/史莱姆/暗影行者 |
-| F6–10 | 灰烬火山 | 火妖/精英兽人/冲锋兽人 |
-| F11–15 | 虚空深渊 | 暗术师/虚空行者/石像守卫 |
-
-**三场 Boss 战**：暗影骑士(F5) / 地狱火魔(F10) / 终焉回响(F15)
-
----
-
-## 智能 AI 系统 (G8 + F15)
-
-本项目是面向**游戏 AI 研究**的完整实验平台。F5 暗影骑士考验反应，F10 地狱火魔考验规则理解，**F15 终焉回响让 AI 学习你的习惯并用你的方式击败你**。
-
-### 架构全景
+`src/ai/mirror/mirror_agent.cpp`：
 
 ```
-Player Behavior Pipeline (F15.1-F15.2)
-  记录 14 层行为 → PlayerAction 事件流
-       │
-       ▼
-PlayerHabitProfile (F15.3)        G8.1 Behavior Tree
-  玩家画像：风格/频率/弱点           基础决策：追击/防御/撤退
-       │                                    │
-       ▼                                    ▼
-MirrorAgent (F15.3-F15.4)          G8.3 Combat MCTS
-  反制策略 + 动作预测               100 次模拟 → 最优动作
-       │                                    │
-       ▼                                    ▼
-  RL Self-play (F15.4)             G8.4 Q-Learning Agent
-  --rl-mirror 500                 离散化状态 → Q-table 训练
+ML 插槽 → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行为预测) → Thompson 采样
 ```
 
-### F15 终焉回响 — 从技术到体验
+实测仲裁分布（v0.9.30，500 局）：`[Clone:0 ML:0 RL:11/25/26 Tho:0]` — RL 完全接管。
 
-| 阶段 | 技术 | 玩家感受 |
+### RL 训练管线
+
+- `--rl-train N`：通用 Q 表（`saves/rl_qtable.json`，~2380 条目）
+- `--rl-mirror N`：镜像 Boss 自博弈，4 风格 Q 表（`saves/rl_mirror_q_<STYLE>.json`）
+- epsilon 退火 0.12→0.005，末段 10% 低探索统计收敛：AGGRESSIVE 96.8% / DEFENSIVE 99.0% / SNIPER 96.4% / BALANCED 99.2% / TRAIN 100%
+- 运行时按玩家画像风格加载（缺失安全降级跳过）
+
+### 导航与模拟
+
+- 模拟器用 **BFS**（`_bfs_toward/_bfs_away`，tile 级 rect 碰撞 + 危险避让：熔岩/毒池/尖刺/木桶）
+- **A\*** pathfinder（priority_queue + Manhattan 启发式）供 BT MoveToTarget 节点
+- `--sim N --sim-seed S`：headless 定步长 1/60，每局统计 → 胜率 / 平均楼层 / Boss 击杀率 / Build 评级（>70% [OP] <25% [UP]）/ 圣物 TOP10 / 威胁度
+
+---
+## F15 Mirror Boss — 终焉回响
+
+> 它观察你、学习你，然后用你的方式击败你。
+
+### 镜像机制
+
+| 项 | 实现 |
+|------|------|
+| **武器同步** | 复制玩家武器 3 段连击（近战=玩家武器 / 远程=CROSSBOW×0.8） |
+| **技能同步** | 按玩家主动技能逐槽镜像，关键词→类型映射（自愈/时停/近战/AOE/弹幕/爆发/吸血/召唤） |
+| **属性同步** | HP=玩家×2.5，ATK=玩家×0.85，防御=玩家+5/+3，自愈≈6.7% maxHP |
+| **真冻结** | Phase≥2 冻结玩家 1.5s（禁移动/攻击），镜像仍可行动 |
+| **节奏** | 决策间隔 0.5s，行为状态机 approach/attack/skill/retreat，追击 120px/s |
+
+### 三阶段人格演化
+
+| 阶段 | 机制 | 玩家感受 |
 |------|------|----------|
-| **开场** | PlayerBehaviorAnalyzer 读取 14 层数据 | 面板弹出：「风格: AGGRESSIVE，弱点: 低闪避」— *它认识我* |
-| **Phase 1** | MirrorAgent 实时观察当前战斗 | Boss 复制你的武器/技能/装备，*我在打自己* |
-| **Phase 2** | 历史反制策略激活 | Boss 开始预判你的技能释放、封堵闪避方向 — *它开始预测我* |
-| **Phase 3** | 进化版人格 | *它比我更懂我* |
+| **Phase 1 观察** | MirrorAgent 实时采集玩家动作（攻击/技能 0.5s 窗口、位移、喝药识别） | Boss 复制你的武器/技能 — *我在打自己* |
+| **Phase 2 镜像** | 历史反制策略激活（BehaviorCloneTable 意图预测 + 战术链 n-gram 序列记忆） | Boss 开始预判你的技能与走位 — *它在预测我* |
+| **Phase 3 进化** | 在线学习：reward = 命中奖励，Thompson 多臂采样持续探索 | *它比我更懂我* |
 
-> **M4 战术层 (v0.9.21)**：镜像新增画像驱动的战术脚本层 —— 根据你的攻击习惯
-> 在远程消耗 / 压进近战 / 拉扯之间切换（含武器槽同步切换），并在 Phase 2 起
-> 使用镜像专属真冻结（玩家 3 秒内无法移动/攻击，镜像仍可行动）。
+### 存档记忆（跨局学习）
 
-### AI 技术清单
+- 镜像先验 144 float（桶-major）写入存档 `mra:`/`mrb:` 字段（M4e）
+- 新局开始自动注入 → 旧后验叠加为新先验（`inject_mirror_memory`）
+- 克隆门槛自适应：策略漂移 >0.5 时置信门槛 0.50→0.75
 
-| 系统 | 文件数 | 说明 |
-|------|--------|------|
-| **Behavior Tree** | 5 | 选择器/序列/条件/动作/黑板，14 个节点，决策时延 <1ms |
-| **A* Pathfinder** | 2 | priority_queue + Manhattan 启发式，有障碍物寻路 |
-| **Combat MCTS** | 3 | UCT 搜索 + 战斗快照 clone，100 次模拟预测最优动作 |
-| **Q-Learning Agent** | 2 | Observation 7 维向量 → Q-table 离散化，ε-greedy 探索 |
-| **Player Behavior Recorder** | 4 | 14 层静默采集：武器攻击/技能/移动/闪避/受伤，每局 260+ 事件 |
-| **Player Behavior Analyzer** | 2 | 事件流 → 玩家画像：频率/偏好/风格聚类 → 反制策略生成 |
-| **MirrorAgent** | 2 | 3 阶段人格演化 + reward 函数：伤害 + 预判 + 反制成功 |
-| **2nd-Layer Boss Domain** | 4 | BossArenaState 状态机 + WeakPoint + 无敌/易伤循环 |
+### RL 自博弈（F15.4）
 
-### CLI 训练命令
-
-```bash
-# 离线 RL 训练：MirrorAgent × 4 玩家风格 × 500 局
-build/roguelike_cpp --rl-mirror 500
-
-# 行为树模拟
-build/roguelike_cpp --sim-ai bt
-
-# MCTS 模拟
-build/roguelike_cpp --sim-ai mcts
-
-# Q-learning 训练
-build/roguelike_cpp --rl-train 1000
-```
-Q 表持久化: `saves/rl_qtable.json` / `saves/rl_mirror_q_<STYLE>.json`, 再次运行自动续训; `--rl-train` 与 `--rl-mirror` 可同跑。
+`--rl-mirror N`：镜像 × 4 玩家风格离线训练 Q 表（95%+ 收敛），运行时按 `profile.style_name()` 加载，观察期（phase<2）不启用。实测 RL 完全接管仲裁。
 
 ---
 
-## 房间
+## v1.0 验证数据
 
-每层 2~5 个特殊房间：祭坛、宝箱、泉水、商店、铁匠、图书馆、赌徒、神殿、隐藏密室。
+### 平衡回归（500 局 / 5 seeds，目标区间 6-10%）
+
+| 版本 | 胜率 | 备注 |
+|------|------|------|
+| Q3.12 基线 | **5.8%** (29/500) | 死亡分布 F1-5≈40% F6-10≈50% F11-15≈8% |
+| v0.9.30 | **6.6%** | RL 决策层接入镜像（Boss 变强，8.6%→6.6%） |
+| v0.9.31 | **7.0%** | M4b 地狱火魔领域作战 |
+| v0.9.32 | **8.0%** | 五项 Stable 验收 |
+| v0.9.33 | **10.0%** | 收官体检（Boss 冷却恢复判定后区间上沿） |
+
+### 确定性
+
+- **Q3.14 对拍**：3 种子 × 20 局 × 2 批 **逐字节一致**（130 万行级）
+- 修复三类跨进程分叉：怪物脱卡状态/SimAI 记忆/双节棍追踪 指针键 → instance_id/uint64
+- Replay hash 链（`compute_state_hash` 逐帧链式 + `verify_hash_chain`）
+
+### 性能
+
+- sim 500 局（5 进程并行）：**53s**，单核 ~9.4 局/s（支撑万局规模评估）
+- 全量测试套件：0.46s
+
+### 测试与验证
+
+- **34 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip）
+- World Validator：20+ JSON 交叉引用 **0 errors 0 warnings**
+- 木桶闭环实测：200 局 sim **38 次 点燃→爆炸 完全成对**（伤害随楼层缩放）
+- 收官体检：编译 0 警告（bgm narrowing 修复后）
+
+---
+
+## Current Limitations
+
+诚实清单（v1.0 已知边界）：
+
+- **美术** — 程序化像素 + Kenney CC0 占位素材，无完整商业美术资产
+- **手感** — 实时动作（攻击间隔 0.5s），无翻滚/无锁定，非回合制；打击感三件套已就位但数值打磨以研究平衡为主
+- **平衡** — 胜率目标区间 6-10%（研究平台定位，非商业难度曲线）
+- **Boss 决策链** — D5 决策系统结果目前仅 HUD 展示，实际行为由连招模板驱动（`boss.cpp`）；`boss_decision_to_command` 为显示层
+- **导航** — 运行时模拟用 BFS；A* pathfinder 有测试支撑但未接入生产路径
+- **环境物** — 原 hazards.json（环境危险物）为死链路已移除（v0.9.33）；当前环境机制为 ArenaObject（毒池/尖刺/图腾/木桶）+ 熔岩地砖
+- **中文渲染** — 依赖生成字体图集（1769 码点），新增中文文案需重跑 `extract_chars.py`
+- **平台** — Windows 实机验证；macOS/Linux 构建规范见 `docs/G4_PLATFORM_BIBLE.md`，未实机验证
+- **输入** — 键盘 only，无手柄/触摸
+- **RL 资产** — Q 表生成于本地 `saves/`（训练产物，非仓库内置）；首次运行无 Q 表时镜像自动降级
+- **性能** — 单线程模拟（9.4 局/s/核），万局评估需多进程并行（已验证）
 
 ---
 
@@ -225,19 +216,15 @@ Q 表持久化: `saves/rl_qtable.json` / `saves/rl_mirror_q_<STYLE>.json`, 再�
 
 ```
 src/
-├── core/          # 引擎框架 (Object/Node/SceneTree/InputMap)
-├── game/
-│   ├── entities/  # 实体 (Player/Monster/Item/Skill/Inventory)
-│   ├── systems/   # 战斗/武器/VFX/楼层
-│   ├── world/     # 地图/地牢生成/特殊房间/事件/NPC
-│   ├── scenes/    # 场景 (Title/Game/Tutorial/Death/Victory)
-│   ├── director/  # 表现层/游戏流程/Boss系统
-│   ├── audio/     # 程序化合成音频
-│   └── save/      # 存档
-├── data/          # JSON 加载器 (items/buffs/enemies/skills/weapons…)
-├── ai/            # 行为树/导航/MCTS/RL
-└── tests/         # GoogleTest (80+ 用例)
-resources/         # JSON 配置（12+ 文件）
+├── core/          # 引擎框架 + sim 模拟器 (sim_ai/sim_runner) + replay + Mod
+├── game/          # 实体/战斗/世界/场景/director/音频/存档
+├── ai/            # 行为树/导航(A*)/MCTS/RL/MirrorAgent
+├── data/          # JSON 加载器 (20+ 配置)
+├── main.cpp       # 入口 + CLI (--sim/--rl-train/--record/--mods)
+tests/             # GoogleTest 34 条目
+resources/         # 20+ JSON 配置（数据骨干）
+tools/             # world_validator.py / extract_chars.py
+docs/              # 设计文档（ARCHITECTURE / G4_PLATFORM / WORLD_LORE / D1_GAMEPLAY …）
 vendor/            # raylib 5.0 + nlohmann/json
 ```
 
@@ -260,17 +247,18 @@ cmake --build build && cd build && ctest
 
 | 参数 | 说明 |
 |------|------|
-| `--record <path>` | 录制 Replay |
-| `--replay <path>` | 回放 |
-| `--sim N` | 跑 N 局模拟 |
-| `--sim-ai bt/mcts` | 行为树/MCTS 模拟 |
-| `--rl-test N` | RL 环境测试 |
+| `--sim N` | 跑 N 局模拟（`--sim-seed S` 种子） |
+| `--sim-ai bt/mcts/decision` | 模拟 AI 类型 |
+| `--rl-train N` | Q-Learning 训练 |
+| `--rl-mirror N` | 镜像 Boss 自博弈训练 |
+| `--record <path>` / `--replay <path>` | 回放录制/播放 |
+| `--sim-build` / `--sim-all-builds` | Build 流派评估 |
 
 ### Python 工具
 
 ```bash
-python tools/world_validator.py    # JSON 交叉校验
-python tools/extract_chars.py      # 提取 CJK 字符
+python tools/world_validator.py    # 20+ JSON 交叉校验（修改配置后必跑）
+python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 ```
 
 ### 设计文档
@@ -280,7 +268,8 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | `docs/ARCHITECTURE.md` | 模块架构 |
 | `docs/WORLD_LORE.md` | 世界观设定 |
 | `docs/D1_GAMEPLAY_LOOP_DESIGN.md` | 战斗循环设计 |
-| `docs/G4_PLATFORM_BIBLE.md` | 平台兼容 |
+| `docs/G4_PLATFORM_BIBLE.md` | 平台兼容 + v1.0.0 Release Standard |
+| `docs/V1_0_0_ACCEPTANCE.md` | 五项 Stable 验收报告 |
 
 ---
 
@@ -353,7 +342,7 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | G5.8.7–8 | Presentation Integration: PresentationEvent + dispatch() + Timeline sequencing | ✅ |
 | G6.1 | Biome System: 3 biomes (Prison/Volcano/Abyss) + TilePalette + enemy_pool/boss_id + biome BGM | ✅ |
 | G6.2 | Landmark System: 9 biome landmarks + SpecialRoomType.LANDMARK + DungeonGenerator placement | ✅ |
-| G6.3 | Biome Hazards: 6 environmental hazards on landmark rooms (slow/burn/confuse/deflect) | ✅ |
+| G6.3 | Biome Hazards: 6 environmental hazards (已移除 — v0.9.33 死链路清理) | ✅ |
 | G6.4 | Biome Events: 6 risk/reward events (25% floor trigger) + floor_config BGM biome routing | ✅ |
 | G6.5 | Encounter Framework: EncounterDef/Node/Choice + multi-round dialogue + trade + 9 encounters | ✅ |
 | G6.6 | Exploration: wall_interact secrets + SpecialRoomType.SECRET 30% placement + 3 secret encounters | ✅ |
@@ -378,7 +367,6 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | M4a.1 | M4a 战斗体验修复: 连招触发距离 48→192px / 脱战 384px 不打断连招 / 旋风范围圈可视化 / 狂暴紫色演出 / 弹幕全特效 | ✅ |
 | M4a.2 | M4a 数值平衡: 毒池 DOT 改 0.5s 周期 + 高亮 / 弹幕撞墙消失 / 旋风 1.6× 扇形 1.25× / shadow_knight 专属连招配置 | ✅ |
 | M4a.3 | 伤害日志全链路: attack_target 统一标签 + CombatStats 记账去重 + 每帧兜底未标注掉血 + [COMBO] 连招可见性 | ✅ |
-| M4b | 第二章 Boss 领域作战 (茶杯头式 Boss 房 / 弹幕演出 / 机制阶段) | ✅ v0.9.31 完成 (详见里程碑表) |
 | M4f | 美术管线: 像素渲染骨架 + 角色/怪物/VFX 全接入程序化精灵 | ✅ |
 | M4f.3 | 怪物差异化体型 + 待机帧动画 (2帧 spritesheet 管线直通) | ✅ |
 | M4f.4 | 数据驱动素材 — Kenney Tiny CC0 精灵上线 (玩家/怪物/墙地板) | ✅ |
@@ -412,7 +400,6 @@ python tools/extract_chars.py      # 提取 CJK 字符
 | Q3.7 | 胜利判定修正: next>MAX_FLOORS(15) 且玩家存活才算通关 (死在 F15 不算) | ✅ |
 | Q3.8 | 脱卡状态 static→实例成员: 跨局残留裸指针键清零 (run 间状态泄漏) | ✅ |
 | Q3.9 | 怪物实例 ID 唯一不复用 (同种子确定) + CountingRng 掷骰计数; sim HP 统计按 instance_id 追踪/回收; 镜像冻结计时归零 (F15 冻结中死亡后跨局泄漏) | ✅ |
-| Q3.10 | 模拟器胜率管线: hitstop sim 跳过 (表现层冻结稀释 game_time → 900s 超时失效); 初始 2 瓶治疗药水 (无自愈系开局毒/环境死); 墙钟兜底置顶 (state!=PLAYING 提前 return 致 600s 永不触发); FIX 近距环 r=1 仅 (r=2=64px 超出近战48px); 传送环 sync_rect 两遍 (只改 position 不同步 rect → 攻击判定用旧 rect → 8s 循环重传); 口袋兜底 (卡死≥8s 传送 + 毒池放宽); 战斗判定仅怪血量总和变动; 长枪空挥修复 (命中形状朝前, 攻击前面向最近目标); 镜像削弱 v4 (HP ×5→×2.5, ATK ×1.2→×0.85, 自愈 20%→6.7%, 冻结 3s→1.5s) | ✅ |
 | Q3.11 | 模拟器通关路径修复: sim 胜利后不得执行 VictoryScene 流程 (_collect_sim_stats 已处理重启/退出) — 否则批次挂在 VictoryScene 永不退出 (镜像削弱后出胜局触发, 伪装成"无限循环冻结", v13/v14 各耗 150min); 修复后 10 局批次 ~4s 退出, 出真实胜局 (暗影刺客 F15 1091 turns) | ✅ |
 | Q3.12 | F15 Mirror Baseline Evaluation (500 runs, 5 seeds): 胜率 5.8% (29/500), 死亡分布 F1-5≈40% F6-10≈50% F11-15≈8%; 中期数值下调 — F6-10 倍率 -12% (1.60→1.40/1.50→1.30 … 2.20→1.95/2.00→1.75), F2-4 微调 (-5~8%), F10 火魔 320→300; 验证胜率 ~6-10% (s7 达 10%+); 附带发现间歇性堆损坏崩溃 (ntdll 0xC0000005, ~1/3 批次, 待排查) | ✅ |
 | Q3.13 | 间歇堆损坏崩溃根因定位与修复 (gdb 堆栈抓取): ① 双节棍跨帧 `sp.tracked` 裸指针 UAF (目标死亡释放后悬垂, 写已释放堆 → ntdll 随机崩溃) — 用 std::find 校验当前帧存活列表; ② SummonMinions 召唤指针 push 进 static 向量跨帧累积悬垂 (static→局部); ③ 根因: `pixel_to_tile` 截断取整, 击退/传送使实体位置出图 → BFS `is_target[ty*w+tx]` 越界写堆 (OOB 怪跳过 + 玩家瓦片钳制 ×3 BFS); 验证 8×100 局零崩溃 (s7 ×3 11%/6%/9%, s2000 ×2 7%/11%), 34/34 测试通过 | ✅ |
