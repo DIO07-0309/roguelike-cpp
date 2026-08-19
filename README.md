@@ -31,14 +31,12 @@ build/roguelike_cpp.exe
 
 | 按键 | 功能 |
 |------|------|
-| **WASD** | 移动 |
-| **↑↓←→** | 切换朝向 |
+| **WASD / ↑↓←→** | 移动（八方向，斜向 √2 归一化） |
 | **空格** | 普攻（武器三连击） |
-| **1~4** | 主动技能 |
-| **E** | 拾取 / 触发特殊房间 |
-| **I** | 背包（X装备 U使用 D丢弃） |
+| **1~4 / 小键盘 1~4** | 主动技能 |
+| **E** | 拾取 / 触发特殊房间 / 下楼 |
+| **B** | 背包（X 装备 · U 使用 · D 丢弃） |
 | **R** | 圣物面板 |
-| **>** | 下楼（清空楼层后） |
 
 ### 系统
 
@@ -48,8 +46,11 @@ build/roguelike_cpp.exe
 | **C** | 继续 |
 | **F** | 选关 |
 | **T** | 教程 |
-| **Esc** | 返回标题 |
-| **F11** | 全屏 |
+| **Enter** | 确认（对话/菜单） |
+| **Esc** | 取消 / 返回标题 |
+| **G** | 全屏切换 |
+
+> 按键映射唯一来源：`src/core/input_map.cpp:46`（`setup_defaults`）— 与代码同步维护。
 
 ---
 
@@ -87,9 +88,93 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 - **存档 v3** — 跨版本兼容（v1→v3 + 增量字段），SaveStable 3 验收测试
 - **Mod 系统** — `mods/` 扫描 + 依赖解析 + MergeMode{Skip/Replace/MergePatch} 字段级合并
 - **中文 UI** — 生成字体图集全中文渲染，`tools/extract_chars.py` 自动维护码点
-- **音频** — 程序化合成（wave_synth）：8 SFX + 4 BGM + 交叉淡入 + Boss Phase2 cue
+- **音频** — 程序化合成（wave_synth）：14 SFX（hit/hurt/melee/slash/bolt/heal/timestop/domain_expand/victory/ui 等）+ 4 BGM（title/select/dungeon/boss + biome 动态变体）+ 交叉淡入 + Boss Phase2 cue
 - **回放/确定性** — Replay 录制 + hash 链逐帧校验（`--record/--replay`）
 - **批量评估** — `--sim N` headless 模拟 + 平衡报告（`reports/balance_report.json`）
+
+---
+
+## 系统架构
+
+### 分层与依赖（单向，无循环）
+
+```
+JSON 资源 ──→ Data Registry ──→ Factory/Manager ──→ Runtime 对象 ──→ Gameplay 系统 ──→ EventBus ──→ Presentation ──→ Scene 层
+                        ↑                                                     │
+                        └────────────── SaveManager（读取 Runtime 状态）───────┘
+```
+
+| 层 | 目录 | 职责 |
+|------|------|------|
+| `src/core/` | 25 文件 | 引擎框架（SceneTree/InputMap/Logger）+ sim 模拟器 + replay + Mod 管线 |
+| `src/data/` | 22 文件 | 12 个 Def 结构 + 加载器（`load_/get_/get_all_/is_loaded` 统一 API） |
+| `src/game/` | 178 文件 | 实体/系统/世界/场景/Director/音频/存档 |
+| `src/ai/` | 43 文件 | mirror(13) / rl(9) / behavior_tree(8) / mcts(8) / agents(5) |
+
+关键原则：
+
+- **Def ≠ Runtime**：Def（JSON 不可变、无 Raylib 依赖、无函数指针、Registry 只读） vs Runtime（C++ 可变、`virtual execute()`、Manager 持有）
+- **Manager 无状态**：协调者只读状态 + 发 EventBus，不持有业务数据
+- **边界规则**：Gameplay → EventBus ✅ 但不引用 UI 对象；Presentation 订阅事件但不改 Gameplay；Gameplay 不知道 Renderer 存在
+- **Architecture Freeze**（禁止重构）：Object/Node/SceneTree、InputMap、EventBus/ServiceLocator、CombatSystem 伤害公式、BossAI 状态机、BSP 生成器、GameFlowDirector 状态机、SaveManager 核心格式（`docs/ARCHITECTURE.md` 第 9 节）
+
+### GameScene 组合（5 个 Director）
+
+GameScene 不继承 Director，全部组合持有（`game_scene.h:203-211`）：
+
+| Director | 子系统/职责 |
+|------|------|
+| **BossSystemDirector** | 12 子系统：narrative / evolution / behavior / skill_queue / arena / encounter / replay_mem / battle_report / cinematic / timeline / command / modifier_hook + F10 领域状态机 + F15 MirrorAgent 与 MirrorCombatDirector |
+| **GameplaySystemDirector** | 非 Boss 逻辑：world_state（Flags+Counters）/ story / rels（NPC 好感）/ quest_mgr（12 任务）/ ending_dir（5 结局）/ run_stats |
+| **PresentationSystemDirector** | 纯表现：damage_floats / shake / freeze / hit_flash / room_msg / BuildTheme（VFX·Camera·ScreenFX·Audio 四类调制）/ boss_intro / floor 入场 |
+| **GameFlowDirector** | 12 状态生命周期：TITLE→NEW_GAME→ENTER_FLOOR→PLAYING→BOSS_INTRO→BOSS_FIGHT→FLOOR_CLEAR→BOSS_DEAD→PLAYER_DEAD→GAME_CLEAR→ENDING→CREDITS→RETURN_TITLE |
+| **PlayerController** | 玩家输入集中：移动/攻击/技能/拾取/交互/背包（`player_controller.cpp`） |
+
+实体均为组合：`Player = Entity + CombatStats + Inventory + SkillManager + ComboState + AttackEvolutionState + Weapon + Element`；`Monster = Entity + CombatStats + MonsterAI + TeamRole + instance_id`。
+
+### 数据驱动管线（JSON → Registry → 运行时）
+
+`main.cpp` 启动顺序：
+
+```
+CLI 解析 → sim 前置配置(静音/只读存档) → SceneTree 创建
+→ RegistryBuilder.add(BuiltinProvider, priority=0)
+→ 注册 12 模块加载器（buff/relic/enemy/boss/dialogue/quest/ending/meta/skill/item/weapon/element）
+→ ModManager.scan("mods") → DependencyResolver 拓扑排序 + 循环检测 → 按序 add_provider
+→ build_all() → BuildRecord 日志 + ValFinding 校验 → g_meta.load_from_defs + VFX/Biome/Landmark/Encounter 加载
+```
+
+- **MergeMode 三种合并语义**：`Skip`（同 id 跳过）/ `Replace`（同 id 覆盖）/ `MergePatch`（`__patch` 标记的字段级递归合并）
+- **Mod 命名空间**：`mod_id:entry_id` 前缀隔离，Mod 优先级来自 mod.json manifest（默认 100，内置 0）
+- **World Validator**（`tools/world_validator.py`，4 类检查）：① 跨文件交叉引用（biome→enemy_pool/boss_id/bgm、dialogue next 闭环、floor_config 1-15 范围）② 冒号 DSL 校验（`spawn:orc`/`buff:poison` 等 kind 白名单 + 引用存在性）③ 内部引用（elite_buffs/on_hit/skill.triggers/buff_id）④ 覆盖完整性告警（每 biome 必有 enemy_pool/boss_id/landmarks≥2/encounters）；另有 VFX recipe 13 kind/17 color 白名单 + 敌人投射物参数范围检查
+
+### 事件总线（EventBus，45 事件）
+
+轻量载荷 `GameEvent{type, sender, int_val, float_val, str_val}`，单例 `EventBus::inst()`，订阅者按 owner 批量注销（GameScene 析构统一 unregister）。分类：玩家 4 / 怪物 3 / Boss 4 / 物品圣物 3 / 进化 3 / Buff 2 / 特殊房间 2 / NPC 2 / 任务 2 / 楼层 2 / 武器 4 / 元素 7 / Boss 领域 3 / 游戏结局 4。
+
+订阅范例：PresentationSystemDirector 订阅 LEVEL_UP/MONSTER_DIED/EVOLVED/QUEST_COMPLETE → 弹 toast；RuleChainManager 订阅 BOSS_DEAD → 规则链推进；GameScene 静态订阅 7 个 ELEMENT_* → 排队元素 VFX。
+
+### 存档架构（三份独立数据）
+
+| 文件 | 内容 |
+|------|------|
+| `saves/save.json`（v3，key:value 文本） | core/v1（player/floor/seed/special）· v2（atl/rule_counters）· v3（qst/end）· G10.1 元素（elem）· M4e 镜像记忆（mra/mrb 各 72 float）· wpn/weapon |
+| `saves/meta_save.json`（JSON） | 跨局永久：runs/souls/knowledge/memory/nodes（MetaProgression 10 天赋节点，sim 模式 `g_readonly`） |
+| `saves/relic_archive.json` | 跨局圣物收藏：obtained_count/最高稀有度/mastery(0-500)/套装加成 |
+
+兼容策略：`getV(key, default)` 缺字段取默认；旧技能名映射（`Slash`→`slash`）；旧 act 格式（1 逗号）兼容解析；v1→v3 全链路 SaveStable 验收测试覆盖。
+
+### sim 架构与确定性
+
+- **流程**：`--sim N [--sim-seed S]` → SimRunner 接管 → 直接建 GameScene + `new_game()`（跳过元素选择固定火系）→ 隐藏窗口定步长 1/60 逐帧 `tree.process_frame` → `_collect_sim_stats()` 构造 RunResult → 批量完成出 BalanceReport（JSON 导出：胜率/平均楼层/Boss 击杀率/死亡分布[16]/Build 评级/圣物 TOP10/威胁度）
+- **确定性三支柱**：`CountingRng`（mt19937 + 掷骰计数）· 种子公式 `seed_start + run*1234567` · Replay hash 链（`compute_state_hash` 逐帧链式 + `verify_hash_chain` 对拍）；历史修复：指针键 → instance_id/uint64（Q3.14 三处跨进程分叉）
+- **AI 驱动玩家**：`_is_action_just_pressed()` 在 sim 下询问 BTAgent/DecisionAgent 而非键盘，输出动作字符串 confirm/descend/attack/skill_1-4/pickup/use_potion/move_*
+
+### 渲染管线
+
+帧循环 `_process`（game_scene.cpp:447）：输入 → Boss 演出/时停检查 → game_time → sim 统计 → Boss Phase2/LastStand/领域 → Build Fusion → buff 逐帧 → 元素 VFX 队列 → Arena 环境对象（木桶引信/毒池/尖刺/图腾）→ 熔岩灼烧 → 玩家控制 + 怪物 AI → 武器/投射物结算 → FlowDirector/任务/对话 → presentation.tick。
+
+`_render` 顺序：清屏 → 相机（WorldReaction 色调 + 震屏偏移）→ 地图 → 地面物 → 实体 → VFX → Boss 领域 → 投射物（预警圈/弹体）→ 伤害数字 → 受击红屏 → HUD → 调试面板 → 章节入场 → 时停 overlay。VFX 生命周期：`active_effects` 每帧 elapsed += dt，超时移除；9+1 基础图元（ring/beam/lightning/explosion/slash/smoke/spark/aura/flash/shockwave）+ JSON recipe 派发。中文渲染：生成字体图集（1769 码点）+ `GuiFont::DrawTextCH()`。
 
 ---
 
@@ -97,20 +182,41 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 
 ### 玩家侧决策（模拟器驱动）
 
-| 系统 | 说明 |
-|------|------|
-| **DecisionAgent** | 评分式决策（`src/core/sim/sim_ai.cpp`）：attack/skill/move/pickup/heal 计分取最大，BuildType 12 流派感知 |
-| **BTAgent** | 行为树（`src/ai/agents/bt_agent.cpp`）：根 Selector 8 子节点优先序 — BossIntro→确认 / Stairs→下楼 / 低血→自愈 / BossNear→攻击 / AoE / EnemyNear / 拾取 / Wander 兜底 |
-| **MCTS** | `--sim-ai mcts`：UCT 搜索 C=1.414，100 次迭代，深度上限 10，回溯折扣 0.95，终局 ±1000 |
-| **Q-Learning** | `--sim-ai decision` 内的 RL 环境（G8.4）：7 维观测 → Q 表离散化 |
+| 系统 | 实现 | 细节 |
+|------|------|------|
+| **DecisionAgent** | 评分式决策（`src/core/sim/sim_ai.cpp`） | attack/skill/move/pickup/heal 五类计分取最大；BuildType 12 流派感知（攻击/走位/搜刮权重随流派调整）；`--sim-ai decision`（默认） |
+| **BTAgent** | 行为树（`src/ai/agents/bt_agent.cpp` + `src/ai/behavior_tree/` 节点库） | 根 Selector 8 子节点优先序 — BossIntro→确认 / Stairs→下楼 / 低血→自愈 / BossNear→攻击 / AoE / EnemyNear / 拾取 / Wander 兜底；BTNode/Selector/Sequence/Condition/Action/Blackboard 结构，16 测试 |
+| **MCTS** | UCT 搜索（`src/ai/mcts/`） | C=1.414，100 迭代，深度上限 10，回溯折扣 0.95，终局 ±1000；SimulationState 深克隆模拟对局；16 测试；`--sim-ai mcts` |
+| **Q-Learning** | RL 环境（`src/ai/rl/`） | Gym-like API（reset/step/reward）+ Observation 7 维 → Q 表离散化 + RandomAgent/QAgent；17 测试；`--rl-test/train` |
+
+### MirrorAgent 详解（F15 镜像学习核心）
+
+定位：**分析层非控制层** — 读玩家习惯调整 BossAI 参数，不直接调用 attack/move（`mirror_agent.h:21`）。三阶段人格：
+
+| 阶段 | 进入条件（`mirror_tuning.h` 全部参数） | 行为 |
+|------|------|------|
+| **P1 观察** | — | 实时采集：攻击/技能 0.5s 窗口、位移、喝药识别；Boss 复制玩家武器/技能 |
+| **P2 镜像** | 观察 ≥20 次 或 40 次兜底 / 时间 12s 兜底 / 准确率 ≥0.65 | 克隆预测（BehaviorCloneTable）+ 战术链 n-gram 反制 |
+| **P3 进化** | 同桶命中 10 次 / 准确率 ≥0.70 / 玩家 HP <0.35 危险线 | 在线学习：reward=命中，Thompson 多臂持续探索 |
+
+- **决策接口**：`recommend_action`（Thompson 采样，phase<2 返回 -1）/ `report_outcome`（Beta 后验更新）/ `should_interrupt_skill` / `should_pressure_close` / `predict_next_action` / `recommend_distance`
+- **跨局记忆**：alpha+beta 144 float（桶-major）→ 存档 `mra:`/`mrb:` → 新局旧后验叠加为先验（`inject_mirror_memory`）
+- **漂移自适应**：策略漂移 >0.5 时克隆置信门槛 0.50→0.75（步进 0.25）
+- **战斗快照** MirrorBattleState：boss_hp_pct / player_hp_pct / dist_tiles / player_attacking / player_using_skill / boss_can_attack / boss_in_domain / player_skills_ready
 
 ### 仲裁链（镜像 Boss 决策，五层）
 
-`src/ai/mirror/mirror_agent.cpp`：
+```
+ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行为预测) → Thompson 采样 → 规则兜底
+```
 
-```
-ML 插槽 → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行为预测) → Thompson 采样
-```
+| 层 | 数据结构 | 机制 |
+|------|------|------|
+| ML | 预测器插槽 `set_ml_predictor` | 默认关闭，未训练 |
+| 战术链 | TacticalChainTable（`tactical_chain_table.h`） | 11 符号（SKILL_0-3 / MOVE_×4 / COMBO_1-3）3-gram 计数表（键 `s0*121+s1*11+s2`）+ 2-gram 分母 + 单前缀；降级链 3-gram→2-gram→1-gram |
+| RL | QAgent（4 风格 Q 表） | 离线训练 95%+ 收敛，运行时按玩家画像加载，exploit 为主 |
+| 克隆 | BehaviorCloneTable（`behavior_clone_table.h`） | PlayerIntention 7 类（ATTACK/SKILL/DODGE/HEAL/ADVANCE/RETREAT/IDLE）；CloneContext 状态桶 `d<dist>:h<hp>:s<skills>` — dist 5 档（<2/2-4/4-8/8-14/≥14）· hp 4 档（<25%/25-50%/50-80%/≥80%）· skill 0-3；降级链 exact→fuzzy→profile→default |
+| Thompson | OnlineAdaptivePolicy | Beta 后验采样，`report_outcome` 持续更新 |
 
 实测仲裁分布（v0.9.30，500 局）：`[Clone:0 ML:0 RL:11/25/26 Tho:0]` — RL 完全接管。
 
