@@ -288,43 +288,46 @@ src/                                    # 281 源文件（127 cpp + 154 h）
 ├── main.cpp                            # 入口 + CLI（--sim / --sim-ai / --rl-train / --rl-mirror / --record / --replay / --sim-build / --mods）
 │
 ├── core/                    (25)       # 引擎框架 + 模拟器 + 回放 + Mod 管线
-│   ├── node.h / scene_tree.h           # 场景树框架（Object/Node）
-│   ├── input_map.cpp                   # 按键映射唯一来源（setup_defaults）
-│   ├── logger.cpp / seh_handler.cpp    # 日志 / Windows SEH 异常捕获
-│   ├── sim/                  (4)       # sim_ai.cpp（DecisionAgent 评分决策）/ sim_runner.cpp（批量评估）
-│   ├── replay/               (8)       # recorder / player / replay_file / state_hash（确定性 hash 链）
-│   ├── mod_manager.cpp / mod_dependency.cpp   # Mod 扫描 + 拓扑排序 + 循环检测
-│   ├── registry_builder.cpp / registry_provider.h  # 注册表构建 / 12 模块统一 API
-│   └── merge_patch.h / builtin_provider.cpp / mod_provider.cpp   # 字段级合并 / 内置·Mod 数据源
+│   ├── 框架            node.cpp · node.h · object.h · scene_tree.cpp · scene_tree.h
+│   ├── 输入/日志        input_map.cpp · input_map.h（按键唯一来源）· logger.cpp · logger.h · seh_handler.cpp · win_center.cpp · win_center.h
+│   ├── 字体            font_codepoints.h
+│   ├── Mod 管线        mod_manager.cpp · mod_manager.h · mod_dependency.cpp · mod_dependency.h · mod_provider.cpp · mod_provider.h · builtin_provider.cpp · builtin_provider.h · registry_builder.cpp · registry_builder.h · registry_provider.h · merge_patch.h
+│   ├── sim/    (4)     sim_ai.cpp · sim_ai.h（DecisionAgent）· sim_runner.cpp · sim_runner.h
+│   └── replay/ (8)     recorder.cpp · recorder.h · player.cpp · player.h · replay_file.cpp · replay_file.h · state_hash.cpp · state_hash.h（确定性 hash 链）
 │
-├── data/                    (22)       # Def 加载器（JSON → 不可变配置，buff/relic 注册于 registry_builder）
-│   ├── boss_defs / enemy_defs / skill_defs / item_defs / weapon_defs
-│   ├── element_defs / quest_defs / ending_defs / dialogue_defs / meta_node_defs
-│   └── vfx_recipe
+├── data/                    (22)       # Def 加载器（JSON → 不可变配置；buff/relic 注册于 registry_builder）
+│   ├── boss_defs.cpp · boss_defs.h · enemy_defs.cpp · enemy_defs.h · skill_defs.cpp · skill_defs.h
+│   ├── item_defs.cpp · item_defs.h · weapon_defs.cpp · weapon_defs.h · element_defs.cpp · element_defs.h
+│   ├── quest_defs.cpp · quest_defs.h · ending_defs.cpp · ending_defs.h · dialogue_defs.cpp · dialogue_defs.h
+│   └── meta_node_defs.cpp · meta_node_defs.h · vfx_recipe.cpp · vfx_recipe.h
 │
-├── game/                    (178)      # 游戏逻辑（分层子模块）
-│   ├── scenes/              (14)       # 7 场景：title / game / floor_select / tutorial / death / victory / credits
-│   ├── scene/                (6)       # GameScene 拆分：game_scene_input / combat / interaction
-│   ├── director/            (10)       # 5 Director：boss_system / gameplay / presentation / game_flow / mirror_combat
-│   ├── entities/            (18)       # player / monster / boss / item / skill / inventory / combat_stats / ai
-│   ├── systems/             (27)       # combat_system / hit_detection / weapon_executor / projectile_factory / vfx_server / team_coordinator / attack·skill_evolution / game_renderer / floor_manager
-│   ├── world/               (34)       # dungeon_generator（BSP）/ game_map / biome / landmark / encounter / special_room / quest_manager / npc_system / rule_chain / event_system / world_state / flow_director / growth_curve
-│   ├── boss/                (18)       # 12 子系统：behavior / evolution / narrative / cinematic / encounter / replay / timeline / command / arena
-│   ├── combat/ components/   (4)       # element_resolver / element_component（元素核心 G10）
-│   ├── core/                 (4)       # event_bus / event_types（45 事件）/ service_locator
-│   ├── rendering/ resources/ (4)       # sprite_renderer（atlas + 程序化像素）/ resource_manager（字体/纹理缓存）
-│   ├── audio/                (6)       # wave_synth（程序化合成）/ bgm_engine / audio_server
-│   ├── save/                 (2)       # save_manager（v3 文本格式）
-│   ├── ai/player_behavior/   (8)       # 玩家行为采集（镜像 AI 数据源：recorder / analyzer / habit_profile）
-│   └── types/ tutorial/      (8)       # 共享类型（combat/boss/weapon/meta/story/world）/ 教程
+├── game/                    (178)      # 游戏逻辑
+│   ├── 顶层    (15)     player_controller.cpp · player_controller.h · meta_progression.cpp · meta_progression.h · relic_progression.cpp · relic_progression.h · ending_director.cpp · ending_director.h · build_score.cpp · build_score.h · config.cpp · config.h · build_tag.h · camera_director.h · combat_feel.h
+│   ├── scenes/ (14)     title_scene.cpp · title_scene.h · game_scene.cpp · game_scene.h（主场景 2000+ 行）· floor_select_scene.cpp · floor_select_scene.h · tutorial_scene.cpp · tutorial_scene.h · death_scene.cpp · death_scene.h · victory_scene.cpp · victory_scene.h · credits_scene.cpp · credits_scene.h
+│   ├── scene/   (6)     game_scene_input.cpp · game_scene_input.h · game_scene_combat.cpp · game_scene_combat.h · game_scene_interaction.cpp · game_scene_interaction.h
+│   ├── director/ (10)   boss_system_director.cpp · boss_system_director.h · gameplay_system_director.cpp · gameplay_system_director.h · presentation_system_director.cpp · presentation_system_director.h · game_flow_director.cpp · game_flow_director.h · mirror_combat_director.cpp · mirror_combat_director.h
+│   ├── entities/ (18)   entity.cpp · entity.h · player.cpp · player.h · monster.cpp · monster.h · boss.cpp · boss.h · item.cpp · item.h · skill.cpp · skill.h · inventory.cpp · inventory.h · combat_stats.cpp · combat_stats.h · ai.cpp · ai.h（MonsterAI + 9 原型）
+│   ├── systems/ (27)    combat_system.cpp · combat_system.h · combat_coordinator.cpp · combat_coordinator.h · hit_detection.cpp · hit_detection.h · weapon_executor.cpp · weapon_executor.h · weapon_component.cpp · weapon_component.h · projectile_factory.cpp · projectile_factory.h · vfx_server.cpp · vfx_server.h · game_renderer.cpp · game_renderer.h · floor_manager.cpp · floor_manager.h · team_coordinator.cpp · team_coordinator.h · attack_evolution.cpp · attack_evolution.h · attack_evolution_state.h · skill_evolution.cpp · skill_evolution.h · interaction_handler.cpp · interaction_handler.h
+│   ├── world/   (34)    dungeon_generator.cpp · dungeon_generator.h（BSP）· game_map.cpp · game_map.h · biome.cpp · biome.h · landmark.cpp · landmark.h · encounter.cpp · encounter.h · special_room.cpp · special_room.h · quest_manager.cpp · quest_manager.h · npc_system.cpp · npc_system.h · relationship_system.cpp · relationship_system.h · rule_chain.cpp · rule_chain.h · event_system.cpp · event_system.h · world_state.cpp · world_state.h · flow_director.cpp · flow_director.h · floor_config.cpp · floor_config.h · floor_narrative.cpp · floor_narrative.h · growth_curve.cpp · growth_curve.h · world_reaction.cpp · world_reaction.h
+│   ├── boss/   (18)     boss_behavior.cpp · boss_behavior.h · boss_evolution.cpp · boss_evolution.h · boss_narrative.cpp · boss_narrative.h · boss_cinematic.cpp · boss_cinematic.h · boss_encounter.cpp · boss_encounter.h · boss_replay.cpp · boss_replay.h · boss_timeline.cpp · boss_timeline.h · boss_command.cpp · boss_command.h · arena_manager.cpp · arena_manager.h
+│   ├── combat/  (2)     element_resolver.cpp · element_resolver.h
+│   ├── components/ (2)  element_component.cpp · element_component.h
+│   ├── core/    (4)     event_bus.cpp · event_bus.h · event_types.h（45 事件）· service_locator.h
+│   ├── rendering/ (2)   sprite_renderer.cpp · sprite_renderer.h（atlas + 程序化像素）
+│   ├── resources/ (2)   resource_manager.cpp · resource_manager.h（字体/纹理/JSON 缓存）
+│   ├── audio/   (6)     wave_synth.cpp · wave_synth.h（程序化合成）· bgm_engine.cpp · bgm_engine.h · audio_server.cpp · audio_server.h
+│   ├── save/    (2)     save_manager.cpp · save_manager.h（v3 文本格式）
+│   ├── ai/player_behavior/ (8)  player_action.h · player_behavior_recorder.cpp · player_behavior_recorder.h · player_behavior_analyzer.cpp · player_behavior_analyzer.h · player_habit_profile.cpp · player_habit_profile.h · player_behavior_data.h
+│   ├── types/   (6)     combat_types.h · boss_types.h · weapon_types.h · meta_types.h · story_types.h · world_types.h
+│   └── tutorial/ (2)    tutorial_guide.cpp · tutorial_guide.h
 │
 ├── ai/                      (43)       # AI 研究层
-│   ├── agents/               (3)       # ai_agent / bt_agent（行为树驱动玩家）
-│   ├── behavior_tree/        (8)       # selector / sequence / condition / action / blackboard / move_to_target
-│   ├── mcts/                 (8)       # mcts_search（UCT）/ simulation_state（深克隆）/ combat_evaluator
-│   ├── rl/                   (9)       # environment（Gym-like）/ observation（7 维）/ q_agent / random_agent / rl_runner
-│   ├── mirror/              (13)       # mirror_agent / behavior_clone_table / tactical_chain_table / online_adaptive_policy / mirror_tuning / rolling_accuracy
-│   └── navigation/           (2)       # pathfinder（A*）
+│   ├── agents/         (3)  ai_agent.h · bt_agent.cpp · bt_agent.h
+│   ├── behavior_tree/  (8)  bt_node.h · bt_selector.h · bt_sequence.h · bt_condition.h · bt_action.h · bt_move_to_target.h · behavior_tree.h · blackboard.h
+│   ├── mcts/           (8)  mcts_node.h · mcts_search.cpp · mcts_search.h · simulation_state.cpp · simulation_state.h · combat_evaluator.cpp · combat_evaluator.h · action.h
+│   ├── rl/             (9)  environment.cpp · environment.h（Gym-like）· observation.cpp · observation.h（7 维）· q_agent.cpp · q_agent.h · random_agent.cpp · random_agent.h · rl_runner.cpp
+│   ├── mirror/         (13) mirror_agent.cpp · mirror_agent.h · behavior_clone_table.cpp · behavior_clone_table.h · tactical_chain_table.cpp · tactical_chain_table.h · online_adaptive_policy.cpp · online_adaptive_policy.h · rolling_accuracy.cpp · rolling_accuracy.h · mirror_tuning.h · mirror_debug_stats.cpp · mirror_debug_stats.h
+│   └── navigation/     (2)  pathfinder.cpp · pathfinder.h（A*）
 
 tests/                      (34 条目)  # GoogleTest，按模块分目录
 resources/                             # 20+ JSON 配置（enemies/skills/relics/bosses/weapons/elements/biomes/encounters/dialogues/quests/endings/…）+ world/ 三章子目录
