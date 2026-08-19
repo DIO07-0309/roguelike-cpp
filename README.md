@@ -94,87 +94,50 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 
 ---
 
-## 系统架构
+## 技术栈与专业技术
 
-### 分层与依赖（单向，无循环）
+### 技术栈
 
-```
-JSON 资源 ──→ Data Registry ──→ Factory/Manager ──→ Runtime 对象 ──→ Gameplay 系统 ──→ EventBus ──→ Presentation ──→ Scene 层
-                        ↑                                                     │
-                        └────────────── SaveManager（读取 Runtime 状态）───────┘
-```
-
-| 层 | 目录 | 职责 |
-|------|------|------|
-| `src/core/` | 25 文件 | 引擎框架（SceneTree/InputMap/Logger）+ sim 模拟器 + replay + Mod 管线 |
-| `src/data/` | 22 文件 | 12 个 Def 结构 + 加载器（`load_/get_/get_all_/is_loaded` 统一 API） |
-| `src/game/` | 178 文件 | 实体/系统/世界/场景/Director/音频/存档 |
-| `src/ai/` | 43 文件 | mirror(13) / rl(9) / behavior_tree(8) / mcts(8) / agents(5) |
-
-关键原则：
-
-- **Def ≠ Runtime**：Def（JSON 不可变、无 Raylib 依赖、无函数指针、Registry 只读） vs Runtime（C++ 可变、`virtual execute()`、Manager 持有）
-- **Manager 无状态**：协调者只读状态 + 发 EventBus，不持有业务数据
-- **边界规则**：Gameplay → EventBus ✅ 但不引用 UI 对象；Presentation 订阅事件但不改 Gameplay；Gameplay 不知道 Renderer 存在
-- **Architecture Freeze**（禁止重构）：Object/Node/SceneTree、InputMap、EventBus/ServiceLocator、CombatSystem 伤害公式、BossAI 状态机、BSP 生成器、GameFlowDirector 状态机、SaveManager 核心格式（`docs/ARCHITECTURE.md` 第 9 节）
-
-### GameScene 组合（5 个 Director）
-
-GameScene 不继承 Director，全部组合持有（`game_scene.h:203-211`）：
-
-| Director | 子系统/职责 |
+| 类别 | 技术 |
 |------|------|
-| **BossSystemDirector** | 12 子系统：narrative / evolution / behavior / skill_queue / arena / encounter / replay_mem / battle_report / cinematic / timeline / command / modifier_hook + F10 领域状态机 + F15 MirrorAgent 与 MirrorCombatDirector |
-| **GameplaySystemDirector** | 非 Boss 逻辑：world_state（Flags+Counters）/ story / rels（NPC 好感）/ quest_mgr（12 任务）/ ending_dir（5 结局）/ run_stats |
-| **PresentationSystemDirector** | 纯表现：damage_floats / shake / freeze / hit_flash / room_msg / BuildTheme（VFX·Camera·ScreenFX·Audio 四类调制）/ boss_intro / floor 入场 |
-| **GameFlowDirector** | 12 状态生命周期：TITLE→NEW_GAME→ENTER_FLOOR→PLAYING→BOSS_INTRO→BOSS_FIGHT→FLOOR_CLEAR→BOSS_DEAD→PLAYER_DEAD→GAME_CLEAR→ENDING→CREDITS→RETURN_TITLE |
-| **PlayerController** | 玩家输入集中：移动/攻击/技能/拾取/交互/背包（`player_controller.cpp`） |
+| 语言 | C++17（`unique_ptr` / `shared_ptr` / `std::optional` / `enum class`），组合优于继承，函数 ≤40 行规范 |
+| 图形/输入 | Raylib 5.0（窗口/绘制/输入/音频），sprite atlas + 程序化像素占位 |
+| JSON | nlohmann/json（header-only），20+ 配置文件全数据驱动 |
+| 构建 | CMake 3.16+ + CMakePresets + MinGW（UTF-8 编译标志），Release/Debug + 测试三配置 |
+| 测试 | GoogleTest（34 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
+| Python 工具 | `tools/`：world_validator（JSON 交叉引用）/ extract_chars（中文字体码点） |
 
-实体均为组合：`Player = Entity + CombatStats + Inventory + SkillManager + ComboState + AttackEvolutionState + Weapon + Element`；`Monster = Entity + CombatStats + MonsterAI + TeamRole + instance_id`。
+### 工程与架构技术
 
-### 数据驱动管线（JSON → Registry → 运行时）
+- **数据驱动 + Def/Runtime 分离** — JSON 不可变配置 ≠ C++ 可变状态；Registry 只读查询（`load_/get_/get_all_/is_loaded` 统一 API）；20+ JSON → 12 模块加载器 → 运行时
+- **Mod 热插拔** — `IRegistryProvider` 优先级链 + MergeMode{Skip/Replace/**MergePatch** 字段级合并} + 依赖**拓扑排序** + 循环检测 + `mod_id:entry_id` 命名空间隔离
+- **事件驱动解耦** — EventBus 45 事件、轻量载荷 `{type,sender,int,float,str}`、按 owner 批量注销；Gameplay→EventBus→Presentation 单向流（Gameplay 不引用 UI）
+- **组合式 Director** — GameScene 组合 5 Director：Boss（12 子系统）/ Gameplay（world_state/quest/ending）/ Presentation（shake/freeze/BuildTheme）/ Flow（12 态生命周期）/ PlayerController；零继承
+- **确定性游戏技术** — `CountingRng`（mt19937 + 掷骰计数）· 种子公式 `seed_start + run*1234567` · **replay hash 链**逐帧校验（mixer 黄金比例常量）· 指针键 → instance_id 防跨进程分叉（Q3.14 对拍逐字节一致）
+- **存档兼容工程** — v1→v3 追加式字段 + `getV` 默认值 + 旧技能名映射 + SaveStable 3 验收测试；三份数据独立：save.json（局内）/ meta_save.json（局外成长）/ relic_archive.json（收藏）
+- **内存安全实践** — 全智能指针 + 工厂方法（`spawn_monster`/`boss_factory_create`），无裸 `new`；SEH 异常捕获 → crash.log
+- **中文字体管线** — `extract_chars.py` 精确码位扫描（1769 码点）→ 生成字体图集 → `GuiFont::DrawTextCH()`（Raylib DrawText 不支持中文）
 
-`main.cpp` 启动顺序：
+### 算法与 AI 技术
 
-```
-CLI 解析 → sim 前置配置(静音/只读存档) → SceneTree 创建
-→ RegistryBuilder.add(BuiltinProvider, priority=0)
-→ 注册 12 模块加载器（buff/relic/enemy/boss/dialogue/quest/ending/meta/skill/item/weapon/element）
-→ ModManager.scan("mods") → DependencyResolver 拓扑排序 + 循环检测 → 按序 add_provider
-→ build_all() → BuildRecord 日志 + ValFinding 校验 → g_meta.load_from_defs + VFX/Biome/Landmark/Encounter 加载
-```
+- **BSP 二分划分** 随机地牢 + Seed 驱动确定性（同种子同地图，跨进程可对拍）
+- **行为树** — Selector/Sequence/条件/动作 + 黑板（BTAgent 根 Selector 8 节点优先序）
+- **MCTS** — UCT 搜索（C=1.414，100 迭代，深度 10，回溯折扣 0.95）+ SimulationState 深克隆
+- **Q-Learning** — 7 维观测离散化 + epsilon 退火 0.12→0.005 + 4 风格 Q 表 + RL 自博弈（95%+ 收敛）
+- **n-gram 序列建模** — 11 符号 3-gram 计数表（键 `s0*121+s1*11+s2`）+ 2-gram 分母降级链
+- **Thompson 采样** — Beta 后验多臂赌博机在线学习（命中奖励持续更新）
+- **状态桶离散化** — `d<距离>:h<血量>:s<技能>` 三维聚类 → 行为克隆预测（exact→fuzzy→profile→default 降级）
+- **A\***（priority_queue + Manhattan 启发式）生产测试双用 + **BFS** 危险避让（熔岩/毒池/尖刺/木桶）
+- **Headless 确定性模拟器** — 定步长 1/60 批量评估（500 局 53s，9.4 局/s/核），胜率/死亡分布/Build 评级自动报告
 
-- **MergeMode 三种合并语义**：`Skip`（同 id 跳过）/ `Replace`（同 id 覆盖）/ `MergePatch`（`__patch` 标记的字段级递归合并）
-- **Mod 命名空间**：`mod_id:entry_id` 前缀隔离，Mod 优先级来自 mod.json manifest（默认 100，内置 0）
-- **World Validator**（`tools/world_validator.py`，4 类检查）：① 跨文件交叉引用（biome→enemy_pool/boss_id/bgm、dialogue next 闭环、floor_config 1-15 范围）② 冒号 DSL 校验（`spawn:orc`/`buff:poison` 等 kind 白名单 + 引用存在性）③ 内部引用（elite_buffs/on_hit/skill.triggers/buff_id）④ 覆盖完整性告警（每 biome 必有 enemy_pool/boss_id/landmarks≥2/encounters）；另有 VFX recipe 13 kind/17 color 白名单 + 敌人投射物参数范围检查
+### 表现与内容技术
 
-### 事件总线（EventBus，45 事件）
+- **程序化音频合成** — wave_synth 波形合成 14 SFX + 4 BGM（零音频素材），交叉淡入 + Boss Phase2 cue
+- **VFX 图元系统** — 10 基础图元（ring/beam/lightning/explosion/slash/smoke/spark/aura/flash/shockwave）+ JSON recipe 派发 + BuildTheme 主题调制（VFX/Camera/ScreenFX/Audio 四类）
+- **打击感工程** — HitStop 冻结帧 / 震屏 / 伤害数字 / 受击红闪 / 连击评分（CameraDirector 常量调参）
+- **数值验证流水线** — 胜率目标区间 6-10% + 500 局回归 + 死亡分布监控 + World Validator 4 类检查
 
-轻量载荷 `GameEvent{type, sender, int_val, float_val, str_val}`，单例 `EventBus::inst()`，订阅者按 owner 批量注销（GameScene 析构统一 unregister）。分类：玩家 4 / 怪物 3 / Boss 4 / 物品圣物 3 / 进化 3 / Buff 2 / 特殊房间 2 / NPC 2 / 任务 2 / 楼层 2 / 武器 4 / 元素 7 / Boss 领域 3 / 游戏结局 4。
-
-订阅范例：PresentationSystemDirector 订阅 LEVEL_UP/MONSTER_DIED/EVOLVED/QUEST_COMPLETE → 弹 toast；RuleChainManager 订阅 BOSS_DEAD → 规则链推进；GameScene 静态订阅 7 个 ELEMENT_* → 排队元素 VFX。
-
-### 存档架构（三份独立数据）
-
-| 文件 | 内容 |
-|------|------|
-| `saves/save.json`（v3，key:value 文本） | core/v1（player/floor/seed/special）· v2（atl/rule_counters）· v3（qst/end）· G10.1 元素（elem）· M4e 镜像记忆（mra/mrb 各 72 float）· wpn/weapon |
-| `saves/meta_save.json`（JSON） | 跨局永久：runs/souls/knowledge/memory/nodes（MetaProgression 10 天赋节点，sim 模式 `g_readonly`） |
-| `saves/relic_archive.json` | 跨局圣物收藏：obtained_count/最高稀有度/mastery(0-500)/套装加成 |
-
-兼容策略：`getV(key, default)` 缺字段取默认；旧技能名映射（`Slash`→`slash`）；旧 act 格式（1 逗号）兼容解析；v1→v3 全链路 SaveStable 验收测试覆盖。
-
-### sim 架构与确定性
-
-- **流程**：`--sim N [--sim-seed S]` → SimRunner 接管 → 直接建 GameScene + `new_game()`（跳过元素选择固定火系）→ 隐藏窗口定步长 1/60 逐帧 `tree.process_frame` → `_collect_sim_stats()` 构造 RunResult → 批量完成出 BalanceReport（JSON 导出：胜率/平均楼层/Boss 击杀率/死亡分布[16]/Build 评级/圣物 TOP10/威胁度）
-- **确定性三支柱**：`CountingRng`（mt19937 + 掷骰计数）· 种子公式 `seed_start + run*1234567` · Replay hash 链（`compute_state_hash` 逐帧链式 + `verify_hash_chain` 对拍）；历史修复：指针键 → instance_id/uint64（Q3.14 三处跨进程分叉）
-- **AI 驱动玩家**：`_is_action_just_pressed()` 在 sim 下询问 BTAgent/DecisionAgent 而非键盘，输出动作字符串 confirm/descend/attack/skill_1-4/pickup/use_potion/move_*
-
-### 渲染管线
-
-帧循环 `_process`（game_scene.cpp:447）：输入 → Boss 演出/时停检查 → game_time → sim 统计 → Boss Phase2/LastStand/领域 → Build Fusion → buff 逐帧 → 元素 VFX 队列 → Arena 环境对象（木桶引信/毒池/尖刺/图腾）→ 熔岩灼烧 → 玩家控制 + 怪物 AI → 武器/投射物结算 → FlowDirector/任务/对话 → presentation.tick。
-
-`_render` 顺序：清屏 → 相机（WorldReaction 色调 + 震屏偏移）→ 地图 → 地面物 → 实体 → VFX → Boss 领域 → 投射物（预警圈/弹体）→ 伤害数字 → 受击红屏 → HUD → 调试面板 → 章节入场 → 时停 overlay。VFX 生命周期：`active_effects` 每帧 elapsed += dt，超时移除；9+1 基础图元（ring/beam/lightning/explosion/slash/smoke/spark/aura/flash/shockwave）+ JSON recipe 派发。中文渲染：生成字体图集（1769 码点）+ `GuiFont::DrawTextCH()`。
+> 分层依赖图与边界规则等权威架构参考：`docs/ARCHITECTURE.md`（唯一权威文档）
 
 ---
 
@@ -321,17 +284,53 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 ## 项目结构
 
 ```
-src/
-├── core/          # 引擎框架 + sim 模拟器 (sim_ai/sim_runner) + replay + Mod
-├── game/          # 实体/战斗/世界/场景/director/音频/存档
-├── ai/            # 行为树/导航(A*)/MCTS/RL/MirrorAgent
-├── data/          # JSON 加载器 (20+ 配置)
-├── main.cpp       # 入口 + CLI (--sim/--rl-train/--record/--mods)
-tests/             # GoogleTest 34 条目
-resources/         # 20+ JSON 配置（数据骨干）
-tools/             # world_validator.py / extract_chars.py
-docs/              # 设计文档（ARCHITECTURE / G4_PLATFORM / WORLD_LORE / D1_GAMEPLAY …）
-vendor/            # raylib 5.0 + nlohmann/json
+src/                                    # 281 源文件（127 cpp + 154 h）
+├── main.cpp                            # 入口 + CLI（--sim / --sim-ai / --rl-train / --rl-mirror / --record / --replay / --sim-build / --mods）
+│
+├── core/                    (25)       # 引擎框架 + 模拟器 + 回放 + Mod 管线
+│   ├── node.h / scene_tree.h           # 场景树框架（Object/Node）
+│   ├── input_map.cpp                   # 按键映射唯一来源（setup_defaults）
+│   ├── logger.cpp / seh_handler.cpp    # 日志 / Windows SEH 异常捕获
+│   ├── sim/                  (4)       # sim_ai.cpp（DecisionAgent 评分决策）/ sim_runner.cpp（批量评估）
+│   ├── replay/               (8)       # recorder / player / replay_file / state_hash（确定性 hash 链）
+│   ├── mod_manager.cpp / mod_dependency.cpp   # Mod 扫描 + 拓扑排序 + 循环检测
+│   ├── registry_builder.cpp / registry_provider.h  # 注册表构建 / 12 模块统一 API
+│   └── merge_patch.h / builtin_provider.cpp / mod_provider.cpp   # 字段级合并 / 内置·Mod 数据源
+│
+├── data/                    (22)       # Def 加载器（JSON → 不可变配置，buff/relic 注册于 registry_builder）
+│   ├── boss_defs / enemy_defs / skill_defs / item_defs / weapon_defs
+│   ├── element_defs / quest_defs / ending_defs / dialogue_defs / meta_node_defs
+│   └── vfx_recipe
+│
+├── game/                    (178)      # 游戏逻辑（分层子模块）
+│   ├── scenes/              (14)       # 7 场景：title / game / floor_select / tutorial / death / victory / credits
+│   ├── scene/                (6)       # GameScene 拆分：game_scene_input / combat / interaction
+│   ├── director/            (10)       # 5 Director：boss_system / gameplay / presentation / game_flow / mirror_combat
+│   ├── entities/            (18)       # player / monster / boss / item / skill / inventory / combat_stats / ai
+│   ├── systems/             (27)       # combat_system / hit_detection / weapon_executor / projectile_factory / vfx_server / team_coordinator / attack·skill_evolution / game_renderer / floor_manager
+│   ├── world/               (34)       # dungeon_generator（BSP）/ game_map / biome / landmark / encounter / special_room / quest_manager / npc_system / rule_chain / event_system / world_state / flow_director / growth_curve
+│   ├── boss/                (18)       # 12 子系统：behavior / evolution / narrative / cinematic / encounter / replay / timeline / command / arena
+│   ├── combat/ components/   (4)       # element_resolver / element_component（元素核心 G10）
+│   ├── core/                 (4)       # event_bus / event_types（45 事件）/ service_locator
+│   ├── rendering/ resources/ (4)       # sprite_renderer（atlas + 程序化像素）/ resource_manager（字体/纹理缓存）
+│   ├── audio/                (6)       # wave_synth（程序化合成）/ bgm_engine / audio_server
+│   ├── save/                 (2)       # save_manager（v3 文本格式）
+│   ├── ai/player_behavior/   (8)       # 玩家行为采集（镜像 AI 数据源：recorder / analyzer / habit_profile）
+│   └── types/ tutorial/      (8)       # 共享类型（combat/boss/weapon/meta/story/world）/ 教程
+│
+├── ai/                      (43)       # AI 研究层
+│   ├── agents/               (3)       # ai_agent / bt_agent（行为树驱动玩家）
+│   ├── behavior_tree/        (8)       # selector / sequence / condition / action / blackboard / move_to_target
+│   ├── mcts/                 (8)       # mcts_search（UCT）/ simulation_state（深克隆）/ combat_evaluator
+│   ├── rl/                   (9)       # environment（Gym-like）/ observation（7 维）/ q_agent / random_agent / rl_runner
+│   ├── mirror/              (13)       # mirror_agent / behavior_clone_table / tactical_chain_table / online_adaptive_policy / mirror_tuning / rolling_accuracy
+│   └── navigation/           (2)       # pathfinder（A*）
+
+tests/                      (34 条目)  # GoogleTest，按模块分目录
+resources/                             # 20+ JSON 配置（enemies/skills/relics/bosses/weapons/elements/biomes/encounters/dialogues/quests/endings/…）+ world/ 三章子目录
+tools/                                 # world_validator.py / extract_chars.py / replace_methods.py
+docs/                                  # ARCHITECTURE / G4_PLATFORM_BIBLE / WORLD_LORE / D1_GAMEPLAY / ART_*
+vendor/                                # raylib 5.0（include + lib）+ nlohmann/json（header-only）
 ```
 
 ---
