@@ -1,3 +1,15 @@
+# v0.9.32 — v1.0.0 Release Standard 验收 (五项 Stable 全部达标) (2026-08-19)
+
+## 五项 Stable 冻结验收
+- **Save Stable**: 新增 `SaveStable.*` 3 验收测试 (v1 旧档兼容/坏条目容错/全字段 roundtrip); **修复真实 bug** — elem 字段写元素名 ("fire") 而读端 atoi=0, 元素类型读档永久丢失, 改写 int (M4b-fix)
+- **API Stable**: 对外契约冻结 2+ 版本 (存档 v3 格式/Registry MergeMode/Mod 管线/Replay hash 链)
+- **Mod Stable**: mods scan + ModProvider + MergePatch + DependencyResolver 全链路 + registry 引用完整性测试
+- **Regression Stable**: Q3.14 确定性对拍 (逐字节一致) + 500 局平衡回归 8.0% (区间 6-10%) + 37 gtest 全绿
+- **Performance Stable**: sim 500 局并行 53s / 单核 ~9.4 局/s / 全量测试 0.46s
+- 验收报告: `docs/V1_0_0_ACCEPTANCE.md`
+
+---
+
 # v0.9.31 — M4b: 地狱火魔领域作战 (弹幕演出 + 机制阶段 + Boss 房地形) (2026-08-19)
 
 ## M4b.1 弹幕图案化 (茶杯头式)

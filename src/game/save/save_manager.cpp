@@ -165,9 +165,9 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     }
     fprintf(f, "\n");
 
-    // ── G10.1: Element Core ──
-    fprintf(f, "elem:%s,%d,%d,%d\n",
-        element_type_name(player->element.type),
+    // ── G10.1: Element Core (M4b-fix: 写 int 而非名字 — atoi("fire")=0 曾致元素类型读档丢失) ──
+    fprintf(f, "elem:%d,%d,%d,%d\n",
+        (int)player->element.type,
         player->element.level,
         player->element.experience,
         player->element.initialized ? 1 : 0);
