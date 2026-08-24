@@ -132,10 +132,10 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 
 - **BSP 二分划分** 随机地牢 + Seed 驱动确定性（同种子同地图，跨进程可对拍）
 - **行为树** — Selector/Sequence/条件/动作 + 黑板（BTAgent 根 Selector 8 节点优先序）
-- **MCTS** — UCT 搜索（C=1.414，100 迭代，深度 10，回溯折扣 0.95）+ SimulationState 深克隆
-- **Q-Learning** — 7 维观测离散化 + epsilon 退火 0.12→0.005 + 4 风格 Q 表 + RL 自博弈（95%+ 收敛）
+- **MCTS** — UCT 搜索（C=1.414，100 迭代，深度 10，奖励 sigmoid 归一化）+ SimulationState 深克隆
+- **Q-Learning** — 观测离散化 Q 表 + epsilon 退火 0.12→0.005 + 学习率按访问衰减 + 终局 done 处理 + RL 自博弈（95%+ 收敛）
 - **n-gram 序列建模** — 11 符号 3-gram 计数表（键 `s0*121+s1*11+s2`）+ 2-gram 分母降级链
-- **Thompson 采样** — Beta 后验多臂赌博机在线学习（命中奖励持续更新）
+- **Thompson 采样** — Beta 后验多臂赌博机在线学习（命中奖励持续更新 + 全臂折扣遗忘防先验爆炸）
 - **状态桶离散化** — `d<距离>:h<血量>:s<技能>` 三维聚类 → 行为克隆预测（exact→fuzzy→profile→default 降级）
 - **A\***（priority_queue + Manhattan 启发式）生产测试双用 + **BFS** 危险避让（熔岩/毒池/尖刺/木桶）
 - **Headless 确定性模拟器** — 定步长 1/60 批量评估（500 局 53s，9.4 局/s/核），胜率/死亡分布/Build 评级自动报告
@@ -159,8 +159,8 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 |------|------|------|
 | **DecisionAgent** | 评分式决策（`src/core/sim/sim_ai.cpp`） | attack/skill/move/pickup/heal 五类计分取最大；BuildType 12 流派感知（攻击/走位/搜刮权重随流派调整）；`--sim-ai decision`（默认） |
 | **BTAgent** | 行为树（`src/ai/agents/bt_agent.cpp` + `src/ai/behavior_tree/` 节点库） | 根 Selector 8 子节点优先序 — BossIntro→确认 / Stairs→下楼 / 低血→自愈 / BossNear→攻击 / AoE / EnemyNear / 拾取 / Wander 兜底；BTNode/Selector/Sequence/Condition/Action/Blackboard 结构，16 测试 |
-| **MCTS** | UCT 搜索（`src/ai/mcts/`） | C=1.414，100 迭代，深度上限 10，回溯折扣 0.95，终局 ±1000；SimulationState 深克隆模拟对局；16 测试；`--sim-ai mcts` |
-| **Q-Learning** | RL 环境（`src/ai/rl/`） | Gym-like API（reset/step/reward）+ Observation 7 维 → Q 表离散化 + RandomAgent/QAgent；17 测试；`--rl-test/train` |
+| **MCTS** | UCT 搜索（`src/ai/mcts/`） | C=1.414，100 迭代，深度上限 10，奖励 sigmoid 归一化，终局 ±1000；SimulationState 深克隆模拟对局（含真实冷却快照）；16 测试；`--sim-ai mcts` |
+| **Q-Learning** | RL 环境（`src/ai/rl/`） | Gym-like API（reset/step/reward + done）+ 观测离散化 Q 表（学习率按访问衰减）+ RandomAgent/QAgent；17 测试；`--rl-test/train` |
 
 ### MirrorAgent 详解（F15 镜像学习核心）
 
@@ -173,7 +173,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 | **P3 进化** | 同桶命中 10 次 / 准确率 ≥0.70 / 玩家 HP <0.35 危险线 | 在线学习：reward=命中，Thompson 多臂持续探索 |
 
 - **决策接口**：`recommend_action`（Thompson 采样，phase<2 返回 -1）/ `report_outcome`（Beta 后验更新）/ `should_interrupt_skill` / `should_pressure_close` / `predict_next_action` / `recommend_distance`
-- **跨局记忆**：alpha+beta 144 float（桶-major）→ 存档 `mra:`/`mrb:` → 新局旧后验叠加为先验（`inject_mirror_memory`）
+- **跨局记忆**：alpha+beta 各 36 float（9 桶 × 4 臂，桶-major，共 72）→ 存档 `mra:`/`mrb:` → 新局旧后验叠加为先验（`inject_mirror_memory`）；导出时扣除本局画像先验 + 全臂折扣遗忘 λ=0.995 防止后验无界增长（v0.9.34 MP1）
 - **漂移自适应**：策略漂移 >0.5 时克隆置信门槛 0.50→0.75（步进 0.25）
 - **战斗快照** MirrorBattleState：boss_hp_pct / player_hp_pct / dist_tiles / player_attacking / player_using_skill / boss_can_attack / boss_in_domain / player_skills_ready
 
@@ -189,11 +189,13 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 | 战术链 | TacticalChainTable（`tactical_chain_table.h`） | 11 符号（SKILL_0-3 / MOVE_×4 / COMBO_1-3）3-gram 计数表（键 `s0*121+s1*11+s2`）+ 2-gram 分母 + 单前缀；降级链 3-gram→2-gram→1-gram |
 | RL | QAgent（4 风格 Q 表） | 离线训练 95%+ 收敛，运行时按玩家画像加载，exploit 为主 |
 | 克隆 | BehaviorCloneTable（`behavior_clone_table.h`） | PlayerIntention 7 类（ATTACK/SKILL/DODGE/HEAL/ADVANCE/RETREAT/IDLE）；CloneContext 状态桶 `d<dist>:h<hp>:s<skills>` — dist 5 档（<2/2-4/4-8/8-14/≥14）· hp 4 档（<25%/25-50%/50-80%/≥80%）· skill 0-3；降级链 exact→fuzzy→profile→default |
-| Thompson | OnlineAdaptivePolicy | Beta 后验采样，`report_outcome` 持续更新 |
+| Thompson | OnlineAdaptivePolicy | Beta 后验采样，`report_outcome` 持续更新 + 全臂折扣遗忘 λ=0.995（非平稳环境恢复探索） |
 
 实测仲裁分布（v0.9.30，500 局）：`[Clone:0 ML:0 RL:11/25/26 Tho:0]` — RL 完全接管。
 
 ### RL 训练管线
+
+> v0.9.34 起训练管线含终局 done 处理 + 学习率衰减（B1/B2）与增量击杀奖励（B3）；下列收敛数字为旧管线历史产物，重训后数值会变化。
 
 - `--rl-train N`：通用 Q 表（`saves/rl_qtable.json`，~2380 条目）
 - `--rl-mirror N`：镜像 Boss 自博弈，4 风格 Q 表（`saves/rl_mirror_q_<STYLE>.json`）
@@ -231,8 +233,8 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 
 ### 存档记忆（跨局学习）
 
-- 镜像先验 144 float（桶-major）写入存档 `mra:`/`mrb:` 字段（M4e）
-- 新局开始自动注入 → 旧后验叠加为新先验（`inject_mirror_memory`）
+- 镜像记忆 alpha+beta 各 36 float（9 桶 × 4 臂）写入存档 `mra:`/`mrb:` 字段（M4e）
+- 新局开始自动注入 → 旧后验叠加为先验（`inject_mirror_memory`）；导出扣除当局画像先验 + 折扣遗忘，防后验无界增长（v0.9.34）
 - 克隆门槛自适应：策略漂移 >0.5 时置信门槛 0.50→0.75
 
 ### RL 自博弈（F15.4）
@@ -471,9 +473,9 @@ src/                                    # 281 源文件（127 cpp + 154 h）
 │   │   ├── combat_evaluator.cpp · combat_evaluator.h  # 终局评估（±1000）
 │   │   └── action.h                       # 动作空间
 │   ├── rl/                                # 强化学习（9）
-│   │   ├── environment.cpp · environment.h            # Gym-like 环境（reset/step/reward）
-│   │   ├── observation.cpp · observation.h            # 7 维观测
-│   │   ├── q_agent.cpp · q_agent.h        # Q 表 Agent（epsilon 退火）
+│   │   ├── environment.cpp · environment.h            # Gym-like 环境（reset/step/reward/done）
+│   │   ├── observation.cpp · observation.h            # 观测向量 + 离散化键
+│   │   ├── q_agent.cpp · q_agent.h        # Q 表 Agent（epsilon 退火 + 学习率衰减）
 │   │   ├── random_agent.cpp · random_agent.h          # 随机基线
 │   │   └── rl_runner.cpp                  # 训练主循环（--rl-train/--rl-mirror）
 │   ├── mirror/                            # 镜像学习 Boss（13）
@@ -536,6 +538,7 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | `docs/D1_GAMEPLAY_LOOP_DESIGN.md` | 战斗循环设计 |
 | `docs/G4_PLATFORM_BIBLE.md` | 平台兼容 + v1.0.0 Release Standard |
 | `docs/V1_0_0_ACCEPTANCE.md` | 五项 Stable 验收报告 |
+| `docs/AI_CODE_REVIEW.md` | AI 子系统源码级审查（11 处修复 + 剩余优化路线图） |
 
 ---
 
