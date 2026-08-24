@@ -1,6 +1,6 @@
 # v0.9.34 — AI 系统代码审查修复: 11 处算法正确性 bug (2026-08-25)
 
-> 源起: 全仓 AI 子系统源码级深度审查 (报告 docs/AI_CODE_REVIEW.md 同步桌面), 修复其中经回归验证的 11 处
+> 源起: 全仓 AI 子系统源码级深度审查 (发现与修复记录整理于 docs/AI_LEARNING_GUIDE.md), 修复其中经回归验证的 11 处
 
 ## BTAgent (行为树, `--sim-ai bt`)
 - **P0-1 接线修复**: confirm/descend 动作已创建但从未挂入树 (根节点 push 的是裸 Condition, Selector 命中即短路) — 改为 Sequence{cond, act}, BT agent 首次具备下楼/确认能力

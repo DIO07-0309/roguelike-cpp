@@ -254,7 +254,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 | v0.9.31 | **7.0%** | M4b 地狱火魔领域作战 |
 | v0.9.32 | **8.0%** | 五项 Stable 验收 |
 | v0.9.33 | **10.0%** | 收官体检（Boss 冷却恢复判定后区间上沿） |
-| v0.9.34 | **9.0%** | AI 审查修复 11 处算法 bug（BT 接线/Q-Learning done+学习率/Thompson 先验爆炸/MCTS 归一化，报告 docs/AI_CODE_REVIEW.md） |
+| v0.9.34 | **9.0%** | AI 审查修复 11 处算法 bug（BT 接线/Q-Learning done+学习率/Thompson 先验爆炸/MCTS 归一化，报告 docs/AI_LEARNING_GUIDE.md） |
 
 ### 确定性
 
@@ -538,7 +538,7 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | `docs/D1_GAMEPLAY_LOOP_DESIGN.md` | 战斗循环设计 |
 | `docs/G4_PLATFORM_BIBLE.md` | 平台兼容 + v1.0.0 Release Standard |
 | `docs/V1_0_0_ACCEPTANCE.md` | 五项 Stable 验收报告 |
-| `docs/AI_CODE_REVIEW.md` | AI 子系统源码级审查（11 处修复 + 剩余优化路线图） |
+| `docs/AI_LEARNING_GUIDE.md` | AI 子系统源码级审查（11 处修复 + 剩余优化路线图） |
 
 ---
 
