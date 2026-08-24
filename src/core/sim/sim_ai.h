@@ -118,8 +118,9 @@ public:
     std::string last_best_action() const { return _cached_best; }
 
     // ── G8.3: Build SimulationState from game state ──
+    // Q3.15 (A6 fix): 需要 game_time 计算真实剩余冷却 (原伪造常量导致根节点永久禁用普攻)
     static mcts::SimulationState build_sim_state(
-        const Player* player, const std::vector<Monster*>& monsters);
+        const Player* player, const std::vector<Monster*>& monsters, double game_time);
 };
 
 // ── Backward compat alias ──

@@ -484,6 +484,7 @@ void GameScene::_process(double delta) {
     }
     game_time += dt;
     if (_sim_ai) _sim_ai->set_time(game_time); // Q3.2: AI 技能冷却判定需要当前时间
+    if (_sim_bt) _sim_bt->set_time(game_time); // Q3.15: BT agent 同样需要真实时间 (P0-2 fix)
 
     // Q3.2: sim 真实伤害统计 — 玩家 HP 下降累计 (含毒池等环境伤害)
     if (_sim_mode && player) {

@@ -28,8 +28,10 @@ public:
     mcts::CombatAction select(const mcts::SimulationState& state, uint32_t& seed);
 
     // Q(s,a) ← Q(s,a) + α * (reward + γ*max_a' Q(s',a') - Q(s,a))
+    // Q3.15: done=true 时 target 只等于 reward — 终局不得自举未来价值 (B1 fix)
+    // Q3.15: 有效学习率按 (s,a) 访问次数衰减 α/(1+0.05n) — 满足 Σα²<∞ 收敛条件 (B2 fix)
     void update(const Observation& obs, mcts::CombatAction action,
-                double reward, const Observation& next_obs);
+                double reward, const Observation& next_obs, bool done = false);
 
     // Stats
     size_t table_size() const { return _q.size(); }
@@ -54,6 +56,7 @@ private:
     mcts::CombatAction _best_action(const std::string& obs_key) const;
 
     std::unordered_map<std::string, double> _q;  // key:"obs:action" → q-value
+    std::unordered_map<std::string, int> _sa_visits;  // Q3.15: (s,a) 访问计数 → 学习率衰减
     double _alpha, _gamma, _epsilon;
 };
 

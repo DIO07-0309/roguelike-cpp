@@ -110,6 +110,13 @@ static double evaluate_terminal(const SimulationState& state) {
     return score;
 }
 
+// Q3.15 (A1 fix): 奖励归一化到 [0,1] — UCT 探索常数 C=√2 的理论前提是奖励在该区间。
+// 原始量纲 ±1000 下兄弟节点 Q 差值(数百)永远压过探索项上界(~2.5) → UCT 退化为纯贪心。
+// sigmoid(score/250): 胜≈0.998, 负≈0.002, 中间启发式分数平滑映射, 区分度保留。
+static double normalize_reward(double raw_score) {
+    return 1.0 / (1.0 + std::exp(-raw_score / 250.0));
+}
+
 } // namespace detail
 
 // ═══════════════════════════════════════════════════════════
@@ -127,8 +134,11 @@ CombatAction MCTS::search(const SimulationState& state) {
         // 2. Expansion
         if (!node->is_terminal() && !node->is_fully_expanded()) {
             expand(node);
-            if (!node->children.empty())
-                node = node->children.back().get();
+            if (!node->children.empty()) {
+                // Q3.15 (A2 fix): expand-all 后按迭代序轮换首个模拟起点 —
+                // 原恒取 children.back()(WAIT) 使每个新节点的首轮统计系统性偏向等待分支
+                node = node->children[i % node->children.size()].get();
+            }
         }
         // 3. Simulation
         double reward = simulate(node->state, state.rng.next() + i * 7919u);
@@ -191,15 +201,16 @@ double MCTS::simulate(const SimulationState& state, uint32_t rng_seed) {
         CombatAction a = actions[(rng + sim.depth) % actions.size()];
         detail::apply_action(sim, a, rng);
     }
-    return detail::evaluate_terminal(sim);
+    return detail::normalize_reward(detail::evaluate_terminal(sim));
 }
 
 void MCTS::backpropagate(MCTSNode* leaf, double reward) {
+    // Q3.15 (A3 fix): 标准无折扣回传 — 原 0.95 衰减使不同深度节点的
+    // reward/visits 均值不可比，而 UCT 恰在同一父节点下比较兄弟均值。
     MCTSNode* node = leaf;
     while (node) {
         node->visits++;
         node->reward += reward;
-        reward *= 0.95; // discount toward root
         node = node->parent;
     }
 }

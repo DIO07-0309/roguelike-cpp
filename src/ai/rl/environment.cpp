@@ -94,11 +94,14 @@ StepResult CombatEnvironment::step(mcts::CombatAction action) {
     if (!any_alive) { _state.victory = true; _state.terminal = true; }
     if (!p.alive) _state.terminal = true;
 
-    // Reward: damage dealt - damage taken
+    // Reward: kill bonus (incremental) - HP change penalty - terminal bonuses
+    // Q3.15 (B3 fix): was "+50 per dead monster per step" — a corpse paid out
+    // forever, coupling total return to remaining steps. Now one-shot per kill,
+    // computed from prev_alive vs current alive count.
     double reward = 0;
-    // Damage dealt
-    for (auto& m : _state.monsters)
-        if (!m.alive) reward += 50.0;
+    int alive_now = 0;
+    for (auto& m : _state.monsters) if (m.alive) alive_now++;
+    reward += 50.0 * (prev_alive - alive_now);
     // HP change
     float hp_delta = p.hp - prev_hp;
     if (hp_delta < 0) reward += hp_delta; // penalty for taking damage

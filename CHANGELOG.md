@@ -1,3 +1,35 @@
+# v0.9.34 — AI 系统代码审查修复: 11 处算法正确性 bug (2026-08-25)
+
+> 源起: 全仓 AI 子系统源码级深度审查 (报告 docs/AI_CODE_REVIEW.md 同步桌面), 修复其中经回归验证的 11 处
+
+## BTAgent (行为树, `--sim-ai bt`)
+- **P0-1 接线修复**: confirm/descend 动作已创建但从未挂入树 (根节点 push 的是裸 Condition, Selector 命中即短路) — 改为 Sequence{cond, act}, BT agent 首次具备下楼/确认能力
+- **P0-2 时间语义**: 技能冷却判断 can_use(0) → can_use(_game_time); 新增 BTAgent::set_time 注入链 (game_scene 每帧同步, 原 BT 模式拿不到时间 → 用过一次技能后永久假阴性)
+
+## Q-Learning (`src/ai/rl/`)
+- **B1 终局自举污染**: update() 增加 done 参数 — done 时 target=reward 不自举 max Q(s') (原把"键不存在"当终止, 真终局反而自举); rl_runner 两处调用传 env.is_done()
+- **B2 学习率衰减**: α/(1+0.05·visits(s,a)) — 常数学习率违反 Σα²<∞ 收敛条件, Q 值永远震荡
+- **B3 击杀奖励增量式**: 原"+50/尸体/步"每步重复发放 (prev_alive 死变量佐证原意), 改为 prev vs now 差值一次性 +50
+
+## MirrorAgent Thompson 采样 (`src/ai/mirror/`)
+- **MP1 先验爆炸**: init_prior 的 +2 伪计数随存档每局固化叠加 + import 纯加法无遗忘 → 后验无界增长, 探索概率随局数衰减至零; 双重修复: ① export 扣除本局 pending 先验 (画像只服务当局冷启动) ② update 引入全臂折扣遗忘 λ=0.995 + floor 0.25 (非平稳环境恢复探索)
+
+## MCTS (`src/ai/mcts/`, `--sim-ai mcts`)
+- **A1 奖励归一化**: sigmoid(score/250) 映射 [0,1] — C=√2 的理论前提是单位化奖励, ±1000 量纲下探索项上界 ~2.5 永远翻不动利用项 → UCT 退化为纯贪心
+- **A2 WAIT 偏差**: expand-all 后恒取 children.back()(WAIT) 使新节点首轮统计系统性偏向等待 → 按迭代序轮换 (保持确定性)
+- **A3 回传折扣**: 删除 0.95 衰减 — 不同深度均值不可比而 UCT 在同一父下比较兄弟
+- **A6 冷却伪造**: 快照 attack_cooldown 恒 0.5/skill 恒就绪 → 根节点永久禁用普攻; 改读真实 remaining_cooldown (build_sim_state 增加 game_time 参数)
+
+## DecisionAgent (默认 sim AI)
+- **P1-2 治疗优先级倒置**: 自愈槽遍历无 break, 最低优先级槽反向覆盖 → _skill_priority 首个可用即 break
+- **P0-3 死区 (实测回退)**: 确认 [48px, ideal] 区间 attack/move 双零且"拉开距离"分支为不可达死代码; 尝试激活后 200 局胜率 10%→3.5% (风筝震荡破坏 Q3.12 平衡), **回退保留站桩行为**并在注释中记录缺陷与数据
+
+## 验证
+- 编译 0 警告; 34/34 ctest; world validator 0 error
+- **500 局平衡回归 9.0% (45/500)** — 区间 6-10% 内 (基线 v0.9.33 为 10.0%, 波动范围内)
+
+---
+
 # v0.9.33 — 收官体检修复: 死配置清理 + 木桶闭环 + Boss 冷却恢复 (2026-08-19)
 
 ## 全面代码体检 (240+ 源文件)

@@ -69,20 +69,29 @@ mcts::CombatAction QAgent::select(const mcts::SimulationState& state, uint32_t& 
 }
 
 void QAgent::update(const Observation& obs, mcts::CombatAction action,
-                     double reward, const Observation& next_obs) {
+                     double reward, const Observation& next_obs, bool done) {
     std::string s_key = obs.to_key();
     std::string sn_key = next_obs.to_key();
 
     double old_q = _q_value(s_key, (int)action);
-    double max_next = -std::numeric_limits<double>::max();
-    for (int i = 0; i < (int)mcts::CombatAction::COUNT; i++) {
-        double qv = _q_value(sn_key, i);
-        if (qv > max_next) max_next = qv;
+    double max_next = 0.0;
+    if (!done) {
+        // Q3.15 (B1 fix): 终局转移不得自举 — target = reward
+        max_next = -std::numeric_limits<double>::max();
+        for (int i = 0; i < (int)mcts::CombatAction::COUNT; i++) {
+            double qv = _q_value(sn_key, i);
+            if (qv > max_next) max_next = qv;
+        }
+        if (max_next < -999) max_next = 0; // next state unseen → treat as terminal
     }
-    if (max_next < -999) max_next = 0; // terminal state
 
-    double new_q = old_q + _alpha * (reward + _gamma * max_next - old_q);
-    _q[_make_key(s_key, (int)action)] = new_q;
+    // Q3.15 (B2 fix): 学习率按访问次数衰减 — 表格 Q 收敛的必要条件
+    std::string sa_key = _make_key(s_key, (int)action);
+    int visits = _sa_visits[sa_key]++;
+    double alpha_eff = _alpha / (1.0 + 0.05 * visits);
+
+    double new_q = old_q + alpha_eff * (reward + _gamma * max_next - old_q);
+    _q[sa_key] = new_q;
 }
 
 std::vector<QActionStats> QAgent::action_distribution() const {

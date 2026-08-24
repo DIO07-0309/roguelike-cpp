@@ -82,7 +82,7 @@ void run_rl_mode(int test_episodes, int train_episodes) {
                 uint32_t local_seed = seed + i * 7331u + env.state().depth;
                 auto a = q_agent.select(env.state(), local_seed);
                 auto sr = env.step(a);
-                q_agent.update(obs, a, sr.reward, sr.observation);
+                q_agent.update(obs, a, sr.reward, sr.observation, env.is_done());
                 obs = sr.observation;
             }
             if (env.state().victory) { wins++; if (i >= tail_start) tail_wins++; }
@@ -174,7 +174,7 @@ void run_rl_mirror_mode(int episodes) {
                             || a == CombatAction::MOVE_UP || a == CombatAction::MOVE_DOWN);
                 double mirror_bonus = MirrorAgent::mirror_reward(
                     profile, (int)a, base, 0, dodged, false);
-                q_agent.update(obs, a, base + mirror_bonus, sr.observation);
+                q_agent.update(obs, a, base + mirror_bonus, sr.observation, env.is_done());
                 obs = sr.observation;
                 total_r += base + mirror_bonus;
             }

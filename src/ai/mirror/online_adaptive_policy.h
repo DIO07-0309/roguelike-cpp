@@ -42,12 +42,17 @@ public:
     void import_alpha(const std::vector<float>& in);
     void import_beta(const std::vector<float>& in);
 
+    // Q3.15 (MP1 fix): 导出前清零本局 init_prior 注入记账 — 画像先验只服务当局冷启动,
+    // 若随存档固化则每局净增 ~+2 → 后验无界增长 → Thompson 探索概率衰减至零
+    void strip_pending_prior() const;
+
     // 调试: 某桶某臂的当前胜率估计 alpha/(alpha+beta)
     float win_rate(int bucket, int action) const;
 
 private:
     float _alpha[BUCKET_COUNT][ACTION_COUNT];   // 胜计数
     float _beta[BUCKET_COUNT][ACTION_COUNT];    // 负计数
+    mutable float _pending_prior[BUCKET_COUNT][ACTION_COUNT];  // 本局先验注入记录 (export 时撤销)
 
     static double _sample_beta(float a, float b);
     static double _sample_gamma(float a);       // Marsaglia & Tsang (2000)

@@ -53,7 +53,7 @@ void BTAgent::_sync_state(const Player* player,
     // Skills
     bool any_ready = false;
     for (int i = 0; i < 4; i++)
-        if (i < (int)player->skills.active_skills.size() && player->skills.active_skills[i]->can_use(0)) { any_ready = true; break; }
+        if (i < (int)player->skills.active_skills.size() && player->skills.active_skills[i]->can_use(_game_time)) { any_ready = true; break; }
     _board.set("skill_ready", any_ready);
 
     // Heal slot available
@@ -157,10 +157,24 @@ void BTAgent::build_tree() {
     pu_children.push_back(actPickup->clone());
     auto pickupST = std::make_unique<Sequence>(std::move(pu_children));
 
+    // Boss intro: condition + confirm action (P0-1 fix: was a bare Condition —
+    // actConfirm never entered the tree, so BT agent could not dismiss the intro)
+    std::vector<std::unique_ptr<Node>> intro_children;
+    intro_children.push_back(bossIntro->clone());
+    intro_children.push_back(actConfirm->clone());
+    auto introST = std::make_unique<Sequence>(std::move(intro_children));
+
+    // Stairs: condition + descend action (P0-1 fix: actDescend was created
+    // but never referenced — BT agent could never advance floors)
+    std::vector<std::unique_ptr<Node>> stairs_children;
+    stairs_children.push_back(stairsActive->clone());
+    stairs_children.push_back(actDescend->clone());
+    auto stairsST = std::make_unique<Sequence>(std::move(stairs_children));
+
     // Root: Selector (priority order)
     std::vector<std::unique_ptr<Node>> root_children;
-    root_children.push_back(bossIntro->clone());   // 1. Boss intro → confirm
-    root_children.push_back(stairsActive->clone()); // 2. Stairs → descend
+    root_children.push_back(std::move(introST));    // 1. Boss intro → confirm
+    root_children.push_back(std::move(stairsST));   // 2. Stairs → descend
     root_children.push_back(std::move(healST));     // 3. Heal if low
     root_children.push_back(std::move(bossST));     // 4. Boss fight
     root_children.push_back(std::move(aoeST));      // 5. AoE if multi-target

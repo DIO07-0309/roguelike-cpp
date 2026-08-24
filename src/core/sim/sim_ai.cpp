@@ -18,7 +18,7 @@ int  DecisionAgent::g_mcts_iters = 100;
 
 // G8.3: Build SimulationState snapshot from live game state
 mcts::SimulationState DecisionAgent::build_sim_state(
-    const Player* player, const std::vector<Monster*>& monsters) {
+    const Player* player, const std::vector<Monster*>& monsters, double game_time) {
     mcts::SimulationState s;
     if (!player) return s;
     auto& p = s.player;
@@ -30,11 +30,18 @@ mcts::SimulationState DecisionAgent::build_sim_state(
     p.pdef = player->combat.physical_defense;
     p.mdef = player->combat.magical_defense;
     p.alive = player->combat.is_alive;
-    // Cooldowns from player's last_attack_time vs game_time
-    float gt = 0; // MCTS operates in abstract time
-    p.attack_cooldown = std::max(0.0f, 0.5f);
-    for (int i = 0; i < 4; i++)
-        p.skill_cooldowns[i] = (i < (int)player->skills.active_skills.size()) ? 0.0f : 99.0f;
+    // Cooldowns: real remaining time (Q3.15 A6 fix — was faked to constant
+    // 0.5s/0s, which permanently disabled ATTACK at the MCTS root since
+    // get_possible_actions requires attack_cooldown <= 0)
+    p.attack_cooldown = std::max(0.0f,
+        player->_last_attack_time + Player::ATTACK_COOLDOWN - (float)game_time);
+    for (int i = 0; i < 4; i++) {
+        if (i < (int)player->skills.active_skills.size() && player->skills.active_skills[i])
+            p.skill_cooldowns[i] = std::max(0.0f,
+                (float)player->skills.active_skills[i]->remaining_cooldown(game_time));
+        else
+            p.skill_cooldowns[i] = 99.0f;   // 未拥有的技能 = 永不可用
+    }
     // Buffs
     for (auto& b : player->active_buffs)
         if (b.stacks > 0)
@@ -472,14 +479,11 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
     float ideal_dist = atk_range + _prefer_range * 2.0f; // 近战=1.5, 远程=2.5~4.5
 
     // Q3.2: 已到攻击圈内 → 站桩攻击/放技能, 不移动
+    // Q3.15: 此处存在已知理论缺陷 — d ∈ (48px, ideal_dist] 区间 attack=0/move=0,
+    // 远程 build 死区宽达 ~90px。曾尝试激活"拉开距离"分支消除死区, 实测 200 局
+    // 胜率 10.0%→3.5%(风筝震荡破坏 Q3.12 数值平衡), 故回退保留站桩行为。
+    // 后续若重调此段必须同步重跑 500 局平衡回归。
     if (d <= ideal_dist * 32.0f) return 0;
-
-    // Q3.2: 远程且过近 → BFS 拉开距离 (优先安全路径)
-    if (_prefer_range > 0 && d < ideal_dist * 32.0f * 0.6f) {
-        int away = _bfs_away(p, t, map, true);
-        if (away < 0) away = _bfs_away(p, t, map, false);
-        return (dir == away) ? 0.4f : 0.0f;
-    }
 
     // Q3.2: 太远 → BFS 寻路接近 (绕墙+绕毒, 无路时轴贪心兜底)
     int step = _bfs_toward(p, monsters, map, true);
@@ -577,7 +581,7 @@ std::string DecisionAgent::best_action(const Player* player,
 
     // ── G8.3: MCTS path (combat-only, enemies present) ──
     if (g_use_mcts && !monsters.empty()) {
-        auto sim = build_sim_state(player, monsters);
+        auto sim = build_sim_state(player, monsters, _game_time);
         if (sim.alive_monsters() > 0) {
             mcts::MCTS mcts(g_mcts_iters);
             mcts::CombatAction ca = mcts.search(sim);
@@ -649,6 +653,8 @@ std::string DecisionAgent::best_action(const Player* player,
                 player->skills.active_skills[slot]->can_use(_game_time)) {
                 best_score = 3.0f; // override other actions
                 best = "skill_" + std::to_string(slot + 1);
+                break; // Q3.15 (P1-2 fix): _skill_priority 已按优先序排列, 首个可用即最优 —
+                       // 原 continue 遍历使最低优先级槽反向覆盖
             }
         }
     }

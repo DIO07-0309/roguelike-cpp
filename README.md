@@ -252,6 +252,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 | v0.9.31 | **7.0%** | M4b 地狱火魔领域作战 |
 | v0.9.32 | **8.0%** | 五项 Stable 验收 |
 | v0.9.33 | **10.0%** | 收官体检（Boss 冷却恢复判定后区间上沿） |
+| v0.9.34 | **9.0%** | AI 审查修复 11 处算法 bug（BT 接线/Q-Learning done+学习率/Thompson 先验爆炸/MCTS 归一化，报告 docs/AI_CODE_REVIEW.md） |
 
 ### 确定性
 

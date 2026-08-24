@@ -41,6 +41,10 @@ public:
     // Tick frame counter (for rate-limiting)
     void tick() { _frame++; }
 
+    // Q3.15: current game time — required for skill cooldown checks (P0-2 fix:
+    // can_use(0) was always true at start and permanently false after first use)
+    void set_time(double t) { _game_time = t; }
+
     // G8.1: access blackboard for testing
     const bt::Blackboard& board() const { return _board; }
 
@@ -48,6 +52,7 @@ private:
     bt::Blackboard _board;
     std::unique_ptr<bt::Node> _root;
     int _frame = 0;
+    double _game_time = 0.0;
 
     void _sync_state(const Player* player,
         const std::vector<Monster*>& monsters,
