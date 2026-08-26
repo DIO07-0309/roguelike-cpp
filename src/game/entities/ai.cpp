@@ -27,6 +27,16 @@ void MonsterAI::update(Monster* self, Player* player, GameMap* map,
                         std::vector<Monster*>* all, std::vector<Effect>* effects) {
     if (!self->combat.is_alive) return;
 
+    // Q3.16: 房间守卫 — 首次 update 记录出生锚点; 掉血即视为被挑衅 (解除束缚)。
+    // Boss 不受束缚 (Boss 房有独立机制与领域地形)。
+    if (home_x < 0.0f && home_y < 0.0f) {
+        home_x = self->entity.rect.x + self->entity.rect.width/2;
+        home_y = self->entity.rect.y + self->entity.rect.height/2;
+    }
+    if (!provoked && self->combat.current_hp < self->combat.max_hp)
+        provoked = true;
+    if (self->is_boss) provoked = true;
+
     // G5.3: Archetype-driven behaviors (替代旧的 monster_type 检查)
     // ── 向后兼容: DEFAULT → 从 monster_type 推断 ──
     if (archetype == AIArchetype::DEFAULT) {
@@ -198,12 +208,31 @@ void MonsterAI::_decide_state(Monster* self, Player* player) {
     float attack_px = attack_range * 32.0f;
     float sight_px = sight_range * 32.0f;
 
-    if (dist <= attack_px) state = AIState::ATTACK;
-    else if (dist <= sight_px) state = AIState::CHASE;
+    if (dist <= attack_px) { state = AIState::ATTACK; return; }
+
+    // Q3.16: 未被挑衅的怪不追出房间 — 距锚点超过追击上限则回 IDLE (守家巡逻)。
+    // 视野内的玩家只有靠近到攻击距离或先动手才会触发真正的战斗。
+    if (!provoked && home_x >= 0.0f) {
+        float hd = hypotf(self->entity.rect.x + self->entity.rect.width/2 - home_x,
+                          self->entity.rect.y + self->entity.rect.height/2 - home_y);
+        if (hd > kChaseLeashPx) { state = AIState::IDLE; return; }
+    }
+
+    if (dist <= sight_px) state = AIState::CHASE;
     else state = AIState::IDLE;
 }
 
 void MonsterAI::_execute_idle(Monster* self, GameMap* map, double dt) {
+    // Q3.16: 守家巡逻 — 离出生锚点超过巡逻半径时朝锚点折返 (未挑衅时)
+    if (!provoked && home_x >= 0.0f) {
+        float hx = home_x - (self->entity.rect.x + self->entity.rect.width/2);
+        float hy = home_y - (self->entity.rect.y + self->entity.rect.height/2);
+        float hd = sqrtf(hx*hx + hy*hy);
+        if (hd > kLeashPx) {
+            if (hd > 1.0f) _apply_movement(self, map, hx/hd, hy/hd, dt);
+            return;
+        }
+    }
     _patrol_timer -= (float)dt;
     if (_patrol_timer <= 0) {
         _pick_new_dir();

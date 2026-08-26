@@ -94,6 +94,13 @@ public:
     float _archetype_timer = 0.0f;   // 通用计时器 (sniper蓄力/controller间隔/ambush冷却)
     bool  _archetype_active = false; // 特殊状态激活中 (ambush隐身中)
 
+    // Q3.16: 房间守卫 (leash) — 怪物锚定出生房间, 未被挑衅不远离追击。
+    // 解决: IDLE 随机巡逻走出房间 → 进入视野全图追击 → 前期怪涌向主角、中后期没怪。
+    float home_x = -1.0f, home_y = -1.0f; // 出生锚点 (首次 update 记录, -1=未初始化)
+    bool  provoked = false;               // 掉血后解除束缚 (含毒/环境伤)
+    static constexpr float kLeashPx      = 4.5f * 32; // 巡逻半径: 超出则折返锚点
+    static constexpr float kChaseLeashPx = 8.0f * 32; // 追击上限: 超出则放弃回家
+
 protected:
     float _patrol_timer = 0.0f;
     Vector2 _patrol_dir{0, 0};

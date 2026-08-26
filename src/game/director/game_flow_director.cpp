@@ -75,6 +75,7 @@ void GameFlowDirector::on_player_dead() {
 void GameFlowDirector::on_game_clear() {
     if (!_scene) return;
     current_state = GameFlowState::GAME_CLEAR;
+    // Q3.16: 通关 BGM 由 VictoryScene::get_bgm_name() 声明, change_scene 管线自动切换
 
     // ── 计算结局 ──
     auto* gs = _scene;

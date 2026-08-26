@@ -31,4 +31,6 @@ public:
 
     void _render() override;
     void _input(const InputMap& input) override;
+    // Q3.16: 通关动画专属欢快 BGM (change_scene 管线自动切换, 替代沿用的 Boss 曲)
+    const char* get_bgm_name() const override { return "victory"; }
 };

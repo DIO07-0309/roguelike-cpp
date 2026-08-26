@@ -89,6 +89,27 @@ Sound BGMEngine::_compile_bgm(const std::string& name) {
         melody = {{"C4",0.12f},{"Eb4",0.12f},{"G4",0.12f},{"C5",0.2f},{"B4",0.12f},{"G4",0.12f},{"F4",0.15f},{"Eb4",0.1f},{0,0.05f}};
         bass  = {{"C2",0.25f},{"C2",0.25f},{"Ab1",0.25f},{"Ab1",0.25f},{"Bb1",0.25f},{"Bb1",0.25f},{"G1",0.25f},{"G1",0.25f}};
         mw = "saw"; bw = "square";
+    } else if (name == "victory") {
+        // Q3.16: 通关动画专属 BGM — C 大调 I-V-vi-IV 经典欢快进行 (明快上行旋律,
+        // 替代原通关后沿用的紧张 Boss 曲), 播放至回到主界面
+        bpm = 132; beat = 60.0f / bpm;
+        chords = {{"C4",1.0f},{"G3",1.0f},{"A3",1.0f},{"F3",1.0f},
+                  {"C4",1.0f},{"G3",1.0f},{"F3",1.0f},{"C4",1.0f}};
+        melody = {
+            {"C5",0.25f},{"E5",0.25f},{"G5",0.25f},{"C6",0.25f},   // I: 上行琶音
+            {"B5",0.25f},{"G5",0.25f},{"D5",0.25f},{0,0.25f},      // V
+            {"A5",0.25f},{"C6",0.25f},{"B5",0.25f},{"G5",0.25f},   // vi
+            {"F5",0.25f},{"A5",0.25f},{"G5",0.25f},{"E5",0.25f},   // IV
+            {"C5",0.25f},{"E5",0.25f},{"G5",0.25f},{"C6",0.25f},   // I'
+            {"B5",0.25f},{"C6",0.25f},{"D5",0.25f},{"G5",0.25f},   // V'
+            {"A5",0.25f},{"F5",0.25f},{"G5",0.25f},{"E5",0.25f},   // IV'
+            {"C6",0.5f},{"G5",0.25f},{"E5",0.25f},                 // 终止高音解决
+        };
+        bass  = {{"C3",0.5f},{"C3",0.5f},{"G2",0.5f},{"G2",0.5f},
+                 {"A2",0.5f},{"A2",0.5f},{"F2",0.5f},{"F2",0.5f},
+                 {"C3",0.5f},{"C3",0.5f},{"G2",0.5f},{"G2",0.5f},
+                 {"F2",0.5f},{"F2",0.5f},{"C3",0.5f},{"G2",0.5f}};
+        mw = "square"; bw = "triangle";
     } else {
         // G6.1: Biome BGM variants (reuse dungeon chords, vary BPM+waveform)
         chords = {{"C3",3.0f},{"Db3",3.0f},{"Eb3",3.0f},{"C3",3.0f}};
@@ -200,6 +221,7 @@ void BGMEngine::init() {
     _cache["select"]  = _compile_bgm("select");
     _cache["dungeon"] = _compile_bgm("dungeon");
     _cache["boss"]    = _compile_bgm("boss");
+    _cache["victory"] = _compile_bgm("victory");   // Q3.16: 通关动画专属
 }
 
 void BGMEngine::close() { for (auto& [_, s] : _cache) UnloadSound(s); _cache.clear(); }

@@ -197,22 +197,25 @@ void PlayerController::handle_input(const InputMap& input) {
         int max_page = std::max(0, (item_count + kPage - 1) / kPage - 1);
         int page = gs.inventory_cursor / kPage;
         int rel = gs.inventory_cursor % kPage;
+        // Q3.16: 背包内导航与动作键解耦 — 原翻页走 move_right(绑定了 D) 会抢占丢弃,
+        // 且 D 同时承担"丢弃"与"右移"双重语义。现在: WS/↑↓ 移光标, ←→ 翻页,
+        // X/U/D 动作键优先判定, 彻底消除 D 的二义性。
         if (gs._is_action_just_pressed(input,"inventory") || gs._is_action_just_pressed(input,"cancel"))
             gs.inventory_open = false;
-        else if (gs._is_action_just_pressed(input,"move_up"))
-            gs.inventory_cursor = std::max(0, gs.inventory_cursor - 1);
-        else if (gs._is_action_just_pressed(input,"move_down"))
-            gs.inventory_cursor = std::min(std::max(0, item_count - 1), gs.inventory_cursor + 1);
-        else if (gs._is_action_just_pressed(input,"move_left") && page > 0)
-            gs.inventory_cursor = (page - 1) * kPage + rel;
-        else if (gs._is_action_just_pressed(input,"move_right") && page < max_page)
-            gs.inventory_cursor = std::min((page + 1) * kPage + rel, item_count - 1);
         else if (IsKeyPressed(KEY_X))
             { gs.player->inventory.equip(gs.inventory_cursor, gs.player.get()); gs.inventory_cursor = std::min(gs.inventory_cursor, std::max(0, (int)gs.player->inventory.items.size() - 1)); }
         else if (IsKeyPressed(KEY_U))
             { gs.player->inventory.use_item(gs.inventory_cursor, gs.player.get()); gs.inventory_cursor = std::min(gs.inventory_cursor, std::max(0, (int)gs.player->inventory.items.size() - 1)); }
         else if (IsKeyPressed(KEY_D))
             { gs.player->inventory.remove(gs.inventory_cursor); gs.inventory_cursor = std::min(gs.inventory_cursor, std::max(0, (int)gs.player->inventory.items.size() - 1)); }
+        else if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP))
+            gs.inventory_cursor = std::max(0, gs.inventory_cursor - 1);
+        else if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN))
+            gs.inventory_cursor = std::min(std::max(0, item_count - 1), gs.inventory_cursor + 1);
+        else if (IsKeyPressed(KEY_LEFT) && page > 0)
+            gs.inventory_cursor = (page - 1) * kPage + rel;
+        else if (IsKeyPressed(KEY_RIGHT) && page < max_page)
+            gs.inventory_cursor = std::min((page + 1) * kPage + rel, item_count - 1);
         return;
     }
 
