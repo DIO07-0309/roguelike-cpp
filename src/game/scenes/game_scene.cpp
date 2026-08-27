@@ -317,6 +317,9 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     DungeonGenerator gen(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
     game_map = gen.generate(_dungeon_seed, fcfg->special_room_count, fcfg->arena_density);
     _setup_boss_arena_terrain(gen, floor);   // M4b: Boss 房机制地形
+    game_map->reset_visibility();
+    _last_player_tile_x = -1;
+    _last_player_tile_y = -1;
     auto rooms = gen.get_room_centers();
 
     // D9-rest: 休息层保证 1 个泉水房 — 50% landmark 替换可能吞掉治疗资源
@@ -941,6 +944,18 @@ void GameScene::_process(double delta) {
 
     // D6 Step7: 玩家移动/交互/怪物AI — 委托给 PlayerController
     _player_ctrl.tick(dt);
+
+    // Phase 1: FOV — 玩家跨 tile 时更新
+    if (player && game_map) {
+        auto [tx, ty] = game_map->pixel_to_tile(
+            player->entity.rect.x + player->entity.rect.width / 2,
+            player->entity.rect.y + player->entity.rect.height / 2);
+        if (tx != _last_player_tile_x || ty != _last_player_tile_y) {
+            _last_player_tile_x = tx;
+            _last_player_tile_y = ty;
+            game_map->update_fov(tx, ty, FOV_RADIUS);
+        }
+    }
 
     // Q3.2: sim 自动装备 — 搜刮到的武器/护甲直接换上 (总值更高才换)
     if (_sim_mode && player && !player->inventory.items.empty()) {
@@ -2168,6 +2183,13 @@ void GameScene::_draw_entities() {
         : std::pair<int,int>{0, 0};
     int ptx = ppl.first, pty = ppl.second;
     for (auto& m : monsters) {
+        // Phase 1: 实体中心 tile 不可见 → 跳过渲染
+        if (game_map) {
+            auto [mtx, mty] = game_map->pixel_to_tile(
+                m->entity.rect.x + m->entity.rect.width / 2,
+                m->entity.rect.y + m->entity.rect.height / 2);
+            if (!game_map->isVisible(mtx, mty)) continue;
+        }
         m->draw(_cam_x, _cam_y);
         // F10.2: Weak point glow
         if (m->is_weak_point && m->combat.is_alive) {
@@ -2224,6 +2246,8 @@ void GameScene::_draw_entities() {
     };
     for (int i = 0; i < _npc_count; i++) {
         if (_npc_state[i].finished) continue;
+        // Phase 1: NPC tile 不可见 → 跳过渲染
+        if (game_map && !game_map->isVisible(_npc_tile_x[i], _npc_tile_y[i])) continue;
         float nx = _npc_tile_x[i] * TILE_SIZE + TILE_SIZE/2 - _cam_x;
         float ny = _npc_tile_y[i] * TILE_SIZE + TILE_SIZE/2 - _cam_y;
         const char* nn = "NPC";
@@ -2267,6 +2291,8 @@ void GameScene::_draw_entities() {
 
 void GameScene::_draw_ground_items() {
     for (auto& d : ground_items) {
+        // Phase 1: 物品 tile 不可见 → 跳过渲染
+        if (game_map && !game_map->isVisible(d.tile_x, d.tile_y)) continue;
         float px = d.tile_x * TILE_SIZE - _cam_x;
         float py = d.tile_y * TILE_SIZE - _cam_y;
         float size = TILE_SIZE - 4;

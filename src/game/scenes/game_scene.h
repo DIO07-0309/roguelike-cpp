@@ -277,6 +277,11 @@ private:
 
     float _cam_x = 0, _cam_y = 0;
 
+    // Phase 1: FOV — 玩家跨 tile 时更新
+    int _last_player_tile_x = -1;
+    int _last_player_tile_y = -1;
+    static constexpr int FOV_RADIUS = 8;
+
     // ── G4.5: Replay ──
     ReplayRecorder _recorder;
     ReplayPlayer   _replay_player;

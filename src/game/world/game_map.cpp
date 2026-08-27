@@ -69,6 +69,56 @@ bool GameMap::_in_bounds(int tx, int ty) const {
     return tx >= 0 && tx < width && ty >= 0 && ty < height;
 }
 
+// ── Phase 1: FOV ──────────────────────────────────────────
+
+bool GameMap::isVisible(int x, int y) const {
+    return _in_bounds(x, y) && _tiles[y][x].is_visible;
+}
+
+bool GameMap::isExplored(int x, int y) const {
+    return _in_bounds(x, y) && _tiles[y][x].is_explored;
+}
+
+bool GameMap::blocks_sight(int x, int y) const {
+    if (!_in_bounds(x, y)) return true;
+    // Phase 1: 临时使用墙壁类型判断
+    // 未来可扩展为独立字段 (支持半透明/可破坏墙壁)
+    return _tiles[y][x].type == TileType::WALL;
+}
+
+void GameMap::reset_visibility() {
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++) {
+            _tiles[y][x].is_visible = false;
+            _tiles[y][x].is_explored = false;
+        }
+}
+
+void GameMap::update_fov(int cx, int cy, int radius) {
+    // 1. 清除所有 is_visible
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+            _tiles[y][x].is_visible = false;
+
+    // 2. 射线投射: 360 条, 每度一条
+    for (int deg = 0; deg < 360; deg++) {
+        float rad = deg * DEG2RAD;
+        float dx = cosf(rad);
+        float dy = sinf(rad);
+
+        for (float dist = 0; dist <= radius; dist += 0.5f) {
+            int tx = cx + static_cast<int>(roundf(dx * dist));
+            int ty = cy + static_cast<int>(roundf(dy * dist));
+            if (!_in_bounds(tx, ty)) break;
+
+            _tiles[ty][tx].is_visible = true;
+            _tiles[ty][tx].is_explored = true;
+
+            if (blocks_sight(tx, ty)) break;
+        }
+    }
+}
+
 SpecialRoom* GameMap::get_special_room_at(int tile_x, int tile_y) {
     for (auto& sr : special_rooms) {
         if (tile_x >= sr.rx && tile_x < sr.rx + sr.rw &&
@@ -90,6 +140,16 @@ const SpecialRoom* GameMap::get_special_room_at(int tile_x, int tile_y) const {
 void GameMap::set_palette(const TilePalette* palette) {
     _has_palette = (palette != nullptr);
     if (_has_palette) _palette = *palette;
+}
+
+// Phase 1: 颜色变暗 (已探索但不在视野内时使用)
+static Color _dim(Color c, float brightness) {
+    return {
+        (unsigned char)(c.r * brightness),
+        (unsigned char)(c.g * brightness),
+        (unsigned char)(c.b * brightness),
+        c.a
+    };
 }
 
 void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
@@ -122,14 +182,21 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
             float dy = y * tile_size - cam_y;
             const auto& t = _tiles[y][x];
 
+            // Phase 1: 未探索 → 不渲染
+            if (!t.is_explored) continue;
+
+            // Phase 1: 可见性亮度 (1.0=正常, 0.6=昏暗)
+            float bright = t.is_visible ? 1.0f : 0.6f;
+
             if (t.type == TileType::WALL) {
                 if (wall_tex.id > 0) {
                     SpriteDef& wd = wall_data.id > 0 ? wall_def : sd;
                     SpriteRenderer::draw_sprite(wall_tex, wd, 0,
-                        {dx, dy, (float)tile_size, (float)tile_size});
+                        {dx, dy, (float)tile_size, (float)tile_size},
+                        _dim({255,255,255,255}, bright));
                 } else
-                    DrawRectangle(dx, dy, tile_size, tile_size, wall_c);
-                DrawRectangleLines(dx, dy, tile_size, tile_size, {40, 40, 55, 255});
+                    DrawRectangle(dx, dy, tile_size, tile_size, _dim(wall_c, bright));
+                DrawRectangleLines(dx, dy, tile_size, tile_size, _dim({40, 40, 55, 255}, bright));
             } else if (t.type == TileType::FLOOR) {
                 const SpecialRoom* sr = get_special_room_at(x, y);
                 if (sr) {
@@ -152,8 +219,8 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                         base.g = (unsigned char)(base.g * 0.55f);
                         base.b = (unsigned char)(base.b * 0.55f);
                     }
-                    DrawRectangle(dx, dy, tile_size, tile_size, base);
-                    DrawRectangleLines(dx, dy, tile_size, tile_size, {35, 35, 45, 255});
+                    DrawRectangle(dx, dy, tile_size, tile_size, _dim(base, bright));
+                    DrawRectangleLines(dx, dy, tile_size, tile_size, _dim({35, 35, 45, 255}, bright));
                     // 房间中心绘制图标 (M4f.5: 素材装饰优先, 缺配回退字符)
                     if (x == sr->cx && y == sr->cy) {
                         const char* pkey = nullptr;
@@ -192,40 +259,41 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                             }
                             Color ic = sr->triggered ? Color{100, 100, 100, 255}
                                                      : Color{255, 255, 200, 255};
-                            DrawText(icon, (int)dx + 10, (int)dy + 5, 20, ic);
+                            DrawText(icon, (int)dx + 10, (int)dy + 5, 20, _dim(ic, bright));
                         }
                     }
                 } else {
                     if (floor_tex.id > 0) {
                         SpriteDef& fd = floor_data.id > 0 ? floor_def : sd;
                         SpriteRenderer::draw_sprite(floor_tex, fd, 0,
-                            {dx, dy, (float)tile_size, (float)tile_size});
+                            {dx, dy, (float)tile_size, (float)tile_size},
+                            _dim({255,255,255,255}, bright));
                     } else
-                        DrawRectangle(dx, dy, tile_size, tile_size, floor_c);
+                        DrawRectangle(dx, dy, tile_size, tile_size, _dim(floor_c, bright));
                     // 细微网格线
-                    DrawRectangleLines(dx, dy, tile_size, tile_size, {35, 35, 45, 255});
+                    DrawRectangleLines(dx, dy, tile_size, tile_size, _dim({35, 35, 45, 255}, bright));
                 }
             } else if (t.type == TileType::STAIRS_DOWN) {
-                DrawRectangle(dx, dy, tile_size, tile_size, {50, 40, 20, 255});
-                DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4, {255, 200, 50, 255});
-                DrawText(">", dx + 10, dy + 6, 20, {255, 220, 100, 255});
+                DrawRectangle(dx, dy, tile_size, tile_size, _dim({50, 40, 20, 255}, bright));
+                DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4, _dim({255, 200, 50, 255}, bright));
+                DrawText(">", dx + 10, dy + 6, 20, _dim({255, 220, 100, 255}, bright));
             } else if (t.type == TileType::LAVA) {
                 // M4b: 熔岩地砖 — 橙红脉动 (Boss 房机制地形)
                 float pulse = 0.7f + 0.3f * sinf((float)GetTime() * 4.0f);
-                Color lc = { (unsigned char)(200 + 40 * pulse), 60, 15, 255 };
+                Color lc = _dim({ (unsigned char)(200 + 40 * pulse), 60, 15, 255 }, bright);
                 DrawRectangle(dx, dy, tile_size, tile_size, lc);
                 DrawRectangleLines(dx, dy, tile_size, tile_size,
-                                   {255, 120, 40, (unsigned char)(160 * pulse)});
+                                   _dim({255, 120, 40, (unsigned char)(160 * pulse)}, bright));
                 DrawCircle(dx + tile_size/2, dy + tile_size/2, 5.0f * pulse + 2.0f,
-                           {255, 160, 60, (unsigned char)(120 + 80 * pulse)});
+                           _dim({255, 160, 60, (unsigned char)(120 + 80 * pulse)}, bright));
             }
 
             // D4 Step1: 事件房间中心绘制标记
             if (event_room_index >= 0 && x == event_tile_x && y == event_tile_y) {
                 float pulse = 2 + sinf((float)GetTime() * 5) * 2;
                 Color ec = event_triggered ? Color{80, 80, 80, 120} : Color{255, 200, 100, 200};
-                DrawRectangleLinesEx({dx - pulse, dy - pulse, tile_size + pulse*2, tile_size + pulse*2}, float(1.5), ec);
-                DrawText("?", dx + 10, dy + 5, 18, event_triggered ? Color{100, 100, 100, 200} : Color{255, 220, 100, 255});
+                DrawRectangleLinesEx({dx - pulse, dy - pulse, tile_size + pulse*2, tile_size + pulse*2}, float(1.5), _dim(ec, bright));
+                DrawText("?", dx + 10, dy + 5, 18, _dim(event_triggered ? Color{100, 100, 100, 200} : Color{255, 220, 100, 255}, bright));
             }
 
             // D2 Step5: Arena 元素绘制
@@ -236,31 +304,31 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                     // 收官: 点燃中 (timer>0) 红色脉动警告
                     if (arena->timer > 0.0f) {
                         float fuse = 0.5f + 0.5f * sinf((float)GetTime() * 14.0f);
-                        DrawRectangle(dx+4, dy+4, tile_size-8, tile_size-8, {220, 70, 30, 255});
+                        DrawRectangle(dx+4, dy+4, tile_size-8, tile_size-8, _dim({220, 70, 30, 255}, bright));
                         DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4,
-                                           {255, 90, 40, (unsigned char)(200 * fuse)});
+                                           _dim({255, 90, 40, (unsigned char)(200 * fuse)}, bright));
                     } else {
-                        DrawRectangle(dx+6, dy+6, tile_size-12, tile_size-12, {180, 100, 30, 255});
+                        DrawRectangle(dx+6, dy+6, tile_size-12, tile_size-12, _dim({180, 100, 30, 255}, bright));
                     }
-                    DrawText("!", dx+12, dy+5, 18, {255, 200, 50, 255}); break;
+                    DrawText("!", dx+12, dy+5, 18, _dim({255, 200, 50, 255}, bright)); break;
                 case ArenaObjectType::HEALING_TOTEM:
-                    DrawRectangle(dx+4, dy+4, tile_size-8, tile_size-8, {30, 140, 60, 255});
-                    DrawText("+", dx+11, dy+5, 18, {100, 255, 120, 255}); break;
+                    DrawRectangle(dx+4, dy+4, tile_size-8, tile_size-8, _dim({30, 140, 60, 255}, bright));
+                    DrawText("+", dx+11, dy+5, 18, _dim({100, 255, 120, 255}, bright)); break;
                 case ArenaObjectType::POISON_POOL: {
                     // M4a-fix: 亮绿 + 脉动描边 (原深绿不易察觉, 玩家踩毒不自知)
                     float pulse = 0.6f + 0.4f * sinf((float)GetTime() * 5.0f);
-                    DrawRectangle(dx+2, dy+2, tile_size-4, tile_size-4, {40, 150, 55, 210});
+                    DrawRectangle(dx+2, dy+2, tile_size-4, tile_size-4, _dim({40, 150, 55, 210}, bright));
                     DrawRectangleLines(dx+2, dy+2, tile_size-4, tile_size-4,
-                                       {90, 250, 90, (unsigned char)(170 * pulse)});
-                    DrawText("~", dx+10, dy+5, 16, {170, 255, 170, 230});
+                                       _dim({90, 250, 90, (unsigned char)(170 * pulse)}, bright));
+                    DrawText("~", dx+10, dy+5, 16, _dim({170, 255, 170, 230}, bright));
                 } break;
                 case ArenaObjectType::ROCK: {
-                    DrawRectangle(dx+2, dy+8, tile_size-4, tile_size-10, {100, 95, 100, 255});
-                    DrawRectangleLines(dx+2, dy+8, tile_size-4, tile_size-10, {130, 125, 130, 255});
+                    DrawRectangle(dx+2, dy+8, tile_size-4, tile_size-10, _dim({100, 95, 100, 255}, bright));
+                    DrawRectangleLines(dx+2, dy+8, tile_size-4, tile_size-10, _dim({130, 125, 130, 255}, bright));
                 } break;
                 case ArenaObjectType::SPIKE:
                     DrawTriangle({dx+tile_size/2, dy+2}, {dx+2, dy+tile_size-4},
-                                {dx+tile_size-2, dy+tile_size-4}, {180, 50, 50, 255});
+                                {dx+tile_size-2, dy+tile_size-4}, _dim({180, 50, 50, 255}, bright));
                     break;
                 }
             }

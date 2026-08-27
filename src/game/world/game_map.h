@@ -29,11 +29,13 @@ enum class TileType { FLOOR, WALL, STAIRS_DOWN, LAVA };  // M4b: LAVA — 可走
 struct Tile {
     TileType type = TileType::WALL;
     bool is_walkable = false;
+    bool is_visible = false;    // 当前帧是否在 FOV 内
+    bool is_explored = false;   // 是否曾被玩家探索过
 
-    static Tile floor()  { return {TileType::FLOOR, true}; }
-    static Tile wall()   { return {TileType::WALL, false}; }
-    static Tile stairs() { return {TileType::STAIRS_DOWN, true}; }
-    static Tile lava()   { return {TileType::LAVA, true}; }   // M4b
+    static Tile floor()  { return {TileType::FLOOR, true, false, false}; }
+    static Tile wall()   { return {TileType::WALL, false, false, false}; }
+    static Tile stairs() { return {TileType::STAIRS_DOWN, true, false, false}; }
+    static Tile lava()   { return {TileType::LAVA, true, false, false}; }
 };
 
 class GameMap {
@@ -75,6 +77,13 @@ public:
     void set_palette(const TilePalette* palette);
     const TilePalette& palette() const { return _palette; }
     bool has_palette() const { return _has_palette; }
+
+    // Phase 1: FOV 可见性
+    bool isVisible(int x, int y) const;
+    bool isExplored(int x, int y) const;
+    bool blocks_sight(int x, int y) const;
+    void update_fov(int center_x, int center_y, int radius);
+    void reset_visibility();
 
     void draw(float cam_x, float cam_y, int screen_w, int screen_h) const;
 
