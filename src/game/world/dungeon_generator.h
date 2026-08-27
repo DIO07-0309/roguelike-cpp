@@ -50,6 +50,9 @@ public:
                                      const std::string& biome_id = "");
     std::vector<std::pair<int,int>> get_room_centers() const;
     std::vector<SpecialRoom> get_special_rooms() const { return _special_rooms; }
+    // 诊断：暴露房间矩形与连接（供拓扑验证工具使用）
+    const std::vector<std::tuple<int,int,int,int>>& get_room_rects() const { return _rooms; }
+    const std::vector<CorridorConnection>& get_connections() const { return _connections; }
     // M4b: Boss 房矩形 (rooms.back()), 无房间时返回 {0,0,0,0}
     std::tuple<int,int,int,int> get_boss_room_rect() const {
         return _rooms.empty() ? std::make_tuple(0, 0, 0, 0) : _rooms.back();
