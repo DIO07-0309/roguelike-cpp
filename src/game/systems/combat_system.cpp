@@ -384,14 +384,19 @@ int get_effective_attack(const Player* p) {
     float atk = (float)base * buff_sum;
     // Relic multipliers (additive factor, applied to base)
     float relic_sum = 1.0f;
-    if (player_has_relic(p, "war_drum"))    relic_sum += 0.10f; // was +15% multiplicative
+    if (player_has_relic(p, "war_drum")) {
+        const RelicDef* def = get_relic_def("war_drum");
+        relic_sum += (def ? def->param : 0.15f);  // M0.1A: JSON 为 Single Source of Truth
+    }
     if (player_has_relic(p, "hunter_gloves")) relic_sum += 0.08f;
     if (player_has_relic(p, "ancient_crown")) relic_sum += 0.06f;
     if (player_has_relic(p, "dragon_heart"))  relic_sum += 0.10f;
     if (player_has_relic(p, "infinity_orb"))  relic_sum += 0.12f;
     if (player_has_relic(p, "blood_chalice")) {
+        const RelicDef* def = get_relic_def("blood_chalice");
+        float max_mult = def ? def->param : 0.30f;  // M0.1A: JSON 为 Single Source of Truth
         float hp_r = (float)p->combat.current_hp / get_effective_max_hp(p);
-        relic_sum += (1.0f - hp_r) * 0.20f; // was 0.30
+        relic_sum += (1.0f - hp_r) * max_mult;
     }
     atk *= relic_sum;
     return std::max(1, (int)atk);

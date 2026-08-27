@@ -1003,13 +1003,13 @@ void GameScene::_process(double delta) {
             _boss.dmg_done += r.damage;
             _presentation.spawn_damage(r.hit_point.x, r.hit_point.y, r.damage,
                 r.is_crit ? Color{255,220,30,255} : Color{100,200,255,255}, 0.5f);
-            if (r.is_killing_blow) _combat.on_monster_killed(r.target);
+            // P0-A: 不在此处调用 on_monster_killed，委托下帧 cleanup_dead_monsters 统一处理
         }
         for (auto& r : proj_results) {
             _boss.dmg_done += r.damage;
             _presentation.spawn_damage(r.hit_point.x, r.hit_point.y, r.damage,
                 Color{255,180,50,255}, 0.5f);
-            if (r.is_killing_blow) _combat.on_monster_killed(r.target);
+            // P0-A: 同上
         }
     }
 

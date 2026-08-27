@@ -399,8 +399,8 @@ void PlayerController::_process_weapon_result(GameScene& gs, Player& p,
         gs.pending_damage.emplace_back(r.target, r.damage);
         return;
     }
-    CombatCoordinator::apply_attack_damage(r.target, r.damage,
-        gs.active_effects, gs.get_tree()->get_audio());
+    // P0-B: _resolve_one 已施加 take_damage，此处不再重复
+    // 仅保留 VFX (damage float) + kill 处理
     Color dc = r.is_crit ? Color{255, 220, 30, 255}
              : dmg_color_for(r.damage, false, false);
     gs._presentation.damage_floats.push_back({

@@ -73,6 +73,7 @@ public:
     int  weak_point_state = 0;           // WeakPointState as int (0=SPAWNED)
     void* _weak_point_owner = nullptr;   // Boss* that spawned this core
 
+    bool kill_processed = false;   // P0-A: 防止 on_monster_killed 重复触发 (defensive guard)
     bool uses_projectile = false;
     float projectile_speed = 300.0f;
     float projectile_warning_time = 0.8f;

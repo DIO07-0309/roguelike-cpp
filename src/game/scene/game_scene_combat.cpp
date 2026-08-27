@@ -25,6 +25,10 @@
 // GameSceneCombat — 战斗善后
 // ============================================================
 void GameSceneCombat::on_monster_killed(Monster* m) {
+    // P0-A: Exactly-once guard — cleanup_dead_monsters 会再次遇到已标记的怪物
+    if (!m || m->kill_processed) return;
+    m->kill_processed = true;
+
     // D7 Step5: EventBus 广播
     EventBus::inst().emit(m->is_boss ? GameEventType::BOSS_DEAD
                                      : GameEventType::MONSTER_DIED,
