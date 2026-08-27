@@ -10,6 +10,7 @@
 #include "vfx_server.h"
 #include "combat_feel.h"
 #include "weapon_executor.h"   // G9
+#include "collision_utils.h"
 #include "skill_evolution.h"   // G1
 #include "flow_director.h"
 #include "input_map.h"
@@ -568,15 +569,7 @@ void PlayerController::_apply_attack_feedback(GameScene& gs, Player& p,
         float len = sqrtf(dx*dx + dy*dy);
         if (len > 0) {
             float knock = is_crit ? 36.0f : 24.0f;
-            target->entity.position.x += dx / len * knock;
-            target->entity.position.y += dy / len * knock;
-            target->entity.sync_rect();
-            // 穿墙回退
-            if (!gs.game_map->is_rect_walkable(target->entity.rect)) {
-                target->entity.position.x -= dx / len * knock;
-                target->entity.position.y -= dy / len * knock;
-                target->entity.sync_rect();
-            }
+            clamp_displacement(target->entity, dx / len * knock, dy / len * knock, gs.game_map.get());
         }
         gs._presentation.trigger_shake(is_crit ? 16.0f : CombatFeelSystem::SHAKE_HEAVY);
         gs._presentation.trigger_freeze(is_crit ? CombatFeelSystem::CRITICAL_HIT

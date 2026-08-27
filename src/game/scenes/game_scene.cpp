@@ -23,6 +23,7 @@
 #include "vfx_server.h"              // G9: spear lightning VFX
 #include "data/weapon_defs.h"        // G9: Boss drop
 #include "data/element_defs.h"       // G10: element select screen
+#include "systems/collision_utils.h"
 #include "core/sim/sim_ai.h"         // G5.6
 #include "core/sim/sim_runner.h"     // G5.6
 #include "ai/agents/bt_agent.h"      // G8.1
@@ -898,13 +899,8 @@ void GameScene::_process(double delta) {
                         // 击退
                         float dx = m->entity.rect.x - cx, dy = m->entity.rect.y - cy;
                         float len = sqrtf(dx*dx + dy*dy);
-                        if (len > 0) { m->entity.position.x += dx / len * 30; m->entity.position.y += dy / len * 30; m->entity.sync_rect();
-                            // 穿墙回退
-                            if (!game_map->is_rect_walkable(m->entity.rect)) {
-                                m->entity.position.x -= dx / len * 30;
-                                m->entity.position.y -= dy / len * 30;
-                                m->entity.sync_rect();
-                            }
+                        if (len > 0) {
+                            clamp_displacement(m->entity, dx / len * 30, dy / len * 30, game_map.get());
                         }
                     }
                 }

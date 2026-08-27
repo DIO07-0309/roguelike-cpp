@@ -8,6 +8,7 @@
 #include "systems/team_coordinator.h"   // G2.2
 #include "core/event_bus.h"             // Q4.4: 怪物攻击事件
 #include "core/event_types.h"
+#include "systems/collision_utils.h"
 #include <cmath>
 
 // Forward declarations for functions defined later in this file
@@ -621,16 +622,7 @@ void MonsterAI::_exec_charge(Monster* self, Player* player, GameMap* map,
             player->combat.get_effective_defense(self->attack_type));
         player->combat.take_damage(dmg);
         // 击退玩家
-        float px = player->entity.position.x + ndx * 48.0f;
-        float py = player->entity.position.y + ndy * 48.0f;
-        player->entity.position = {px, py};
-        player->entity.sync_rect();
-        // 穿墙回退
-        if (map && !map->is_rect_walkable(player->entity.rect)) {
-            player->entity.position.x -= ndx * 48.0f;
-            player->entity.position.y -= ndy * 48.0f;
-            player->entity.sync_rect();
-        }
+        clamp_displacement(player->entity, ndx * 48.0f, ndy * 48.0f, map);
     }
 
     // 冲刺轨迹特效

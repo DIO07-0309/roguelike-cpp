@@ -2,6 +2,7 @@
 #include "monster.h"
 #include "player.h"
 #include "game_map.h"
+#include "systems/collision_utils.h"
 #include "combat_system.h"
 #include "vfx_server.h"
 #include "config.h"
@@ -1016,15 +1017,8 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
         float dx = bx - px, dy = by - py;
         float len = sqrtf(dx*dx+dy*dy);
         if (len > 1 && len < 300.0f) {
-            player->entity.position.x += dx/len * 120.0f * (float)dt;
-            player->entity.position.y += dy/len * 120.0f * (float)dt;
-            player->entity.sync_rect();
-            // 穿墙回退
-            if (map && !map->is_rect_walkable(player->entity.rect)) {
-                player->entity.position.x -= dx/len * 120.0f * (float)dt;
-                player->entity.position.y -= dy/len * 120.0f * (float)dt;
-                player->entity.sync_rect();
-            }
+            clamp_displacement(player->entity, dx/len * 120.0f * (float)dt,
+                               dy/len * 120.0f * (float)dt, map);
         }
         // 0.8s pull → shockwave with 1.5x range
         _gravity_timer += (float)dt;

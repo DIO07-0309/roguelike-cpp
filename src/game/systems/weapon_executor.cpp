@@ -12,6 +12,7 @@
 #include "core/event_bus.h"
 #include "combat/element_resolver.h"  // G10.3
 #include "systems/relic_effect_processor.h"  // M1A.1
+#include "systems/collision_utils.h"
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.1
 #include <algorithm>
 #include <cmath>
@@ -307,15 +308,7 @@ static bool _try_crossbow_power(Player* p, const AttackStageDef& st,
     proj.lifetime = 1.5f;
     proj.owner = (int)ProjectileOwner::PLAYER; projs->push_back(proj);
     // 后坐力
-    p->entity.position.x -= fwd.x * TILE_SIZE;
-    p->entity.position.y -= fwd.y * TILE_SIZE;
-    p->entity.sync_rect();
-    // 穿墙回退
-    if (map && !map->is_rect_walkable(p->entity.rect)) {
-        p->entity.position.x += fwd.x * TILE_SIZE;
-        p->entity.position.y += fwd.y * TILE_SIZE;
-        p->entity.sync_rect();
-    }
+    clamp_displacement(p->entity, -fwd.x * TILE_SIZE, -fwd.y * TILE_SIZE, map);
     return true;
 }
 
