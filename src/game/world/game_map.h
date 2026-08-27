@@ -24,7 +24,7 @@ struct ArenaObject {
 // ============================================================
 // Tile / GameMap — 地图数据结构
 // ============================================================
-enum class TileType { FLOOR, WALL, STAIRS_DOWN, LAVA };  // M4b: LAVA — 可走但灼烧
+enum class TileType { FLOOR, WALL, STAIRS_DOWN, LAVA, DOOR };  // Phase 2: DOOR — 静态开启门
 
 struct Tile {
     TileType type = TileType::WALL;
@@ -36,6 +36,7 @@ struct Tile {
     static Tile wall()   { return {TileType::WALL, false, false, false}; }
     static Tile stairs() { return {TileType::STAIRS_DOWN, true, false, false}; }
     static Tile lava()   { return {TileType::LAVA, true, false, false}; }
+    static Tile door()   { return {TileType::DOOR, true, false, false}; }  // Phase 2
 };
 
 class GameMap {

@@ -18,7 +18,7 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_r
     _seed = seed;
     if (seed != 0) _local_rng.seed(seed);
 
-    _rooms.clear(); _corridors.clear(); _special_rooms.clear();
+    _rooms.clear(); _corridors.clear(); _connections.clear(); _special_rooms.clear();
     delete _root;
     _root = new BSPNode(0, 0, _w, _h);
 
@@ -187,10 +187,30 @@ void DungeonGenerator::_connect_rooms(BSPNode* node) {
     if (node->right) _connect_rooms(node->right);
     if (!node->left || !node->right) return;
 
-    auto a = _pick_room(node->left);
-    auto b = _pick_room(node->right);
-    if (a.first >= 0 && b.first >= 0)
-        _corridors.emplace_back(a.first, a.second, b.first, b.second);
+    // Phase 2: 获取两个子树的房间信息
+    auto [arx, ary, arw, arh] = _get_room_rect(node->left);
+    auto [brx, bry, brw, brh] = _get_room_rect(node->right);
+    if (arw <= 0 || brw <= 0) return;
+
+    // 获取两个房间的中心（用于选择最近边缘）
+    int acx = arx + arw/2, acy = ary + arh/2;
+    int bcx = brx + brw/2, bcy = bry + brh/2;
+
+    // 选择边缘连接点
+    auto edge_a = _pick_room_edge(node->left, bcx, bcy);
+    auto edge_b = _pick_room_edge(node->right, acx, acy);
+    if (edge_a.first < 0 || edge_b.first < 0) return;
+
+    // 计算 Door 位置
+    auto door_a = _compute_door_pos(edge_a.first, edge_a.second, arx, ary, arw, arh);
+    auto door_b = _compute_door_pos(edge_b.first, edge_b.second, brx, bry, brw, brh);
+    if (door_a.first < 0 || door_b.first < 0) return;
+
+    // 存储连接信息
+    _connections.push_back({edge_a, door_a, door_b, edge_b});
+
+    // 保留旧 _corridors 用于兼容（走廊从 Door 到 Door）
+    _corridors.emplace_back(door_a.first, door_a.second, door_b.first, door_b.second);
 }
 
 std::pair<int,int> DungeonGenerator::_pick_room(BSPNode* node) {
@@ -205,12 +225,81 @@ std::pair<int,int> DungeonGenerator::_pick_room(BSPNode* node) {
     return _pick_room(valid[_rand_int((int)valid.size())]);
 }
 
+// Phase 2: 返回 Room 内部紧邻墙壁的地板 tile（边缘中点）
+std::pair<int,int> DungeonGenerator::_pick_room_edge(BSPNode* node, int target_x, int target_y) {
+    auto [rx, ry, rw, rh] = _get_room_rect(node);
+    if (rw <= 0 || rh <= 0) return {-1, -1};
+
+    // 4 个边缘中点（房间内部地板 tile）
+    struct Edge { int x, y; int door_x, door_y; };
+    Edge edges[4] = {
+        {rx + rw/2, ry,         rx + rw/2, ry - 1},      // 上 → Door 向上
+        {rx + rw/2, ry+rh-1,    rx + rw/2, ry + rh},     // 下 → Door 向下
+        {rx,        ry + rh/2,  rx - 1,    ry + rh/2},   // 左 → Door 向左
+        {rx+rw-1,   ry + rh/2,  rx + rw,   ry + rh/2},   // 右 → Door 向右
+    };
+
+    // 过滤 Door 越界的边缘
+    int best_idx = -1;
+    double best_dist = 1e9;
+    for (int i = 0; i < 4; i++) {
+        if (edges[i].door_x < 0 || edges[i].door_x >= _w) continue;
+        if (edges[i].door_y < 0 || edges[i].door_y >= _h) continue;
+        double dist = (double)(edges[i].x - target_x) * (edges[i].x - target_x)
+                    + (double)(edges[i].y - target_y) * (edges[i].y - target_y);
+        if (dist < best_dist) { best_dist = dist; best_idx = i; }
+    }
+    if (best_idx < 0) return {-1, -1};
+    return {edges[best_idx].x, edges[best_idx].y};
+}
+
+// Phase 2: 从 edge point 计算 Door 位置
+std::pair<int,int> DungeonGenerator::_compute_door_pos(int edge_x, int edge_y,
+                                                        int room_rx, int room_ry,
+                                                        int room_rw, int room_rh) {
+    // edge 是房间内部地板 tile，Door 是其向外 1 格的墙壁 tile
+    if (edge_y == room_ry && edge_x >= room_rx && edge_x < room_rx + room_rw)
+        return {edge_x, room_ry - 1};           // 上边缘 → Door 向上
+    if (edge_y == room_ry + room_rh - 1 && edge_x >= room_rx && edge_x < room_rx + room_rw)
+        return {edge_x, room_ry + room_rh};     // 下边缘 → Door 向下
+    if (edge_x == room_rx && edge_y >= room_ry && edge_y < room_ry + room_rh)
+        return {room_rx - 1, edge_y};           // 左边缘 → Door 向左
+    if (edge_x == room_rx + room_rw - 1 && edge_y >= room_ry && edge_y < room_ry + room_rh)
+        return {room_rx + room_rw, edge_y};     // 右边缘 → Door 向右
+    return {-1, -1};  // 不应该到这里
+}
+
+// Phase 2: 获取 BSP 叶子节点的 Room 矩形
+std::tuple<int,int,int,int> DungeonGenerator::_get_room_rect(BSPNode* node) {
+    if (node->is_leaf() && node->has_room)
+        return {node->rx, node->ry, node->rw, node->rh};
+    // 非叶子：递归找任意一个子房间
+    if (node->left) {
+        auto r = _get_room_rect(node->left);
+        if (std::get<2>(r) > 0) return r;
+    }
+    if (node->right) {
+        auto r = _get_room_rect(node->right);
+        if (std::get<2>(r) > 0) return r;
+    }
+    return {0, 0, 0, 0};
+}
+
 std::vector<std::string> DungeonGenerator::_build_template() {
     std::vector<std::string> grid(_h, std::string(_w, '#'));
     for (auto& [rx, ry, rw, rh] : _rooms)
         _carve_rect(grid, rx, ry, rw, rh);
     for (auto& [x1, y1, x2, y2] : _corridors)
         _carve_corridor(grid, x1, y1, x2, y2);
+    // Phase 2: 放置 Door tiles
+    for (auto& conn : _connections) {
+        auto [dx, dy] = conn.door_a;
+        if (dx >= 0 && dx < _w && dy >= 0 && dy < _h)
+            grid[dy][dx] = 'D';
+        auto [dx2, dy2] = conn.door_b;
+        if (dx2 >= 0 && dx2 < _w && dy2 >= 0 && dy2 < _h)
+            grid[dy2][dx2] = 'D';
+    }
     return grid;
 }
 
@@ -249,6 +338,7 @@ void DungeonGenerator::_carve_diamond(std::vector<std::string>& g, int cx, int c
             if (abs(dx) + abs(dy) > r) continue;
             int tx = cx + dx, ty = cy + dy;
             if (tx >= 0 && tx < _w && ty >= 0 && ty < _h)
-                g[ty][tx] = '.';
+                if (g[ty][tx] == '#')  // Phase 2: 只雕刻墙壁，保护 Room Interior
+                    g[ty][tx] = '.';
         }
 }

@@ -31,6 +31,15 @@ struct BSPNode {
 // ============================================================
 // DungeonGenerator — BSP 地牢生成器
 // ============================================================
+
+// Phase 2: Room ↔ Door ↔ Corridor 连接信息
+struct CorridorConnection {
+    std::pair<int,int> room_a_edge;   // Room A 内部边缘地板 tile
+    std::pair<int,int> door_a;        // Room A 外部 Door 位置 (墙壁 tile)
+    std::pair<int,int> door_b;        // Room B 外部 Door 位置 (墙壁 tile)
+    std::pair<int,int> room_b_edge;   // Room B 内部边缘地板 tile
+};
+
 class DungeonGenerator {
 public:
     DungeonGenerator(int w, int h, int ts,
@@ -50,7 +59,8 @@ private:
     int _w, _h, _ts, _min_part, _min_room, _margin;
     BSPNode* _root = nullptr;
     std::vector<std::tuple<int,int,int,int>> _rooms;
-    std::vector<std::tuple<int,int,int,int>> _corridors;
+    std::vector<std::tuple<int,int,int,int>> _corridors;  // 保留兼容
+    std::vector<CorridorConnection> _connections;  // Phase 2: 新连接
     std::vector<SpecialRoom> _special_rooms;
 
     // Seed 驱动 (B8)
@@ -71,4 +81,9 @@ private:
     void _carve_corridor(std::vector<std::string>& grid, int x1, int y1, int x2, int y2);
     void _carve_line(std::vector<std::string>& grid, int x1, int y1, int x2, int y2, int width);
     void _carve_diamond(std::vector<std::string>& grid, int cx, int cy, int r);
+
+    // Phase 2: Room ↔ Door ↔ Corridor
+    std::pair<int,int> _pick_room_edge(BSPNode* node, int target_x, int target_y);
+    std::pair<int,int> _compute_door_pos(int edge_x, int edge_y, int room_rx, int room_ry, int room_rw, int room_rh);
+    std::tuple<int,int,int,int> _get_room_rect(BSPNode* node);
 };

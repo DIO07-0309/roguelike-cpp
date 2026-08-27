@@ -35,6 +35,7 @@ void GameMap::load_from_template(const std::vector<std::string>& tmpl) {
         for (int x = 0; x < std::min((int)line.size(), width); x++) {
             if (line[x] == '#') _tiles[y][x] = Tile::wall();
             else if (line[x] == '.') _tiles[y][x] = Tile::floor();
+            else if (line[x] == 'D') _tiles[y][x] = Tile::door();  // Phase 2
         }
     }
 }
@@ -286,6 +287,12 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                                    _dim({255, 120, 40, (unsigned char)(160 * pulse)}, bright));
                 DrawCircle(dx + tile_size/2, dy + tile_size/2, 5.0f * pulse + 2.0f,
                            _dim({255, 160, 60, (unsigned char)(120 + 80 * pulse)}, bright));
+            } else if (t.type == TileType::DOOR) {
+                // Phase 2: 门 — 棕色木质标记
+                DrawRectangle(dx, dy, tile_size, tile_size, _dim({140, 100, 50, 255}, bright));
+                DrawRectangleLines(dx, dy, tile_size, tile_size, _dim({100, 70, 30, 255}, bright));
+                DrawCircle(dx + tile_size/2, dy + tile_size/2, 3.0f,
+                           _dim({200, 180, 100, 255}, bright));
             }
 
             // D4 Step1: 事件房间中心绘制标记
