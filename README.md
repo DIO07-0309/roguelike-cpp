@@ -76,8 +76,8 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 
 ### 战斗系统
 
-- **武器 (G9)** — 6 种 × 3 段连击 × 5 命中判定（拳头/匕首/长剑/双截棍/连弩/长矛），21 条 JSON 配置，传奇特效 + 攻击标签联动
-- **技能** — 22 条：16 主动（4 基础：斩击/神罚/自愈/The World + 12 变体）+ 6 被动，每技能 3 级进化（使用次数驱动）
+- **武器 (G9)** — 5 类 × 3 段连击（匕首/长剑/双截棍/连弩/长矛）× 5 种命中形状（CIRCLE/SECTOR/RECTANGLE/CAPSULE/PROJECTILE），21 条 JSON 配置，传奇特效 + 攻击标签联动
+- **技能** — 22 条：16 主动（4 基础：斩击/神罚/自愈/The World + 5 签名：冰爆/连锁闪电/暗影突袭/血怒/召唤英灵 + 7 数据驱动变体）+ 6 被动，每技能 3 级进化（使用次数驱动）
 - **元素核心 (G10)** — 开局永久三选一：火焰暴击 / 冰霜冻结 / 剧毒 DOT，独立成长 + VFX
 - **Boss** — 5 场（F5 三选一）：暗影骑士 / 亡灵法师 / 血族伯爵 / **地狱火魔(F10)** — 弹幕图案化（扇形/环形/螺旋多波）+ 机制阶段（核心破坏→弹幕风暴→易伤）+ 领域地形 / **终焉回响(F15)** — 镜像学习 Boss
 - **敌人** — 30 种，9 类 AI（含 SNIPER/CONTROLLER/AMBUSH/GUARDIAN 原型），全数据驱动
@@ -98,7 +98,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 - **存档 v3** — 跨版本兼容（v1→v3 + 增量字段），SaveStable 3 验收测试
 - **Mod 系统** — `mods/` 扫描 + 依赖解析 + MergeMode{Skip/Replace/MergePatch} 字段级合并
 - **中文 UI** — 生成字体图集全中文渲染，`tools/extract_chars.py` 自动维护码点
-- **音频** — 程序化合成（wave_synth）：14 SFX（hit/hurt/melee/slash/bolt/heal/timestop/domain_expand/victory/ui 等）+ 4 BGM（title/select/dungeon/boss + biome 动态变体）+ 交叉淡入 + Boss Phase2 cue
+- **音频** — 程序化合成（wave_synth）：14 SFX（hit/hurt/melee/slash/bolt/heal/timestop/domain_expand/victory/ui 等）+ 5 BGM（title/select/dungeon/boss/victory + biome 动态变体）+ 交叉淡入 + Boss Phase2 cue
 - **回放/确定性** — Replay 录制 + hash 链逐帧校验（`--record/--replay`）
 - **批量评估** — `--sim N` headless 模拟 + 平衡报告（`reports/balance_report.json`）
 
@@ -122,7 +122,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 - **数据驱动 + Def/Runtime 分离** — JSON 不可变配置 ≠ C++ 可变状态；Registry 只读查询（`load_/get_/get_all_/is_loaded` 统一 API）；20+ JSON → 12 模块加载器 → 运行时
 - **Mod 热插拔** — `IRegistryProvider` 优先级链 + MergeMode{Skip/Replace/**MergePatch** 字段级合并} + 依赖**拓扑排序** + 循环检测 + `mod_id:entry_id` 命名空间隔离
 - **事件驱动解耦** — EventBus 45 事件、轻量载荷 `{type,sender,int,float,str}`、按 owner 批量注销；Gameplay→EventBus→Presentation 单向流（Gameplay 不引用 UI）
-- **组合式 Director** — GameScene 组合 5 Director：Boss（12 子系统）/ Gameplay（world_state/quest/ending）/ Presentation（shake/freeze/BuildTheme）/ Flow（12 态生命周期）/ PlayerController；零继承
+- **组合式 Director** — GameScene 组合 5 Director：BossSystem（12 子系统）/ GameplaySystem（world_state/quest/ending）/ PresentationSystem（shake/freeze/BuildTheme）/ GameFlow（12 态生命周期）/ Flow（动态内容编排）；CameraDirector 常量 + EndingDirector 判定为辅助模块；零继承
 - **确定性游戏技术** — `CountingRng`（mt19937 + 掷骰计数）· 种子公式 `seed_start + run*1234567` · **replay hash 链**逐帧校验（mixer 黄金比例常量）· 指针键 → instance_id 防跨进程分叉（Q3.14 对拍逐字节一致）
 - **存档兼容工程** — v1→v3 追加式字段 + `getV` 默认值 + 旧技能名映射 + SaveStable 3 验收测试；三份数据独立：save.json（局内）/ meta_save.json（局外成长）/ relic_archive.json（收藏）
 - **内存安全实践** — 全智能指针 + 工厂方法（`spawn_monster`/`boss_factory_create`），无裸 `new`；SEH 异常捕获 → crash.log
@@ -142,7 +142,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 
 ### 表现与内容技术
 
-- **程序化音频合成** — wave_synth 波形合成 14 SFX + 4 BGM（零音频素材），交叉淡入 + Boss Phase2 cue
+- **程序化音频合成** — wave_synth 波形合成 14 SFX + 5 BGM（零音频素材），交叉淡入 + Boss Phase2 cue
 - **VFX 图元系统** — 10 基础图元（ring/beam/lightning/explosion/slash/smoke/spark/aura/flash/shockwave）+ JSON recipe 派发 + BuildTheme 主题调制（VFX/Camera/ScreenFX/Audio 四类）
 - **打击感工程** — HitStop 冻结帧 / 震屏 / 伤害数字 / 受击红闪 / 连击评分（CameraDirector 常量调参）
 - **数值验证流水线** — 胜率目标区间 6-10% + 500 局回归 + 死亡分布监控 + World Validator 4 类检查
@@ -283,8 +283,8 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 - **美术** — 程序化像素 + Kenney CC0 占位素材，无完整商业美术资产
 - **手感** — 实时动作（攻击间隔 0.5s），无翻滚/无锁定，非回合制；打击感三件套已就位但数值打磨以研究平衡为主
 - **平衡** — 胜率目标区间 6-10%（研究平台定位，非商业难度曲线）
-- **Boss 决策链** — D5 决策系统结果目前仅 HUD 展示，实际行为由连招模板驱动（`boss.cpp`）；`boss_decision_to_command` 为显示层
-- **导航** — 运行时模拟用 BFS；A* pathfinder 有测试支撑但未接入生产路径
+- **Boss 决策链** — D5 决策系统 → `boss_decision_to_command` → `boss_execute_command` 完整链路（含攻击/技能/移动/领域命令），同时 HUD 展示决策名称
+- **导航** — 运行时模拟用 BFS（`_bfs_toward/_bfs_away`）；A* pathfinder 已接入 BT Agent 的 MoveToTarget 叶节点（`bt_move_to_target.h`）
 - **环境物** — 原 hazards.json（环境危险物）为死链路已移除（v0.9.33）；当前环境机制为 ArenaObject（毒池/尖刺/图腾/木桶）+ 熔岩地砖
 - **中文渲染** — 依赖生成字体图集（1769 码点），新增中文文案需重跑 `extract_chars.py`
 - **平台** — Windows 实机验证；macOS/Linux 构建规范见 `docs/G4_PLATFORM_BIBLE.md`，未实机验证
@@ -381,7 +381,7 @@ src/                                    # 281 源文件（127 cpp + 154 h）
 │   │   ├── combat_system.cpp · combat_system.h         # 伤害结算 + CountingRng
 │   │   ├── combat_coordinator.cpp · combat_coordinator.h  # 连击系统
 │   │   ├── hit_detection.cpp · hit_detection.h         # 命中判定（5 种形状）
-│   │   ├── weapon_executor.cpp · weapon_executor.h     # 6 武器 × 3 段连击执行
+│   │   ├── weapon_executor.cpp · weapon_executor.h     # 5 武器 × 3 段连击执行
 │   │   ├── weapon_component.cpp · weapon_component.h   # 武器组件
 │   │   ├── projectile_factory.cpp · projectile_factory.h  # 投射物工厂（连弩/弹幕）
 │   │   ├── vfx_server.cpp · vfx_server.h               # VFX 10 基础图元 + recipe 派发
@@ -400,10 +400,10 @@ src/                                    # 281 源文件（127 cpp + 154 h）
 │   │   ├── encounter.cpp · encounter.h   # 遭遇框架（9 个：NPC/事件）
 │   │   ├── special_room.cpp · special_room.h           # 10 类特殊房间
 │   │   ├── quest_manager.cpp · quest_manager.h         # 任务管理（12 任务）
-│   │   ├── npc_system.cpp · npc_system.h               # NPC 系统（6 NPC）
+│   │   ├── npc_system.cpp · npc_system.h               # NPC 系统（12 NPC 类型）
 │   │   ├── relationship_system.cpp · relationship_system.h  # 好感度
 │   │   ├── rule_chain.cpp · rule_chain.h               # Boss 死亡 → 规则链激活
-│   │   ├── event_system.cpp · event_system.h           # 世界事件（10 个）
+│   │   ├── event_system.cpp · event_system.h           # 世界事件（18 类型）
 │   │   ├── world_state.cpp · world_state.h             # Flags + Counters
 │   │   ├── flow_director.cpp · flow_director.h         # 动态内容编排
 │   │   ├── floor_config.cpp · floor_config.h           # 楼层配置（倍率/特殊房/BGM）
@@ -434,7 +434,7 @@ src/                                    # 281 源文件（127 cpp + 154 h）
 │   │   └── resource_manager.cpp · resource_manager.h   # 字体/纹理/JSON 缓存
 │   ├── audio/                             # 音频（6）
 │   │   ├── wave_synth.cpp · wave_synth.h  # 程序化波形合成（零素材）
-│   │   ├── bgm_engine.cpp · bgm_engine.h  # 4 BGM 编译 + 交叉淡入 + Phase2 cue
+│   │   ├── bgm_engine.cpp · bgm_engine.h  # 5 BGM 编译 + 交叉淡入 + Phase2 cue
 │   │   └── audio_server.cpp · audio_server.h           # SFX 播放/音量/静音
 │   ├── save/                              # 存档（2）
 │   │   └── save_manager.cpp · save_manager.h           # v3 key:value 存档（v1→v3 兼容）
@@ -577,7 +577,7 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | G1.3 | SkillEvolutionManager (技能使用次数驱动进化) + has_confirmed_build() | ✅ |
 | G1.4 | RuleChainManager (Boss死亡→规则激活→WorldState→后续楼层影响) | ✅ |
 | G1.5 | EnemyDef 数据模块 + enemies.json (10 enemies 全数据驱动) + spawn_monster 通用工厂 | ✅ |
-| G1.6 | BossDef 数据模块 + bosses.json (6 bosses 数据驱动) + Phase2 参数化 + Vampire 新Boss | ✅ |
+| G1.6 | BossDef 数据模块 + bosses.json (5 bosses 数据驱动) + Phase2 参数化 + Vampire 新Boss | ✅ |
 | G1.7 | Save v2: atl + skill evo/use + rule_counters 序列化 + 向后兼容旧存档 | ✅ |
 | G2.0 | Infrastructure Polish: 4 Def 统一接口 (get_all + is_loaded) + 重复 ID 检测 + 加载日志标准化 | ✅ |
 | G2.1 | Dialogue Data Driven: dialogues.json + DialogueDef + BossNarrative 重构 | ✅ |
@@ -586,8 +586,8 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | G2.4 | QuestDef + quests.json (12 quests) + EventBus quest events + Save v3 qst: | ✅ |
 | G2.5 | EndingDef + endings.json + Save v3 end: + ENDING_REACHED emit | ✅ |
 | G3.1 | MetaNodeDef + meta_nodes.json + MetaProgression::load_from_defs() (10 nodes) | ✅ |
-| G3.2 | SkillDef + skills.json (6 skills) + SkillFactory + _skill_id 替代 dynamic_cast | ✅ |
-| G3.3 | ItemDef + items.json (20 templates) + ItemFactory 替代硬编码数组 | ✅ |
+| G3.2 | SkillDef + skills.json (22 skills) + SkillFactory + _skill_id 替代 dynamic_cast | ✅ |
+| G3.3 | ItemDef + items.json (31 templates) + ItemFactory 替代硬编码数组 | ✅ |
 | G3.4 | Architecture Freeze: 命名统一 + 12 模块 API 审计 | ✅ |
 | G3.5 | Meta Reward Integration: reward_from_ending() + MetaRewardRecord 审计日志 | ✅ |
 | G4.1 | Mod Loader: IRegistryProvider + RegistryBuilder + BuiltinProvider + ModProvider + 12×_from_json | ✅ |
@@ -596,9 +596,9 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | G4.3 | Advanced Merge: MergePatch (__patch field merge) + merge_patch.h helper + BuildRecord patch | ✅ |
 | G4.4 | ModManager: scan/enable/disable/list + mods/config.json + startup summary | ✅ |
 | G4.5 | Replay Regression: ReplayFile + Recorder + Player + _is_action + state_hash + seed_rng + CLI | ✅ |
-| G5.1 | Build Diversity: BuildType 6→12 + skills 6→20 + relics 33→63 + buffs 20→25 + items 20→36 + enemies 10→23 | ✅ |
+| G5.1 | Build Diversity: BuildType 6→12 + skills 6→22 + relics 33→60 + buffs 20→27 + items 20→31 + enemies 10→30 | ✅ |
 | G5.2 | Signature Skills: IceNova/ChainLightning/ShadowStrike/BloodFrenzy/SummonSpirit | ✅ |
-| G5.3 | Enemy Archetypes: AIArchetype + SNIPER/CONTROLLER/AMBUSH/GUARDIAN + enemies 23→31 | ✅ |
+| G5.3 | Enemy Archetypes: AIArchetype + SNIPER/CONTROLLER/AMBUSH/GUARDIAN + enemies 23→30 | ✅ |
 | G5.4 | Boss Rework: Whirlwind/LaserBarrage/GravityPull + per-boss Phase2 identity (6 unique) | ✅ |
 | G5.5 | Run Events: spawn rate 25→40% + ch2+双事件 + special rooms 2-3→3-5 + NOTHING权重↓ | ✅ |
 | G5.6 | Balance Pass: SimAI + SimRunner + --sim N CLI + automated 100-run balance report | ✅ |
@@ -624,7 +624,7 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | G8.2 | Navigation: A* pathfinder + MoveToTarget BT node + 7 astar tests | ✅ |
 | G8.3 | Combat MCTS: MCTSNode + UCT search + SimulationState clone + 16 tests + --sim-ai mcts | ✅ |
 | G8.4 | RL Environment: Gym-like API + Observation + RandomAgent + QAgent + 17 tests + --rl-test/train | ✅ |
-| G9.0 | Weapon Framework: WeaponType(6)/HitShape(5) + WeaponDef registry + weapons.json (24 entries) | ✅ |
+| G9.0 | Weapon Framework: WeaponType(5)/HitShape(5) + WeaponDef registry + weapons.json (21 entries) | ✅ |
 | G9.1 | Weapon Specials: Nunchaku 5-hit auto-track / Spear 10-hit rapid / Crossbow real projectile system | ✅ |
 | G9.2 | Equipment Identity: 命名池(稀有/史诗/传奇) + Affix系统(5种) + 传奇特殊效果(5把) | ✅ |
 | G9.3 | Weapon Synergy: AttackTag→技能联动 (Sword→Ice/Dagger→Shadow/Nunchaku→Lightning/Crossbow→Fire/Spear→Blood) | ✅ |
