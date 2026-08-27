@@ -5,6 +5,7 @@
 #include "systems/combat_system.h"
 #include "systems/hit_detection.h"
 #include "systems/vfx_server.h"
+#include "game_map.h"
 #include "combat_feel.h"
 #include "config.h"
 #include "audio_server.h"
@@ -156,7 +157,7 @@ static bool _try_nunchaku_special(Player* p, const AttackStageDef& st,
     float rpx, float wp, const std::vector<Monster*>& rt);
 static bool _try_spear_special(Player* p, const AttackStageDef& st, float rpx);
 static bool _try_crossbow_power(Player* p, const AttackStageDef& st,
-    Vector2 origin, std::vector<Projectile>* projs);
+    Vector2 origin, std::vector<Projectile>* projs, GameMap* map);
 static void _crossbow_normal(Player* p, const AttackStageDef& st,
     Vector2 origin, int stage_idx, std::vector<Projectile>* projs);
 static std::vector<WeaponAttackResult> _melee_normal(
@@ -172,7 +173,8 @@ std::vector<WeaponAttackResult> WeaponExecutor::execute(
     const std::vector<Monster*>& targets,
     double game_time,
     AudioServer* audio,
-    std::vector<Projectile>* projectiles)
+    std::vector<Projectile>* projectiles,
+    GameMap* map)
 {
     std::vector<WeaponAttackResult> results;
     if (!player || !player->combat.is_alive) return results;
@@ -196,7 +198,7 @@ std::vector<WeaponAttackResult> WeaponExecutor::execute(
         else if (def->type == WeaponType::SPEAR)
             is_special = _try_spear_special(player, stage, rpx);
         else if (def->type == WeaponType::CROSSBOW && projectiles)
-            is_special = _try_crossbow_power(player, stage, origin, projectiles);
+            is_special = _try_crossbow_power(player, stage, origin, projectiles, map);
     }
 
     // ── G9.3: range indicator for ranged + nunchaku weapons ──
@@ -285,7 +287,7 @@ static bool _try_spear_special(Player* p, const AttackStageDef& st, float rpx)
 
 // ── Stage-3 special: crossbow power shot (piercing projectile + recoil) ──
 static bool _try_crossbow_power(Player* p, const AttackStageDef& st,
-    Vector2 origin, std::vector<Projectile>* projs)
+    Vector2 origin, std::vector<Projectile>* projs, GameMap* map)
 {
     Vector2 fwd = {0, 1};
     switch (p->direction) {
@@ -304,9 +306,16 @@ static bool _try_crossbow_power(Player* p, const AttackStageDef& st,
     proj.piercing = true;
     proj.lifetime = 1.5f;
     proj.owner = (int)ProjectileOwner::PLAYER; projs->push_back(proj);
+    // 后坐力
     p->entity.position.x -= fwd.x * TILE_SIZE;
     p->entity.position.y -= fwd.y * TILE_SIZE;
     p->entity.sync_rect();
+    // 穿墙回退
+    if (map && !map->is_rect_walkable(p->entity.rect)) {
+        p->entity.position.x += fwd.x * TILE_SIZE;
+        p->entity.position.y += fwd.y * TILE_SIZE;
+        p->entity.sync_rect();
+    }
     return true;
 }
 

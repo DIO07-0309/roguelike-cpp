@@ -420,7 +420,7 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
     for (auto& m : gs.monsters) mlist.push_back(m.get());
     auto results = WeaponExecutor::execute(
         &p, mlist, gs.game_time, gs.get_tree()->get_audio(),
-        &gs.projectiles);
+        &gs.projectiles, gs.game_map.get());
 
     // Feedback always, even on whiff
     p.combo.hit(gs.game_time);

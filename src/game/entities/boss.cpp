@@ -1019,6 +1019,12 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
             player->entity.position.x += dx/len * 120.0f * (float)dt;
             player->entity.position.y += dy/len * 120.0f * (float)dt;
             player->entity.sync_rect();
+            // 穿墙回退
+            if (map && !map->is_rect_walkable(player->entity.rect)) {
+                player->entity.position.x -= dx/len * 120.0f * (float)dt;
+                player->entity.position.y -= dy/len * 120.0f * (float)dt;
+                player->entity.sync_rect();
+            }
         }
         // 0.8s pull → shockwave with 1.5x range
         _gravity_timer += (float)dt;

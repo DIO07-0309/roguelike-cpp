@@ -5,6 +5,7 @@
 
 class Player;
 class Monster;
+class GameMap;
 class AudioServer;
 struct Effect;
 
@@ -21,7 +22,8 @@ public:
         const std::vector<Monster*>& targets,
         double game_time,
         AudioServer* audio,
-        std::vector<Projectile>* projectiles = nullptr);
+        std::vector<Projectile>* projectiles = nullptr,
+        GameMap* map = nullptr);
 
     // G9.1: Tick ongoing multi-hit specials (nunchaku flurry, spear rapid).
     // Call once per frame from GameScene::_process().
