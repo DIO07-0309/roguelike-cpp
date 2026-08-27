@@ -571,6 +571,12 @@ void PlayerController::_apply_attack_feedback(GameScene& gs, Player& p,
             target->entity.position.x += dx / len * knock;
             target->entity.position.y += dy / len * knock;
             target->entity.sync_rect();
+            // 穿墙回退
+            if (!gs.game_map->is_rect_walkable(target->entity.rect)) {
+                target->entity.position.x -= dx / len * knock;
+                target->entity.position.y -= dy / len * knock;
+                target->entity.sync_rect();
+            }
         }
         gs._presentation.trigger_shake(is_crit ? 16.0f : CombatFeelSystem::SHAKE_HEAVY);
         gs._presentation.trigger_freeze(is_crit ? CombatFeelSystem::CRITICAL_HIT

@@ -898,7 +898,14 @@ void GameScene::_process(double delta) {
                         // 击退
                         float dx = m->entity.rect.x - cx, dy = m->entity.rect.y - cy;
                         float len = sqrtf(dx*dx + dy*dy);
-                        if (len > 0) { m->entity.position.x += dx / len * 30; m->entity.position.y += dy / len * 30; m->entity.sync_rect(); }
+                        if (len > 0) { m->entity.position.x += dx / len * 30; m->entity.position.y += dy / len * 30; m->entity.sync_rect();
+                            // 穿墙回退
+                            if (!game_map->is_rect_walkable(m->entity.rect)) {
+                                m->entity.position.x -= dx / len * 30;
+                                m->entity.position.y -= dy / len * 30;
+                                m->entity.sync_rect();
+                            }
+                        }
                     }
                 }
                 _presentation.trigger_shake(8.0f);

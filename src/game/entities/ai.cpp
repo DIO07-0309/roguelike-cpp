@@ -625,6 +625,12 @@ void MonsterAI::_exec_charge(Monster* self, Player* player, GameMap* map,
         float py = player->entity.position.y + ndy * 48.0f;
         player->entity.position = {px, py};
         player->entity.sync_rect();
+        // 穿墙回退
+        if (map && !map->is_rect_walkable(player->entity.rect)) {
+            player->entity.position.x -= ndx * 48.0f;
+            player->entity.position.y -= ndy * 48.0f;
+            player->entity.sync_rect();
+        }
     }
 
     // 冲刺轨迹特效
