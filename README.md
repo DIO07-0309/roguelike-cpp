@@ -1,9 +1,11 @@
 # 地牢肉鸽 — Roguelike C++
 
-> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **281 源文件** (127 cpp + 154 h) | Windows 实机验证
+> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **289 源文件** (129 cpp + 160 h) | Windows 实机验证
 >
 > 随机生成 15 层地牢，击败 Boss「终焉回响」通关。
 > 五项 Stable 冻结验收通过：**API / Save / Mod / Regression / Performance**（报告 `docs/V1_0_0_ACCEPTANCE.md`）
+>
+> **v1.0.0 后新增**（Phase 1-3，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图
 
 本项目定位：
 
@@ -72,7 +74,7 @@ build/roguelike_cpp.exe
 
 ### 地牢生成
 
-BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗深渊 / F11-15 虚空深渊），F4/9/14 休整层、F5/10/15 Boss 层。10 类特殊房间（祭坛/宝箱/泉水/商店/铁匠/图书馆/赌徒/神殿/隐藏密室/地标）+ ArenaObject 战场元素（毒池/尖刺/图腾/**木桶 — 攻击或弹体点燃 → 0.6s 引信 → AOE 爆炸**）。F10 地狱火魔 Boss 房含机制地形（LAVA 灼烧 + 中央安全区熔岩环带）。
+BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗深渊 / F11-15 虚空深渊），F4/9/14 休整层、F5/10/15 Boss 层。**Room→Door→Corridor 拓扑（Phase 2）**——房间经边缘门与走廊连接，走廊只雕刻墙壁不侵入房间内部；门为静态开启（walkable、不挡视线，未来可扩展 CLOSED/LOCKED/SEALED）。10 类特殊房间（祭坛/宝箱/泉水/商店/铁匠/图书馆/赌徒/神殿/隐藏密室/地标）+ ArenaObject 战场元素（毒池/尖刺/图腾/**木桶 — 攻击或弹体点燃 → 0.6s 引信 → AOE 爆炸**）。F10 地狱火魔 Boss 房含机制地形（LAVA 灼烧 + 中央安全区熔岩环带）。
 
 ### 战斗系统
 
@@ -95,6 +97,8 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 
 ### 系统能力
 
+- **FOV 可见性（Phase 1）** — 360° 射线投射，Tile 三层状态（未探索黑色 / 当前可见全亮 / 已探索不可见 60% 暗）；实体中心 tile 可见性剔除；`is_visible`/`is_explored` 独立于 `is_walkable`
+- **Minimap 小地图（Phase 3）** — 右下角常驻面板（M 键开关），只读现有 `isExplored/isVisible` **无第二套探索状态**；未探索区不显示、已探索永久记忆、当前可见高亮；Room/Corridor/Door 缩略色块 + 玩家/Boss 最后已知位置/楼梯标记；实体仅当前可见才显示，绝不泄露未探索区
 - **存档 v3** — 跨版本兼容（v1→v3 + 增量字段），SaveStable 3 验收测试
 - **Mod 系统** — `mods/` 扫描 + 依赖解析 + MergeMode{Skip/Replace/MergePatch} 字段级合并
 - **中文 UI** — 生成字体图集全中文渲染，`tools/extract_chars.py` 自动维护码点
@@ -114,7 +118,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 | 图形/输入 | Raylib 5.0（窗口/绘制/输入/音频），sprite atlas + 程序化像素占位 |
 | JSON | nlohmann/json（header-only），20+ 配置文件全数据驱动 |
 | 构建 | CMake 3.16+ + CMakePresets + MinGW（UTF-8 编译标志），Release/Debug + 测试三配置 |
-| 测试 | GoogleTest（34 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
+| 测试 | GoogleTest（39 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
 | Python 工具 | `tools/`：world_validator（JSON 交叉引用）/ extract_chars（中文字体码点） |
 
 ### 工程与架构技术
@@ -269,7 +273,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 
 ### 测试与验证
 
-- **34 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip）
+- **39 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip）
 - World Validator：20+ JSON 交叉引用 **0 errors 0 warnings**
 - 木桶闭环实测：200 局 sim **38 次 点燃→爆炸 完全成对**（伤害随楼层缩放）
 - 收官体检：编译 0 警告（bgm narrowing 修复后）
@@ -297,7 +301,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 ## 项目结构
 
 ```
-src/                                    # 281 源文件（127 cpp + 154 h）
+src/                                    # 289 源文件（129 cpp + 160 h）
 ├── main.cpp                            # 入口：CLI 解析 / Registry+Mod 构建 / sim 前置 / 场景树启动
 │
 ├── core/                               # 引擎框架 + 模拟器 + 回放 + Mod 管线（25）
@@ -393,8 +397,8 @@ src/                                    # 281 源文件（127 cpp + 154 h）
 │   │   ├── skill_evolution.cpp · skill_evolution.h     # 技能进化（使用次数驱动）
 │   │   └── interaction_handler.cpp · interaction_handler.h  # 拾取/交互结果解析
 │   ├── world/                             # 世界生成与规则（34）
-│   │   ├── dungeon_generator.cpp · dungeon_generator.h # BSP 二分划分地图生成
-│   │   ├── game_map.cpp · game_map.h     # 瓦片地图（碰撞/特殊房/熔岩/木桶）
+│   │   ├── dungeon_generator.cpp · dungeon_generator.h # BSP 二分划分地图生成（Phase 2: Door 拓扑）
+│   │   ├── game_map.cpp · game_map.h     # 瓦片地图（碰撞/特殊房/熔岩/木桶/FOV 可见性）
 │   │   ├── biome.cpp · biome.h           # 三章生态（Prison/Volcano/Abyss）
 │   │   ├── landmark.cpp · landmark.h     # 地标（9 个）
 │   │   ├── encounter.cpp · encounter.h   # 遭遇框架（9 个：NPC/事件）
@@ -430,6 +434,8 @@ src/                                    # 281 源文件（127 cpp + 154 h）
 │   │   └── service_locator.h              # 服务定位
 │   ├── rendering/                         # 渲染（2）
 │   │   └── sprite_renderer.cpp · sprite_renderer.h     # sprite atlas + 程序化像素占位
+│   ├── ui/                                # UI 渲染（Phase 3 Minimap）
+│   │   └── minimap.cpp · minimap.h        # 小地图（只读 isExplored/isVisible，无第二套状态）
 │   ├── resources/                         # 资源管理（2）
 │   │   └── resource_manager.cpp · resource_manager.h   # 字体/纹理/JSON 缓存
 │   ├── audio/                             # 音频（6）
@@ -489,7 +495,7 @@ src/                                    # 281 源文件（127 cpp + 154 h）
 │   └── navigation/                        # 导航（2）
 │       └── pathfinder.cpp · pathfinder.h  # A* 寻路（priority_queue + Manhattan）
 
-tests/                      (34 条目)  # GoogleTest，按模块分目录
+tests/                      (39 条目)  # GoogleTest，按模块分目录 — fov / dungeon_topology / minimap 等
 resources/                             # 20+ JSON 配置（enemies/skills/relics/bosses/weapons/elements/biomes/encounters/dialogues/quests/endings/…）+ world/ 三章子目录
 tools/                                 # world_validator.py / extract_chars.py / replace_methods.py
 docs/                                  # ARCHITECTURE / G4_PLATFORM_BIBLE / WORLD_LORE / D1_GAMEPLAY / ART_*
@@ -677,3 +683,7 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | M4b | 第二章 Boss 领域作战 (地狱火魔): ① 弹幕图案化 (扇形/环形/螺旋多波, 波次发射, 帧率无关步进) ② 机制阶段 MECHANIC_PHASE 激活 (核心破坏→弹幕风暴演出→易伤, 遭遇阶段驱动连招模板) ③ Boss 房机制地形 (LAVA 地砖灼烧 + 中央安全区熔岩环带, 数据驱动); 500 局胜率 7.0% 区间内, 34/34 测试 | ✅ |
 | v1.0.0 | Release Standard 五项 Stable 冻结验收: API (对外契约 2+ 版冻结) / Save (v1→v3 兼容 + 3 验收测试 + 修复 elem 存档丢失 bug) / Mod (管线+测试) / Regression (确定性对拍 + 500 局 8.0%) / Performance (500 局并行 53s) — 报告 docs/V1_0_0_ACCEPTANCE.md | ✅ |
 | 收官体检 | 全仓代码体检修复: ① 删除 hazards.json 死链路 (零消费者) ② EXPLOSIVE_BARREL 最小闭环 (攻击/弹体点燃 → 0.6s 引信 → AOE 爆炸 → VFX → 销毁, 实测 38 次成对) ③ Boss 技能冷却恢复判定 (can_use 读端接入, 冷却中退普攻) ④ bgm 音符解析警告修复; 34/34 测试, validator 0 error, 500 局 10.0% 区间内 | ✅ |
+| Phase 0 | 可见性/拓扑/数据一致性审计 + 平衡审计（docs/VISIBILITY_SYSTEM_AUDIT / DUNGEON_TOPOLOGY_AUDIT / P0_5_BALANCE_AUDIT） | ✅ |
+| Phase 1 | FOV 可见性系统（360° 射线投射）：Tile 三层状态（未探索/可见/记忆暗）+ 实体中心 tile 剔除 + 8 单测；阻断可见性 bug | ✅ |
+| Phase 2 | 地牢拓扑：Room→Door→Corridor 边缘连接（_pick_room_edge + _compute_door_pos）+ DOOR tile（walkable、不挡视线）+ _carve_diamond 墙壁保护 + 12 拓扑测试 + 5 结构回归 | ✅ |
+| Phase 3 | Minimap 小地图：MinimapRenderer 只读 isExplored/isVisible（无第二套状态）+ M 键开关右下角面板 + Boss 最后已知位置/楼梯发现地标 + 12 单测 | ✅ |

@@ -1,3 +1,42 @@
+# v1.1.0 — 可见性与空间体验 (Phase 1-3): FOV + 地牢拓扑 + Minimap (2026-08-28)
+
+> v1.0.0 之后的地牢空间感三连深耕：从"做完"到"做得像"。全部保证 FOV/Save/AI/战斗系统零改动（除 Phase 1 自身）。
+
+## Phase 1 — FOV 可见性系统
+
+- **Tile 三层状态**：`is_visible`（当前帧 FOV 内）/ `is_explored`（曾探索）/ `is_walkable`（碰撞，独立于可见性）三字段解耦
+- **360° 射线投射**：`update_fov(cx,cy,radius)` 逐度投射，撞墙/越界即断；`reset_visibility()` 进层清空
+- **三层渲染**：未探索=全黑不渲染；当前可见=全亮；已探索但不可见=60% 暗（记忆态）
+- **实体剔除**：怪物/NPC/地面物品按中心 tile 的 `is_visible` 剔除，未探索区看不到生物
+- 8 个 FOV 单测（`tests/world/fov_test.cpp`）
+- 阻断问题：实体可见性判定错误、贯穿墙视线
+
+## Phase 2 — 地牢拓扑 (Room → Door → Corridor)
+
+- **`TileType::DOOR`**：`walkable=true`、`blocks_sight=false`（静态开启门，预留 CLOSED/LOCKED/SEALED 扩展）
+- **边缘连接算法**：`_pick_room_edge`（房间边缘中点）+ `_compute_door_pos`（向外 1 格放门）+ `CorridorConnection` 结构
+- **`_carve_diamond` 墙壁保护**：`if (g[ty][tx]=='#')` 只雕刻墙壁，走廊绝不侵入房间 Interior
+- **门边界安全**：`_pick_room_edge` 过滤 Door 越界的边缘（地图侧)
+- 12 拓扑测试 + 5 结构回归（`dungeon_topology_test` / `dungeon_verify_test`，永久保留）
+- 验收报告：`docs/PHASE2_ACCEPTANCE_REPORT.md`（房间环墙覆盖率 71~78%，墙体密度 41~52%，无巨型开放区）
+
+## Phase 3 — Minimap 小地图
+
+- **`MinimapRenderer`**（`src/game/ui/`）：只读 `isExplored/isVisible`，**无第二套探索状态**；职责=坐标换算/绘制/标记/面板背景
+- **不泄露原则**（纯函数可测）：`should_show_boss`（最后已知位置，仅已探索）/ `should_show_stairs`（发现后永久）/ `should_show_entity`（仅当前可见，离开视野即消失）
+- **常量集中**：`MINIMAP_TILE_SIZE/WIDTH/HEIGHT`（非魔法数字，便于扩展）
+- 右下角常驻面板，**M 键**开关（默认显示）；Boss 不实时追踪不可见区移动
+- 12 单测（`tests/ui/minimap_test.cpp`）
+
+## 验证
+
+- **39/39 ctest 全绿**（含 minimap 12 + dungeon_verify 5 + dungeon_topology 12）
+- world_validator 0 error 0 warning
+- 多 seed 实机 smoke test 无崩溃；桌面打包版已同步
+- 完整审计/设计/验收：`docs/PHASE1_FOV_PLAN.md` / `PHASE3_MINIMAP_PLAN.md` / `PHASE2_ACCEPTANCE_REPORT.md`
+
+---
+
 # v0.9.35 — 实测反馈修复: 背包键位冲突 + 怪物房间守卫 + 通关专属 BGM (2026-08-25)
 
 ## 玩家实测三连 (来源: 试玩反馈)
