@@ -26,6 +26,12 @@ inline constexpr int DUNGEON_ROOM_MARGIN = 1;
 inline constexpr int DUNGEON_CORRIDOR_MIN = 1;
 inline constexpr int DUNGEON_CORRIDOR_MAX = 2;
 
+// ---- 小地图 (Phase 3) ----
+// 每个 tile 的小地图像素尺寸；宽高由地图尺寸推导，便于后续扩展
+inline constexpr int MINIMAP_TILE_SIZE = 4;
+inline constexpr int MINIMAP_WIDTH  = MAP_WIDTH * MINIMAP_TILE_SIZE;   // 160
+inline constexpr int MINIMAP_HEIGHT = MAP_HEIGHT * MINIMAP_TILE_SIZE;  // 120
+
 // ---- 关卡 ----
 inline constexpr int MAX_FLOORS = 15;
 inline constexpr int BOSS_FLOORS[] = {5, 10, 15};

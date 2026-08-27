@@ -32,6 +32,7 @@ include_directories("${CMAKE_SOURCE_DIR}/src/game/scene")
 include_directories("${CMAKE_SOURCE_DIR}/src/game/types")
 include_directories("${CMAKE_SOURCE_DIR}/src/game/resources")
 include_directories("${CMAKE_SOURCE_DIR}/src/game/core")
+include_directories("${CMAKE_SOURCE_DIR}/src/game/ui")       # Phase 3 Minimap
 include_directories("${CMAKE_SOURCE_DIR}/src/game/boss")
 include_directories("${CMAKE_SOURCE_DIR}/src/game/director")
 include_directories("${CMAKE_SOURCE_DIR}/src/data")       # G1 Step5

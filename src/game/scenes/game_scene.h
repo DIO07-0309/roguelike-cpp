@@ -38,6 +38,7 @@ class BTAgent;
 #include "boss_command.h"
 #include "arena_manager.h"
 #include "boss_replay.h"
+#include "minimap.h"
 #include "boss_encounter.h"
 #include "camera_director.h"
 #include "boss_cinematic.h"
@@ -269,6 +270,11 @@ private:
     GameSceneInteraction _interaction{*this};
     GameRenderer _renderer;
     InteractionHandler _interact;
+
+    // Phase 3: Minimap — 只读 GameMap，无第二套探索状态
+    MinimapRenderer _minimap;
+    bool _show_minimap = true;              // 默认显示，M 切换
+    std::pair<int,int> _boss_last_known{-1,-1};  // Boss 最后已知可见位置（已发现才记录）
 
     // 渲染辅助 (保留 GameScene 中的轻量级方法)
     void _draw_map();

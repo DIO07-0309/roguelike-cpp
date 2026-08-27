@@ -320,6 +320,7 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     game_map->reset_visibility();
     _last_player_tile_x = -1;
     _last_player_tile_y = -1;
+    _boss_last_known = {-1, -1};   // Phase 3: 新楼层重置 Boss 最后已知位置
     auto rooms = gen.get_room_centers();
 
     // D9-rest: 休息层保证 1 个泉水房 — 50% landmark 替换可能吞掉治疗资源
@@ -956,6 +957,18 @@ void GameScene::_process(double delta) {
             game_map->update_fov(tx, ty, FOV_RADIUS);
         }
     }
+
+    // Phase 3: Boss 最后已知位置 — 当前可见才记录，不实时追踪不可见移动
+    if (player && game_map) {
+        Monster* b = _get_boss();
+        if (b) {
+            auto [btx, bty] = game_map->pixel_to_tile(b->entity.position.x, b->entity.position.y);
+            if (game_map->isVisible(btx, bty)) _boss_last_known = {btx, bty};
+        }
+    }
+
+    // Phase 3: M 键 — 小地图开关
+    if (IsKeyPressed(KEY_M)) _show_minimap = !_show_minimap;
 
     // Q3.2: sim 自动装备 — 搜刮到的武器/护甲直接换上 (总值更高才换)
     if (_sim_mode && player && !player->inventory.items.empty()) {
@@ -1876,6 +1889,51 @@ void GameScene::_render() {
                         inventory_open, inventory_cursor,
                         _presentation.room_msg, _presentation.room_msg_timer, sw, sh,
                         is_echo ? &echo_panel_data : nullptr);
+
+    // Phase 3: Minimap — 右下角常驻面板 (M 键开关)
+    if (_show_minimap && game_map && player) {
+        MinimapInput mm;
+        auto [ptx, pty] = game_map->pixel_to_tile(
+            player->entity.rect.x + player->entity.rect.width / 2,
+            player->entity.rect.y + player->entity.rect.height / 2);
+        mm.player_tx = ptx; mm.player_ty = pty;
+
+        // Boss 最后已知位置（已发现才显示，不实时追踪）
+        if (MinimapRenderer::should_show_boss(*game_map, _boss_last_known.first, _boss_last_known.second)) {
+            mm.boss_marker.tx = _boss_last_known.first;
+            mm.boss_marker.ty = _boss_last_known.second;
+            mm.boss_marker.visible = true;
+            mm.boss_marker.color = {220, 60, 50, 255};  // 红 — Boss
+        }
+        // 楼梯（发现后永久地标）
+        if (MinimapRenderer::should_show_stairs(*game_map, stairs_pos.first, stairs_pos.second)) {
+            mm.stairs_marker.tx = stairs_pos.first;
+            mm.stairs_marker.ty = stairs_pos.second;
+            mm.stairs_marker.visible = true;
+            mm.stairs_marker.color = {230, 210, 70, 255};  // 黄 — 楼梯
+        }
+        // 当前可见的怪物/物品（仅当前 is_visible 才显示）
+        for (auto& m : monsters) {
+            if (!m) continue;
+            auto [mtx, mty] = game_map->pixel_to_tile(m->entity.position.x, m->entity.position.y);
+            if (!m->is_boss && MinimapRenderer::should_show_entity(*game_map, mtx, mty)) {
+                MinimapMarker mark; mark.tx = mtx; mark.ty = mty; mark.visible = true;
+                mark.color = {200, 80, 80, 255};  // 暗红 — 普通怪
+                mm.markers.push_back(mark);
+            }
+        }
+        for (auto& d : ground_items) {
+            if (MinimapRenderer::should_show_entity(*game_map, d.tile_x, d.tile_y)) {
+                MinimapMarker mark; mark.tx = d.tile_x; mark.ty = d.tile_y; mark.visible = true;
+                mark.color = {80, 200, 120, 255};  // 绿 — 物品
+                mm.markers.push_back(mark);
+            }
+        }
+
+        Rectangle panel = {(float)(sw - MINIMAP_WIDTH - 14), (float)(sh - MINIMAP_HEIGHT - 14),
+                           (float)MINIMAP_WIDTH, (float)MINIMAP_HEIGHT};
+        _minimap.draw(*game_map, mm, panel);
+    }
 
     // G9.1: Combo stage UI (bottom center)
     if (player->weapon.weapon_type() != WeaponType::FIST && player->weapon.combo_index() > 0) {
