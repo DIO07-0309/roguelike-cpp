@@ -405,6 +405,9 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
         heal_player(player.get(), 10);
     }
 
+    // M1A.1: 新遗物系统 on_floor_enter
+    _combat.relic_fx().on_floor_enter(player.get());
+
     // D4 Step3: 楼层入场演出 (非Boss层, 首次进入, new_game)
     if (!fcfg->is_boss && !_gameplay.narr_state.floor_intro_played[floor - 1]) {
         _gameplay.narr_state.floor_intro_played[floor - 1] = true;
@@ -625,6 +628,9 @@ void GameScene::_process(double delta) {
     // 时停期间世界冻结 — 敌方 buff (毒/DOT) 不结算 (玩家自身 buff 正常)
     if (time_stop_remaining <= 0)
         for (auto& m : monsters) tick_buffs(m.get(), dt, &buf_events, player.get()); // B11: venom_fang
+
+    // M1A.1: 新遗物系统 PASSIVE 效果逐帧结算
+    _combat.relic_fx().tick(player.get(), dt);
 
     // Buff 事件日志 + C1: poison tick 伤害数字
     for (auto& ev : buf_events) {

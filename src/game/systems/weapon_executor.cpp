@@ -10,6 +10,7 @@
 #include "audio_server.h"
 #include "core/event_bus.h"
 #include "combat/element_resolver.h"  // G10.3
+#include "systems/relic_effect_processor.h"  // M1A.1
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.1
 #include <algorithm>
 #include <cmath>
@@ -90,12 +91,24 @@ static WeaponAttackResult _resolve_one(Player* p, Monster* m,
     // G10.3: Element combat effects (fire crit / ice slow+freeze / poison DOT)
     bool did_freeze = false;
     ElementResolver::resolve(p, m, ar.damage, ar.is_crit, did_freeze);
-    // Fire crit may increase damage + set is_crit → re-check if weapon crit was already set
-    // ElementResolver already merged is_crit correctly
+
+    // M1A.1: PRE_DAMAGE hook — 通过 DamageContext 允许遗物修改伤害
+    DamageContext dctx;
+    dctx.source = p;
+    dctx.target = m;
+    dctx.raw_damage = ar.damage;
+    dctx.final_damage = ar.damage;
+    dctx.damage_type = (atype == AttackType::MAGICAL) ? DamageType::MAGICAL
+                     : (atype == AttackType::TRUE) ? DamageType::TRUE
+                     : DamageType::PHYSICAL;
+    RelicEffectProcessor::static_on_pre_damage(dctx, p);
 
     int hp_before = m->combat.current_hp;
-    m->combat.take_damage(ar.damage);
+    m->combat.take_damage(dctx.final_damage);
     ar.is_killing_blow = (!m->combat.is_alive && hp_before > 0);
+
+    // M1A.1: 新遗物系统 on_hit
+    RelicEffectProcessor::static_on_hit(p, m);
 
     // G10.3: Element EXP
     if (ar.damage > 0) {

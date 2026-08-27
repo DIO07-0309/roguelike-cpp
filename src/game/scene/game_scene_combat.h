@@ -1,9 +1,9 @@
 #pragma once
+#include "systems/relic_effect_processor.h"
 
 class GameScene;
 struct Monster;
 
-// 从 GameScene 提取的战斗善后模块
 class GameSceneCombat {
 public:
     explicit GameSceneCombat(GameScene& scene) : _s(scene) {}
@@ -12,6 +12,9 @@ public:
     void cleanup_dead_monsters();
     void apply_pending_damage();
 
+    RelicEffectProcessor& relic_fx() { return _relic_fx; }
+
 private:
     GameScene& _s;
+    RelicEffectProcessor _relic_fx;
 };

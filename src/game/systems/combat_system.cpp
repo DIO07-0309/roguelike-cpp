@@ -533,6 +533,59 @@ static std::string _parse_relic_obj(const char*& p, RelicDef& out) {
                 else if (tag == "support") out.favorite_tags.push_back(BuildTag::SUPPORT);
                 else if (tag == "dot") out.favorite_tags.push_back(BuildTag::DOT);
             }
+        } else if (key == "effects") {
+            p = _skip_ws(p);
+            if (*p == '[') {
+                p++;
+                while (*p) {
+                    p = _skip_ws(p);
+                    if (*p == ']') { p++; break; }
+                    if (*p == ',') { p++; continue; }
+                    if (*p != '{') break;
+                    RelicEffectDef eff;
+                    p++;
+                    while (*p) {
+                        p = _skip_ws(p);
+                        if (*p == '}') { p++; break; }
+                        if (*p == ',') { p++; continue; }
+                        std::string ek = _read_string(p);
+                        p = _skip_ws(p);
+                        if (*p != ':') break;
+                        p++;
+                        if (ek == "trigger") {
+                            std::string v = _read_string(p);
+                            if (v == "passive") eff.trigger = RelicTrigger::PASSIVE;
+                            else if (v == "on_hit") eff.trigger = RelicTrigger::ON_HIT;
+                            else if (v == "on_kill") eff.trigger = RelicTrigger::ON_KILL;
+                            else if (v == "pre_damage") eff.trigger = RelicTrigger::PRE_DAMAGE;
+                            else if (v == "on_hurt") eff.trigger = RelicTrigger::ON_HURT;
+                            else if (v == "on_floor_enter") eff.trigger = RelicTrigger::ON_FLOOR_ENTER;
+                        } else if (ek == "type") {
+                            std::string v = _read_string(p);
+                            if (v == "modify_stat") eff.type = RelicEffectType::MODIFY_STAT;
+                            else if (v == "add_buff") eff.type = RelicEffectType::ADD_BUFF;
+                            else if (v == "heal") eff.type = RelicEffectType::HEAL;
+                            else if (v == "deal_aoe_damage") eff.type = RelicEffectType::DEAL_AOE_DAMAGE;
+                            else if (v == "damage_reduction") eff.type = RelicEffectType::DAMAGE_REDUCTION;
+                        } else if (ek == "target") {
+                            std::string v = _read_string(p);
+                            if (v == "self") eff.target = RelicTarget::SELF;
+                            else if (v == "all_enemies") eff.target = RelicTarget::ALL_ENEMIES;
+                        } else if (ek == "stat") { eff.stat = _read_string(p);
+                        } else if (ek == "value") { eff.value = _read_float(p);
+                        } else if (ek == "value2") { eff.value2 = _read_int(p);
+                        } else if (ek == "buff_id") { eff.buff_id = _read_string(p);
+                        } else if (ek == "chance") { eff.chance = _read_float(p);
+                        } else {
+                            if (*p == '"') _read_string(p);
+                            else if (*p == '[') { while (*p && *p != ']') p++; if (*p == ']') p++; }
+                            else if (*p == '{') { int d=1; p++; while(*p&&d){if(*p=='{')d++;if(*p=='}')d--;p++;} }
+                            else { while (*p && *p != ',' && *p != '}') p++; }
+                        }
+                    }
+                    out.effects.push_back(eff);
+                }
+            }
         } else {
             p = _skip_ws(p);
             if (*p == '"') { _read_string(p); }

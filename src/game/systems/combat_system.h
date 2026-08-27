@@ -8,6 +8,7 @@
 #include "entity.h"
 #include "combat_stats.h"
 #include "types/combat_types.h"
+#include "relic_effect.h"
 #include "core/registry_provider.h"  // G4.1: MergeMode
 
 class Player;
@@ -103,6 +104,8 @@ struct RelicDef {
     int hud_color_b = 200;
     // D3: 圣物偏好的构筑标签 (from JSON "tags" comma-separated)
     std::vector<BuildTag> favorite_tags;
+    // M1A.1: 数据驱动效果列表
+    std::vector<RelicEffectDef> effects;
 };
 
 bool load_relic_defs(const std::string& json_path);

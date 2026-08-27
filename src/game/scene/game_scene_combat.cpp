@@ -207,6 +207,13 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
             LOG_INFO("[RELIC] 时之碎片重置所有技能冷却");
         }
     }
+
+    // M1A.1: 新遗物系统 — 数据驱动 on_kill 效果
+    if (_s.player && m) {
+        std::vector<Monster*> raw;
+        for (auto& om : _s.monsters) raw.push_back(om.get());
+        _relic_fx.on_kill(_s.player.get(), m, raw);
+    }
 }
 
 void GameSceneCombat::cleanup_dead_monsters() {

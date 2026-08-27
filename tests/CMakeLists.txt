@@ -90,6 +90,7 @@ add_roguelike_test(biome_test       world/biome_test.cpp)
 add_roguelike_test(encounter_test   world/encounter_test.cpp)
 add_roguelike_test(condition_test   world/condition_test.cpp)
 add_roguelike_test(action_test      combat/action_test.cpp)
+add_roguelike_test(relic_effect_test combat/relic_effect_test.cpp)
 add_roguelike_test(save_test        save/save_test.cpp)
 # G7.3: Simulation test (data-structure only, no game deps)
 add_executable(simulation_test sim/simulation_test.cpp
