@@ -1,4 +1,32 @@
+# v1.2.0 — 地牢密封 (Batch 1): 门是房间唯一孔径 + DoorState (2026-08-28)
+
+> A1 孔径修复把地牢从"开放地板团块"修成真正的 Room→Door→Corridor 拓扑。
+> 详细: `docs/BATCH1_DUNGEON_SEAL_ACCEPTANCE.md` / `docs/BATCH1_DUNGEON_SEAL_IMPL_PLAN.md`
+
+## A1 — Door Aperture Integrity（孔径完整性）
+
+- **问题**（审计发现）：`_carve_diamond` 雕走廊时在房间环墙留下平均 6.25 个/房的非门缺口（"隐形门"），关门无法密封、FOV 隔门泄露 93.2%
+- **修复**：`_repair_room_apertures`（确定性后处理，零 RNG）— 环墙缺口回墙(94%)/door 化(6%)
+- **结果**（27 seeds）：密封率 0%→100%，非门缺口 6.25→0，房间内部泄漏 0，无死房，全图连通，门数 18.7→22.7
+- **INVARIANT(seal)**：`door_seal_test` T1-T6 永久回归（27 seeds = 7 基准 + 20 fuzz）
+
+## DoorState 数据模型
+
+- `Tile.door_state`（OPEN/CLOSED，LOCKED/SEALED 预留）+ `GameMap` 门态 API
+- 语义：OPEN = walkable + 透视线（现状保持）；CLOSED = 不可走 + 挡视线（Batch 2 启用）
+- 生成后门默认 **OPEN**（D2 决策：独立验证孔径修复与 FOV 效果）
+- FOV 半径可配置：`FOV_RADIUS_DEFAULT=8` + `FloorConfig.fov_radius`（0=默认）
+
+## 验证
+
+- **40/40 ctest 全绿**（含 door_seal_test 6 子断言 + fov_test 3 新用例）
+- 构建 0 警告；确定性保持（同 seed 逐字节一致，A1 零 RNG 消耗）
+- Sim 回归：baseline 10.4% → 2.6%（A1 后新基线）。归因审计排除 path/chokepoint/walkable/怪物出生/Boss 结构后判定为**确定性 Sim 的决策链分叉**，非拓扑 bug。**用户裁决接受新基线**，真人 F5 体验并行验证中
+
+---
+
 # v1.1.0 — 可见性与空间体验 (Phase 1-3): FOV + 地牢拓扑 + Minimap (2026-08-28)
+
 
 > v1.0.0 之后的地牢空间感三连深耕：从"做完"到"做得像"。全部保证 FOV/Save/AI/战斗系统零改动（除 Phase 1 自身）。
 
