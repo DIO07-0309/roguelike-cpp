@@ -7,6 +7,10 @@
 #include <cmath>
 #include <algorithm>
 
+static bool is_repeatable_special_room(SpecialRoomType type) {
+    return type == SpecialRoomType::GAMBLER;
+}
+
 std::string InteractionHandler::try_interact(Player* player, GameMap* map,
                                               std::vector<DroppedItem>& ground_items) {
     if (!player || !map) return "";
@@ -17,9 +21,10 @@ std::string InteractionHandler::try_interact(Player* player, GameMap* map,
         player->entity.rect.y + player->entity.rect.height / 2);
 
     SpecialRoom* room = map->get_special_room_at(tx, ty);
-    if (room && !room->triggered) {
+    if (room && (is_repeatable_special_room(room->type) || !room->triggered)) {
         std::string msg = execute_special_room(room->type, player);
-        room->triggered = true;
+        if (!is_repeatable_special_room(room->type))
+            room->triggered = true;
         return msg;
     }
 

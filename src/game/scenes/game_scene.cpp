@@ -274,6 +274,7 @@ void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
 
 void GameScene::enter_floor(int floor, uint32_t seed) {
     current_floor = floor;
+    player->current_floor = floor;
     game_time = 0;
     ground_items.clear();
     inventory_open = false;

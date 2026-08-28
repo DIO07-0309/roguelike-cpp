@@ -54,6 +54,10 @@ public:
     int gold = 0;        // Batch 3A: 局内金币
     int key_count = 0;   // Batch 3A: 钥匙数量
 
+    // Runtime context: current dungeon floor.
+    // Used by floor-scaled interactions (e.g. Gamble Room cost).
+    int current_floor = 1;
+
     static constexpr float ATTACK_COOLDOWN = 0.5f;
     float _last_attack_time = -999.0f;
     float _last_skill_time = -999.0f;   // M4e: 最近技能施放时刻 (镜像观察)

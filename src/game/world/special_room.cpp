@@ -5,6 +5,7 @@
 #include "core/logger.h"
 #include "build_score.h"
 #include "relic_progression.h"
+#include "reward_manager.h"
 #include <algorithm>
 
 SpecialRoomType special_room_from_index(int idx) {
@@ -309,19 +310,49 @@ static std::string _exec_library(Player* player) {
     return "你研习了古籍，但没有获得新的领悟。";
 }
 
-// ---- GAMBLER (赌徒) — 50% 奖励 / 50% 惩罚 ----
+// ---- GAMBLER (赌徒) — Gold-based gamble: 75% 装备 / 20% 钥匙 / 5% RUN 遗物 ----
+int get_gamble_cost(int floor) {
+    return 40 + floor * 10;
+}
+
 static std::string _exec_gambler(Player* player) {
-    // D9: 基础胜率60%(was50%), golden_dice→85%
-    bool win = (rng() % 100 < 60);
-    if (player_has_relic(player, "golden_dice")) win = (rng() % 100 < 85);
-    if (win) {
+    if (!player) return "";
+
+    int cost = get_gamble_cost(player->current_floor);
+    if (player->gold < cost) {
+        return "金币不足。需要 " + std::to_string(cost) + " 金币。";
+    }
+
+    player->spend_gold(cost);
+
+    int roll = rng() % 100;
+    if (roll < 75) {
+        // 75% Equipment
         auto item = generate_random_item();
-        if (item) { player->inventory.add(item, player); return "赌徒咧嘴一笑：运气不错！"; }
+        if (item && RewardManager::grant_item(*player, item))
+            return "赌徒咧嘴一笑：运气不错！获得了 " + item->get_description();
         return "赌徒摊手：今天没货了。";
+    } else if (roll < 95) {
+        // 20% Key
+        RewardManager::grant_key(*player, 1);
+        return "获得了一把钥匙！";
     } else {
-        int loss = std::max(1, player->combat.current_hp / 5);
-        player->combat.take_damage(loss);
-        return "赌徒摇头：命运不站在你这边。受到 " + std::to_string(loss) + " 伤害。";
+        // 5% RUN Relic (rarity-weighted, exhaustion → Key fallback)
+        auto all_ids = get_all_relic_ids();
+        std::vector<std::string> candidates;
+        for (auto& id : all_ids)
+            if (!player_has_relic(player, id))
+                candidates.push_back(id);
+        if (!candidates.empty()) {
+            std::string chosen = candidates[rng() % candidates.size()];
+            if (RewardManager::grant_relic(*player, chosen, PersistenceScope::RUN)) {
+                const RelicDef* def = get_relic_def(chosen);
+                return def ? ("RELIC:" + def->name) : "获得了一件圣物！";
+            }
+        }
+        // Fallback: all relics owned → give key
+        RewardManager::grant_key(*player, 1);
+        return "圣物库已满，获得了一把钥匙作为替代。";
     }
 }
 

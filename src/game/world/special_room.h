@@ -29,3 +29,6 @@ SpecialRoomType  special_room_from_string(const std::string& s);
 
 // B8 统一交互入口 — GameScene 只调这一个函数
 std::string execute_special_room(SpecialRoomType type, Player* player);
+
+// Batch 3B: Gamble Room cost formula
+int get_gamble_cost(int floor);

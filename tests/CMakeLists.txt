@@ -200,5 +200,6 @@ add_roguelike_test(key_test            economy/key_test.cpp)
 add_roguelike_test(relic_persistence_test economy/relic_persistence_test.cpp)
 add_roguelike_test(reward_manager_test economy/reward_manager_test.cpp)
 add_roguelike_test(save_v4_test        economy/save_v4_test.cpp)
+add_roguelike_test(gamble_room_test    economy/gamble_room_test.cpp)
 
 
