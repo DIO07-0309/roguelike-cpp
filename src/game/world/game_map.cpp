@@ -363,7 +363,7 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                 DrawCircle(dx + tile_size/2, dy + tile_size/2, 5.0f * pulse + 2.0f,
                            _dim({255, 160, 60, (unsigned char)(120 + 80 * pulse)}, bright));
             } else if (t.type == TileType::DOOR) {
-                DoorRenderer::inst().draw_door(x, y, t.door_state, bright);
+                DoorRenderer::inst().draw_door(x, y, t.door_state, bright, cam_x, cam_y);
             }
 
             // D4 Step1: 事件房间中心绘制标记

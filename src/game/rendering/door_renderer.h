@@ -22,7 +22,8 @@ public:
     void init();
     void update(float dt);
     void on_state_change(int tx, int ty, DoorState from, DoorState to);
-    void draw_door(int tx, int ty, DoorState state, bool bright);
+    void draw_door(int tx, int ty, DoorState state, bool bright,
+                   float cam_x = 0, float cam_y = 0);
 
     bool is_loaded() const { return _loaded; }
 

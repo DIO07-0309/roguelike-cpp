@@ -61,11 +61,12 @@ void DoorRenderer::on_state_change(int tx, int ty, DoorState from, DoorState to)
     a.progress = 0.0f;
 }
 
-void DoorRenderer::draw_door(int tx, int ty, DoorState state, bool bright) {
+void DoorRenderer::draw_door(int tx, int ty, DoorState state, bool bright,
+                             float cam_x, float cam_y) {
     if (!_loaded) return;
 
-    float dx = (float)(tx * TILE_SIZE);
-    float dy = (float)(ty * TILE_SIZE);
+    float dx = (float)(tx * TILE_SIZE) - cam_x;
+    float dy = (float)(ty * TILE_SIZE) - cam_y;
     Rectangle dst = { dx, dy, (float)TILE_SIZE, (float)TILE_SIZE };
 
     auto it = _anims.find(_key(tx, ty));
