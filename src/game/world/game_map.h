@@ -99,6 +99,10 @@ public:
     bool set_door_state(int tx, int ty, DoorState s); // 非 DOOR tile 返回 false; OPEN/CLOSED 切换 is_walkable
     bool is_door(int tx, int ty) const;
 
+    // Batch 2B: R1 接触开门 — 玩家移动矩形前方 (沿移动方向) 若有 CLOSED 门则开启
+    // 返回: 是否开启了一扇门 (开启后由调用方触发 FOV 重算)
+    bool try_open_door_toward(Rectangle moved_rect, float mx, float my);
+
     void draw(float cam_x, float cam_y, int screen_w, int screen_h) const;
 
 private:

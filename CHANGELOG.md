@@ -1,3 +1,26 @@
+# v1.2.1 — Batch 2B: Door Interaction (R1 接触开门 + S1 Sim 语义) (2026-08-28)
+
+> Batch 1 (v1.2.0) 完成 DoorState 数据模型后, Batch 2B 接入交互层。门保持默认 OPEN (D2 决策), 不改变 gameplay。
+
+## R1 — 接触开门
+
+- `GameMap::try_open_door_toward(rect, mx, my)`: 玩家移动中心 tile 指向 CLOSED 门时自动开启 (无按键)
+- 接入 `PlayerController` 移动碰撞: 被 CLOSED 门阻挡时先开门再移动 (水平/垂直两轴)
+- `GameScene::on_door_opened()`: 开门后立即重算 FOV (门后区域揭示)
+
+## S1 — Sim 语义
+
+- `_tile_rect_walkable`: CLOSED 门视为可通行 (Sim 与玩家共用 R1 规则, 零 Sim 专用逻辑)
+
+## 验证
+
+- **41/41 ctest 全绿** (新增 `door_interact_test` 5 用例: 四方向接触开门/非门不触发/CLOSED 挡人挡视线/生成图默认 OPEN)
+- 构建 0 警告; 确定性保持 (同 seed 逐字节一致)
+- Sim 冒烟: seed100 50 局与 Batch 1 基线一致 → **未改变 gameplay** (门默认 OPEN)
+- 门 CLOSED 语义已由 Batch 1 `door_seal_test` 覆盖; 真实关门逻辑 (Room Encounter) 在 Batch 2C
+
+---
+
 # v1.2.0 — 地牢密封 (Batch 1): 门是房间唯一孔径 + DoorState (2026-08-28)
 
 > A1 孔径修复把地牢从"开放地板团块"修成真正的 Room→Door→Corridor 拓扑。

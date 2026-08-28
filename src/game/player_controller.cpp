@@ -129,9 +129,25 @@ void PlayerController::tick(float dt) {
         float speed_mul = (gs._tw_speed_boost > 0) ? 1.25f : 1.0f;
         float s = get_effective_speed(gs.player.get()) * speed_mul * dt;
         e.position.x += move.x * s; e.sync_rect();
-        if (!gs.game_map->is_rect_walkable(e.rect)) { e.position.x -= move.x * s; e.sync_rect(); }
+        if (!gs.game_map->is_rect_walkable(e.rect)) {
+            // Batch 2B (R1): 接触开门 — 移动方向前方有 CLOSED 门则开启并重试
+            if (move.x != 0.0f && gs.game_map->try_open_door_toward(e.rect, move.x, 0.0f)) {
+                gs.on_door_opened();   // FOV 重算钩子 (见 game_scene)
+                e.position.x += move.x * s; e.sync_rect();
+            } else {
+                e.position.x -= move.x * s; e.sync_rect();
+            }
+        }
         e.position.y += move.y * s; e.sync_rect();
-        if (!gs.game_map->is_rect_walkable(e.rect)) { e.position.y -= move.y * s; e.sync_rect(); }
+        if (!gs.game_map->is_rect_walkable(e.rect)) {
+            // Batch 2B (R1): 垂直方向接触开门
+            if (move.y != 0.0f && gs.game_map->try_open_door_toward(e.rect, 0.0f, move.y)) {
+                gs.on_door_opened();   // FOV 重算钩子
+                e.position.y += move.y * s; e.sync_rect();
+            } else {
+                e.position.y -= move.y * s; e.sync_rect();
+            }
+        }
 
         // ── 房间发现 ──
         std::string disc = gs._interact.check_special_discovery(gs.player.get(), gs.game_map.get());

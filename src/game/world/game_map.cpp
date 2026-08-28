@@ -115,6 +115,26 @@ bool GameMap::is_door(int tx, int ty) const {
     return _in_bounds(tx, ty) && _tiles[ty][tx].type == TileType::DOOR;
 }
 
+// Batch 2B: R1 接触开门 — 玩家移动矩形沿移动方向的前缘若有 CLOSED 门则开启
+bool GameMap::try_open_door_toward(Rectangle r, float mx, float my) {
+    if (mx == 0.0f && my == 0.0f) return false;
+    bool opened = false;
+    // 用矩形中心 tile + 移动方向偏移, 检查目标 tile 是否为 CLOSED 门
+    auto [cx, cy] = pixel_to_tile(r.x + r.width / 2, r.y + r.height / 2);
+    int step_x = mx > 0 ? 1 : (mx < 0 ? -1 : 0);
+    int step_y = my > 0 ? 1 : (my < 0 ? -1 : 0);
+    int tx = cx + step_x, ty = cy + step_y;
+    if (_in_bounds(tx, ty) && _tiles[ty][tx].type == TileType::DOOR &&
+        _tiles[ty][tx].door_state == DoorState::CLOSED) {
+        _tiles[ty][tx].door_state = DoorState::OPEN;
+        _tiles[ty][tx].is_walkable = true;
+        opened = true;
+    }
+    return opened;
+}
+
+
+
 void GameMap::reset_visibility() {
     for (int y = 0; y < height; y++)
         for (int x = 0; x < width; x++) {

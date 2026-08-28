@@ -1202,6 +1202,19 @@ void GameScene::_process(double delta) {
 // ============================================================
 // 输入处理
 // ============================================================
+// ── Batch 2B: 接触开门回调 ──
+void GameScene::on_door_opened() {
+    if (player && game_map) {
+        auto [tx, ty] = game_map->pixel_to_tile(
+            player->entity.rect.x + player->entity.rect.width / 2,
+            player->entity.rect.y + player->entity.rect.height / 2);
+        _last_player_tile_x = tx;
+        _last_player_tile_y = ty;
+        game_map->update_fov(tx, ty, _fov_radius);
+    }
+}
+
+
 // ── G4.5: Replay recording control ──
 void GameScene::start_recording(uint32_t seed) {
     std::vector<ModSnapshot> mods;

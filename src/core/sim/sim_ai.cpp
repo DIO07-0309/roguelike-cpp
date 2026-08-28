@@ -245,6 +245,8 @@ static bool _boss_winding_up(const Monster* m) {
 // Q3.2: tile 级 rect 碰撞判定 — BFS 与真实移动(rect)对齐, 防 tile可行走但玩家进不去导致的卡墙
 static bool _tile_rect_walkable(const GameMap* map, int tx, int ty) {
     if (!map) return false;
+    // Batch 2B (S1): CLOSED door treated as passable - Sim shares R1 contact-open with player
+    if (map->door_state_at(tx, ty) == DoorState::CLOSED) return true;
     Rectangle r = { (float)(tx * 32), (float)(ty * 32), 32.0f, 32.0f };
     return map->is_rect_walkable(r);
 }

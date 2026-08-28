@@ -94,6 +94,9 @@ public:
     ~GameScene();  // G8.1: defined in .cpp (needed for unique_ptr<DecisionAgent/BTAgent>)
     GameState state = GameState::TITLE;
 
+    // Batch 2B: 接触开门回调 — 门开启后重算 FOV (由 PlayerController 在 R1 触发时调用)
+    void on_door_opened();
+
     // 核心数据
     std::unique_ptr<Player> player;
     std::shared_ptr<GameMap> game_map;
