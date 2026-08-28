@@ -44,6 +44,8 @@ void GameMap::set_tile(int x, int y, TileType t) {
     if (_in_bounds(x, y)) {
         _tiles[y][x].type = t;
         _tiles[y][x].is_walkable = (t != TileType::WALL);
+        // Batch 1: 门态归一化 — 非 DOOR tile 门态必须为 NONE, DOOR tile 置默认 OPEN
+        _tiles[y][x].door_state = (t == TileType::DOOR) ? DoorState::OPEN : DoorState::NONE;
     }
 }
 
@@ -82,9 +84,35 @@ bool GameMap::isExplored(int x, int y) const {
 
 bool GameMap::blocks_sight(int x, int y) const {
     if (!_in_bounds(x, y)) return true;
-    // Phase 1: 临时使用墙壁类型判断
+    // Batch 1: WALL 恒阻挡; DOOR 按状态 (OPEN 透射 / CLOSED 阻挡); 其余类型透射
     // 未来可扩展为独立字段 (支持半透明/可破坏墙壁)
-    return _tiles[y][x].type == TileType::WALL;
+    const Tile& t = _tiles[y][x];
+    if (t.type == TileType::WALL) return true;
+    if (t.type == TileType::DOOR) return t.door_state == DoorState::CLOSED;
+    return false;
+}
+
+// ── Batch 1: Door 状态 API ─────────────────────────────────
+
+DoorState GameMap::door_state_at(int tx, int ty) const {
+    if (!_in_bounds(tx, ty)) return DoorState::NONE;
+    const Tile& t = _tiles[ty][tx];
+    return (t.type == TileType::DOOR) ? t.door_state : DoorState::NONE;
+}
+
+bool GameMap::set_door_state(int tx, int ty, DoorState s) {
+    if (!_in_bounds(tx, ty)) return false;
+    Tile& t = _tiles[ty][tx];
+    if (t.type != TileType::DOOR) return false;   // 仅 DOOR tile 可设门态
+    if (t.door_state == s) return true;
+    t.door_state = s;
+    // 语义落点: OPEN=可走, CLOSED=不可走 (is_walkable 物化字段单点更新)
+    t.is_walkable = (s == DoorState::OPEN);
+    return true;
+}
+
+bool GameMap::is_door(int tx, int ty) const {
+    return _in_bounds(tx, ty) && _tiles[ty][tx].type == TileType::DOOR;
 }
 
 void GameMap::reset_visibility() {

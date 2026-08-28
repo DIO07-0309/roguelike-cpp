@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <map>
 #include <cstdint>
+#include "config.h"      // Batch 1 (D4): FOV_RADIUS_DEFAULT
 #include "node.h"
 #include "player.h"
 #include "monster.h"
@@ -286,7 +287,8 @@ private:
     // Phase 1: FOV — 玩家跨 tile 时更新
     int _last_player_tile_x = -1;
     int _last_player_tile_y = -1;
-    static constexpr int FOV_RADIUS = 8;
+    // Batch 1 (D4): FOV 半径可配置 — enter_floor 时按 FloorConfig::fov_radius 解析 (0→FOV_RADIUS_DEFAULT)
+    int _fov_radius = FOV_RADIUS_DEFAULT;
 
     // ── G4.5: Replay ──
     ReplayRecorder _recorder;

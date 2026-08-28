@@ -68,3 +68,41 @@ TEST_F(FOVTest, OutOfBoundsBlocksSight) {
     EXPECT_TRUE(map->blocks_sight(-1, 0));
     EXPECT_TRUE(map->blocks_sight(10, 5));
 }
+
+// ── Batch 1: Door 状态语义 ─────────────────────────────────
+
+// OPEN 门 (默认态): 透视线 + 可行走 — 锁定 Phase 2 行为
+TEST_F(FOVTest, DoorOpen_TransparentAndWalkable) {
+    map->set_tile(6, 3, TileType::DOOR);            // (5,5) 是墙, y=3 水平线通畅
+    EXPECT_TRUE(map->is_door(6, 3));
+    EXPECT_EQ(map->door_state_at(6, 3), DoorState::OPEN);
+    EXPECT_TRUE(map->is_walkable(6, 3));
+    EXPECT_FALSE(map->blocks_sight(6, 3));
+    map->update_fov(3, 3, 5);
+    EXPECT_TRUE(map->isVisible(7, 3));              // 门后 tile 可见 (透射)
+}
+
+// CLOSED 门: 挡视线 — 门 tile 自身可见, 门后不可见
+TEST_F(FOVTest, DoorClosed_BlocksSight) {
+    map->set_tile(6, 3, TileType::DOOR);
+    ASSERT_TRUE(map->set_door_state(6, 3, DoorState::CLOSED));
+    EXPECT_TRUE(map->blocks_sight(6, 3));
+    map->update_fov(3, 3, 5);
+    EXPECT_TRUE(map->isVisible(6, 3));              // 门 tile 自身可见 (射线先标记后 break)
+    EXPECT_TRUE(map->isExplored(6, 3));
+    EXPECT_FALSE(map->isVisible(7, 3));             // 门后不可见
+    EXPECT_FALSE(map->isExplored(7, 3));
+}
+
+// CLOSED 门: 不可行走; 非 door tile set_door_state 返回 false; 切回 OPEN 恢复
+TEST_F(FOVTest, DoorClosed_NotWalkable_AndReopen) {
+    map->set_tile(6, 3, TileType::DOOR);
+    ASSERT_TRUE(map->set_door_state(6, 3, DoorState::CLOSED));
+    EXPECT_FALSE(map->is_walkable(6, 3));
+    EXPECT_FALSE(map->set_door_state(5, 5, DoorState::CLOSED));  // (5,5) 是 WALL → false
+    EXPECT_EQ(map->door_state_at(5, 5), DoorState::NONE);
+    EXPECT_FALSE(map->is_door(5, 5));
+    EXPECT_TRUE(map->set_door_state(6, 3, DoorState::OPEN));     // 重新开启
+    EXPECT_TRUE(map->is_walkable(6, 3));
+    EXPECT_FALSE(map->blocks_sight(6, 3));
+}

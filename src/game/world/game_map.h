@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <vector>
 #include <string>
 #include "entity.h"
@@ -24,19 +25,26 @@ struct ArenaObject {
 // ============================================================
 // Tile / GameMap — 地图数据结构
 // ============================================================
-enum class TileType { FLOOR, WALL, STAIRS_DOWN, LAVA, DOOR };  // Phase 2: DOOR — 静态开启门
+enum class TileType { FLOOR, WALL, STAIRS_DOWN, LAVA, DOOR };  // Phase 2: DOOR — 门 tile
+
+// Batch 1: Door 状态 (DoorState) —
+//   OPEN:   is_walkable=true,  blocks_sight=false (透视线, 默认态)
+//   CLOSED: is_walkable=false, blocks_sight=true  (挡人+挡视线)
+//   LOCKED/SEALED 于 Batch 3 预留 (复用 CLOSED 行为, 仅开启策略不同)
+enum class DoorState : uint8_t { NONE = 0, OPEN = 1, CLOSED = 2 };
 
 struct Tile {
     TileType type = TileType::WALL;
     bool is_walkable = false;
     bool is_visible = false;    // 当前帧是否在 FOV 内
     bool is_explored = false;   // 是否曾被玩家探索过
+    DoorState door_state = DoorState::NONE;  // Batch 1: 仅 DOOR tile 非 NONE
 
-    static Tile floor()  { return {TileType::FLOOR, true, false, false}; }
-    static Tile wall()   { return {TileType::WALL, false, false, false}; }
-    static Tile stairs() { return {TileType::STAIRS_DOWN, true, false, false}; }
-    static Tile lava()   { return {TileType::LAVA, true, false, false}; }
-    static Tile door()   { return {TileType::DOOR, true, false, false}; }  // Phase 2
+    static Tile floor()  { return {TileType::FLOOR, true, false, false, DoorState::NONE}; }
+    static Tile wall()   { return {TileType::WALL, false, false, false, DoorState::NONE}; }
+    static Tile stairs() { return {TileType::STAIRS_DOWN, true, false, false, DoorState::NONE}; }
+    static Tile lava()   { return {TileType::LAVA, true, false, false, DoorState::NONE}; }
+    static Tile door()   { return {TileType::DOOR, true, false, false, DoorState::OPEN}; }  // D2: 生成后默认 OPEN
 };
 
 class GameMap {
@@ -85,6 +93,11 @@ public:
     bool blocks_sight(int x, int y) const;
     void update_fov(int center_x, int center_y, int radius);
     void reset_visibility();
+
+    // Batch 1: Door 状态 API (仅对 DOOR tile 生效)
+    DoorState door_state_at(int tx, int ty) const;   // 非 DOOR tile 返回 NONE
+    bool set_door_state(int tx, int ty, DoorState s); // 非 DOOR tile 返回 false; OPEN/CLOSED 切换 is_walkable
+    bool is_door(int tx, int ty) const;
 
     void draw(float cam_x, float cam_y, int screen_w, int screen_h) const;
 

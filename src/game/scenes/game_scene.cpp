@@ -312,6 +312,7 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
 
     // D1: FloorConfig — 统一难度/敌人池/特殊房间/BGM/剧情
     const FloorConfig* fcfg = get_floor_config(floor);
+    _fov_radius = (fcfg->fov_radius > 0) ? fcfg->fov_radius : FOV_RADIUS_DEFAULT;  // Batch 1 (D4)
 
     // 生成地牢 (B8: seed 驱动; D1: special_room_count 从配置读)
     DungeonGenerator gen(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
@@ -954,7 +955,7 @@ void GameScene::_process(double delta) {
         if (tx != _last_player_tile_x || ty != _last_player_tile_y) {
             _last_player_tile_x = tx;
             _last_player_tile_y = ty;
-            game_map->update_fov(tx, ty, FOV_RADIUS);
+            game_map->update_fov(tx, ty, _fov_radius);
         }
     }
 

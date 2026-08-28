@@ -36,6 +36,9 @@ struct FloorConfig {
     // D2 Step5: 战场元素密度 (每房间放置个数)
     int arena_density;
 
+    // Batch 1 (D4): FOV 半径逐层覆盖 — 0 = 用 FOV_RADIUS_DEFAULT (config.h)
+    int fov_radius;
+
     // 音效
     const char* bgm;             // "dungeon" | "boss"
 };

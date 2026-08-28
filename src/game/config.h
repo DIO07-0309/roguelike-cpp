@@ -26,6 +26,10 @@ inline constexpr int DUNGEON_ROOM_MARGIN = 1;
 inline constexpr int DUNGEON_CORRIDOR_MIN = 1;
 inline constexpr int DUNGEON_CORRIDOR_MAX = 2;
 
+// ---- FOV (Batch 1: 半径可配置) ----
+// 默认 8 (D4: Batch 1 不调数值); FloorConfig::fov_radius > 0 时按层覆盖
+inline constexpr int FOV_RADIUS_DEFAULT = 8;
+
 // ---- 小地图 (Phase 3) ----
 // 每个 tile 的小地图像素尺寸；宽高由地图尺寸推导，便于后续扩展
 inline constexpr int MINIMAP_TILE_SIZE = 4;
