@@ -773,7 +773,7 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
 
     // Key hints
     if (g_font_loaded) {
-        const char* hint = "[R]圣物  [B]背包  [F1]日志  [ESC]保存";
+        const char* hint = "[R]圣物  [B]背包  [F1]日志  [M]地图  [ESC]保存";
         float hw = MeasureTextEx(g_font_small, hint, 12, 1).x;
         DrawTextEx(g_font_small, hint,
                    {screen_w - hw - 14.0f, (float)screen_h - 26.0f},

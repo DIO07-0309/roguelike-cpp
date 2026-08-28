@@ -60,17 +60,22 @@ void MinimapRenderer::draw(const GameMap& map, const MinimapInput& input,
     DrawRectangleRounded(panel, 0.08f, 8, {18, 18, 26, 235});
     DrawRectangleRoundedLines(panel, 0.08f, 8, 2, {100, 100, 180, 255});
 
-    // 地形（只画已探索）
+    // 地形（已探索 + Boss视野）
     for (int ty = 0; ty < map.height; ty++) {
         for (int tx = 0; tx < map.width; tx++) {
-            if (!should_draw_tile(map, tx, ty)) continue;
+            bool explored = map.isExplored(tx, ty);
+            bool bossfov  = map.isBossVisible(tx, ty);
+            if (!explored && !bossfov) continue;
             Rectangle r = tile_to_screen(tx, ty, panel);
             Color c = color_for_tile(map.tile_at(tx, ty), map.isVisible(tx, ty));
-            // Boss 视野区域 — 红色叠加
-            if (map.isBossVisible(tx, ty) && !map.isVisible(tx, ty)) {
-                c.r = (unsigned char)(c.r * 0.6f + 180 * 0.4f);
-                c.g = (unsigned char)(c.g * 0.5f);
-                c.b = (unsigned char)(c.b * 0.5f);
+            if (bossfov && !explored) {
+                // Boss 视野但玩家未探索 — 暗红色调
+                c = {80, 30, 30, 200};
+            } else if (bossfov && !map.isVisible(tx, ty)) {
+                // 已探索 + Boss视野 + 不在玩家视野 — 红色叠加
+                c.r = (unsigned char)(c.r * 0.5f + 180 * 0.5f);
+                c.g = (unsigned char)(c.g * 0.4f);
+                c.b = (unsigned char)(c.b * 0.4f);
             }
             DrawRectangleRec(r, c);
         }

@@ -197,14 +197,13 @@ void TitleScene::_render() {
             "WASD/方向键 - 移动",
             "J - 攻击   K - 技能",
             "E - 交互   B - 背包   F1 - 日志",
-            "R - 圣物   G - 全屏",
-            "R - 查看圣物",
+            "R - 圣物   M - 小地图   G - 全屏",
             "ESC - 保存并返回",
         };
         float guide_x = sw - 240.0f;
         float guide_y = 180.0f;
         float guide_w = 220.0f;
-        float guide_h = 158.0f;
+        float guide_h = 145.0f;
         DrawRectangleRounded({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, Color{15, 15, 30, 200});
         DrawRectangleRoundedLines({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, 1, Color{70, 70, 100, 180});
         for (int i = 0; i < 6; i++) {
