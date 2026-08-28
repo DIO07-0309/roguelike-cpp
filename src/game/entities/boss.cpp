@@ -586,7 +586,10 @@ void BossAI::_run_combo_command(BossCommand cmd, Monster* self, Player* player,
 
 void BossAI::update(Monster* self, Player* player, GameMap* map,
                      double dt, double gt,
-                     std::vector<Monster*>* all, std::vector<Effect>* effects) {
+                     std::vector<Monster*>* all, std::vector<Effect>* effects,
+                     int monster_room, int player_room,
+                     const RoomManager* room_mgr) {
+    (void)monster_room; (void)player_room; (void)room_mgr;
     if (!self->combat.is_alive) return;
 
     // B15: Phase 2 检测 (仅触发一次, HP < 阈值来自 BossDef)
@@ -649,7 +652,7 @@ void BossAI::_tick_boss_state(Monster* self, Player* player, GameMap* map,
     switch (boss_state) {
     case BossState::IDLE: {
         // 基础 AI (追逐/巡逻)
-        MonsterAI::update(self, player, map, dt, gt, all, effects);
+        MonsterAI::update(self, player, map, dt, gt, all, effects, _monster_room, _player_room, _room_mgr);
         // M4a-fix: 视野内即进入战斗姿态 (原 attack_range 48px —
         // 玩家拉扯>48px 时连招/召唤/瞬移永不触发, BOSS 只会追)
         float dist = _dist_to(self, player);

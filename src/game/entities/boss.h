@@ -184,7 +184,9 @@ public:
     void update(Monster* self, Player* player, GameMap* map,
                 double dt, double game_time,
                 std::vector<Monster*>* all_monsters = nullptr,
-                std::vector<Effect>* effects = nullptr) override;
+                std::vector<Effect>* effects = nullptr,
+                int monster_room = -1, int player_room = -1,
+                const RoomManager* room_mgr = nullptr) override;
 
     // B15: 技能循环状态
     BossState boss_state = BossState::IDLE;

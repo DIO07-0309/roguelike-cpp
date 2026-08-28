@@ -4,10 +4,11 @@
 #include <random>
 #include "raylib.h"
 
-// 前向声明
+// Forward declarations
 class Monster;
 class Player;
 class GameMap;
+class RoomManager;
 struct Effect;
 class MonsterAI;
 
@@ -77,7 +78,9 @@ public:
     virtual void update(Monster* self, Player* player, GameMap* map,
                         double dt, double game_time,
                         std::vector<Monster*>* all_monsters = nullptr,
-                        std::vector<Effect>* effects = nullptr);
+                        std::vector<Effect>* effects = nullptr,
+                        int monster_room = -1, int player_room = -1,
+                        const RoomManager* room_mgr = nullptr);
 
     // D2 Step3: 怪物技能池 (在 spawn_monster 中分配)
     std::vector<MonsterSkillState> _skills;
@@ -100,6 +103,10 @@ public:
     bool  provoked = false;               // 掉血后解除束缚 (含毒/环境伤)
     static constexpr float kLeashPx      = 4.5f * 32; // 巡逻半径: 超出则折返锚点
     static constexpr float kChaseLeashPx = 8.0f * 32; // 追击上限: 超出则放弃回家
+
+    int _monster_room = -1; // 当前 update 周期怪物所在房间索引 (由 update() 设置)
+    int _player_room = -1;  // 当前 update 周期玩家所在房间索引 (由 update() 设置)
+    const RoomManager* _room_mgr = nullptr; // 由 update() 传入, 用于边界检查
 
 protected:
     float _patrol_timer = 0.0f;

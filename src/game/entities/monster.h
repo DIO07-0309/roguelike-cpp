@@ -89,7 +89,9 @@ public:
 
     void update_ai(Player* player, GameMap* map, double dt, double game_time,
                    std::vector<Monster*>* all_monsters = nullptr,
-                   std::vector<struct Effect>* effects = nullptr);
+                   std::vector<struct Effect>* effects = nullptr,
+                   int monster_room = -1, int player_room = -1,
+                   const class RoomManager* room_mgr = nullptr);
     int attack_target(Player* target, double game_time);
     bool can_attack(double game_time) const;
 

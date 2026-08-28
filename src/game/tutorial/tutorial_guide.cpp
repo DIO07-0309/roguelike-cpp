@@ -159,7 +159,8 @@ class DummyAI : public MonsterAI {
 public:
     DummyAI() : MonsterAI(0, 0, 999) {}
     void update(Monster*, Player*, GameMap*, double, double,
-                std::vector<Monster*>*, std::vector<Effect>*) override {}
+                std::vector<Monster*>*, std::vector<Effect>*,
+                int, int, const RoomManager*) override {}
 };
 
 std::unique_ptr<Monster> create_tutorial_dummy(int tx, int ty) {

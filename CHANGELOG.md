@@ -1,3 +1,24 @@
+# v1.2.3 — 怪物房间边界约束 + 小地图位置修正 (2026-08-28)
+
+## 怪物房间约束
+
+- **AI 视觉**：`_decide_state()` 增加 `room_at()` 检查 — 玩家不在怪物房间时强制 IDLE，禁止 CHASE/ATTACK
+- **AI 移动**：`_apply_movement()` 目标 tile 不在怪物房间内 → 阻止移动
+- **远程技能**：SNIPER/RAPID_SHOT/SCATTER/CONTROLLER 跨房间 → 跳过攻击
+- **传送技能**：AMBUSH/CHARGE/LEAP 目标不在房间内 → 跳过
+- **脱困传送**：`_unstuck_wedged_monsters` 只传送到怪物自己房间内，无有效 tile 则重置到 home
+- **架构**：`MonsterAI::update()` 新增 `monster_room`/`player_room`/`room_mgr` 参数，由 `GameScene::_update_monsters()` 计算传入
+
+## 小地图位置
+
+- 面板上移 26px (`sh - MINIMAP_HEIGHT - 14` → `sh - MINIMAP_HEIGHT - 40`)，不再遮挡底部快捷键提示 `[R]圣物 [B]背包 [F1]日志 [ESC]保存`
+
+## 验证
+
+- 42/42 ctest 全绿; 构建 0 警告; 桌面已同步
+
+---
+
 # v1.2.2 — Batch 2C: Room Encounter (进房→封门→清房→开门) (2026-08-28)
 
 > 在 A1 密封拓扑 + DoorState + R1 接触开门之上, 实现以撒式房间战斗状态机。

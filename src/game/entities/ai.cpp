@@ -9,12 +9,16 @@
 #include "core/event_bus.h"             // Q4.4: 怪物攻击事件
 #include "core/event_types.h"
 #include "systems/collision_utils.h"
+#include "world/room_manager.h"
 #include <cmath>
 
 // Forward declarations for functions defined later in this file
-static void _exec_snipe(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk);
-static void _exec_ambush(Monster* self, Player* player, GameMap* map, std::vector<Effect>* effects, MonsterSkillState& sk);
-static void _exec_scatter(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk);
+static void _exec_snipe(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk,
+                        int monster_room, int player_room);
+static void _exec_ambush(Monster* self, Player* player, GameMap* map, std::vector<Effect>* effects, MonsterSkillState& sk,
+                         int monster_room, int player_room, const RoomManager* room_mgr);
+static void _exec_scatter(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk,
+                          int monster_room, int player_room);
 static void _exec_guard_aura(Monster* self, std::vector<Monster*>* all, std::vector<Effect>* effects, MonsterSkillState& sk);
 
 MonsterAI::MonsterAI(float sight, float speed, float patrol, float attack)
@@ -25,8 +29,14 @@ MonsterAI::MonsterAI(float sight, float speed, float patrol, float attack)
 
 void MonsterAI::update(Monster* self, Player* player, GameMap* map,
                         double dt, double gt,
-                        std::vector<Monster*>* all, std::vector<Effect>* effects) {
+                        std::vector<Monster*>* all, std::vector<Effect>* effects,
+                        int monster_room, int player_room,
+                        const RoomManager* room_mgr) {
     if (!self->combat.is_alive) return;
+
+    _monster_room = monster_room;
+    _player_room = player_room;
+    _room_mgr = room_mgr;
 
     // Q3.16: 房间守卫 — 首次 update 记录出生锚点; 掉血即视为被挑衅 (解除束缚)。
     // Boss 不受束缚 (Boss 房有独立机制与领域地形)。
@@ -83,6 +93,9 @@ void MonsterAI::update(Monster* self, Player* player, GameMap* map,
 
     case AIArchetype::SNIPER: {
         float dist=_dist_to(self,player);
+        // SNIPER: 跨房间不攻击
+        if (_monster_room >= 0 && _player_room >= 0 && _monster_room != _player_room)
+            break;
         // 后退保持 6-9 格距离
         if(dist<6.0f*32.0f){
             float dx=self->entity.rect.x-player->entity.rect.x,dy=self->entity.rect.y-player->entity.rect.y;
@@ -109,6 +122,9 @@ void MonsterAI::update(Monster* self, Player* player, GameMap* map,
 
     case AIArchetype::CONTROLLER: {
         _archetype_timer+=(float)dt;
+        // CONTROLLER: 跨房间不攻击
+        if (_monster_room >= 0 && _player_room >= 0 && _monster_room != _player_room)
+            break;
         if(_archetype_timer>5.0f){
             _archetype_timer=0.0f;
             // 在玩家脚下放置危险区 (scatter 锥形弹)
@@ -135,6 +151,9 @@ void MonsterAI::update(Monster* self, Player* player, GameMap* map,
 
     case AIArchetype::AMBUSH: {
         _archetype_timer+=(float)dt;
+        // AMBUSH: 跨房间不攻击
+        if (_monster_room >= 0 && _player_room >= 0 && _monster_room != _player_room)
+            break;
         if(!_archetype_active&&_archetype_timer>8.0f){
             _archetype_active=true;_archetype_timer=0.0f;self->color.a=80; // 隐身
         }
@@ -209,6 +228,11 @@ void MonsterAI::_decide_state(Monster* self, Player* player) {
     float attack_px = attack_range * 32.0f;
     float sight_px = sight_range * 32.0f;
 
+    if (_monster_room >= 0 && _player_room >= 0 && _monster_room != _player_room) {
+        state = AIState::IDLE;
+        return;
+    }
+
     if (dist <= attack_px) { state = AIState::ATTACK; return; }
 
     // Q3.16: 未被挑衅的怪不追出房间 — 距锚点超过追击上限则回 IDLE (守家巡逻)。
@@ -260,6 +284,7 @@ void MonsterAI::_execute_chase(Monster* self, Player* player, GameMap* map, doub
 void MonsterAI::_execute_attack(Monster* self, Player* player, double gt,
                                  std::vector<Effect>* effects) {
     if (!self->can_attack(gt)) return;
+    if (_monster_room >= 0 && _player_room >= 0 && _monster_room != _player_room) return;
 
     // D2: Projectile-based ranged attack
     if (self->uses_projectile && self->projectiles_ptr) {
@@ -301,6 +326,14 @@ void MonsterAI::_execute_attack(Monster* self, Player* player, double gt,
 void MonsterAI::_apply_movement(Monster* self, GameMap* map, float mx, float my, double dt) {
     auto& e = self->entity;
     float s = get_effective_speed(self, move_speed) * (float)dt;
+
+    // Room boundary: block movement that would cross into a different room
+    if (_monster_room >= 0 && _room_mgr && (mx != 0 || my != 0)) {
+        float dest_cx = e.rect.x + e.rect.width / 2 + mx * s;
+        float dest_cy = e.rect.y + e.rect.height / 2 + my * s;
+        auto [dtx, dty] = map->pixel_to_tile(dest_cx, dest_cy);
+        if (_room_mgr->room_at(dtx, dty) != _monster_room) return;
+    }
 
     // X 轴
     e.position.x += mx * s;
@@ -358,10 +391,10 @@ bool MonsterAI::_think_and_cast(Monster* self, Player* player, GameMap* map,
                     sk.active = false; sk.cooldown = sk.max_cooldown; return true;
                 }
                 if (sk.type == MonsterSkillType::SNIPE) {
-                    _exec_snipe(self, player, effects, sk); return true;
+                    _exec_snipe(self, player, effects, sk, _monster_room, _player_room); return true;
                 }
                 if (sk.type == MonsterSkillType::AMBUSH_ATTACK) {
-                    _exec_ambush(self, player, map, effects, sk); return true;
+                    _exec_ambush(self, player, map, effects, sk, _monster_room, _player_room, _room_mgr); return true;
                 }
                 sk.active = true; // 蓄力完毕
             }
@@ -464,7 +497,7 @@ bool MonsterAI::_think_and_cast(Monster* self, Player* player, GameMap* map,
         case MonsterSkillType::SNIPE:
             sk.cast_left = 1.2f; break;  // 蓄力→ exec_snipe
         case MonsterSkillType::SCATTER:
-            _exec_scatter(self, player, effects, sk); break;
+            _exec_scatter(self, player, effects, sk, _monster_room, _player_room); break;
         case MonsterSkillType::AMBUSH_ATTACK:
             sk.cast_left = 0.3f; break;  // 蓄力→ exec_ambush
         case MonsterSkillType::GUARD_AURA:
@@ -479,6 +512,9 @@ bool MonsterAI::_think_and_cast(Monster* self, Player* player, GameMap* map,
 // ---- Rapid Shot: 连续3发弹幕 ----
 void MonsterAI::_exec_rapid_shot(Monster* self, Player* player, double gt,
                                   std::vector<Effect>* effects, MonsterSkillState& sk) {
+    if (_monster_room >= 0 && _player_room >= 0 && _monster_room != _player_room) {
+        sk.active = false; sk.cooldown = sk.max_cooldown; sk.shot_count = 0; return;
+    }
     int dmg = calculate_damage(self->combat.get_effective_attack(),
         player->combat.get_effective_defense(AttackType::PHYSICAL));
     player->combat.take_damage(dmg);
@@ -537,6 +573,13 @@ void MonsterAI::_exec_leap(Monster* self, Player* player, GameMap* map,
              - self->entity.rect.y - self->entity.rect.height/2;
     float dist = sqrtf(dx*dx + dy*dy);
     if (dist < 1) return;
+    // Room boundary: block leap if destination is outside monster's room
+    if (_monster_room >= 0 && _room_mgr) {
+        float dest_cx = self->entity.rect.x + self->entity.rect.width/2 + dx/dist * (dist - 2.0f*32.0f);
+        float dest_cy = self->entity.rect.y + self->entity.rect.height/2 + dy/dist * (dist - 2.0f*32.0f);
+        auto [dtx, dty] = map->pixel_to_tile(dest_cx, dest_cy);
+        if (_room_mgr->room_at(dtx, dty) != _monster_room) { sk.active = false; return; }
+    }
     // 跳跃到玩家附近 (2格距离)
     float leap_dist = dist - 2.0f * 32.0f;
     if (leap_dist < 0) leap_dist = 0;
@@ -602,8 +645,16 @@ void MonsterAI::_exec_charge(Monster* self, Player* player, GameMap* map,
     if (dist < 1) return;
     float ndx = dx/dist, ndy = dy/dist;
 
-    // 冲刺距离: 4格
+    // Room boundary: block charge if destination is outside monster's room
     float charge_dist = std::min(dist, 4.0f * 32.0f);
+    if (_monster_room >= 0 && _room_mgr) {
+        float dest_cx = self->entity.rect.x + self->entity.rect.width/2 + ndx * charge_dist;
+        float dest_cy = self->entity.rect.y + self->entity.rect.height/2 + ndy * charge_dist;
+        auto [dtx, dty] = map->pixel_to_tile(dest_cx, dest_cy);
+        if (_room_mgr->room_at(dtx, dty) != _monster_room) { (void)sk; return; }
+    }
+
+    // 冲刺距离: 4格
     self->entity.position.x += ndx * charge_dist;
     self->entity.position.y += ndy * charge_dist;
     self->entity.sync_rect();
@@ -729,8 +780,10 @@ void MonsterAI::_team_decision(Monster* self, Player* player, GameMap* map,
 // ═══════════════════════════════════════════════════════════════
 
 // SNIPE — 蓄力贯穿: 蓄力1.2s后发射单发高速弹
-void _exec_snipe(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk) {
+void _exec_snipe(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk,
+                 int monster_room, int player_room) {
     if (sk.cast_left > 0) { sk.cast_left -= 0.016f; return; } // 蓄力
+    if (monster_room >= 0 && player_room >= 0 && monster_room != player_room) { sk.cooldown = sk.max_cooldown; return; }
     float sx = self->entity.rect.x + self->entity.rect.width/2, sy = self->entity.rect.y + self->entity.rect.height/2;
     float tx = player->entity.rect.x + player->entity.rect.width/2, ty = player->entity.rect.y + player->entity.rect.height/2;
     int dmg = calculate_damage((int)(self->combat.get_effective_attack() * 2.5),
@@ -742,7 +795,9 @@ void _exec_snipe(Monster* self, Player* player, std::vector<Effect>* effects, Mo
 }
 
 // SCATTER — 锥形散布 3-4 弹
-void _exec_scatter(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk) {
+void _exec_scatter(Monster* self, Player* player, std::vector<Effect>* effects, MonsterSkillState& sk,
+                   int monster_room, int player_room) {
+    if (monster_room >= 0 && player_room >= 0 && monster_room != player_room) { sk.cooldown = sk.max_cooldown; return; }
     float sx = self->entity.rect.x + self->entity.rect.width/2, sy = self->entity.rect.y + self->entity.rect.height/2;
     int count = 3 + (rng() % 2); // 3-4 shots
     for(int i=0;i<count;i++){
@@ -764,8 +819,10 @@ void _exec_scatter(Monster* self, Player* player, std::vector<Effect>* effects, 
 }
 
 // AMBUSH_ATTACK — 隐身2s→瞬移至玩家旁→高爆发+眩晕
-void _exec_ambush(Monster* self, Player* player, GameMap* map, std::vector<Effect>* effects, MonsterSkillState& sk) {
+void _exec_ambush(Monster* self, Player* player, GameMap* map, std::vector<Effect>* effects, MonsterSkillState& sk,
+                  int monster_room, int player_room, const RoomManager* room_mgr) {
     if (sk.cast_left > 0) { sk.cast_left -= 0.016f; return; }
+    if (monster_room >= 0 && player_room >= 0 && monster_room != player_room) { sk.cooldown = sk.max_cooldown; return; }
     float px = player->entity.rect.x + player->entity.rect.width/2, py = player->entity.rect.y + player->entity.rect.height/2;
     // teleport 2 tiles behind player
     float behind_x = px - 64.0f, behind_y = py;
@@ -774,6 +831,14 @@ void _exec_ambush(Monster* self, Player* player, GameMap* map, std::vector<Effec
     if(map && !map->is_rect_walkable(self->entity.rect)){
         self->entity.position = {px + 64.0f - self->entity.rect.width/2, py - self->entity.rect.height/2};
         self->entity.sync_rect();
+    }
+    // Room boundary: if teleport destination is outside monster's room, cancel
+    if (monster_room >= 0 && room_mgr && map) {
+        auto [dtx, dty] = map->pixel_to_tile(self->entity.rect.x + self->entity.rect.width/2,
+                                              self->entity.rect.y + self->entity.rect.height/2);
+        if (room_mgr->room_at(dtx, dty) != monster_room) {
+            sk.cooldown = sk.max_cooldown; return;
+        }
     }
     int dmg = calculate_damage((int)(self->combat.get_effective_attack() * 3.0),
         player->combat.get_effective_defense(AttackType::PHYSICAL));

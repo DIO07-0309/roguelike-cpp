@@ -174,8 +174,10 @@ int Monster::attack_target(Player* target, double gt) {
 }
 
 void Monster::update_ai(Player* player, GameMap* map, double dt, double gt,
-                         std::vector<Monster*>* all, std::vector<Effect>* effects) {
-    if (ai) ai->update(this, player, map, dt, gt, all, effects);
+                         std::vector<Monster*>* all, std::vector<Effect>* effects,
+                         int monster_room, int player_room,
+                         const RoomManager* room_mgr) {
+    if (ai) ai->update(this, player, map, dt, gt, all, effects, monster_room, player_room, room_mgr);
 }
 
 void Monster::draw(float cam_x, float cam_y) {

@@ -1434,9 +1434,20 @@ void GameScene::_update_monsters(float dt) {
     for (auto& m : monsters) mlist.push_back(m.get());
     // D2: Pass projectiles vector to monsters for ranged attacks
     for (auto& m : monsters) m->projectiles_ptr = &projectiles;
+
+    int ptx = (int)(player->entity.rect.x + 16) / 32;
+    int pty = (int)(player->entity.rect.y + 16) / 32;
+    int player_room = _room_mgr.room_at(ptx, pty);
+
     _unstuck_wedged_monsters(game_time);
-    for (auto& m : monsters)
-        m->update_ai(player.get(), game_map.get(), dt, game_time, &mlist, &active_effects);
+    for (auto& m : monsters) {
+        if (!m->combat.is_alive) continue;
+        int mtx = (int)(m->entity.rect.x + 16) / 32;
+        int mty = (int)(m->entity.rect.y + 16) / 32;
+        int monster_room = _room_mgr.room_at(mtx, mty);
+        m->update_ai(player.get(), game_map.get(), dt, game_time, &mlist, &active_effects,
+                     monster_room, player_room, &_room_mgr);
+    }
 }
 
 // Q3.2: 怪物脱卡 — 存活非boss怪 ≥5s 未位移 → 拉到玩家周边可行走格 (消除贴墙/口袋钉子户软锁)
@@ -1471,6 +1482,7 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
         }
         // Q3.10: 近距环仅 1 格 — r=2(64px) 超出玩家近战48px, 怪仍够不着 → 追打循环拖死
         // 1 格(32px) 落点必在玩家近战内 → 战斗立即恢复 (Q3.2: 远距吸引放远环 8-12格 不变)
+        int monster_room = _room_mgr.room_at(mt0, mt1);
         for (int r = (far_away ? 8 : 1); r <= (far_away ? 12 : 1) && !placed; r++)
             for (int a = 0; a < 8 && !placed; a++) {
                 int tx = ptx + (int)(cosf(a * 0.785398f) * r);
@@ -1478,6 +1490,7 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
                 // Q3.5: 禁止原地传送 — 环内首个可行走格常等于怪当前格 (堆叠/口袋)
                 // → 每 5s 传送回原格 → 900s 死锁 (v38 F11 4怪同格循环)
                 if (tx == mt0 && ty == mt1) continue;
+                if (monster_room >= 0 && _room_mgr.room_at(tx, ty) != monster_room) continue;
                 Rectangle rr = { (float)(tx * 32), (float)(ty * 32),
                                  m->entity.rect.width, m->entity.rect.height };
                 if (game_map->is_rect_walkable(rr)) {
@@ -1490,6 +1503,18 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
                     placed = true;
                 }
             }
+        // Room boundary fallback: if no valid tile in room found, reset to home
+        if (!placed && m->ai && m->ai->home_x >= 0 && m->ai->home_y >= 0) {
+            int htx = (int)(m->ai->home_x) / 32;
+            int hty = (int)(m->ai->home_y) / 32;
+            if (monster_room < 0 || _room_mgr.room_at(htx, hty) == monster_room) {
+                m->entity.position.x = m->ai->home_x - m->entity.rect.width / 2;
+                m->entity.position.y = m->ai->home_y - m->entity.rect.height / 2;
+                m->entity.sync_rect();
+                last_pos[m->instance_id] = {htx, hty};
+                stuck_since[m->instance_id] = gt;
+            }
+        }
     }
 }
 
@@ -1965,7 +1990,7 @@ void GameScene::_render() {
             }
         }
 
-        Rectangle panel = {(float)(sw - MINIMAP_WIDTH - 14), (float)(sh - MINIMAP_HEIGHT - 14),
+        Rectangle panel = {(float)(sw - MINIMAP_WIDTH - 14), (float)(sh - MINIMAP_HEIGHT - 40),
                            (float)MINIMAP_WIDTH, (float)MINIMAP_HEIGHT};
         _minimap.draw(*game_map, mm, panel);
     }

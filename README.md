@@ -687,3 +687,4 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | Phase 1 | FOV 可见性系统（360° 射线投射）：Tile 三层状态（未探索/可见/记忆暗）+ 实体中心 tile 剔除 + 8 单测；阻断可见性 bug | ✅ |
 | Phase 2 | 地牢拓扑：Room→Door→Corridor 边缘连接（_pick_room_edge + _compute_door_pos）+ DOOR tile（walkable、不挡视线）+ _carve_diamond 墙壁保护 + 12 拓扑测试 + 5 结构回归 | ✅ |
 | Phase 3 | Minimap 小地图：MinimapRenderer 只读 isExplored/isVisible（无第二套状态）+ M 键开关右下角面板 + Boss 最后已知位置/楼梯发现地标 + 12 单测 | ✅ |
+| v1.2.3 | 怪物房间边界约束（AI 视觉/移动/技能/脱困全部限制在出生房间内）+ 小地图上移避让快捷键文字; 42/42 测试 | ✅ |
