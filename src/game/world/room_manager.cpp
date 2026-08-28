@@ -69,18 +69,16 @@ int RoomManager::_monster_in_room(const RoomEntry& r, GameMap* map,
 bool RoomManager::_entity_on_doors(const RoomEntry& r, GameMap* map, Player* player,
                                    const std::vector<std::unique_ptr<Monster>>& monsters) const {
     for (auto& [dx, dy] : r.door_tiles) {
-        float door_px = (float)dx * map->tile_size + map->tile_size / 2.0f;
-        float door_py = (float)dy * map->tile_size + map->tile_size / 2.0f;
+        Rectangle door_r = { (float)dx * map->tile_size, (float)dy * map->tile_size,
+                             (float)map->tile_size, (float)map->tile_size };
         if (player) {
             const auto& pr = player->entity.rect;
-            if (door_px >= pr.x && door_px <= pr.x + pr.width &&
-                door_py >= pr.y && door_py <= pr.y + pr.height) return true;
+            if (CheckCollisionRecs(door_r, pr)) return true;
         }
         for (auto& m : monsters) {
             if (!m || !m->combat.is_alive) continue;
             const auto& mr = m->entity.rect;
-            if (door_px >= mr.x && door_px <= mr.x + mr.width &&
-                door_py >= mr.y && door_py <= mr.y + mr.height) return true;
+            if (CheckCollisionRecs(door_r, mr)) return true;
         }
     }
     return false;
