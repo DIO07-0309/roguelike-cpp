@@ -70,8 +70,8 @@ void MinimapRenderer::draw(const GameMap& map, const MinimapInput& input,
         }
     }
 
-    // 标记（Boss / 楼梯；已过滤"已探索"）
-    if (should_show_boss(map, input.boss_marker.tx, input.boss_marker.ty))
+    // 标记（Boss / 楼梯；Boss 始终显示，楼梯需已探索）
+    if (input.boss_marker.visible)
         _draw_marker(input.boss_marker, panel);
     if (should_show_stairs(map, input.stairs_marker.tx, input.stairs_marker.ty))
         _draw_marker(input.stairs_marker, panel);

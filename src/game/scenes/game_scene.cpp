@@ -983,12 +983,12 @@ void GameScene::_process(double delta) {
         }
     }
 
-    // Phase 3: Boss 最后已知位置 — 当前可见才记录，不实时追踪不可见移动
+    // Boss 位置 — 始终追踪（minimap 始终显示 boss 方向）
     if (player && game_map) {
         Monster* b = _get_boss();
         if (b) {
             auto [btx, bty] = game_map->pixel_to_tile(b->entity.position.x, b->entity.position.y);
-            if (game_map->isVisible(btx, bty)) _boss_last_known = {btx, bty};
+            _boss_last_known = {btx, bty};
         }
     }
 
@@ -1966,8 +1966,8 @@ void GameScene::_render() {
             player->entity.rect.y + player->entity.rect.height / 2);
         mm.player_tx = ptx; mm.player_ty = pty;
 
-        // Boss 最后已知位置（已发现才显示，不实时追踪）
-        if (MinimapRenderer::should_show_boss(*game_map, _boss_last_known.first, _boss_last_known.second)) {
+        // Boss — 始终显示（让玩家知道 BOSS 方向）
+        if (_boss_last_known.first >= 0) {
             mm.boss_marker.tx = _boss_last_known.first;
             mm.boss_marker.ty = _boss_last_known.second;
             mm.boss_marker.visible = true;
@@ -2001,6 +2001,11 @@ void GameScene::_render() {
         Rectangle panel = {(float)(sw - MINIMAP_WIDTH - 14), (float)(sh - MINIMAP_HEIGHT - 40),
                            (float)MINIMAP_WIDTH, (float)MINIMAP_HEIGHT};
         _minimap.draw(*game_map, mm, panel);
+        // M 键提示 — 面板下方
+        const char* hint = "[M] Map";
+        int hint_w = MeasureText(hint, 14);
+        DrawText(hint, (int)(panel.x + panel.width / 2 - hint_w / 2),
+                 (int)(panel.y + panel.height + 4), 14, {160, 160, 200, 180});
     }
 
     // G9.1: Combo stage UI (bottom center)
