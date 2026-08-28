@@ -1,11 +1,11 @@
 # 地牢肉鸽 — Roguelike C++
 
-> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **295 源文件** (134 cpp + 161 h) | Windows 实机验证
+> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **295+ 源文件** | Windows 实机验证
 >
 > 随机生成 15 层地牢，击败 Boss「终焉回响」通关。
 > 五项 Stable 冻结验收通过：**API / Save / Mod / Regression / Performance**（报告 `docs/V1_0_0_ACCEPTANCE.md`）
 >
-> **v1.0.0 后新增**（Phase 1-3 + Batch A + v1.2.5/1.2.6，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞
+> **v1.0.0 后新增**（Phase 1-3 + Batch A-F，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞 · **经济系统（金币/钥匙/圣物持久化/背包出售）· 赌徒房 · 挑战房（波次战斗）**
 
 本项目定位：
 
@@ -47,7 +47,7 @@ build/roguelike_cpp.exe
 | **空格** | 普攻（武器三连击） |
 | **1~4 / 小键盘 1~4** | 主动技能 |
 | **E** | 拾取 / 触发特殊房间 / 开门 / 下楼 |
-| **B** | 背包（↑↓/WS 选择 · ←→ 翻页 · X 装备 · U 使用 · D 丢弃） |
+| **B** | 背包（↑↓/WS 选择 · ←→ 翻页 · X 装备 · T 出售 · U 使用 · D 丢弃） |
 | **R** | 圣物面板 |
 
 ### 系统
@@ -76,7 +76,7 @@ build/roguelike_cpp.exe
 
 ### 地牢生成
 
-BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗深渊 / F11-15 虚空深渊），F4/9/14 休整层、F5/10/15 Boss 层。**Room→Door→Corridor 拓扑（Phase 2）**——房间经边缘门与走廊连接，走廊只雕刻墙壁不侵入房间内部；门支持 4 种状态视觉（Kenney 素材 tile_0003/0018/0022）：OPEN 空拱门 / CLOSED 木门 / LOCKED 木门+红色锁 / SEALED 深色门+紫色封印，0.3s 过渡动画。10 类特殊房间（祭坛/宝箱/泉水/商店/铁匠/图书馆/赌徒/神殿/隐藏密室/地标）+ ArenaObject 战场元素（毒池/尖刺/图腾/**木桶 — 攻击或弹体点燃 → 0.6s 引信 → AOE 爆炸**）。F10 地狱火魔 Boss 房含机制地形（LAVA 灼烧 + 中央安全区熔岩环带）。
+BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗深渊 / F11-15 虚空深渊），F4/9/14 休整层、F5/10/15 Boss 层。**Room→Door→Corridor 拓扑（Phase 2）**——房间经边缘门与走廊连接，走廊只雕刻墙壁不侵入房间内部；门支持 4 种状态视觉（Kenney 素材 tile_0003/0018/0022）：OPEN 空拱门 / CLOSED 木门 / LOCKED 木门+红色锁 / SEALED 深色门+紫色封印，0.3s 过渡动画。11 类特殊房间（祭坛/宝箱/泉水/商店/铁匠/图书馆/赌徒/神殿/隐藏密室/地标/挑战房）+ ArenaObject 战场元素（毒池/尖刺/图腾/**木桶 — 攻击或弹体点燃 → 0.6s 引信 → AOE 爆炸**）。F10 地狱火魔 Boss 房含机制地形（LAVA 灼烧 + 中央安全区熔岩环带）。
 
 ### 战斗系统
 
@@ -103,7 +103,10 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 - **FOV 可见性（Phase 1）** — 360° 射线投射，Tile 三层状态（未探索黑色 / 当前可见全亮 / 已探索不可见 60% 暗）；实体中心 tile 可见性剔除；`is_visible`/`is_explored` 独立于 `is_walkable`
 - **Boss FOV** — 每帧追踪 Boss 位置，射线投射更新 Boss 可视范围，主地图红色叠加 + 小地图暗红/红色调显示
 - **Minimap 小地图（Phase 3）** — 右下角常驻面板（M 键开关），只读现有 `isExplored/isVisible` **无第二套探索状态**；未探索区不显示、已探索永久记忆、当前可见高亮；Boss 视野区域红色调显示；Room/Corridor/Door 缩略色块 + 玩家/Boss 最后已知位置/楼梯标记；实体仅当前可见才显示，绝不泄露未探索区
-- **存档 v3** — 跨版本兼容（v1→v3 + 增量字段），SaveStable 3 验收测试
+- **存档 v4** — 跨版本兼容（v1→v4 + 增量字段），SaveStable 3 验收测试
+- **经济系统** — 金币（装备出售获取）/ 钥匙（赌徒房掉落）/ 圣物持久化（FLOOR/RUN 两种作用域）/ 背包出售 [T]
+- **赌徒房** — 金币开房（40+floor×10），75% 装备 / 20% 钥匙 / 5% RUN 圣物，耗尽回退钥匙
+- **挑战房** — 钥匙开启，3 波 × 4 怪物波次战斗，ChallengeModifier（HP×1.5 ATK×1.3），通关 3×RARE+ 奖励
 - **Mod 系统** — `mods/` 扫描 + 依赖解析 + MergeMode{Skip/Replace/MergePatch} 字段级合并
 - **中文 UI** — 生成字体图集全中文渲染，`tools/extract_chars.py` 自动维护码点
 - **音频** — 程序化合成（wave_synth）：14 SFX（hit/hurt/melee/slash/bolt/heal/timestop/domain_expand/victory/ui 等）+ 5 BGM（title/select/dungeon/boss/victory + biome 动态变体）+ 交叉淡入 + Boss Phase2 cue
@@ -122,7 +125,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 | 图形/输入 | Raylib 5.0（窗口/绘制/输入/音频），sprite atlas + 程序化像素占位 |
 | JSON | nlohmann/json（header-only），20+ 配置文件全数据驱动 |
 | 构建 | CMake 3.16+ + CMakePresets + MinGW（UTF-8 编译标志），Release/Debug + 测试三配置 |
-| 测试 | GoogleTest（39 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
+| 测试 | GoogleTest（52 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
 | Python 工具 | `tools/`：world_validator（JSON 交叉引用）/ extract_chars（中文字体码点） |
 
 ### 工程与架构技术
@@ -132,7 +135,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 - **事件驱动解耦** — EventBus 45 事件、轻量载荷 `{type,sender,int,float,str}`、按 owner 批量注销；Gameplay→EventBus→Presentation 单向流（Gameplay 不引用 UI）
 - **组合式 Director** — GameScene 组合 5 Director：BossSystem（12 子系统）/ GameplaySystem（world_state/quest/ending）/ PresentationSystem（shake/freeze/BuildTheme）/ GameFlow（12 态生命周期）/ Flow（动态内容编排）；CameraDirector 常量 + EndingDirector 判定为辅助模块；零继承
 - **确定性游戏技术** — `CountingRng`（mt19937 + 掷骰计数）· 种子公式 `seed_start + run*1234567` · **replay hash 链**逐帧校验（mixer 黄金比例常量）· 指针键 → instance_id 防跨进程分叉（Q3.14 对拍逐字节一致）
-- **存档兼容工程** — v1→v3 追加式字段 + `getV` 默认值 + 旧技能名映射 + SaveStable 3 验收测试；三份数据独立：save.json（局内）/ meta_save.json（局外成长）/ relic_archive.json（收藏）
+- **存档兼容工程** — v1→v4 追加式字段 + `getV` 默认值 + 旧技能名映射 + SaveStable 3 验收测试；三份数据独立：save.json（局内）/ meta_save.json（局外成长）/ relic_archive.json（收藏）
 - **内存安全实践** — 全智能指针 + 工厂方法（`spawn_monster`/`boss_factory_create`），无裸 `new`；SEH 异常捕获 → crash.log
 - **中文字体管线** — `extract_chars.py` 精确码位扫描（1769 码点）→ 生成字体图集 → `GuiFont::DrawTextCH()`（Raylib DrawText 不支持中文）
 
@@ -277,7 +280,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 
 ### 测试与验证
 
-- **39 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip）
+- **52 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip）
 - World Validator：20+ JSON 交叉引用 **0 errors 0 warnings**
 - 木桶闭环实测：200 局 sim **38 次 点燃→爆炸 完全成对**（伤害随楼层缩放）
 - 收官体检：编译 0 警告（bgm narrowing 修复后）
@@ -305,7 +308,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 ## 项目结构
 
 ```
-src/                                    # 289 源文件（129 cpp + 160 h）
+src/                                    # 295+ 源文件（134 cpp + 161+ h）
 ├── main.cpp                            # 入口：CLI 解析 / Registry+Mod 构建 / sim 前置 / 场景树启动
 │
 ├── core/                               # 引擎框架 + 模拟器 + 回放 + Mod 管线（25）
@@ -400,13 +403,14 @@ src/                                    # 289 源文件（129 cpp + 160 h）
 │   │   ├── attack_evolution_state.h                     # 普攻进化状态
 │   │   ├── skill_evolution.cpp · skill_evolution.h     # 技能进化（使用次数驱动）
 │   │   └── interaction_handler.cpp · interaction_handler.h  # 拾取/交互结果解析
-│   ├── world/                             # 世界生成与规则（34）
+│   ├── world/                             # 世界生成与规则（35）
 │   │   ├── dungeon_generator.cpp · dungeon_generator.h # BSP 二分划分地图生成（Phase 2: Door 拓扑）
 │   │   ├── game_map.cpp · game_map.h     # 瓦片地图（碰撞/特殊房/熔岩/木桶/FOV 可见性）
 │   │   ├── biome.cpp · biome.h           # 三章生态（Prison/Volcano/Abyss）
 │   │   ├── landmark.cpp · landmark.h     # 地标（9 个）
 │   │   ├── encounter.cpp · encounter.h   # 遭遇框架（9 个：NPC/事件）
-│   │   ├── special_room.cpp · special_room.h           # 10 类特殊房间
+│   │   ├── special_room.cpp · special_room.h           # 11 类特殊房间
+│   │   ├── challenge_room.cpp · challenge_room.h       # 挑战房（7 阶段状态机 + 波次战斗）
 │   │   ├── quest_manager.cpp · quest_manager.h         # 任务管理（12 任务）
 │   │   ├── npc_system.cpp · npc_system.h               # NPC 系统（12 NPC 类型）
 │   │   ├── relationship_system.cpp · relationship_system.h  # 好感度
@@ -499,7 +503,7 @@ src/                                    # 289 源文件（129 cpp + 160 h）
 │   └── navigation/                        # 导航（2）
 │       └── pathfinder.cpp · pathfinder.h  # A* 寻路（priority_queue + Manhattan）
 
-tests/                      (39 条目)  # GoogleTest，按模块分目录 — fov / dungeon_topology / minimap 等
+tests/                      (52 条目)  # GoogleTest，按模块分目录 — fov / dungeon_topology / minimap / economy 等
 resources/                             # 20+ JSON 配置（enemies/skills/relics/bosses/weapons/elements/biomes/encounters/dialogues/quests/endings/…）+ world/ 三章子目录
 tools/                                 # world_validator.py / extract_chars.py / replace_methods.py
 docs/                                  # ARCHITECTURE / G4_PLATFORM_BIBLE / WORLD_LORE / D1_GAMEPLAY / ART_*
@@ -692,3 +696,11 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | Phase 2 | 地牢拓扑：Room→Door→Corridor 边缘连接（_pick_room_edge + _compute_door_pos）+ DOOR tile（walkable、不挡视线）+ _carve_diamond 墙壁保护 + 12 拓扑测试 + 5 结构回归 | ✅ |
 | Phase 3 | Minimap 小地图：MinimapRenderer 只读 isExplored/isVisible（无第二套状态）+ M 键开关右下角面板 + Boss 最后已知位置/楼梯发现地标 + 12 单测 | ✅ |
 | v1.2.3 | 怪物房间边界约束（AI 视觉/移动/技能/脱困全部限制在出生房间内）+ 小地图上移避让快捷键文字; 42/42 测试 | ✅ |
+| v1.2.5 | 混合码位修复: 重生成字体码位表 (+35字) + 对话箭头 ▶→→ | ✅ |
+| v1.2.6 | 特殊房间装饰素材上线 (9素材) + 装甲/药水/护符图标 | ✅ |
+| Batch 3A | 经济基础: PersistenceScope(FLOOR/RUN) + Player 金币/钥匙 + get_sell_value/sell_item + RewardManager + Save v4 + HUD 金币钥匙显示 + 5 测试 | ✅ |
+| Batch 3B | 赌徒房 MVP: 金币开房(40+floor×10) + 75/20/5 奖励池 + RUN 圣物 + 耗尽→钥匙回退 + is_repeatable 旁路 + 8 测试 | ✅ |
+| Batch 3C | 背包出售 UI: [T] 出售 + sell_selected_item 静态 helper + key hints 更新 + 8 测试 | ✅ |
+| Batch 3D | 挑战房架构审计: SpecialRoom/Key/Room/Monster/Reward 全系统审查 + 最终实现计划 | ✅ |
+| Batch 3E | 挑战房设计冻结: 7阶段状态机 + ChallengeRoomController + 3×4波次 + 确定性RNG + 奖励背包满fallback | ✅ |
+| Batch 3F | 挑战房 MVP: ChallengeRoomController + 7-phase state machine + 出口附近放置 + 波次战斗 + HUD wave 显示 + 14 测试 | ✅ |
