@@ -22,6 +22,19 @@
 #include <cmath>
 #include <algorithm>
 
+// Batch 3C: sell helper — separated for unit testing
+int PlayerController::sell_selected_item(Inventory& inv, Player* player,
+                                          int& cursor,
+                                          PresentationSystemDirector& pres) {
+    int val = inv.sell_item(cursor, player);
+    if (val > 0) {
+        pres.show_message(("出售获得 " + std::to_string(val) + " Gold").c_str(), 2.0f);
+    }
+    int item_count = (int)inv.items.size();
+    cursor = std::min(cursor, std::max(0, item_count - 1));
+    return val;
+}
+
 void PlayerController::tick(float dt) {
     if (!_scene || !_scene->player || !_scene->player->combat.is_alive) return;
 
@@ -213,6 +226,9 @@ void PlayerController::handle_input(const InputMap& input) {
             { gs.player->inventory.use_item(gs.inventory_cursor, gs.player.get()); gs.inventory_cursor = std::min(gs.inventory_cursor, std::max(0, (int)gs.player->inventory.items.size() - 1)); }
         else if (IsKeyPressed(KEY_D))
             { gs.player->inventory.remove(gs.inventory_cursor); gs.inventory_cursor = std::min(gs.inventory_cursor, std::max(0, (int)gs.player->inventory.items.size() - 1)); }
+        else if (IsKeyPressed(KEY_T))
+            sell_selected_item(gs.player->inventory, gs.player.get(),
+                               gs.inventory_cursor, gs._presentation);
         else if (IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP))
             gs.inventory_cursor = std::max(0, gs.inventory_cursor - 1);
         else if (IsKeyPressed(KEY_S) || IsKeyPressed(KEY_DOWN))

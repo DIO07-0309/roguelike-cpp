@@ -520,7 +520,7 @@ void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw
             DrawTextEx(g_font_small, page_buf,
                        {pr.x + 30, pr.y + ph - 52}, 14, 1, {160, 160, 200, 255});
         }
-        DrawTextEx(g_font_small, "^v选择 X装备 U使用 D丢弃 B关闭",
+        DrawTextEx(g_font_small, "^v选择 X装备 T出售 U使用 D丢弃 B关闭",
                    {pr.x + (pw - 260) / 2, pr.y + ph - 30}, 16, 1, {140, 140, 140, 255});
     }
 }

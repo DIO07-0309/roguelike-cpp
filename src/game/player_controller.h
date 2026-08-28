@@ -4,6 +4,8 @@ class GameScene;
 class InputMap;
 class Player;
 class Monster;
+class Inventory;
+class PresentationSystemDirector;
 struct WeaponAttackResult;  // G9: defined in weapon_types.h
 
 // ============================================================
@@ -26,6 +28,11 @@ public:
     // ── 单一动作 ──
     void player_attack();
     void use_skill(int index);
+
+    // Batch 3C: inventory sell helper (testable without Raylib input)
+    static int sell_selected_item(Inventory& inv, Player* player,
+                                  int& cursor,
+                                  PresentationSystemDirector& pres);
 
 private:
     GameScene* _scene = nullptr;
