@@ -40,6 +40,7 @@ class BTAgent;
 #include "arena_manager.h"
 #include "boss_replay.h"
 #include "minimap.h"
+#include "room_manager.h"    // Batch 2C: Room Encounter
 #include "boss_encounter.h"
 #include "camera_director.h"
 #include "boss_cinematic.h"
@@ -96,6 +97,9 @@ public:
 
     // Batch 2B: 接触开门回调 — 门开启后重算 FOV (由 PlayerController 在 R1 触发时调用)
     void on_door_opened();
+
+    // Batch 2C: Room Encounter 通知 — 由 RoomManager 调用 (显示房间消息)
+    void show_room_message(const char* msg);
 
     // 核心数据
     std::unique_ptr<Player> player;
@@ -278,6 +282,9 @@ private:
     // Phase 3: Minimap — 只读 GameMap，无第二套探索状态
     MinimapRenderer _minimap;
     bool _show_minimap = true;              // 默认显示，M 切换
+
+    // Batch 2C: Room Encounter Manager
+    RoomManager _room_mgr;
     std::pair<int,int> _boss_last_known{-1,-1};  // Boss 最后已知可见位置（已发现才记录）
 
     // 渲染辅助 (保留 GameScene 中的轻量级方法)

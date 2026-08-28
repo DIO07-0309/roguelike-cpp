@@ -13,6 +13,7 @@
 #include "core/logger.h"
 #include "save/save_manager.h"
 #include "audio_server.h"
+#include "event_bus.h"     // Batch 2C: ROOM_LOCKED/ROOM_CLEAR
 #include "floor_config.h"
 #include "attack_evolution.h"   // G1
 #include "skill_evolution.h"   // G1 Step3
@@ -367,6 +368,18 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     } else {
         FloorManager::spawn_floor_monsters(floor, game_map.get(), monsters, rooms);
         state = GameState::PLAYING;
+        // Batch 2C: 进层构建 Room Encounter 映射 (房间矩形 + 门组, 一次性固化)
+        RoomEncounterCallbacks cb;
+        cb.on_locked = [this](int) {
+            show_room_message("房间封锁了!");
+            EventBus::inst().emit(GameEventType::ROOM_LOCKED, this, 0, 0.0f, nullptr);
+        };
+        cb.on_cleared = [this](int) {
+            EventBus::inst().emit(GameEventType::ROOM_CLEAR, this, 0, 0.0f, nullptr);
+            /* 掉落钩子 Batch 3 接 */
+        };
+        _room_mgr.set_callbacks(cb);
+        _room_mgr.build(game_map.get(), gen.get_room_rects(), is_boss_floor(floor));
     }
 
     stairs_pos = rooms.back();
@@ -947,6 +960,9 @@ void GameScene::_process(double delta) {
     // D6 Step7: 玩家移动/交互/怪物AI — 委托给 PlayerController
     _player_ctrl.tick(dt);
 
+    // Batch 2C: Room Encounter 状态机 (进有怪房→封门→清房→开门)
+    if (player && game_map) _room_mgr.tick(game_map.get(), player.get(), monsters);
+
     // Phase 1: FOV — 玩家跨 tile 时更新
     if (player && game_map) {
         auto [tx, ty] = game_map->pixel_to_tile(
@@ -1212,6 +1228,11 @@ void GameScene::on_door_opened() {
         _last_player_tile_y = ty;
         game_map->update_fov(tx, ty, _fov_radius);
     }
+}
+
+// ── Batch 2C: Room Encounter 通知 ──
+void GameScene::show_room_message(const char* msg) {
+    if (msg) _presentation.show_message(msg, 1.5f);
 }
 
 

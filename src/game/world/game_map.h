@@ -103,6 +103,10 @@ public:
     // 返回: 是否开启了一扇门 (开启后由调用方触发 FOV 重算)
     bool try_open_door_toward(Rectangle moved_rect, float mx, float my);
 
+    // Batch 2C: 门组原子开闭 (E3) — 多门房间全组一致
+    bool close_room_doors(const std::vector<std::pair<int,int>>& door_tiles);
+    bool open_room_doors(const std::vector<std::pair<int,int>>& door_tiles);
+
     void draw(float cam_x, float cam_y, int screen_w, int screen_h) const;
 
 private:

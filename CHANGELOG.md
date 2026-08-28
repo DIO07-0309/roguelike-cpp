@@ -1,4 +1,42 @@
+# v1.2.2 — Batch 2C: Room Encounter (进房→封门→清房→开门) (2026-08-28)
+
+> 在 A1 密封拓扑 + DoorState + R1 接触开门之上, 实现以撒式房间战斗状态机。
+> 设计: `docs/BATCH2C_ROOM_ENCOUNTER_DESIGN.md` (已审核)
+
+## RoomManager (新增 `src/game/world/room_manager.h/.cpp`)
+
+- **状态机**: IDLE → ARMED → LOCKED → CLEARED
+  - 玩家进入有怪房 → ARMED → (E1 无压门 / E2 房怪在房内 / E3 原子关门) → LOCKED 全门 CLOSED
+  - 房内怪清零 → CLEARED 门 OPEN
+- **性能约束** (用户审核): 只维护/检查当前激活 Encounter, IDLE 房间零扫描; 玩家跨 tile 才检测
+- **映射固化**: build() 时一次性建立 房间矩形 + 门组, 运行时不搜索门
+- **解耦**: 通过回调 (on_locked/on_cleared) 通知 GameScene — 可单元测试
+
+## Door Group API (GameMap)
+
+- `close_room_doors(door_tiles)` / `open_room_doors(door_tiles)`: 多门房间原子开闭 (E3)
+
+## EventBus
+
+- +`ROOM_LOCKED` / `ROOM_CLEAR` (2 枚举)
+
+## 边界规则
+
+- E1 实体压门 → 暂缓落锁 | E2 房怪门外 → 暂缓 | E3 多门原子
+- E4 Boss 房跳过 (现有 BOSS_INTRO 流程) | E5 特殊房照常 | E7 楼梯房照常
+- 击退/传送推出 LOCKED: CLOSED 门=碰撞墙 (Batch 1 语义天然防)
+
+## 验证
+
+- **42/42 ctest 全绿** (新增 `room_encounter_test` 6 用例: 闭环/无怪不触发/压门不锁/Boss 跳过/多门原子/映射集成)
+- 构建 0 警告; 确定性保持 (同 seed 逐字节一致)
+- Sim 回归: seed100 100 局 F5=39% (Room Encounter 引入真实关门, Sim 经 S1 正常通过, 无卡死)
+- 清房掉落钩子 Batch 3 接; 封门演出仅一次性 room_msg
+
+---
+
 # v1.2.1 — Batch 2B: Door Interaction (R1 接触开门 + S1 Sim 语义) (2026-08-28)
+
 
 > Batch 1 (v1.2.0) 完成 DoorState 数据模型后, Batch 2B 接入交互层。门保持默认 OPEN (D2 决策), 不改变 gameplay。
 

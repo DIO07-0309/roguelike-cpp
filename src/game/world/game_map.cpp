@@ -133,6 +133,24 @@ bool GameMap::try_open_door_toward(Rectangle r, float mx, float my) {
     return opened;
 }
 
+// Batch 2C: 门组原子关闭 (E3) — 房间所有门同时 CLOSED
+bool GameMap::close_room_doors(const std::vector<std::pair<int,int>>& door_tiles) {
+    bool all_ok = true;
+    for (auto& [tx, ty] : door_tiles) {
+        if (!set_door_state(tx, ty, DoorState::CLOSED)) all_ok = false;
+    }
+    return all_ok;
+}
+
+// Batch 2C: 门组原子开启 — 房间所有门同时 OPEN
+bool GameMap::open_room_doors(const std::vector<std::pair<int,int>>& door_tiles) {
+    bool all_ok = true;
+    for (auto& [tx, ty] : door_tiles) {
+        if (!set_door_state(tx, ty, DoorState::OPEN)) all_ok = false;
+    }
+    return all_ok;
+}
+
 
 
 void GameMap::reset_visibility() {

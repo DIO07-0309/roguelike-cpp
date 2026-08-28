@@ -59,6 +59,10 @@ enum class GameEventType {
     FLOOR_ENTER,
     FLOOR_CLEAR,
 
+    // ── Batch 2C: Room Encounter ──
+    ROOM_LOCKED,   // 房间封门 (进入有怪房)
+    ROOM_CLEAR,    // 房间清空开门
+
     // ── G9: Weapon combo events ──
     WEAPON_STAGE_1,
     WEAPON_STAGE_2,
