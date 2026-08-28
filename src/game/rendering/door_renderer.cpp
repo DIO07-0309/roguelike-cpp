@@ -1,0 +1,133 @@
+#include "door_renderer.h"
+#include "resource_manager.h"
+#include "config.h"
+#include <algorithm>
+#include <cmath>
+
+// Kenney Tiny Dungeon door tiles (16x16 → scaled to 32x32)
+static const char* PATH_OPEN   = "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0003.png";
+static const char* PATH_CLOSED = "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0022.png";
+static const char* PATH_LOCKED = "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0022.png";
+static const char* PATH_SEALED = "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0018.png";
+
+DoorRenderer& DoorRenderer::inst() { static DoorRenderer r; return r; }
+
+uint64_t DoorRenderer::_key(int tx, int ty) {
+    return (uint64_t)((uint32_t)tx << 16 | (uint32_t)(uint16_t)ty);
+}
+
+Texture2D DoorRenderer::_tex_for(DoorState s) const {
+    switch (s) {
+        case DoorState::OPEN:   return _tex_open;
+        case DoorState::CLOSED: return _tex_closed;
+        case DoorState::LOCKED: return _tex_locked;
+        case DoorState::SEALED: return _tex_sealed;
+        default:                return _tex_closed;
+    }
+}
+
+void DoorRenderer::init() {
+    if (!IsWindowReady()) return;  // headless test — skip texture load
+    auto load = [](const char* path) -> Texture2D {
+        Texture2D t = ResourceManager::inst().load_texture(path);
+        if (t.id > 0) SetTextureFilter(t, TEXTURE_FILTER_POINT);
+        return t;
+    };
+    _tex_open   = load(PATH_OPEN);
+    _tex_closed = load(PATH_CLOSED);
+    _tex_locked = load(PATH_LOCKED);
+    _tex_sealed = load(PATH_SEALED);
+    _loaded = (_tex_open.id > 0 && _tex_closed.id > 0);
+}
+
+void DoorRenderer::update(float dt) {
+    for (auto it = _anims.begin(); it != _anims.end(); ) {
+        auto& a = it->second;
+        if (a.progress < 1.0f) {
+            a.progress = std::min(1.0f, a.progress + dt / _transition_dur);
+            ++it;
+        } else {
+            // animation done — keep entry for draw, no need to advance
+            ++it;
+        }
+    }
+}
+
+void DoorRenderer::on_state_change(int tx, int ty, DoorState from, DoorState to) {
+    if (from == to) return;
+    auto& a = _anims[_key(tx, ty)];
+    a.previous = from;
+    a.current  = to;
+    a.progress = 0.0f;
+}
+
+void DoorRenderer::draw_door(int tx, int ty, DoorState state, bool bright) {
+    if (!_loaded) return;
+
+    float dx = (float)(tx * TILE_SIZE);
+    float dy = (float)(ty * TILE_SIZE);
+    Rectangle dst = { dx, dy, (float)TILE_SIZE, (float)TILE_SIZE };
+
+    auto it = _anims.find(_key(tx, ty));
+    bool animating = (it != _anims.end() && it->second.progress < 1.0f);
+
+    if (animating) {
+        auto& a = it->second;
+        float p = a.progress;
+        // old tile fades out
+        Texture2D old_tex = _tex_for(a.previous);
+        if (old_tex.id > 0) {
+            Color fade_out = { 255, 255, 255, (unsigned char)((1.0f - p) * 255) };
+            DrawTexturePro(old_tex, { 0, 0, (float)old_tex.width, (float)old_tex.height },
+                           dst, { 0, 0 }, 0.0f, fade_out);
+        }
+        // new tile fades in + scale
+        Texture2D new_tex = _tex_for(a.current);
+        if (new_tex.id > 0) {
+            float sc = 0.8f + 0.2f * p;
+            float off = (float)TILE_SIZE * (1.0f - sc) * 0.5f;
+            Rectangle scaled_dst = { dx + off, dy + off,
+                                     (float)TILE_SIZE * sc, (float)TILE_SIZE * sc };
+            Color fade_in = { 255, 255, 255, (unsigned char)(p * 255) };
+            DrawTexturePro(new_tex, { 0, 0, (float)new_tex.width, (float)new_tex.height },
+                           scaled_dst, { 0, 0 }, 0.0f, fade_in);
+        }
+    } else {
+        // static draw
+        Texture2D tex = _tex_for(state);
+        if (tex.id > 0) {
+            Color tint = bright ? WHITE : Color{ 160, 160, 160, 255 };
+            DrawTexturePro(tex, { 0, 0, (float)tex.width, (float)tex.height },
+                           dst, { 0, 0 }, 0.0f, tint);
+        }
+        // overlay icons (only when static)
+        float cx = dx + TILE_SIZE * 0.5f;
+        float cy = dy + TILE_SIZE * 0.5f;
+        if (state == DoorState::LOCKED) _draw_lock_icon(cx, cy, bright);
+        if (state == DoorState::SEALED) _draw_seal_icon(cx, cy, bright);
+    }
+}
+
+void DoorRenderer::_draw_lock_icon(float cx, float cy, bool bright) {
+    // Red lock body (small rectangle)
+    Color body = bright ? Color{ 200, 50, 50, 220 } : Color{ 140, 35, 35, 200 };
+    float bw = 8, bh = 6;
+    DrawRectangle((int)(cx - bw/2), (int)(cy + 2), (int)bw, (int)bh, body);
+    // Yellow lock shackle (arc above body)
+    Color shackle = bright ? Color{ 230, 190, 60, 220 } : Color{ 160, 130, 40, 200 };
+    DrawRectangle((int)(cx - 3), (int)(cy - 2), 6, 4, shackle);
+    DrawRectangle((int)(cx - 4), (int)(cy - 2), 8, 2, shackle);
+}
+
+void DoorRenderer::_draw_seal_icon(float cx, float cy, bool bright) {
+    // Purple pulsing cross + ring
+    float pulse = 0.7f + 0.3f * sinf((float)GetTime() * 3.0f);
+    Color seal = bright
+        ? Color{ (unsigned char)(160 * pulse), 50, (unsigned char)(220 * pulse), 200 }
+        : Color{ (unsigned char)(110 * pulse), 35, (unsigned char)(155 * pulse), 180 };
+    // Cross lines
+    DrawRectangle((int)(cx - 1), (int)(cy - 5), 2, 10, seal);
+    DrawRectangle((int)(cx - 5), (int)(cy - 1), 10, 2, seal);
+    // Outer ring
+    DrawCircleLines((int)cx, (int)cy, 6, seal);
+}

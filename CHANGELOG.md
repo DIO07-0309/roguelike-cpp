@@ -1,3 +1,30 @@
+# v1.2.5 — Door Visual System: Kenney 素材 + 状态动画 (2026-08-28)
+
+> 4种门状态4种外观 + 0.3秒过渡动画
+
+## DoorRenderer (新增 `src/game/rendering/door_renderer.h/.cpp`)
+
+- **素材**: Kenney Tiny Dungeon 16×16 tile (tile_0003/0018/0022) → 32×32
+- **OPEN**: 空拱门 `tile_0003` — 暗色拱形通道
+- **CLOSED**: 木门 `tile_0022` — 棕色木门+把手
+- **LOCKED**: 木门 `tile_0022` + 红色锁 icon (代码绘制)
+- **SEALED**: 深色门 `tile_0018` + 紫色封印十字纹 (sinf 脉冲)
+- **动画**: 状态切换触发 0.3s 过渡 — 旧 tile alpha 渐隐 + 新 tile alpha 渐显 + scale 0.8→1.0
+- 叠加标记只在最终状态绘制，过渡中不画
+
+## 集成
+
+- `GameMap::set_door_state()` 自动触发 `DoorRenderer::on_state_change()`
+- `GameMap::draw()` DOOR 分支 → `DoorRenderer::inst().draw_door()`
+- `GameScene::enter_floor()` 初始化, `_process()` 每帧 update
+
+## 测试
+
+- `door_renderer_test`: 7 case — 单例/init安全/绘制不崩溃/动画状态切换/过渡完成
+- 44/44 ctest 全绿
+
+---
+
 # v1.2.4 — Batch A: 门交互 & 碰撞修复 (2026-08-28)
 
 > 分离视觉/碰撞尺寸 · E 键开门 · LOCKED 门语义 · SimAI 门处理

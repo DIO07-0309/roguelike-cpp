@@ -41,6 +41,7 @@
 #include <cstring>
 #include "resource_manager.h"                 // M4f: NPC 精灵加载
 #include "game/rendering/sprite_renderer.h"   // M4f: NPC 精灵绘制
+#include "game/rendering/door_renderer.h"     // Door sprites + anim
 
 // 字体指针 (在 main.cpp 中初始化)
 extern Font g_font;
@@ -336,6 +337,10 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     // M4f: biome palette → 地图 (程序化像素纹理基色)
     const BiomeDef* biome = get_biome_for_floor(floor);
     game_map->set_palette(biome ? &biome->palette : nullptr);
+
+    // Door sprites — load once, reuse across floors
+    if (!DoorRenderer::inst().is_loaded())
+        DoorRenderer::inst().init();
 
     // 放置玩家
     if (!rooms.empty()) {
@@ -962,6 +967,9 @@ void GameScene::_process(double delta) {
 
     // Batch 2C: Room Encounter 状态机 (进有怪房→封门→清房→开门)
     if (player && game_map) _room_mgr.tick(game_map.get(), player.get(), monsters);
+
+    // Door animation update
+    DoorRenderer::inst().update(dt);
 
     // Phase 1: FOV — 玩家跨 tile 时更新
     if (player && game_map) {

@@ -3,6 +3,7 @@
 #include "core/logger.h"
 #include "resource_manager.h"                 // M4f: 纹理缓存
 #include "game/rendering/sprite_renderer.h"   // M4f: 像素绘制
+#include "game/rendering/door_renderer.h"     // Door sprites + anim
 #include <cmath>
 #include <cstdio>
 
@@ -103,9 +104,10 @@ bool GameMap::set_door_state(int tx, int ty, DoorState s) {
     Tile& t = _tiles[ty][tx];
     if (t.type != TileType::DOOR) return false;   // 仅 DOOR tile 可设门态
     if (t.door_state == s) return true;
+    DoorState old = t.door_state;
     t.door_state = s;
-    // 语义落点: OPEN=可走, CLOSED=不可走 (is_walkable 物化字段单点更新)
     t.is_walkable = (s == DoorState::OPEN);
+    DoorRenderer::inst().on_state_change(tx, ty, old, s);
     return true;
 }
 
@@ -361,11 +363,7 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                 DrawCircle(dx + tile_size/2, dy + tile_size/2, 5.0f * pulse + 2.0f,
                            _dim({255, 160, 60, (unsigned char)(120 + 80 * pulse)}, bright));
             } else if (t.type == TileType::DOOR) {
-                // Phase 2: 门 — 棕色木质标记
-                DrawRectangle(dx, dy, tile_size, tile_size, _dim({140, 100, 50, 255}, bright));
-                DrawRectangleLines(dx, dy, tile_size, tile_size, _dim({100, 70, 30, 255}, bright));
-                DrawCircle(dx + tile_size/2, dy + tile_size/2, 3.0f,
-                           _dim({200, 180, 100, 255}, bright));
+                DoorRenderer::inst().draw_door(x, y, t.door_state, bright);
             }
 
             // D4 Step1: 事件房间中心绘制标记
