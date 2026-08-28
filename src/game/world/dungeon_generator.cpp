@@ -1,7 +1,9 @@
 #include "dungeon_generator.h"
 #include "item.h"  // for rng
+#include "challenge_room.h"
 #include <algorithm>
 #include <queue>
+#include <cfloat>
 
 DungeonGenerator::DungeonGenerator(int w, int h, int ts, int mp, int mr, int mg)
     : _w(w), _h(h), _ts(ts), _min_part(mp), _min_room(mr), _margin(mg) {}
@@ -34,6 +36,40 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_r
 
     _assign_special_rooms(special_room_count, biome_id);
     gm->special_rooms = _special_rooms;
+
+    // Batch 3F: Challenge Room placement near exit (non-boss floors, floor >= 3)
+    if (special_room_count > 0 && _rooms.size() >= 4) {
+        auto [ex, ey, ew, eh] = _rooms.back();
+        int exit_cx = ex + ew / 2;
+        int exit_cy = ey + eh / 2;
+
+        // Find unassigned room closest to exit
+        int best = -1;
+        float best_dist = FLT_MAX;
+        for (int i = 1; i < (int)_rooms.size() - 1; i++) {
+            auto [rx, ry, rw, rh] = _rooms[i];
+            bool has_special = false;
+            for (auto& sr : _special_rooms)
+                if (sr.cx == rx + rw / 2 && sr.cy == ry + rh / 2)
+                    { has_special = true; break; }
+            if (has_special) continue;
+
+            int cx = rx + rw / 2;
+            int cy = ry + rh / 2;
+            float d = (float)((cx - exit_cx) * (cx - exit_cx) + (cy - exit_cy) * (cy - exit_cy));
+            if (d < best_dist) { best_dist = d; best = i; }
+        }
+
+        if (best >= 0) {
+            auto [rx, ry, rw, rh] = _rooms[best];
+            SpecialRoom sr;
+            sr.cx = rx + rw / 2; sr.cy = ry + rh / 2;
+            sr.rx = rx; sr.ry = ry; sr.rw = rw; sr.rh = rh;
+            sr.type = SpecialRoomType::CHALLENGE;
+            sr.triggered = false;
+            _special_rooms.push_back(sr);
+        }
+    }
 
     if (arena_density > 0) _assign_arena_objects(gm.get(), arena_density);
 

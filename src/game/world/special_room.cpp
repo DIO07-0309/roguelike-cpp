@@ -21,6 +21,9 @@ SpecialRoomType special_room_from_index(int idx) {
         default: return SpecialRoomType::SECRET;
     }
 }
+SpecialRoomType special_room_from_challenge() {
+    return SpecialRoomType::CHALLENGE;
+}
 
 std::string special_room_to_string(SpecialRoomType type) {
     switch (type) {
@@ -33,6 +36,7 @@ std::string special_room_to_string(SpecialRoomType type) {
         case SpecialRoomType::GAMBLER:    return "gambler";
         case SpecialRoomType::SHRINE:     return "shrine";
         case SpecialRoomType::SECRET:     return "secret";
+        case SpecialRoomType::CHALLENGE:  return "challenge";
     }
     return "unknown";
 }
@@ -47,6 +51,7 @@ SpecialRoomType special_room_from_string(const std::string& s) {
     if (s == "gambler")    return SpecialRoomType::GAMBLER;
     if (s == "shrine")     return SpecialRoomType::SHRINE;
     if (s == "secret")     return SpecialRoomType::SECRET;
+    if (s == "challenge")  return SpecialRoomType::CHALLENGE;
     return SpecialRoomType::ALTAR;
 }
 
@@ -397,6 +402,7 @@ std::string execute_special_room(SpecialRoomType type, Player* player) {
         case SpecialRoomType::GAMBLER:    return _exec_gambler(player);
         case SpecialRoomType::SHRINE:     return _exec_shrine(player);
         case SpecialRoomType::SECRET:     return _exec_secret(player);
+        case SpecialRoomType::CHALLENGE:  return "挑战房——按 [E] 消耗钥匙开启挑战。";
     }
     return "未知房间。";
 }

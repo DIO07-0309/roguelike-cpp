@@ -32,6 +32,7 @@ class BTAgent;
 #include "growth_curve.h"
 #include "combat_feel.h"
 #include "flow_director.h"
+#include "challenge_room.h"
 #include "relic_progression.h"
 #include "meta_progression.h"
 #include "boss_evolution.h"
@@ -285,6 +286,8 @@ private:
 
     // Batch 2C: Room Encounter Manager
     RoomManager _room_mgr;
+    // Batch 3F: Challenge Room Controller
+    ChallengeRoomController _challenge;
     std::pair<int,int> _boss_last_known{-1,-1};  // Boss 最后已知可见位置（已发现才记录）
 
     // 渲染辅助 (保留 GameScene 中的轻量级方法)

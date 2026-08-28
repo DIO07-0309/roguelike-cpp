@@ -8,6 +8,7 @@
 #include "skill.h"
 #include "item.h"
 #include "vfx_server.h"
+#include "challenge_room.h"
 #include "combat_feel.h"
 #include "weapon_executor.h"   // G9
 #include "collision_utils.h"
@@ -305,6 +306,25 @@ void PlayerController::handle_input(const InputMap& input) {
             if (tx == gs.game_map->event_tile_x && ty == gs.game_map->event_tile_y) {
                 gs._start_event_presentation(gs.game_map->event_type);
                 return;
+            }
+        }
+        // Batch 3F: Challenge Room — E key to activate (before regular interaction)
+        {
+            auto [ptx, pty] = gs.game_map->pixel_to_tile(
+                gs.player->entity.rect.x + gs.player->entity.rect.width/2,
+                gs.player->entity.rect.y + gs.player->entity.rect.height/2);
+            SpecialRoom* room = gs.game_map->get_special_room_at(ptx, pty);
+            if (room && room->type == SpecialRoomType::CHALLENGE) {
+                if (gs._challenge.try_activate(*gs.player)) {
+                    gs._presentation.room_msg = "挑战开始！消灭所有怪物。";
+                    gs._presentation.room_msg_timer = 3.0f;
+                    gs.get_tree()->get_audio()->play_sfx("door_open", 0.5f);
+                    return;
+                } else if (gs._challenge.phase() == ChallengePhase::INACTIVE) {
+                    gs._presentation.room_msg = "需要钥匙才能开启挑战。";
+                    gs._presentation.room_msg_timer = 2.0f;
+                    return;
+                }
             }
         }
         std::string result = gs._interact.try_interact(gs.player.get(), gs.game_map.get(), gs.ground_items);

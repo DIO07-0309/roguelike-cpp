@@ -202,5 +202,6 @@ add_roguelike_test(reward_manager_test economy/reward_manager_test.cpp)
 add_roguelike_test(save_v4_test        economy/save_v4_test.cpp)
 add_roguelike_test(gamble_room_test    economy/gamble_room_test.cpp)
 add_roguelike_test(inventory_sell_ui_test economy/inventory_sell_ui_test.cpp)
+add_roguelike_test(challenge_room_test    economy/challenge_room_test.cpp)
 
 

@@ -971,6 +971,28 @@ void GameScene::_process(double delta) {
     // Batch 2C: Room Encounter 状态机 (进有怪房→封门→清房→开门)
     if (player && game_map) _room_mgr.tick(game_map.get(), player.get(), monsters);
 
+    // Batch 3F: Challenge Room tick
+    if (player && game_map && _challenge.phase() != ChallengePhase::INACTIVE &&
+        _challenge.phase() != ChallengePhase::CLEARED) {
+        int room_idx = 0;
+        for (int i = 0; i < (int)game_map->special_rooms.size(); i++) {
+            if (game_map->special_rooms[i].type == SpecialRoomType::CHALLENGE)
+                { room_idx = i; break; }
+        }
+        _challenge.tick(dt, game_map.get(), player.get(), monsters,
+                        current_floor, _dungeon_seed, room_idx);
+        // When ARMED, lock doors and transition
+        if (_challenge.phase() == ChallengePhase::ARMED) {
+            auto& sr = game_map->special_rooms[room_idx];
+            game_map->lock_room_doors({});
+            _challenge.on_doors_locked();
+        }
+        // When CLEARED, open doors
+        if (_challenge.phase() == ChallengePhase::CLEARED) {
+            game_map->open_room_doors({});
+        }
+    }
+
     // Door animation update
     DoorRenderer::inst().update(dt);
 
@@ -979,6 +1001,16 @@ void GameScene::_process(double delta) {
         auto [tx, ty] = game_map->pixel_to_tile(
             player->entity.rect.x + player->entity.rect.width / 2,
             player->entity.rect.y + player->entity.rect.height / 2);
+        // Batch 3F: detect player entering challenge room
+        if (_challenge.phase() == ChallengePhase::ARMED) {
+            SpecialRoom* ch = nullptr;
+            for (auto& sr : game_map->special_rooms)
+                if (sr.type == SpecialRoomType::CHALLENGE) { ch = &sr; break; }
+            if (ch && tx >= ch->rx && tx < ch->rx + ch->rw &&
+                ty >= ch->ry && ty < ch->ry + ch->rh) {
+                _challenge.on_player_entered();
+            }
+        }
         if (tx != _last_player_tile_x || ty != _last_player_tile_y) {
             _last_player_tile_x = tx;
             _last_player_tile_y = ty;
@@ -1961,11 +1993,15 @@ void GameScene::_render() {
     }
 
     // HUD (委托给 GameRenderer)
+    int ch_wave = (_challenge.phase() == ChallengePhase::COMBAT ||
+                   _challenge.phase() == ChallengePhase::WAVE_SPAWNING)
+                  ? _challenge.current_wave() + 1 : -1;
     _renderer.draw_hud(player.get(), current_floor, game_time,
                         _get_boss(), _show_relic_panel,
                         inventory_open, inventory_cursor,
                         _presentation.room_msg, _presentation.room_msg_timer, sw, sh,
-                        is_echo ? &echo_panel_data : nullptr);
+                        is_echo ? &echo_panel_data : nullptr,
+                        ch_wave, _challenge.total_waves());
 
     // Phase 3: Minimap — 右下角常驻面板 (M 键开关)
     if (_show_minimap && game_map && player) {

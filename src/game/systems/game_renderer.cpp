@@ -658,7 +658,8 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
                              int inventory_open, int inventory_cursor,
                              const std::string& room_msg, float room_msg_timer,
                              int screen_w, int screen_h,
-                             const CharacterPanelData* echo_panel) {
+                             const CharacterPanelData* echo_panel,
+                             int challenge_wave, int challenge_total) {
     if (!player) return;
     auto& c = player->combat;
 
@@ -773,6 +774,14 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
 
     // Key hints
     if (g_font_loaded) {
+        // Batch 3F: Challenge wave HUD (above gold/key)
+        if (challenge_wave >= 0 && challenge_total > 0) {
+            char cw[32];
+            snprintf(cw, sizeof(cw), "Wave: %d/%d", challenge_wave, challenge_total);
+            DrawTextEx(g_font_small, cw,
+                       {14.0f, (float)screen_h - 48.0f},
+                       12, 1, Color{255, 100, 100, 230});
+        }
         // Batch 3A: Gold / Key HUD (bottom-left)
         if (player) {
             char buf[32];

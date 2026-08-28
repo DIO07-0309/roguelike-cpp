@@ -79,6 +79,7 @@ std::string InteractionHandler::check_special_discovery(Player* player, GameMap*
         case SpecialRoomType::GAMBLER:    return "你发现了一个赌徒的房间。";
         case SpecialRoomType::SHRINE:     return "你发现了一座神圣的神殿。";
         case SpecialRoomType::SECRET:     return "你发现了一间隐藏密室！";
+        case SpecialRoomType::CHALLENGE:  return "你发现了一间挑战房。";
     }
     return "";
 }

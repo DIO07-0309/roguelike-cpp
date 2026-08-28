@@ -80,7 +80,8 @@ public:
                   int inventory_open, int inventory_cursor,
                   const std::string& room_msg, float room_msg_timer,
                   int screen_w, int screen_h,
-                  const CharacterPanelData* echo_panel = nullptr);
+                  const CharacterPanelData* echo_panel = nullptr,
+                  int challenge_wave = -1, int challenge_total = 0);
     void draw_skill_bar(const Player* player, float game_time);
     void draw_player_buffs(const Player* player);
     void draw_player_relics(const Player* player);

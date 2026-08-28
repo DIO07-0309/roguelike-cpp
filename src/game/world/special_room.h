@@ -8,7 +8,7 @@
 class Player;
 
 enum class SpecialRoomType { ALTAR, TREASURE, FOUNTAIN,
-    SHOP, BLACKSMITH, LIBRARY, GAMBLER, SHRINE, SECRET, LANDMARK };
+    SHOP, BLACKSMITH, LIBRARY, GAMBLER, SHRINE, SECRET, LANDMARK, CHALLENGE };
 
 struct SpecialRoom {
     int cx = 0, cy = 0;          // 房间中心 tile 坐标
