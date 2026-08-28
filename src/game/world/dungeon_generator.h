@@ -89,4 +89,8 @@ private:
     std::pair<int,int> _pick_room_edge(BSPNode* node, int target_x, int target_y);
     std::pair<int,int> _compute_door_pos(int edge_x, int edge_y, int room_rx, int room_ry, int room_rw, int room_rh);
     std::tuple<int,int,int,int> _get_room_rect(BSPNode* node);
+
+    // Batch 1 (A1): 孔径完整性修复 — 环墙缺口 回墙/door 化, 保证 DOOR 是房间唯一对外孔径
+    // (审计: ROOM_ENCOUNTER_DOOR_FOV_INTEGRATION_AUDIT §4; 算法已由 build/ 量化工具原型验证)
+    void _repair_room_apertures(std::vector<std::string>& grid);
 };

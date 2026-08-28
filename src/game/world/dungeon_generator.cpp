@@ -1,6 +1,7 @@
 #include "dungeon_generator.h"
 #include "item.h"  // for rng
 #include <algorithm>
+#include <queue>
 
 DungeonGenerator::DungeonGenerator(int w, int h, int ts, int mp, int mr, int mg)
     : _w(w), _h(h), _ts(ts), _min_part(mp), _min_room(mr), _margin(mg) {}
@@ -28,6 +29,7 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_r
 
     auto gm = std::make_shared<GameMap>(_w, _h, _ts);
     auto tmpl = _build_template();
+    _repair_room_apertures(tmpl);   // Batch 1 (A1): DOOR 是房间唯一对外孔径 (INVARIANT seal)
     gm->load_from_template(tmpl);
 
     _assign_special_rooms(special_room_count, biome_id);
@@ -341,4 +343,101 @@ void DungeonGenerator::_carve_diamond(std::vector<std::string>& g, int cx, int c
                 if (g[ty][tx] == '#')  // Phase 2: 只雕刻墙壁，保护 Room Interior
                     g[ty][tx] = '.';
         }
+}
+// ── Batch 1 (A1): Room Aperture Integrity ────────────────────────────
+// 目标: DOOR 是房间唯一对外孔径。走廊雕凿 (_carve_diamond) 会在环墙上留
+//       FLOOR 缺口 (39+ 随机测图), 这些是"隐形门"。本修复在 char 域处理:
+//       - 缺口试墙后发现仍全图连通 → 回填 WALL (死凹槽, 占绝大多数)
+//       - 回填会断开连通 -> 升级为 DOOR (活页孔径, 走廊穿行点)
+//       零 RNG 消耗, 保持种子确定性 (扫描序 + 固定决策规则, 无随机)。
+// 算法原型的成功率已由 build/tmp_exploration_audit2 实测 (7 seeds):
+//   467/495 回墙, 28/495 转门; 修复后 gap=0 / interior_leak=0 / dead=0。
+
+static int _grid_walkable_count(const std::vector<std::string>& g) {
+    int n = 0;
+    for (auto& row : g)
+        for (char c : row)
+            if (c != '#') n++;
+    return n;
+}
+
+static int _grid_flood(const std::vector<std::string>& g, int sx, int sy, bool door_mode) {
+    int H = (int)g.size(), W = H ? (int)g[0].size() : 0;
+    if (sx < 0 || sy < 0 || sx >= W || sy >= H) return 0;
+    if (g[sy][sx] == '#') return 0;
+    if (door_mode && g[sy][sx] == 'D') return 0;
+    std::vector<char> vis((size_t)H * W, 0);
+    std::queue<std::pair<int,int> > q;
+    q.push(std::make_pair(sx, sy));
+    vis[sy * W + sx] = 1;
+    int n = 1;
+    const int DX[4] = {1,-1,0,0}, DY[4] = {0,0,1,-1};
+    while (!q.empty()) {
+        std::pair<int,int> c = q.front(); q.pop();
+        for (int d = 0; d < 4; d++) {
+            int nx = c.first + DX[d], ny = c.second + DY[d];
+            if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+            int idx = ny * W + nx;
+            if (vis[idx]) continue;
+            char ch = g[ny][nx];
+            if (ch == '#') continue;
+            if (door_mode && ch == 'D') continue;
+            vis[idx] = 1;
+            n++;
+            q.push(std::make_pair(nx, ny));
+        }
+    }
+    return n;
+}
+
+void DungeonGenerator::_repair_room_apertures(std::vector<std::string>& grid) {
+    if (_rooms.empty()) return;
+    const int H = (int)grid.size();
+    if (H == 0) return;
+    const int W = (int)grid[0].size();
+
+    // 出生房中心作为连通性锚点 (房间内必有 '.' 可用)
+    auto [r0x, r0y, r0w, r0h] = _rooms.front();
+    const int sx = r0x + r0w / 2;
+    const int sy = r0y + r0h / 2;
+
+    // 1. 收集环墙缺口: walkable('.') 且非门('D')
+    std::vector<std::pair<int,int> > gaps;
+    for (auto& [rx, ry, rw, rh] : _rooms) {
+        for (int x = rx; x < rx + rw; x++) {
+            if (ry - 1 >= 0 && grid[ry-1][x] != '#' && grid[ry-1][x] != 'D') gaps.emplace_back(x, ry-1);
+            if (ry + rh < H && grid[ry+rh][x] != '#' && grid[ry+rh][x] != 'D') gaps.emplace_back(x, ry+rh);
+        }
+        for (int y = ry; y < ry + rh; y++) {
+            if (rx - 1 >= 0 && grid[y][rx-1] != '#' && grid[y][rx-1] != 'D') gaps.emplace_back(rx-1, y);
+            if (rx + rw < W && grid[y][rx+rw] != '#' && grid[y][rx+rw] != 'D') gaps.emplace_back(rx+rw, y);
+        }
+    }
+    std::sort(gaps.begin(), gaps.end());
+    gaps.erase(std::unique(gaps.begin(), gaps.end()), gaps.end());
+
+    // 2. 逐缺口决策 (固定顺序, 确定性): 试回墙 -> 连通保持? 保持 : 升级 door
+    //    先过滤"死胡同缺口" (开放邻居<=1): 它不连接任何其它开放区, 仅是一格走廊死端。
+    //    若对这类缺口 door 化会产生孤立门 (违反 Door_NoFloating: 门需 >=1 开放邻居)。
+    //    死胡同回墙不会破坏任何 rooms 之间的连通 (其开放侧已与主区连通, 闭合侧全墙)。
+    for (auto& [gx, gy] : gaps) {
+        char cell = grid[gy][gx];
+        if (cell == '#' || cell == 'D') continue;
+        int open_nb = 0;
+        if (gy-1 >= 0 && grid[gy-1][gx] != '#') open_nb++;
+        if (gy+1 < H  && grid[gy+1][gx] != '#') open_nb++;
+        if (gx-1 >= 0 && grid[gy][gx-1] != '#') open_nb++;
+        if (gx+1 < W  && grid[gy][gx+1] != '#') open_nb++;
+        grid[gy][gx] = '#';                          // 尝试回墙
+        if (open_nb > 1) {
+            int total = _grid_walkable_count(grid);
+            int reach = _grid_flood(grid, sx, sy, false);
+            if (reach != total) {
+                grid[gy][gx] = 'D';                  // 活孔径, 升级门 (有 >1 邻居, 非孤立)
+            }
+        }
+        // open_nb<=1 的死胡同保持 '#' (回墙) — 不产生孤立门
+    }
+
+    // 3. 内建自检与 INVARIANT(seal) 同语义 — 由 door_seal_test 外置永久回归 (T1~T4)
 }

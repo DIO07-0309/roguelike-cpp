@@ -92,6 +92,7 @@ add_roguelike_test(condition_test   world/condition_test.cpp)
 add_roguelike_test(fov_test         world/fov_test.cpp)
 add_roguelike_test(dungeon_topology_test world/dungeon_topology_test.cpp)
 add_roguelike_test(dungeon_verify_test world/dungeon_verify_test.cpp)
+add_roguelike_test(door_seal_test world/door_seal_test.cpp)   # Batch 1: INVARIANT(seal) + 孔径完整性 + DoorState
 add_roguelike_test(minimap_test     ui/minimap_test.cpp)
 add_roguelike_test(action_test      combat/action_test.cpp)
 add_roguelike_test(relic_effect_test combat/relic_effect_test.cpp)
