@@ -165,33 +165,30 @@ for (int i = 0; i < modifier.extra_buffs; i++) {
 
 ```cpp
 void ChallengeRoomController::_grant_rewards(Player& player, GameMap* map) {
-    // 1. Guaranteed: 1× Rare+ item
-    auto guaranteed = generate_random_item();
-    while (guaranteed && guaranteed->rarity < Rarity::RARE) {
-        guaranteed = generate_random_item();
-    }
-    if (guaranteed)
-        RewardManager::grant_item(player, guaranteed);
-
-    // 2. Random: 1-2 additional items (65% RARE / 28% EPIC / 7% LEGENDARY)
-    int extra = 1 + (rng() % 2);  // 1 or 2
-    for (int i = 0; i < extra; i++) {
+    // 1. Guaranteed: 3× RARE+ items
+    for (int i = 0; i < 3; i++) {
         auto item = generate_random_item();
-        // Re-roll COMMON up to 3 times
         int tries = 0;
-        while (item && item->rarity == Rarity::COMMON && tries < 3) {
+        while (item && item->rarity < Rarity::RARE && tries < 5) {
             item = generate_random_item(); tries++;
         }
-        if (item) RewardManager::grant_item(player, item);
+        if (item) {
+            if (player.inventory.add(item, &player)) {
+                // Item added to inventory
+            } else {
+                // Inventory full → ground drop near room center
+                _drop_ground_reward(item, map);
+            }
+        }
     }
 
-    // 3. Gold: floor-scaled
+    // 2. Gold: floor-scaled
     int gold = 50 + player.current_floor * 15;
     RewardManager::grant_gold(player, gold);
 }
 ```
 
-**Rarity weights after re-roll:** Effective ~65% RARE / 28% EPIC / 7% LEGENDARY
+**Inventory-full handling:** If `inventory.add()` fails, items drop on the ground as `DroppedItem` in the challenge room center. Rewards never silently disappear.
 
 ---
 
@@ -319,15 +316,25 @@ Rationale:
 
 ## 11. Determinism
 
-Wave composition is seeded by:
+Wave composition is seeded by deterministic hash (avoids XOR collision):
+
 ```cpp
-uint32_t challenge_seed = dungeon_seed ^ (room_index << 16) ^ (wave_index << 8);
+// challenge_room.cpp
+static uint32_t _challenge_seed(uint32_t dungeon_seed, int room_index, int wave_index) {
+    uint32_t h = dungeon_seed;
+    h ^= (uint32_t)(room_index + 1) * 0x9E3779B9u;
+    h ^= (uint32_t)(wave_index + 1) * 0x85EBCA6Bu;
+    h ^= h >> 16; h *= 0x45D9F3Bu;
+    h ^= h >> 16; h *= 0x45D9F3Bu;
+    h ^= h >> 16;
+    return h;
+}
 ```
 
 This ensures:
-- Same dungeon seed + same room → same wave composition
+- Same dungeon_seed + same room + same wave → same composition
+- No collision between (room=1,wave=2) and (room=2,wave=1)
 - SimAI can reproduce challenge encounters
-- Replay system can record challenge results
 
 ---
 
@@ -349,8 +356,8 @@ This ensures:
 1. **ChallengeRoomController ownership** — Stored as member of GameScene. Acceptable?
 2. **3s wave delay** — Fixed timer, not wave-clear-triggered. Acceptable?
 3. **No cross-save** — Challenge resets on save/load. Acceptable?
-4. **Determinism seed** — `dungeon_seed ^ room_index ^ wave_index`. Acceptable?
-5. **Reward via RewardManager** — All grants go through RewardManager, not direct push_back. Acceptable?
+4. **Determinism seed** — `hash_combine(dungeon_seed, room_index, wave_index)` with avalanche mix. Acceptable?
+5. **Reward via RewardManager** — All grants go through RewardManager, ground fallback if inventory full. Acceptable?
 
 ---
 
