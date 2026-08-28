@@ -520,8 +520,21 @@ void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw
             DrawTextEx(g_font_small, page_buf,
                        {pr.x + 30, pr.y + ph - 52}, 14, 1, {160, 160, 200, 255});
         }
+        // Batch 3A: Gold total in inventory
+        char gold_buf[32];
+        snprintf(gold_buf, sizeof(gold_buf), "金币: %d", player->gold);
+        DrawTextEx(g_font_small, gold_buf,
+                   {pr.x + pw - 120, pr.y + ph - 52}, 14, 1, Color{220, 200, 100, 220});
+        // Show sell value of selected item
+        if (cursor >= 0 && cursor < item_count) {
+            int sv = get_sell_value(inv.items[cursor].get());
+            char sv_buf[32];
+            snprintf(sv_buf, sizeof(sv_buf), "售价: %d", sv);
+            DrawTextEx(g_font_small, sv_buf,
+                       {pr.x + pw - 120, pr.y + ph - 38}, 14, 1, Color{180, 160, 80, 200});
+        }
         DrawTextEx(g_font_small, "^v选择 X装备 T出售 U使用 D丢弃 B关闭",
-                   {pr.x + (pw - 260) / 2, pr.y + ph - 30}, 16, 1, {140, 140, 140, 255});
+                   {pr.x + (pw - 260) / 2, pr.y + ph - 18}, 16, 1, {140, 140, 140, 255});
     }
 }
 

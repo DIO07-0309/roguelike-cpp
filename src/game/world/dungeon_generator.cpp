@@ -121,7 +121,7 @@ int DungeonGenerator::_rand_int(int max_exclusive) {
     return (int)(rng() % max_exclusive);
 }
 
-// B8/G6.2: 从 _rooms 中挑选 N 个作为特殊房间 (50% landmarks, 30% SECRET, rest normal)
+// B8/G6.2: 从 _rooms 中挑选 N 个作为特殊房间 (shuffle pool 随机分配)
 void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome_id) {
     if (_rooms.size() < 4) return;
 
@@ -145,8 +145,19 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
     if (!biome_id.empty())
         landmarks = get_landmarks_for_biome(biome_id);
 
+    // Shuffle pool: all base types except LANDMARK/SECRET/CHALLENGE (special logic)
+    std::vector<SpecialRoomType> pool = {
+        SpecialRoomType::ALTAR, SpecialRoomType::TREASURE,
+        SpecialRoomType::FOUNTAIN, SpecialRoomType::SHOP,
+        SpecialRoomType::BLACKSMITH, SpecialRoomType::LIBRARY,
+        SpecialRoomType::GAMBLER, SpecialRoomType::SHRINE
+    };
+    for (int i = (int)pool.size() - 1; i > 0; i--) {
+        int j = _rand_int(i + 1);
+        std::swap(pool[i], pool[j]);
+    }
+
     int scount = std::min(count, (int)candidates.size());
-    int type_idx = 0;
     int placed_lm = 0;
     for (int i = 0; i < scount; i++) {
         auto [rx, ry, rw, rh] = _rooms[candidates[i]];
@@ -162,7 +173,8 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
             sr.biome_id = biome_id;
             placed_lm++;
         } else {
-            sr.type = special_room_from_index(type_idx++);
+            // Pick from shuffled pool (wraps if more rooms than pool size)
+            sr.type = pool[i % (int)pool.size()];
         }
         sr.triggered = false;
         _special_rooms.push_back(sr);
