@@ -194,4 +194,11 @@ add_roguelike_test(mirror_tactic_test mirror/mirror_tactic_test.cpp)
 add_roguelike_test(tactical_chain_test mirror/tactical_chain_test.cpp)
 add_roguelike_test(sequence_e2e_test mirror/sequence_e2e_test.cpp)
 
+# Batch 3A: Economy & Persistence tests
+add_roguelike_test(gold_test           economy/gold_test.cpp)
+add_roguelike_test(key_test            economy/key_test.cpp)
+add_roguelike_test(relic_persistence_test economy/relic_persistence_test.cpp)
+add_roguelike_test(reward_manager_test economy/reward_manager_test.cpp)
+add_roguelike_test(save_v4_test        economy/save_v4_test.cpp)
+
 

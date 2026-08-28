@@ -51,6 +51,9 @@ public:
     int xp = 0;
     int xp_to_next = 80;
 
+    int gold = 0;        // Batch 3A: 局内金币
+    int key_count = 0;   // Batch 3A: 钥匙数量
+
     static constexpr float ATTACK_COOLDOWN = 0.5f;
     float _last_attack_time = -999.0f;
     float _last_skill_time = -999.0f;   // M4e: 最近技能施放时刻 (镜像观察)
@@ -70,6 +73,14 @@ public:
     static int calc_xp_for_level(int lvl);
     void give_xp(int amount);
     void auto_level_to(int target);
+
+    // Batch 3A: 经济 API
+    void add_gold(int amount);
+    bool spend_gold(int amount);
+    int  get_gold() const;
+    void add_key(int amount);
+    bool spend_key(int amount);
+    int  get_key_count() const;
 
     // 渲染
     void render(Camera2D& cam);

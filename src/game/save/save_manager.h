@@ -14,7 +14,7 @@ struct SaveData {
     uint32_t dungeon_seed = 0;                  // B8: 当前楼层地牢种子
     std::vector<bool> special_triggered;         // B8: 特殊房间触发状态
     std::vector<bool> special_discovered;        // B10: 特殊房间发现状态
-    // B13: Relic 不再跨层 (存档不保存圣物)
+    // Batch 3A: Relic save/load via PersistenceScope (v4+)
     // ── G1 Step7: Save v2 新增 ──
     int attack_evo_level = 1;                    // 普攻进化等级
     std::unordered_map<std::string, int> rule_counters; // rule_* counter

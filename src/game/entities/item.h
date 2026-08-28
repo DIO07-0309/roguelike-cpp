@@ -95,3 +95,6 @@ Rarity random_rarity();
 std::shared_ptr<Item> generate_random_item();
 std::shared_ptr<CharmItem> generate_charm_for_skill(const std::string& skill_class, Rarity r = Rarity::COMMON);
 std::shared_ptr<CharmItem> generate_random_charm();
+
+// Batch 3A: 出售价格计算
+int get_sell_value(const Item* item);

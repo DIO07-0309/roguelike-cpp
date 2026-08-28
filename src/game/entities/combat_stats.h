@@ -21,11 +21,19 @@ struct BuffInstance {
 };
 
 // ============================================================
-// B11: RelicInstance — 局内圣物 (挂在 Player 上, 跨楼层持续)
+// Batch 3A: PersistenceScope — 遗物跨层持久化语义
+// ============================================================
+enum class PersistenceScope : uint8_t {
+    FLOOR = 0,  // 当前楼层有效, 换层消失
+    RUN = 1,    // 整局有效, 换层保留
+};
+
+// ============================================================
+// RelicInstance — 局内圣物 (挂在 Player 上)
 // ============================================================
 struct RelicInstance {
-    std::string id;       // "blood_charm" | "venom_fang" | ...
-    bool from_boss = false; // G10: boss relic persists across floors
+    std::string id;                     // "blood_charm" | "venom_fang" | ...
+    PersistenceScope scope = PersistenceScope::FLOOR;
 };
 
 struct CombatStats {

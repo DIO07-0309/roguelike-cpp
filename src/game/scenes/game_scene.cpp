@@ -286,11 +286,13 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     _presentation.room_msg.clear();
     _presentation.room_msg_timer = 0.0f;
 
-    // G10: Boss relics persist across floors (from_boss=true)
-    std::vector<RelicInstance> keep;
-    for (auto& r : player->relics)
-        if (r.from_boss) keep.push_back(r);
-    player->relics = keep;
+    // Batch 3A: FLOOR relics removed on floor transition
+    player->relics.erase(
+        std::remove_if(player->relics.begin(), player->relics.end(),
+            [](const RelicInstance& r) {
+                return r.scope == PersistenceScope::FLOOR;
+            }),
+        player->relics.end());
 
     // D4 Step1: 重置事件状态
     if (game_map) {

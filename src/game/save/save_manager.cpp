@@ -2,8 +2,10 @@
 #include "player.h"
 #include "skill.h"
 #include "item.h"
+#include "combat_stats.h"
 #include "core/logger.h"
 #include "config.h"
+#include "combat_system.h"
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -54,7 +56,7 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     auto& c = player->combat;
     auto& inv = player->inventory;
 
-    fprintf(f, "v:3\n");
+    fprintf(f, "v:4\n");
     fprintf(f, "floor:%d\n", floor);
     fprintf(f, "maxf:%d\n", max_f);
     fprintf(f, "lv:%d\n", player->level);
@@ -65,6 +67,8 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     fprintf(f, "atk:%d\n", c.attack);           // 基础值（每次升级+2）
     fprintf(f, "pd:%d\n", c.physical_defense);
     fprintf(f, "md:%d\n", c.magical_defense);
+    fprintf(f, "gld:%d\n", player->gold);
+    fprintf(f, "key:%d\n", player->key_count);
 
     // 主动技能: id,lv,evo,use;... (G3.2: _skill_id 替代 dynamic_cast)
     fprintf(f, "act:");
@@ -138,7 +142,13 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     fprintf(f, "seed:%u\n", dungeon_seed);
     fprintf(f, "spr:%s\n", _encode_spr(special_triggered).c_str());
     fprintf(f, "spd:%s\n", _encode_spr(special_discovered).c_str());
-    // B13: Relic 不再跨层 (不保存圣物)
+    // Batch 3A: 保存 RUN relics
+    fprintf(f, "rlc:");
+    for (auto& r : player->relics) {
+        if (r.scope == PersistenceScope::RUN)
+            fprintf(f, "%s,%d;", r.id.c_str(), static_cast<int>(r.scope));
+    }
+    fprintf(f, "\n");
 
     // ── G1 Step7: Save v2 新增 ──
     fprintf(f, "atl:%d\n", player->attack_evo.level);
@@ -247,12 +257,13 @@ SaveData* SaveManager::load_save() {
     uint32_t seed = (uint32_t)getV("seed", 0);
     std::vector<bool> spr = _decode_spr(getS("spr"));
     std::vector<bool> spd = _decode_spr(getS("spd"));
-    // B13: Relic 不再跨层 (不读取圣物,兼容旧档中残留的 rlc: 行)
     int mhp   = getV("mhp", PLAYER_MAX_HP);
     int chp   = getV("chp", mhp);
     int atk   = getV("atk", PLAYER_ATTACK);
     int pd    = getV("pd", PLAYER_PDEF);
     int md    = getV("md", PLAYER_MDEF);
+    int gld   = getV("gld", 0);
+    int kcnt  = getV("key", 0);
 
     auto p = std::make_unique<Player>(
         TILE_SIZE * 2, TILE_SIZE * 2, PLAYER_SPEED, mhp, atk, pd, md);
@@ -260,6 +271,28 @@ SaveData* SaveManager::load_save() {
     p->level = lv;
     p->xp = xp;
     p->xp_to_next = xpt;
+    p->gold = gld;
+    p->key_count = kcnt;
+
+    // Batch 3A: 读取 RUN relics (v4+)
+    std::string rlc_str = getS("rlc");
+    if (!rlc_str.empty()) {
+        for (size_t pos = 0; pos < rlc_str.size(); ) {
+            size_t semi = rlc_str.find(';', pos);
+            std::string tok = rlc_str.substr(pos, (semi != std::string::npos ? semi - pos : std::string::npos));
+            if (tok.empty()) break;
+            size_t comma = tok.find(',');
+            if (comma != std::string::npos) {
+                std::string rid = tok.substr(0, comma);
+                int scope_val = std::atoi(tok.substr(comma + 1).c_str());
+                if (scope_val == static_cast<int>(PersistenceScope::RUN) && !rid.empty()) {
+                    const RelicDef* def = get_relic_def(rid);
+                    if (def) p->relics.push_back({rid, PersistenceScope::RUN});
+                }
+            }
+            pos = (semi != std::string::npos) ? semi + 1 : std::string::npos;
+        }
+    }
 
     // 恢复主动技能 (G3.2: SkillFactory 替代 dynamic_cast, 兼容旧格式 name)
     // G3.2: 旧 save 名映射 ("Slash"→"slash", "Fireball"→"fireball", etc.)
@@ -463,7 +496,6 @@ SaveData* SaveManager::load_save() {
     d->dungeon_seed = seed;
     d->special_triggered = spr;
     d->special_discovered = spd;
-    // B13: Relic 不再跨层 (不恢复圣物)
 
     // ── G1 Step7: Save v2 新增字段解析 ──
     // ── G2.4: Parse quest states ──

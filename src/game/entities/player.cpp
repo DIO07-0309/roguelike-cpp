@@ -312,3 +312,32 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
     // D2: Combo 指示器 (连击数显示在头顶)
     _draw_combo_indicator(combo.count, combo.timer, hx, hy, hw);
 }
+
+// ============================================================
+// Batch 3A: 经济 API
+// ============================================================
+void Player::add_gold(int amount) {
+    if (amount <= 0) return;
+    gold += amount;
+}
+
+bool Player::spend_gold(int amount) {
+    if (amount <= 0 || gold < amount) return false;
+    gold -= amount;
+    return true;
+}
+
+int Player::get_gold() const { return gold; }
+
+void Player::add_key(int amount) {
+    if (amount <= 0) return;
+    key_count += amount;
+}
+
+bool Player::spend_key(int amount) {
+    if (amount <= 0 || key_count < amount) return false;
+    key_count -= amount;
+    return true;
+}
+
+int Player::get_key_count() const { return key_count; }

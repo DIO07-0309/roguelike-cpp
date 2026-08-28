@@ -28,4 +28,7 @@ public:
     std::string equip(int index, Player* player);
     std::string unequip(const std::string& slot, Player* player);
     std::string use_item(int index, Player* player);
+
+    // Batch 3A: 出售物品
+    int sell_item(int index, Player* player);
 };

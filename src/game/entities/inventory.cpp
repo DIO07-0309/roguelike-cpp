@@ -1,5 +1,6 @@
 #include "inventory.h"
 #include "player.h"
+#include "item.h"
 
 Inventory::Inventory(int capacity) : max_size(capacity) {
     equipped["weapon"] = nullptr;
@@ -61,4 +62,13 @@ std::string Inventory::use_item(int index, Player* player) {
     std::string result = cons->use(player);
     items.erase(items.begin() + index);
     return result;
+}
+
+// Batch 3A: 出售物品
+int Inventory::sell_item(int index, Player* player) {
+    if (index < 0 || index >= (int)items.size()) return 0;
+    int value = get_sell_value(items[index].get());
+    items.erase(items.begin() + index);
+    if (player) player->add_gold(value);
+    return value;
 }

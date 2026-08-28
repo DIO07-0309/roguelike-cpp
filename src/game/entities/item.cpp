@@ -274,3 +274,18 @@ const char* item_icon_key(const Item* item) {
     if (c) return (c->effect_type == "buff") ? "item_potion_blue" : "item_potion_red";
     return nullptr;
 }
+
+// Batch 3A: 出售价格计算
+int get_sell_value(const Item* item) {
+    if (!item) return 0;
+    int rarity_idx = static_cast<int>(item->rarity);
+    if (auto* eq = dynamic_cast<const EquipmentItem*>(item)) {
+        (void)eq;
+        return 10 + rarity_idx * 8;  // COMMON=10, RARE=18, EPIC=26, LEGENDARY=34
+    }
+    if (auto* cn = dynamic_cast<const ConsumableItem*>(item)) {
+        (void)cn;
+        return 5 + rarity_idx * 4;   // COMMON=5, RARE=9, EPIC=13, LEGENDARY=17
+    }
+    return 0;
+}
