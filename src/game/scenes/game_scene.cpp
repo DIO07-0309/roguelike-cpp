@@ -1435,15 +1435,15 @@ void GameScene::_update_monsters(float dt) {
     // D2: Pass projectiles vector to monsters for ranged attacks
     for (auto& m : monsters) m->projectiles_ptr = &projectiles;
 
-    int ptx = (int)(player->entity.rect.x + 16) / 32;
-    int pty = (int)(player->entity.rect.y + 16) / 32;
+    int ptx = (int)(player->entity.rect.x + player->entity.rect.width / 2) / 32;
+    int pty = (int)(player->entity.rect.y + player->entity.rect.height / 2) / 32;
     int player_room = _room_mgr.room_at(ptx, pty);
 
     _unstuck_wedged_monsters(game_time);
     for (auto& m : monsters) {
         if (!m->combat.is_alive) continue;
-        int mtx = (int)(m->entity.rect.x + 16) / 32;
-        int mty = (int)(m->entity.rect.y + 16) / 32;
+        int mtx = (int)(m->entity.rect.x + m->entity.rect.width / 2) / 32;
+        int mty = (int)(m->entity.rect.y + m->entity.rect.height / 2) / 32;
         int monster_room = _room_mgr.room_at(mtx, mty);
         m->update_ai(player.get(), game_map.get(), dt, game_time, &mlist, &active_effects,
                      monster_room, player_room, &_room_mgr);
@@ -1456,8 +1456,8 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
     auto& stuck_since = _unstuck_since;
     for (auto& m : monsters) {
         if (!m || !m->combat.is_alive) { last_pos.erase(m->instance_id); stuck_since.erase(m->instance_id); continue; }
-        int mt0 = (int)(m->entity.rect.x + 16) / 32;
-        int mt1 = (int)(m->entity.rect.y + 16) / 32;
+        int mt0 = (int)(m->entity.rect.x + m->entity.rect.width / 2) / 32;
+        int mt1 = (int)(m->entity.rect.y + m->entity.rect.height / 2) / 32;
         auto it = last_pos.find(m->instance_id);
         if (it == last_pos.end() || it->second.first != mt0 || it->second.second != mt1) {
             last_pos[m->instance_id] = {mt0, mt1};
@@ -1465,8 +1465,8 @@ void GameScene::_unstuck_wedged_monsters(double gt) {
             continue;
         }
         bool placed = false;
-        int ptx = (int)(player->entity.rect.x + 16) / 32;
-        int pty = (int)(player->entity.rect.y + 16) / 32;
+        int ptx = (int)(player->entity.rect.x + player->entity.rect.width / 2) / 32;
+        int pty = (int)(player->entity.rect.y + player->entity.rect.height / 2) / 32;
         bool far_away = abs(mt0 - ptx) > 38 || abs(mt1 - pty) > 38;   // 远距怪: 强制吸引
         double idle_need = m->is_boss ? 12.0 : 5.0;
         if (!far_away) {

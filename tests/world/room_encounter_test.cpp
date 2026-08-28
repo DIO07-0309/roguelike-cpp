@@ -72,7 +72,7 @@ struct CallbackRecorder {
 };
 
 void place_player(Player& p, int tx, int ty) {
-    p.entity.position = {(float)(tx * 32 + 16), (float)(ty * 32 + 16)};
+    p.entity.position = {(float)(tx * 32), (float)(ty * 32)};
     p.entity.sync_rect();
 }
 

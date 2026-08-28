@@ -1,3 +1,56 @@
+# v1.2.4 — Batch A: 门交互 & 碰撞修复 (2026-08-28)
+
+> 分离视觉/碰撞尺寸 · E 键开门 · LOCKED 门语义 · SimAI 门处理
+
+## Entity 碰撞/视觉分离 (A1)
+
+- `Entity` 新增 `collision_size` 字段 (28×28)，独立于 `size` (32×32)
+- `sync_rect()` 将碰撞矩形居中放置于视觉矩形内
+- `draw_rect()` 仍返回视觉尺寸 (32×32)，攻击判定用 `rect` (28×28)
+- Player 构造: `entity(x, y, 32, 32, 28, 28)`
+
+## 锁门 API (A1)
+
+- `GameMap::lock_room_doors()` — 设置 DoorState::LOCKED (不可 E 键打开)
+- `blocks_sight()` 改为 `door_state != DoorState::OPEN` (LOCKED 也遮挡视线)
+- `close_room_doors()` → CLOSED, `lock_room_doors()` → LOCKED, `open_room_doors()` → OPEN 严格对称
+
+## E 键开门 (A2)
+
+- PlayerController 拾取处理中新增 E 键 → 检测4方向 CLOSED 门 → 打开
+- 仅响应 CLOSED 门 (LOCKED/SEALED 不可 E 键打开)
+
+## 删除自动撞门 (A3)
+
+- `_update_player()` 中 `try_open_door_toward()` 调用已移除
+- 现在必须显式按 E 键开门
+
+## Room Encounter → LOCKED (A4)
+
+- `RoomManager::_try_lock()` 改调 `lock_room_doors()` (原 `close_room_doors()`)
+- 怪物房间封锁用 LOCKED 语义，防止 E 键误开
+
+## SimAI 门处理 (A5)
+
+- `_tile_rect_walkable`: CLOSED=true (可穿透), LOCKED=false (绕路)
+- `best_action()`: 目标 tile 为 CLOSED 门 → 返回 "pickup" (先开门)
+- LOCKED 门对 Sim 不可规划
+
+## 硬编码修正 (A6)
+
+- 8 处 `+16` 改为 `rect.width / 2` / `rect.height / 2` (game_scene.cpp ×6, sim_ai.cpp ×2)
+- 测试 `place_player()` 修正碰撞中心偏移 (room_encounter_test T3)
+
+## 新增测试 (A7)
+
+- `entity_center_test`: 视觉中心=碰撞中心不变量、sync_rect保中心、Player碰撞尺寸、draw_rect用视觉尺寸
+
+## 验证
+
+- 43/43 ctest 全绿; 构建 0 警告; sim smoke 通过
+
+---
+
 # v1.2.3 — 怪物房间边界约束 + 小地图位置修正 (2026-08-28)
 
 ## 怪物房间约束

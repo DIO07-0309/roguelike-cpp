@@ -91,7 +91,7 @@ void RoomManager::_try_lock(RoomEntry& r, GameMap* map, Player* player,
                             const std::vector<std::unique_ptr<Monster>>& monsters) {
     if (_entity_on_doors(r, map, player, monsters)) return;      // E1
     if (_monster_in_room(r, map, monsters) <= 0) return;         // no monsters
-    if (!map->close_room_doors(r.door_tiles)) return;            // E3 atomic failure
+    if (!map->lock_room_doors(r.door_tiles)) return;            // E3 atomic LOCKED
     r.state = RoomEncounterState::LOCKED;
     if (_cb.on_locked) _cb.on_locked((int)(&r - &_rooms[0]));
 }

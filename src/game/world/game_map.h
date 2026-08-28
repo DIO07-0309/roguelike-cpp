@@ -27,11 +27,12 @@ struct ArenaObject {
 // ============================================================
 enum class TileType { FLOOR, WALL, STAIRS_DOWN, LAVA, DOOR };  // Phase 2: DOOR — 门 tile
 
-// Batch 1: Door 状态 (DoorState) —
+// Door 状态:
 //   OPEN:   is_walkable=true,  blocks_sight=false (透视线, 默认态)
-//   CLOSED: is_walkable=false, blocks_sight=true  (挡人+挡视线)
-//   LOCKED/SEALED 于 Batch 3 预留 (复用 CLOSED 行为, 仅开启策略不同)
-enum class DoorState : uint8_t { NONE = 0, OPEN = 1, CLOSED = 2 };
+//   CLOSED: is_walkable=false, blocks_sight=true  (挡人+挡视线, E 键可开)
+//   LOCKED: is_walkable=false, blocks_sight=true  (挡人+挡视线, E 键不可开, Room Encounter 封门)
+//   SEALED: is_walkable=false, blocks_sight=true  (不可开, 未来扩展)
+enum class DoorState : uint8_t { NONE = 0, OPEN = 1, CLOSED = 2, LOCKED = 3, SEALED = 4 };
 
 struct Tile {
     TileType type = TileType::WALL;
@@ -104,8 +105,9 @@ public:
     bool try_open_door_toward(Rectangle moved_rect, float mx, float my);
 
     // Batch 2C: 门组原子开闭 (E3) — 多门房间全组一致
-    bool close_room_doors(const std::vector<std::pair<int,int>>& door_tiles);
-    bool open_room_doors(const std::vector<std::pair<int,int>>& door_tiles);
+    bool close_room_doors(const std::vector<std::pair<int,int>>& door_tiles);  // → CLOSED (E 键可开)
+    bool lock_room_doors(const std::vector<std::pair<int,int>>& door_tiles);   // → LOCKED (E 键不可开)
+    bool open_room_doors(const std::vector<std::pair<int,int>>& door_tiles);   // → OPEN
 
     void draw(float cam_x, float cam_y, int screen_w, int screen_h) const;
 

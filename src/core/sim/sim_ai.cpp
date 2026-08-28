@@ -245,8 +245,9 @@ static bool _boss_winding_up(const Monster* m) {
 // Q3.2: tile 级 rect 碰撞判定 — BFS 与真实移动(rect)对齐, 防 tile可行走但玩家进不去导致的卡墙
 static bool _tile_rect_walkable(const GameMap* map, int tx, int ty) {
     if (!map) return false;
-    // Batch 2B (S1): CLOSED door treated as passable - Sim shares R1 contact-open with player
-    if (map->door_state_at(tx, ty) == DoorState::CLOSED) return true;
+    DoorState ds = map->door_state_at(tx, ty);
+    if (ds == DoorState::CLOSED) return true;   // Sim 自动开 CLOSED
+    if (ds != DoorState::NONE) return false;     // LOCKED/SEALED 不可走
     Rectangle r = { (float)(tx * 32), (float)(ty * 32), 32.0f, 32.0f };
     return map->is_rect_walkable(r);
 }
@@ -567,8 +568,8 @@ std::string DecisionAgent::best_action(const Player* player,
         }
         if (can_move) {
             // Q3.2-fix: 搜刮被半格偏移卡死 → 原地 ≥2s 放弃搜刮直接下楼
-            int ct0 = (int)(player->entity.rect.x + 16) / 32;
-            int ct1 = (int)(player->entity.rect.y + 16) / 32;
+            int ct0 = (int)(player->entity.rect.x + player->entity.rect.width / 2) / 32;
+            int ct1 = (int)(player->entity.rect.y + player->entity.rect.height / 2) / 32;
             if (abs(ct0 - _loot_last_tx) + abs(ct1 - _loot_last_ty) >= 2) {
                 _loot_last_tx = ct0; _loot_last_ty = ct1; _loot_stuck_since = -1;
             } else if (_loot_stuck_since < 0) {
@@ -594,8 +595,8 @@ std::string DecisionAgent::best_action(const Player* player,
     // Q3.2: 卡死逃脱 — 原地 ≥2s 且无近距怪 → 直线脱困 (先于一切评分)
     // Q3.10: 仅怪物血量总和变动视为战斗 (毒/环境只影响自身HP, 不得掩盖卡死)
     if (player && map) {
-        int pt0 = (int)(player->entity.rect.x + 16) / 32;
-        int pt1 = (int)(player->entity.rect.y + 16) / 32;
+        int pt0 = (int)(player->entity.rect.x + player->entity.rect.width / 2) / 32;
+        int pt1 = (int)(player->entity.rect.y + player->entity.rect.height / 2) / 32;
         if (pt0 != (int)_last_px || pt1 != (int)_last_py) { _stuck_since = -1; _escape_dir = -1; }
         else {
             float mon = 0;
@@ -697,10 +698,19 @@ std::string DecisionAgent::best_action(const Player* player,
         const char* dirs[] = {"move_up","move_down","move_left","move_right"};
         best = dirs[best_dir];
         _current_dir = best_dir;
-        // Q3.2: 记录路径记忆 (与 _evaluate_move 的等权震荡消解配合)
         _mem_step = best_dir;
         auto* mem_t = _find_nearest(player, monsters);
         _mem_target = mem_t ? mem_t->instance_id : 0;
+        // Sim: 目标 tile 是 CLOSED 门 → 先开门再走
+        if (map && best != "pickup") {
+            float mdx[] = {0, 0, -1, 1}, mdy[] = {-1, 1, 0, 0};
+            auto [cx, cy] = map->pixel_to_tile(
+                player->entity.rect.x + player->entity.rect.width/2,
+                player->entity.rect.y + player->entity.rect.height/2);
+            int ntx = cx + (int)mdx[best_dir], nty = cy + (int)mdy[best_dir];
+            if (map->door_state_at(ntx, nty) == DoorState::CLOSED)
+                best = "pickup";
+        }
     }
 
     // If nothing better — move randomly

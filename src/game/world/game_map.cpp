@@ -84,11 +84,9 @@ bool GameMap::isExplored(int x, int y) const {
 
 bool GameMap::blocks_sight(int x, int y) const {
     if (!_in_bounds(x, y)) return true;
-    // Batch 1: WALL 恒阻挡; DOOR 按状态 (OPEN 透射 / CLOSED 阻挡); 其余类型透射
-    // 未来可扩展为独立字段 (支持半透明/可破坏墙壁)
     const Tile& t = _tiles[y][x];
     if (t.type == TileType::WALL) return true;
-    if (t.type == TileType::DOOR) return t.door_state == DoorState::CLOSED;
+    if (t.type == TileType::DOOR) return t.door_state != DoorState::OPEN;
     return false;
 }
 
@@ -133,7 +131,7 @@ bool GameMap::try_open_door_toward(Rectangle r, float mx, float my) {
     return opened;
 }
 
-// Batch 2C: 门组原子关闭 (E3) — 房间所有门同时 CLOSED
+// 门组原子关闭 — 房间所有门同时 CLOSED (E 键可开)
 bool GameMap::close_room_doors(const std::vector<std::pair<int,int>>& door_tiles) {
     bool all_ok = true;
     for (auto& [tx, ty] : door_tiles) {
@@ -142,7 +140,16 @@ bool GameMap::close_room_doors(const std::vector<std::pair<int,int>>& door_tiles
     return all_ok;
 }
 
-// Batch 2C: 门组原子开启 — 房间所有门同时 OPEN
+// 门组原子锁定 — 房间所有门同时 LOCKED (E 键不可开, Room Encounter 封门)
+bool GameMap::lock_room_doors(const std::vector<std::pair<int,int>>& door_tiles) {
+    bool all_ok = true;
+    for (auto& [tx, ty] : door_tiles) {
+        if (!set_door_state(tx, ty, DoorState::LOCKED)) all_ok = false;
+    }
+    return all_ok;
+}
+
+// 门组原子开启 — 房间所有门同时 OPEN
 bool GameMap::open_room_doors(const std::vector<std::pair<int,int>>& door_tiles) {
     bool all_ok = true;
     for (auto& [tx, ty] : door_tiles) {

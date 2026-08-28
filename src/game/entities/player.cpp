@@ -40,7 +40,7 @@ bool Player::consume_heavy_combo() {
 }
 
 Player::Player(float x, float y, float spd, int hp, int atk, int pdef, int mdef)
-    : entity(x, y, 32, 32), speed(spd), combat(hp, atk, pdef, mdef),
+    : entity(x, y, 32, 32, 28, 28), speed(spd), combat(hp, atk, pdef, mdef),
       inventory(INVENTORY_MAX) {}
 
 // Q3.2 平衡: lvl²×20 → lvl×30+50 — 前期升级更快, 玩家到 F5 可达 Lv4-6 (原 Lv3)

@@ -130,23 +130,11 @@ void PlayerController::tick(float dt) {
         float s = get_effective_speed(gs.player.get()) * speed_mul * dt;
         e.position.x += move.x * s; e.sync_rect();
         if (!gs.game_map->is_rect_walkable(e.rect)) {
-            // Batch 2B (R1): 接触开门 — 移动方向前方有 CLOSED 门则开启并重试
-            if (move.x != 0.0f && gs.game_map->try_open_door_toward(e.rect, move.x, 0.0f)) {
-                gs.on_door_opened();   // FOV 重算钩子 (见 game_scene)
-                e.position.x += move.x * s; e.sync_rect();
-            } else {
-                e.position.x -= move.x * s; e.sync_rect();
-            }
+            e.position.x -= move.x * s; e.sync_rect();
         }
         e.position.y += move.y * s; e.sync_rect();
         if (!gs.game_map->is_rect_walkable(e.rect)) {
-            // Batch 2B (R1): 垂直方向接触开门
-            if (move.y != 0.0f && gs.game_map->try_open_door_toward(e.rect, 0.0f, move.y)) {
-                gs.on_door_opened();   // FOV 重算钩子
-                e.position.y += move.y * s; e.sync_rect();
-            } else {
-                e.position.y -= move.y * s; e.sync_rect();
-            }
+            e.position.y -= move.y * s; e.sync_rect();
         }
 
         // ── 房间发现 ──
@@ -264,6 +252,23 @@ void PlayerController::handle_input(const InputMap& input) {
         player_attack();
     }
     else if (gs._is_action_just_pressed(input,"pickup")) {
+        // E 键门交互 — 只开 CLOSED 门 (LOCKED 不可开)
+        {
+            auto [ptx, pty] = gs.game_map->pixel_to_tile(
+                gs.player->entity.rect.x + gs.player->entity.rect.width/2,
+                gs.player->entity.rect.y + gs.player->entity.rect.height/2);
+            constexpr int dx4[] = {0, 0, -1, 1};
+            constexpr int dy4[] = {-1, 1, 0, 0};
+            for (int i = 0; i < 4; i++) {
+                int nx = ptx + dx4[i], ny = pty + dy4[i];
+                if (gs.game_map->door_state_at(nx, ny) == DoorState::CLOSED) {
+                    gs.game_map->set_door_state(nx, ny, DoorState::OPEN);
+                    gs.on_door_opened();
+                    gs.get_tree()->get_audio()->play_sfx("door_open", 0.5f);
+                    return;
+                }
+            }
+        }
         // D4 Step4: NPC交互 + D4 Step1: 事件交互 + B8: 特殊房间
         {
             auto [ptx, pty] = gs.game_map->pixel_to_tile(
