@@ -83,6 +83,10 @@ bool GameMap::isExplored(int x, int y) const {
     return _in_bounds(x, y) && _tiles[y][x].is_explored;
 }
 
+bool GameMap::isBossVisible(int x, int y) const {
+    return _in_bounds(x, y) && _tiles[y][x].boss_visible;
+}
+
 bool GameMap::blocks_sight(int x, int y) const {
     if (!_in_bounds(x, y)) return true;
     const Tile& t = _tiles[y][x];
@@ -190,6 +194,25 @@ void GameMap::update_fov(int cx, int cy, int radius) {
             _tiles[ty][tx].is_visible = true;
             _tiles[ty][tx].is_explored = true;
 
+            if (blocks_sight(tx, ty)) break;
+        }
+    }
+}
+
+void GameMap::update_boss_fov(int cx, int cy, int radius) {
+    for (int y = 0; y < height; y++)
+        for (int x = 0; x < width; x++)
+            _tiles[y][x].boss_visible = false;
+
+    for (int deg = 0; deg < 360; deg++) {
+        float rad = deg * DEG2RAD;
+        float dx = cosf(rad);
+        float dy = sinf(rad);
+        for (float dist = 0; dist <= radius; dist += 0.5f) {
+            int tx = cx + static_cast<int>(roundf(dx * dist));
+            int ty = cy + static_cast<int>(roundf(dy * dist));
+            if (!_in_bounds(tx, ty)) break;
+            _tiles[ty][tx].boss_visible = true;
             if (blocks_sight(tx, ty)) break;
         }
     }
@@ -364,6 +387,11 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                            _dim({255, 160, 60, (unsigned char)(120 + 80 * pulse)}, bright));
             } else if (t.type == TileType::DOOR) {
                 DoorRenderer::inst().draw_door(x, y, t.door_state, bright, cam_x, cam_y);
+            }
+
+            // Boss FOV 叠加 — 红色半透明覆盖
+            if (t.boss_visible && t.is_explored && !t.is_visible) {
+                DrawRectangle(dx, dy, tile_size, tile_size, {180, 40, 40, 50});
             }
 
             // D4 Step1: 事件房间中心绘制标记

@@ -37,15 +37,16 @@ enum class DoorState : uint8_t { NONE = 0, OPEN = 1, CLOSED = 2, LOCKED = 3, SEA
 struct Tile {
     TileType type = TileType::WALL;
     bool is_walkable = false;
-    bool is_visible = false;    // 当前帧是否在 FOV 内
+    bool is_visible = false;    // 当前帧是否在玩家 FOV 内
     bool is_explored = false;   // 是否曾被玩家探索过
+    bool boss_visible = false;  // 当前帧是否在 Boss FOV 内
     DoorState door_state = DoorState::NONE;  // Batch 1: 仅 DOOR tile 非 NONE
 
-    static Tile floor()  { return {TileType::FLOOR, true, false, false, DoorState::NONE}; }
-    static Tile wall()   { return {TileType::WALL, false, false, false, DoorState::NONE}; }
-    static Tile stairs() { return {TileType::STAIRS_DOWN, true, false, false, DoorState::NONE}; }
-    static Tile lava()   { return {TileType::LAVA, true, false, false, DoorState::NONE}; }
-    static Tile door()   { return {TileType::DOOR, true, false, false, DoorState::OPEN}; }  // D2: 生成后默认 OPEN
+    static Tile floor()  { return {TileType::FLOOR, true, false, false, false, DoorState::NONE}; }
+    static Tile wall()   { return {TileType::WALL, false, false, false, false, DoorState::NONE}; }
+    static Tile stairs() { return {TileType::STAIRS_DOWN, true, false, false, false, DoorState::NONE}; }
+    static Tile lava()   { return {TileType::LAVA, true, false, false, false, DoorState::NONE}; }
+    static Tile door()   { return {TileType::DOOR, true, false, false, false, DoorState::OPEN}; }
 };
 
 class GameMap {
@@ -91,8 +92,10 @@ public:
     // Phase 1: FOV 可见性
     bool isVisible(int x, int y) const;
     bool isExplored(int x, int y) const;
+    bool isBossVisible(int x, int y) const;
     bool blocks_sight(int x, int y) const;
     void update_fov(int center_x, int center_y, int radius);
+    void update_boss_fov(int center_x, int center_y, int radius);
     void reset_visibility();
 
     // Batch 1: Door 状态 API (仅对 DOOR tile 生效)

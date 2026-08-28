@@ -983,12 +983,13 @@ void GameScene::_process(double delta) {
         }
     }
 
-    // Boss 位置 — 始终追踪（minimap 始终显示 boss 方向）
+    // Boss 位置 + FOV — 始终追踪
     if (player && game_map) {
         Monster* b = _get_boss();
         if (b) {
             auto [btx, bty] = game_map->pixel_to_tile(b->entity.position.x, b->entity.position.y);
             _boss_last_known = {btx, bty};
+            game_map->update_boss_fov(btx, bty, FOV_RADIUS_DEFAULT);
         }
     }
 

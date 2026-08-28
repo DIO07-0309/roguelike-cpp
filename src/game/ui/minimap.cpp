@@ -66,6 +66,12 @@ void MinimapRenderer::draw(const GameMap& map, const MinimapInput& input,
             if (!should_draw_tile(map, tx, ty)) continue;
             Rectangle r = tile_to_screen(tx, ty, panel);
             Color c = color_for_tile(map.tile_at(tx, ty), map.isVisible(tx, ty));
+            // Boss 视野区域 — 红色叠加
+            if (map.isBossVisible(tx, ty) && !map.isVisible(tx, ty)) {
+                c.r = (unsigned char)(c.r * 0.6f + 180 * 0.4f);
+                c.g = (unsigned char)(c.g * 0.5f);
+                c.b = (unsigned char)(c.b * 0.5f);
+            }
             DrawRectangleRec(r, c);
         }
     }
