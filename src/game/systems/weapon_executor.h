@@ -37,5 +37,6 @@ public:
     static std::vector<WeaponAttackResult> tick_projectiles(
         std::vector<Projectile>& projectiles,
         const std::vector<Monster*>& targets,
-        float dt);
+        float dt,
+        const GameMap* map = nullptr);
 };

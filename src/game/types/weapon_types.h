@@ -156,7 +156,8 @@ struct Projectile {
     int damage = 0;
     float lifetime = 2.0f;
     float elapsed = 0.0f;
-    bool piercing = false;
+    bool piercing = false;   // passes through entities (NOT walls)
+    bool pierce_walls = false; // passes through walls (boss wind-up, crossbow power shot)
     bool alive = true;
 
     // D2: Owner, element, damage type

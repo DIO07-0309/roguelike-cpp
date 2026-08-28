@@ -1038,7 +1038,7 @@ void GameScene::_process(double delta) {
         std::vector<Monster*> mlist;
         for (auto& m : monsters) mlist.push_back(m.get());
         auto spec_results = WeaponExecutor::tick_specials(player.get(), mlist, dt);
-        auto proj_results = WeaponExecutor::tick_projectiles(projectiles, mlist, dt);
+        auto proj_results = WeaponExecutor::tick_projectiles(projectiles, mlist, dt, game_map.get());
 
         // G9: spear stage-3 lightning VFX on each rapid hit
         if (player->weapon.runtime().special.active
@@ -1093,6 +1093,11 @@ void GameScene::_process(double delta) {
         if (p.active_time >= p.lifetime) { p.alive = false; continue; }
         p.pos.x += p.vel.x * dt;
         p.pos.y += p.vel.y * dt;
+        // 墙体碰撞 — pierce_walls=false 的弹幕碰墙销毁
+        if (!p.pierce_walls && game_map) {
+            auto [wtx, wty] = game_map->pixel_to_tile(p.pos.x, p.pos.y);
+            if (!game_map->is_walkable(wtx, wty)) { p.alive = false; continue; }
+        }
         // D2: AOE 用 warning_radius, 点弹用宽容半径
         float hit_radius = (p.owner == (int)ProjectileOwner::ENVIRONMENT)
             ? p.warning_radius : kProjectileHitRadius;

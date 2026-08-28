@@ -305,6 +305,7 @@ static bool _try_crossbow_power(Player* p, const AttackStageDef& st,
     bool dummy_crit = false;
     proj.damage = _calc_weapon_dmg(p, nullptr, st.damage_multiplier * legendary_bonus, dummy_crit);
     proj.piercing = true;
+    proj.pierce_walls = true;  // 弩箭蓄力穿透墙体
     proj.lifetime = 1.5f;
     proj.owner = (int)ProjectileOwner::PLAYER; projs->push_back(proj);
     // 后坐力
@@ -457,17 +458,22 @@ std::vector<WeaponAttackResult> WeaponExecutor::tick_specials(
 std::vector<WeaponAttackResult> WeaponExecutor::tick_projectiles(
     std::vector<Projectile>& projectiles,
     const std::vector<Monster*>& targets,
-    float dt)
+    float dt,
+    const GameMap* map)
 {
     std::vector<WeaponAttackResult> results;
     for (auto& p : projectiles) {
         if (!p.alive) continue;
-        // D2: only tick PLAYER projectiles (MONSTER projs handled by game_scene)
         if (p.owner != (int)ProjectileOwner::PLAYER) continue;
         p.elapsed += dt;
         if (p.elapsed >= p.lifetime) { p.alive = false; continue; }
         p.pos.x += p.vel.x * dt;
         p.pos.y += p.vel.y * dt;
+        // 墙体碰撞 — pierce_walls=false 的弹幕碰墙销毁
+        if (!p.pierce_walls && map) {
+            auto [wtx, wty] = map->pixel_to_tile(p.pos.x, p.pos.y);
+            if (!map->is_walkable(wtx, wty)) { p.alive = false; continue; }
+        }
 
         for (auto* m : targets) {
             if (!m || !m->combat.is_alive) continue;
