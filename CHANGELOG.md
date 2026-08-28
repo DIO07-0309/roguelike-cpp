@@ -1,3 +1,32 @@
+# v1.2.6 — Boss FOV + 弹幕穿墙 + UI 键位提示 (2026-08-28)
+
+## Boss FOV 视野系统
+
+- **Tile** 新增 `boss_visible` 字段
+- **GameMap::update_boss_fov()** — 360°射线投射，Boss 周围8格视野，受墙壁遮挡
+- **主地图**：Boss 视野区域叠加红色半透明覆盖（已探索+boss可见+不在玩家视野）
+- **小地图**：Boss 视野绘制 — 未探索区域暗红色，已探索区域红色叠加
+- 每帧追踪 Boss 实际位置并更新 FOV
+
+## 弹幕墙体碰撞
+
+- `Projectile` 新增 `pierce_walls` 字段（默认 false）
+- 玩家/怪物弹幕 tick 循环加 `is_walkable` 墙体检测，碰墙销毁
+- 弩箭 power shot（stage 3）`pierce_walls = true` 可穿墙
+- Boss BarrageSkill 已有独立墙体碰撞（Shot struct）
+
+## UI 键位提示
+
+- 战斗 HUD 右下角：`[R]圣物 [B]背包 [F1]日志 [M]地图 [ESC]保存`
+- 标题画面操作说明：新增 `M - 小地图`
+- 小地图面板下方：`[M] Map` 提示
+
+## 测试
+
+- 44/44 ctest 全绿
+
+---
+
 # v1.2.5 — Door Visual System: Kenney 素材 + 状态动画 (2026-08-28)
 
 > 4种门状态4种外观 + 0.3秒过渡动画

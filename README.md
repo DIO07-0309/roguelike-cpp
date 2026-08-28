@@ -1,11 +1,11 @@
 # 地牢肉鸽 — Roguelike C++
 
-> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **293 源文件** (132 cpp + 161 h) | Windows 实机验证
+> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **295 源文件** (134 cpp + 161 h) | Windows 实机验证
 >
 > 随机生成 15 层地牢，击败 Boss「终焉回响」通关。
 > 五项 Stable 冻结验收通过：**API / Save / Mod / Regression / Performance**（报告 `docs/V1_0_0_ACCEPTANCE.md`）
 >
-> **v1.0.0 后新增**（Phase 1-3 + Batch A，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互
+> **v1.0.0 后新增**（Phase 1-3 + Batch A + v1.2.5/1.2.6，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞
 
 本项目定位：
 
@@ -46,7 +46,7 @@ build/roguelike_cpp.exe
 | **WASD / ↑↓←→** | 移动（八方向，斜向 √2 归一化） |
 | **空格** | 普攻（武器三连击） |
 | **1~4 / 小键盘 1~4** | 主动技能 |
-| **E** | 拾取 / 触发特殊房间 / 下楼 |
+| **E** | 拾取 / 触发特殊房间 / 开门 / 下楼 |
 | **B** | 背包（↑↓/WS 选择 · ←→ 翻页 · X 装备 · U 使用 · D 丢弃） |
 | **R** | 圣物面板 |
 
@@ -58,6 +58,8 @@ build/roguelike_cpp.exe
 | **C** | 继续 |
 | **F** | 选关 |
 | **T** | 教程 |
+| **F1** | 事件日志 |
+| **M** | 小地图开关 |
 | **Enter** | 确认（对话/菜单） |
 | **Esc** | 取消 / 返回标题 |
 | **G** | 全屏切换 |
@@ -74,7 +76,7 @@ build/roguelike_cpp.exe
 
 ### 地牢生成
 
-BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗深渊 / F11-15 虚空深渊），F4/9/14 休整层、F5/10/15 Boss 层。**Room→Door→Corridor 拓扑（Phase 2）**——房间经边缘门与走廊连接，走廊只雕刻墙壁不侵入房间内部；门为静态开启（walkable、不挡视线，未来可扩展 CLOSED/LOCKED/SEALED）。10 类特殊房间（祭坛/宝箱/泉水/商店/铁匠/图书馆/赌徒/神殿/隐藏密室/地标）+ ArenaObject 战场元素（毒池/尖刺/图腾/**木桶 — 攻击或弹体点燃 → 0.6s 引信 → AOE 爆炸**）。F10 地狱火魔 Boss 房含机制地形（LAVA 灼烧 + 中央安全区熔岩环带）。
+BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗深渊 / F11-15 虚空深渊），F4/9/14 休整层、F5/10/15 Boss 层。**Room→Door→Corridor 拓扑（Phase 2）**——房间经边缘门与走廊连接，走廊只雕刻墙壁不侵入房间内部；门支持 4 种状态视觉（Kenney 素材 tile_0003/0018/0022）：OPEN 空拱门 / CLOSED 木门 / LOCKED 木门+红色锁 / SEALED 深色门+紫色封印，0.3s 过渡动画。10 类特殊房间（祭坛/宝箱/泉水/商店/铁匠/图书馆/赌徒/神殿/隐藏密室/地标）+ ArenaObject 战场元素（毒池/尖刺/图腾/**木桶 — 攻击或弹体点燃 → 0.6s 引信 → AOE 爆炸**）。F10 地狱火魔 Boss 房含机制地形（LAVA 灼烧 + 中央安全区熔岩环带）。
 
 ### 战斗系统
 
@@ -83,6 +85,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 - **元素核心 (G10)** — 开局永久三选一：火焰暴击 / 冰霜冻结 / 剧毒 DOT，独立成长 + VFX
 - **Boss** — 5 场（F5 三选一）：暗影骑士 / 亡灵法师 / 血族伯爵 / **地狱火魔(F10)** — 弹幕图案化（扇形/环形/螺旋多波）+ 机制阶段（核心破坏→弹幕风暴→易伤）+ 领域地形 / **终焉回响(F15)** — 镜像学习 Boss
 - **敌人** — 30 种，9 类 AI（含 SNIPER/CONTROLLER/AMBUSH/GUARDIAN 原型），全数据驱动
+- **弹幕墙体碰撞** — 玩家/怪物弹幕碰墙销毁，Boss BarrageSkill 独立碰撞，弩箭 power shot 可穿墙
 
 ### 内容规模
 
@@ -98,7 +101,8 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 ### 系统能力
 
 - **FOV 可见性（Phase 1）** — 360° 射线投射，Tile 三层状态（未探索黑色 / 当前可见全亮 / 已探索不可见 60% 暗）；实体中心 tile 可见性剔除；`is_visible`/`is_explored` 独立于 `is_walkable`
-- **Minimap 小地图（Phase 3）** — 右下角常驻面板（M 键开关），只读现有 `isExplored/isVisible` **无第二套探索状态**；未探索区不显示、已探索永久记忆、当前可见高亮；Room/Corridor/Door 缩略色块 + 玩家/Boss 最后已知位置/楼梯标记；实体仅当前可见才显示，绝不泄露未探索区
+- **Boss FOV** — 每帧追踪 Boss 位置，射线投射更新 Boss 可视范围，主地图红色叠加 + 小地图暗红/红色调显示
+- **Minimap 小地图（Phase 3）** — 右下角常驻面板（M 键开关），只读现有 `isExplored/isVisible` **无第二套探索状态**；未探索区不显示、已探索永久记忆、当前可见高亮；Boss 视野区域红色调显示；Room/Corridor/Door 缩略色块 + 玩家/Boss 最后已知位置/楼梯标记；实体仅当前可见才显示，绝不泄露未探索区
 - **存档 v3** — 跨版本兼容（v1→v3 + 增量字段），SaveStable 3 验收测试
 - **Mod 系统** — `mods/` 扫描 + 依赖解析 + MergeMode{Skip/Replace/MergePatch} 字段级合并
 - **中文 UI** — 生成字体图集全中文渲染，`tools/extract_chars.py` 自动维护码点
