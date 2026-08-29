@@ -1,3 +1,56 @@
+# v1.3.0 — Batch 3: 经济系统 + 赌徒房 + 挑战房 (2026-08-29)
+
+> v1.2.x 门/房间遭遇系统之上的内容扩展批次（3A→3I），引入金币经济与两类可重复特殊房。
+> 设计: `docs/BATCH_3A_ECONOMY_REWARD_DESIGN.md` · `BATCH_3B_GAMBLE_ROOM_PLAN.md` · `BATCH_3E_CHALLENGE_ROOM_FINAL_PLAN.md` · `BATCH_3I_CHALLENGE_PORTAL_PLAN.md`
+
+## Batch 3A — 经济与持久化基础
+
+- `PersistenceScope(FLOOR/RUN)` 圣物作用域；Player 金币/钥匙字段
+- `get_sell_value` / `sell_item`（装备出售）；RewardManager 统一奖励发放
+- **Save v4**（跨版本兼容追加字段）；HUD 金币/钥匙显示；5 测试
+
+## Batch 3B — 赌徒房 MVP
+
+- 金币开房（40 + floor×10）；奖励池 75% 装备 / 20% 钥匙 / 5% RUN 圣物
+- 奖励耗尽回退钥匙；`is_repeatable` 旁路特殊房一次性限制；8 测试
+
+## Batch 3C — 背包出售 UI
+
+- `[T]` 出售选中装备（sell_selected_item 静态 helper）+ 键位提示更新；8 测试
+
+## Batch 3D/3E — 挑战房审计与设计冻结
+
+- SpecialRoom/Key/Room/Monster/Reward 全系统架构审查
+- 设计冻结: 7 阶段状态机 + ChallengeRoomController + 3 波×4 怪 + 确定性 RNG 派生 + 背包满奖励 fallback
+
+## Batch 3F/3G — 挑战房 MVP + HUD
+
+- ChallengeRoomController: 7-phase 状态机、出口附近放置、波次战斗、HUD wave 显示（3F，14 测试）
+- 挑战房 HUD: 进度条 + 击杀计数 + 剩余波次 + floor 横幅 + Boss 变体（精英/双怪）（3G，10 测试）
+
+## Batch 3H/3I — 传送门系统 + 竞技场修复
+
+- **传送门系统**: 出口传送门生成 → E 键交互 → 选择面板 → 独立竞技场地图 → 返回传送门
+- **Arena 移动式架构**: 进场保存地牢怪物/地图状态，退场恢复
+- 竞技场内战斗修复: 武器 recovery_timer/冷却正常推进；VFX/连招/演出 tick（特效与屏震正确过期）
+- E 键返回直查 `challenge return_portal_tx/ty`（竞技场无 special_rooms）；ESC 退竞技场跳过存档但允许回标题
+- 性能: O(n²) 怪物列表构建移出内层循环；字体扩容（1835 codepoints）
+- `challenge_portal_test` + `challenge_room_test` 合计 53/53 全绿
+
+## 期中热修复
+
+- 字体 codepoints 修正 + 赌徒房奖励洗牌修复 + 背包金币显示（`3a9c13b`）
+- 赌徒房生成侧 + 全屏缩放 + 特殊房放置（`a6ed40a`，Batch 3G）
+
+## 验证
+
+- **53/53 ctest 全绿**（新增 economy/challenge_room_test、challenge_portal_test 等 36 测试）
+- GitHub Actions CI 通过；README 结构/键位/存档 v4 同步更新
+- 实机验证: 传送门进出竞技场、波次战斗、返回恢复地牢状态
+
+---
+
+
 # v1.2.6 — Boss FOV + 弹幕穿墙 + UI 键位提示 (2026-08-28)
 
 ## Boss FOV 视野系统
