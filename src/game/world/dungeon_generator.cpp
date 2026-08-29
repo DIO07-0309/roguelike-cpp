@@ -37,13 +37,14 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_r
     _assign_special_rooms(special_room_count, biome_id);
     gm->special_rooms = _special_rooms;
 
-    // Batch 3F: Challenge Room placement near exit (non-boss floors, floor >= 3)
+    // Batch 3G: Challenge Room placement near exit (non-boss floors)
+    // Side branch: pick closest unassigned room to exit (not blocking main path since
+    // rooms connect via corridors, Challenge Room doesn't physically block movement)
     if (special_room_count > 0 && _rooms.size() >= 4) {
         auto [ex, ey, ew, eh] = _rooms.back();
         int exit_cx = ex + ew / 2;
         int exit_cy = ey + eh / 2;
 
-        // Find unassigned room closest to exit
         int best = -1;
         float best_dist = FLT_MAX;
         for (int i = 1; i < (int)_rooms.size() - 1; i++) {
@@ -54,8 +55,7 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_r
                     { has_special = true; break; }
             if (has_special) continue;
 
-            int cx = rx + rw / 2;
-            int cy = ry + rh / 2;
+            int cx = rx + rw / 2, cy = ry + rh / 2;
             float d = (float)((cx - exit_cx) * (cx - exit_cx) + (cy - exit_cy) * (cy - exit_cy));
             if (d < best_dist) { best_dist = d; best = i; }
         }
@@ -127,7 +127,6 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
 
     std::vector<int> candidates;
     // G10: prioritize rooms near player spawn (room 0) for first few relics
-    // Put room 1 first to guarantee at least one relic room is close
     if ((int)_rooms.size() >= 3) candidates.push_back(1);
     if ((int)_rooms.size() >= 4) candidates.push_back(2);
     for (int i = 3; i < (int)_rooms.size() - 1; i++)
@@ -135,17 +134,15 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
 
     for (int i = (int)candidates.size() - 1; i > 0; i--) {
         int j = _rand_int(i + 1);
-        // Don't shuffle room 1 away from first position
         if (candidates[i] == 1 || candidates[j] == 1) continue;
         std::swap(candidates[i], candidates[j]);
     }
 
-    // G6.2: load landmarks for this biome
     std::vector<const LandmarkDef*> landmarks;
     if (!biome_id.empty())
         landmarks = get_landmarks_for_biome(biome_id);
 
-    // Shuffle pool: all base types except LANDMARK/SECRET/CHALLENGE (special logic)
+    // Shuffle pool: all base types except LANDMARK/SECRET/CHALLENGE
     std::vector<SpecialRoomType> pool = {
         SpecialRoomType::ALTAR, SpecialRoomType::TREASURE,
         SpecialRoomType::FOUNTAIN, SpecialRoomType::SHOP,
@@ -157,6 +154,14 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
         std::swap(pool[i], pool[j]);
     }
 
+    // Batch 3G: Guarantee GAMBLER at Room 1 (spawn-side economic anchor)
+    for (int i = 0; i < (int)pool.size(); i++) {
+        if (pool[i] == SpecialRoomType::GAMBLER && i != 0) {
+            std::swap(pool[0], pool[i]);
+            break;
+        }
+    }
+
     int scount = std::min(count, (int)candidates.size());
     int placed_lm = 0;
     for (int i = 0; i < scount; i++) {
@@ -165,15 +170,15 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
         sr.cx = rx + rw / 2; sr.cy = ry + rh / 2;
         sr.rx = rx; sr.ry = ry; sr.rw = rw; sr.rh = rh;
 
-        // G6.2: ~50% chance → biome landmark
-        if (!landmarks.empty() && _rand_int(2) == 0 && placed_lm < 3) {
+        // G6.2: ~50% chance → biome landmark (never override GAMBLER at Room 1)
+        if (!landmarks.empty() && _rand_int(2) == 0 && placed_lm < 3
+            && !(i == 0 && pool[0] == SpecialRoomType::GAMBLER)) {
             const LandmarkDef* lm = landmarks[_rand_int((int)landmarks.size())];
             sr.type = SpecialRoomType::LANDMARK;
             sr.landmark_id = lm->id;
             sr.biome_id = biome_id;
             placed_lm++;
         } else {
-            // Pick from shuffled pool (wraps if more rooms than pool size)
             sr.type = pool[i % (int)pool.size()];
         }
         sr.triggered = false;
@@ -185,7 +190,8 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
         auto* enc = pick_encounter_by_trigger(biome_id, "wall_interact");
         if (enc) {
             int idx = _rand_int((int)_special_rooms.size());
-            if (_special_rooms[idx].type != SpecialRoomType::LANDMARK)
+            if (_special_rooms[idx].type != SpecialRoomType::LANDMARK
+                && _special_rooms[idx].type != SpecialRoomType::GAMBLER)
                 _special_rooms[idx].type = SpecialRoomType::SECRET;
         }
     }

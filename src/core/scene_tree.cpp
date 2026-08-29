@@ -2,8 +2,11 @@
 #include "logger.h"
 #include "win_center.h"
 #include "audio_server.h"
+#include "config.h"
+#include "rlgl.h"
 #include <algorithm>
 #include <cstring>
+#include <cmath>
 
 SceneTree::SceneTree(int w, int h, const char* title) {
     InitWindow(w, h, title);
@@ -76,7 +79,32 @@ void SceneTree::run() {
         process_frame(dt);
         BeginDrawing();
         ClearBackground(BLACK);
+        // Batch 3G: Fullscreen proportional scaling (letterbox/pillarbox)
+        if (IsWindowFullscreen()) {
+            int mw = GetMonitorWidth(0);
+            int mh = GetMonitorHeight(0);
+            float scale = fminf((float)mw / WINDOW_WIDTH, (float)mh / WINDOW_HEIGHT);
+            int vpW = (int)(WINDOW_WIDTH * scale);
+            int vpH = (int)(WINDOW_HEIGHT * scale);
+            int vpX = (mw - vpW) / 2;
+            int vpY = (mh - vpH) / 2;
+            rlViewport(vpX, vpY, vpW, vpH);
+            rlMatrixMode(RL_PROJECTION);
+            rlLoadIdentity();
+            rlOrtho(0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 1);
+            rlMatrixMode(RL_MODELVIEW);
+            rlLoadIdentity();
+        }
         if (_root) _root->_render();
+        // Restore default viewport after scaled render
+        if (IsWindowFullscreen()) {
+            rlViewport(0, 0, GetScreenWidth(), GetScreenHeight());
+            rlMatrixMode(RL_PROJECTION);
+            rlLoadIdentity();
+            rlOrtho(0, GetScreenWidth(), GetScreenHeight(), 0, 0, 1);
+            rlMatrixMode(RL_MODELVIEW);
+            rlLoadIdentity();
+        }
         EndDrawing();
     }
 }

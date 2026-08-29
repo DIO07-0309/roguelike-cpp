@@ -68,10 +68,6 @@ bool TitleScene::_activate(const std::string& action) {
         LOG_INFO("进入教程");
         return true;
     }
-    if (action == "fullscreen") {
-        ToggleFullscreen();
-        return true;
-    }
     if (action == "quit") {
         tree->quit();
         return true;
