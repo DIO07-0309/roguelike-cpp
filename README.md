@@ -308,10 +308,10 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 ## 项目结构
 
 ```
-src/                                    # 295+ 源文件（134 cpp + 161+ h）
+src/                                    # 297 源文件（138 cpp + 159+ h）
 ├── main.cpp                            # 入口：CLI 解析 / Registry+Mod 构建 / sim 前置 / 场景树启动
 │
-├── core/                               # 引擎框架 + 模拟器 + 回放 + Mod 管线（25）
+├── core/                               # 引擎框架 + 模拟器 + 回放 + Mod 管线（27）
 │   ├── object.h                        # 引擎对象基类
 │   ├── node.cpp · node.h               # 场景树节点（process/render 生命周期）
 │   ├── scene_tree.cpp · scene_tree.h   # 场景树：节点挂载/卸载/逐帧驱动
@@ -319,7 +319,7 @@ src/                                    # 295+ 源文件（134 cpp + 161+ h）
 │   ├── logger.cpp · logger.h           # 分级日志（game.log）
 │   ├── seh_handler.cpp                 # Windows SEH 异常捕获 → crash.log
 │   ├── win_center.cpp · win_center.h   # 窗口居中
-│   ├── font_codepoints.h               # 中文字体码点表（1769 码点）
+│   ├── font_codepoints.h               # 中文字体码点表（1835 码点）
 │   ├── registry_provider.h             # IRegistryProvider 接口 + MergeMode{Skip/Replace/MergePatch} + BuildRecord
 │   ├── registry_builder.cpp · registry_builder.h   # 注册表构建：模块注册 / build_all / validate
 │   ├── builtin_provider.cpp · builtin_provider.h   # 内置数据源（resources/ 路径，priority 0）
@@ -349,7 +349,7 @@ src/                                    # 295+ 源文件（134 cpp + 161+ h）
 │   ├── meta_node_defs.cpp · meta_node_defs.h       # 局外成长节点（10 天赋）
 │   └── vfx_recipe.cpp · vfx_recipe.h   # VFX 特效配方（13 kind / 17 color）
 │
-├── game/                               # 游戏逻辑（178）
+├── game/                               # 游戏逻辑（195）
 │   ├── 顶层
 │   │   ├── player_controller.cpp · player_controller.h     # 玩家输入集中：移动/攻击/技能/拾取/背包
 │   │   ├── meta_progression.cpp · meta_progression.h       # 局外成长 g_meta（10 节点/souls/knowledge）
@@ -388,7 +388,7 @@ src/                                    # 295+ 源文件（134 cpp + 161+ h）
 │   │   ├── inventory.cpp · inventory.h    # 背包（装备/使用/丢弃）
 │   │   ├── combat_stats.cpp · combat_stats.h  # 属性/伤害计算
 │   │   └── ai.cpp · ai.h                  # MonsterAI 状态机（IDLE/CHASE/ATTACK + 9 原型）
-│   ├── systems/                           # 无状态系统（27）
+│   ├── systems/                           # 无状态系统（35）
 │   │   ├── combat_system.cpp · combat_system.h         # 伤害结算 + CountingRng
 │   │   ├── combat_coordinator.cpp · combat_coordinator.h  # 连击系统
 │   │   ├── hit_detection.cpp · hit_detection.h         # 命中判定（5 种形状）
@@ -402,8 +402,14 @@ src/                                    # 295+ 源文件（134 cpp + 161+ h）
 │   │   ├── attack_evolution.cpp · attack_evolution.h   # 普攻进化管理器（Lv1→Lv3）
 │   │   ├── attack_evolution_state.h                     # 普攻进化状态
 │   │   ├── skill_evolution.cpp · skill_evolution.h     # 技能进化（使用次数驱动）
-│   │   └── interaction_handler.cpp · interaction_handler.h  # 拾取/交互结果解析
-│   ├── world/                             # 世界生成与规则（35）
+│   │   ├── interaction_handler.cpp · interaction_handler.h  # 拾取/交互结果解析
+│   │   ├── relic_effect_processor.cpp · relic_effect_processor.h  # 圣物效果处理器
+│   │   ├── reward_manager.cpp · reward_manager.h       # 奖励管理（掉落表/商店价）
+│   │   ├── collision_utils.h                           # 碰撞工具函数
+│   │   ├── damage_context.h                            # 伤害上下文数据结构
+│   │   ├── relic_effect.h                              # 圣物效果定义
+│   │   └── relic_effect_runtime.h                      # 圣物效果运行时状态
+│   ├── world/                             # 世界生成与规则（38）
 │   │   ├── dungeon_generator.cpp · dungeon_generator.h # BSP 二分划分地图生成（Phase 2: Door 拓扑）
 │   │   ├── game_map.cpp · game_map.h     # 瓦片地图（碰撞/特殊房/熔岩/木桶/FOV 可见性）
 │   │   ├── biome.cpp · biome.h           # 三章生态（Prison/Volcano/Abyss）
@@ -411,6 +417,7 @@ src/                                    # 295+ 源文件（134 cpp + 161+ h）
 │   │   ├── encounter.cpp · encounter.h   # 遭遇框架（9 个：NPC/事件）
 │   │   ├── special_room.cpp · special_room.h           # 11 类特殊房间
 │   │   ├── challenge_room.cpp · challenge_room.h       # 挑战房（7 阶段状态机 + 波次战斗）
+│   │   ├── room_manager.cpp · room_manager.h           # 房间管理（布局/邻接/门）
 │   │   ├── quest_manager.cpp · quest_manager.h         # 任务管理（12 任务）
 │   │   ├── npc_system.cpp · npc_system.h               # NPC 系统（12 NPC 类型）
 │   │   ├── relationship_system.cpp · relationship_system.h  # 好感度
@@ -440,8 +447,9 @@ src/                                    # 295+ 源文件（134 cpp + 161+ h）
 │   │   ├── event_bus.cpp · event_bus.h    # 事件总线（45 事件）
 │   │   ├── event_types.h                  # 事件枚举 + GameEvent 载荷
 │   │   └── service_locator.h              # 服务定位
-│   ├── rendering/                         # 渲染（2）
-│   │   └── sprite_renderer.cpp · sprite_renderer.h     # sprite atlas + 程序化像素占位
+│   ├── rendering/                         # 渲染（4）
+│   │   ├── sprite_renderer.cpp · sprite_renderer.h     # sprite atlas + 程序化像素占位
+│   │   └── door_renderer.cpp · door_renderer.h         # 门动画渲染（Phase 2 Door 拓扑）
 │   ├── ui/                                # UI 渲染（Phase 3 Minimap）
 │   │   └── minimap.cpp · minimap.h        # 小地图（只读 isExplored/isVisible，无第二套状态）
 │   ├── resources/                         # 资源管理（2）
@@ -503,7 +511,7 @@ src/                                    # 295+ 源文件（134 cpp + 161+ h）
 │   └── navigation/                        # 导航（2）
 │       └── pathfinder.cpp · pathfinder.h  # A* 寻路（priority_queue + Manhattan）
 
-tests/                      (52 条目)  # GoogleTest，按模块分目录 — fov / dungeon_topology / minimap / economy 等
+tests/                      (53 条目)  # GoogleTest，按模块分目录 — fov / dungeon_topology / minimap / economy 等
 resources/                             # 20+ JSON 配置（enemies/skills/relics/bosses/weapons/elements/biomes/encounters/dialogues/quests/endings/…）+ world/ 三章子目录
 tools/                                 # world_validator.py / extract_chars.py / replace_methods.py
 docs/                                  # ARCHITECTURE / G4_PLATFORM_BIBLE / WORLD_LORE / D1_GAMEPLAY / ART_*
