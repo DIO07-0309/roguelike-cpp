@@ -1097,7 +1097,8 @@ Monster* spawn_boss(int tile_x, int tile_y, int floor) {
 // D8 Step2: boss_type_for_floor — 随机Boss池
 // ============================================================
 BossType boss_type_for_floor(int floor, uint32_t seed) {
-    auto rng_local = std::mt19937(seed ? seed : (uint32_t)std::random_device{}());
+    // G9.3 (RNG-002): seed=0 → 固定兜底 1 (原 random_device 使 BossType 进程随机)
+    auto rng_local = std::mt19937(seed ? seed : 1u);
     if (floor == 5) {
         // G1 Step6: 3 种 Boss 随机 (Shadow Knight / Necromancer / Vampire)
         int roll = (int)(rng_local() % 3);

@@ -28,6 +28,11 @@ struct CountingRng : std::mt19937 {
 extern CountingRng rng;
 void seed_rng(uint32_t seed);  // G4.5: deterministic RNG for replay
 
+// G9.3 (RNG-001): 独立视觉随机流 — Screen Shake / VFX / Cosmetic 专用。
+// 渲染路径禁止调用 rng() (gameplay 流); 边界: shake_offset() 是唯一合法入口。
+extern CountingRng visual_rng;
+void seed_visual_rng(uint32_t seed);
+
 // ---- 伤害公式 ----
 int calculate_damage(int atk, int def, AttackType type = AttackType::PHYSICAL);
 

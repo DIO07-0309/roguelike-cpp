@@ -44,6 +44,18 @@ class RoomManager {
 public:
     void set_callbacks(const RoomEncounterCallbacks& cb) { _cb = cb; }
 
+    // G9.2 (audit LIFE-002): 换层重置 — 上一层 room rect / door group 不得跨层存活。
+    // Boss 层不走 build 分支, 必须在此显式清空; 普通层 build() 自身亦会清空。
+    void reset() {
+        _rooms.clear();
+        _active = -1;
+        _last_player_tile_x = -1;
+        _last_player_tile_y = -1;
+    }
+
+    // G9.2 (audit TEST-001): 回归测试观测点 (只读)
+    int room_count() const { return (int)_rooms.size(); }
+
     // 进层时构建 (一次): 房间矩形 + 门组映射全部固化
     void build(GameMap* map, const std::vector<std::tuple<int,int,int,int>>& rooms,
                bool is_boss_floor);

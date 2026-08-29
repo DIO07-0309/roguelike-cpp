@@ -17,8 +17,14 @@
 // D9: MinGW std::random_device 确定性修复 — 混合时间戳
 CountingRng rng;  // Q3.9: CountingRng 带掷骰计数 (构造种子由首次 seed_rng 覆盖)
 
+// G9.3 (RNG-001): 独立视觉流 — 固定初种, 与 gameplay 流严格隔离
+CountingRng visual_rng;
+
 // G4.5: deterministic RNG seed for replay
 void seed_rng(uint32_t seed) { rng.seed(seed); }
+
+// G9.3 (RNG-001): 视觉流播种 (enter_floor 按 dungeon seed 派生, replay 稳定)
+void seed_visual_rng(uint32_t seed) { visual_rng.seed(seed); }
 
 // ---- 伤害公式 ----
 int calculate_damage(int atk, int def, AttackType type) {

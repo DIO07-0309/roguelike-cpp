@@ -168,6 +168,9 @@ public:
 
     // 场景间通信
     void enter_floor(int floor, uint32_t seed = 0);
+    // Batch 3I: 挑战竞技场往返 (场景级转换; G9.2 移至 public 以支持回归测试驱动)
+    void enter_challenge_arena();
+    void exit_challenge_arena();
     void new_game();
     // B13: Relic 不再跨层 (load_saved_game 不再接收 relics 参数)
     void load_saved_game(int floor, int max_floor, std::unique_ptr<Player> p,
@@ -180,6 +183,17 @@ public:
 
     // 输入 (override Node::_input)
     void _input(const InputMap& input) override;
+
+    // G9.2 (audit TEST-001): 生命周期回归测试访问器 — 仅测试/诊断用, 勿在业务逻辑中穿透
+    ChallengeRoomController&       challenge_ctrl()       { return _challenge; }
+    const ChallengeRoomController& challenge_ctrl() const { return _challenge; }
+    RoomManager&       room_mgr()       { return _room_mgr; }
+    const RoomManager& room_mgr() const { return _room_mgr; }
+    WorldMode          world_mode() const { return _world_mode; }
+
+    // G9.3 (RNG-001): 屏震相机偏移计算 — 消耗独立 visual_rng, 严禁触碰 gameplay rng()。
+    // _draw() 每帧调用; timer<=0 返回零偏移。static 纯函数以便确定性回归测试。
+    static std::pair<float, float> shake_offset(float intensity, float timer);
 
     // ── M4e: 跨对局镜像记忆 (读档时由场景注入, spawn 自动恢复) ──
     void set_mirror_memory(const std::vector<float>& alpha,
@@ -307,10 +321,7 @@ private:
     float _teleport_fade_timer = 0.0f;
     float _portal_pulse_timer = 0.0f;
     bool _portal_fade_in = false;
-    void enter_challenge_arena();
-    void exit_challenge_arena();
     bool is_save_blocked() const;
-    WorldMode world_mode() const { return _world_mode; }
 
     // Batch 3I: Challenge choice UI
     bool challenge_choice_active = false;

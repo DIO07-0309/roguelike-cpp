@@ -205,4 +205,10 @@ add_roguelike_test(inventory_sell_ui_test economy/inventory_sell_ui_test.cpp)
 add_roguelike_test(challenge_room_test    economy/challenge_room_test.cpp)
 add_roguelike_test(challenge_portal_test  economy/challenge_portal_test.cpp)
 
+add_roguelike_test(floor_lifecycle_test   world/floor_lifecycle_test.cpp)  # G9.2: 生命周期残留回归 (audit LIFE-001/002/003)
+add_roguelike_test(rng_boundary_test      world/rng_boundary_test.cpp)   # G9.3: RNG 边界 (audit RNG-001/RNG-002)
+add_roguelike_test(door_truth_table_test   world/door_truth_table_test.cpp)  # G9.4: DoorState Truth Table 回归锁定 (audit §9)
+
+
+
 

@@ -272,6 +272,15 @@ void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
     // B13: Relic 不再跨层 — 读档不恢复圣物 (每层重新Build)
 }
 
+// G9.3 (RNG-001): 屏震偏移 — 视觉流唯一合法消费入口 (GREEN: 独立 visual_rng)
+std::pair<float, float> GameScene::shake_offset(float intensity, float timer) {
+    if (timer <= 0.0f) return {0.0f, 0.0f};
+    float s = intensity * (timer / 0.12f);
+    float ox = ((float)(visual_rng() % 100) / 100.0f - 0.5f) * s * 2;
+    float oy = ((float)(visual_rng() % 100) / 100.0f - 0.5f) * s * 2;
+    return {ox, oy};
+}
+
 void GameScene::enter_floor(int floor, uint32_t seed) {
     current_floor = floor;
     player->current_floor = floor;
@@ -312,11 +321,19 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     _unstuck_last_pos.clear();
     _unstuck_since.clear();
 
+    // G9.2 (audit LIFE-001/002): 换层统一重置跨层生命周期状态 —
+    //   Challenge 相位禁止跨层残留 (防免钥匙挑战/幽灵 tick);
+    //   RoomManager 房间数据禁止带入 Boss 层 (Boss 层不走 build 分支)。
+    _challenge.reset();
+    _room_mgr.reset();
+
     if (seed != 0) {
         _dungeon_seed = seed;
     } else {
         _dungeon_seed = static_cast<uint32_t>(rng());
     }
+    // G9.3 (RNG-001): 视觉流按层重播种 — 派生自 dungeon seed, 不触碰 gameplay 流
+    seed_visual_rng(_dungeon_seed ^ 0x9E3779B9u);
 
     // D1: FloorConfig — 统一难度/敌人池/特殊房间/BGM/剧情
     const FloorConfig* fcfg = get_floor_config(floor);
@@ -1898,13 +1915,9 @@ void GameScene::_render() {
         }
     }
 
-    // C1: 屏幕震动 (相机偏移)
-    float shake_ox = 0, shake_oy = 0;
-    if (_presentation.shake_timer > 0) {
-        float s = _presentation.shake_intensity * (_presentation.shake_timer / 0.12f);
-        shake_ox = ((float)(rng() % 100) / 100.0f - 0.5f) * s * 2;
-        shake_oy = ((float)(rng() % 100) / 100.0f - 0.5f) * s * 2;
-    }
+    // C1: 屏幕震动 (相机偏移) — G9.3 (RNG-001): 走独立视觉流, 不消耗战斗 RNG
+    auto [shake_ox, shake_oy] = shake_offset(_presentation.shake_intensity,
+                                             _presentation.shake_timer);
     float saved_cx = _cam_x, saved_cy = _cam_y;
     _cam_x += shake_ox; _cam_y += shake_oy;
 
@@ -2807,7 +2820,8 @@ void GameScene::exit_challenge_arena() {
     _saved_dungeon_monsters.clear();
     _saved_dungeon_map.reset();
 
-    game_map->reset_visibility();
+    // G9.2 (audit LIFE-003): 不调用 reset_visibility — 它会清空 is_explored,
+    // 吞掉本层探索进度 (minimap/探索)。下方 update_fov 已负责重建当前帧可见性。
     auto [tx, ty] = game_map->pixel_to_tile(
         player->entity.rect.x + player->entity.rect.width/2,
         player->entity.rect.y + player->entity.rect.height/2);
