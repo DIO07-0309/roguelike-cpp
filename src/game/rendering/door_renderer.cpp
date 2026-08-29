@@ -3,12 +3,33 @@
 #include "config.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
-// Kenney Tiny Dungeon door tiles (16x16 → scaled to 32x32)
-static const char* PATH_OPEN   = "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0003.png";
-static const char* PATH_CLOSED = "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0022.png";
-static const char* PATH_LOCKED = "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0022.png";
-static const char* PATH_SEALED = "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0018.png";
+// G10.2-B2: 门贴图路径已移除 — 统一经 Asset ID (door.open/closed/locked/sealed) 走 manifest。
+// 唯一映射: DoorRenderer::asset_id_for(DoorState)。
+
+// G10.2-B2: Door Visual Asset Mapping — 四态 ID 映射 + LOCKED overlay
+// Asset ID 唯一来源 = manifest (resources/sprites.json §assets.door); 无硬编码路径。
+const char* DoorRenderer::asset_id_for(DoorState s) {
+    switch (s) {
+        case DoorState::OPEN:   return "door.open";
+        case DoorState::CLOSED: return "door.closed";
+        case DoorState::LOCKED: return "door.locked";
+        case DoorState::SEALED: return "door.sealed";
+        default:                return "door.closed";
+    }
+}
+
+Color DoorRenderer::overlay_for(DoorState s) {
+    if (s != DoorState::LOCKED) return {0, 0, 0, 0};
+    const AssetDef* d = ResourceManager::inst().asset_by_id("door.locked");
+    if (!d || d->overlay.empty()) return {0, 0, 0, 0};
+    unsigned r = 0, g = 0, b = 0;
+    std::sscanf(d->overlay.c_str() + 1, "%02x%02x%02x", &r, &g, &b);
+    float alpha = (d->overlay_alpha > 0.0f) ? d->overlay_alpha : 0.35f;
+    return {(unsigned char)r, (unsigned char)g, (unsigned char)b,
+            (unsigned char)(alpha * 255.0f)};
+}
 
 DoorRenderer& DoorRenderer::inst() { static DoorRenderer r; return r; }
 
@@ -28,15 +49,15 @@ Texture2D DoorRenderer::_tex_for(DoorState s) const {
 
 void DoorRenderer::init() {
     if (!IsWindowReady()) return;  // headless test — skip texture load
-    auto load = [](const char* path) -> Texture2D {
-        Texture2D t = ResourceManager::inst().load_texture(path);
+    auto load = [](const char* id) -> Texture2D {
+        Texture2D t = ResourceManager::inst().tex_by_id(id);
         if (t.id > 0) SetTextureFilter(t, TEXTURE_FILTER_POINT);
         return t;
     };
-    _tex_open   = load(PATH_OPEN);
-    _tex_closed = load(PATH_CLOSED);
-    _tex_locked = load(PATH_LOCKED);
-    _tex_sealed = load(PATH_SEALED);
+    _tex_open   = load(asset_id_for(DoorState::OPEN));
+    _tex_closed = load(asset_id_for(DoorState::CLOSED));
+    _tex_locked = load(asset_id_for(DoorState::LOCKED));
+    _tex_sealed = load(asset_id_for(DoorState::SEALED));
     _loaded = (_tex_open.id > 0 && _tex_closed.id > 0);
 }
 
@@ -100,6 +121,11 @@ void DoorRenderer::draw_door(int tx, int ty, DoorState state, bool bright,
             Color tint = bright ? WHITE : Color{ 160, 160, 160, 255 };
             DrawTexturePro(tex, { 0, 0, (float)tex.width, (float)tex.height },
                            dst, { 0, 0 }, 0.0f, tint);
+        }
+        // G10.2-B2 (D3): LOCKED 色罩 — 视觉明确区分于 CLOSED, 规则来自 manifest overlay
+        {
+            Color ov = overlay_for(state);
+            if (ov.a > 0) DrawRectangleRec(dst, ov);
         }
         // overlay icons (only when static)
         float cx = dx + TILE_SIZE * 0.5f;

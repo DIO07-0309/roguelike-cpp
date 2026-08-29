@@ -209,6 +209,7 @@ add_roguelike_test(floor_lifecycle_test   world/floor_lifecycle_test.cpp)  # G9.
 add_roguelike_test(rng_boundary_test      world/rng_boundary_test.cpp)   # G9.3: RNG 边界 (audit RNG-001/RNG-002)
 add_roguelike_test(door_truth_table_test   world/door_truth_table_test.cpp)  # G9.4: DoorState Truth Table 回归锁定 (audit §9)
 add_roguelike_test(asset_manifest_test   world/asset_manifest_test.cpp)   # G10.2-B1: Asset Manifest 校验 (ERROR/WARNING/INFO 分级)
+add_roguelike_test(door_visual_mapping_test world/door_visual_mapping_test.cpp)  # G10.2-B2: 门视觉资产映射 (与 Truth Table 分层)
 
 
 

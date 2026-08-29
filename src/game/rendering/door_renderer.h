@@ -35,6 +35,13 @@ private:
     void _draw_lock_icon(float cx, float cy, bool bright);
     void _draw_seal_icon(float cx, float cy, bool bright);
 
+public:
+    // ── G10.2-B2: Door Visual Asset Mapping (静态, headless 可测) ──
+    // DoorState → Asset ID (DoorRenderer 唯一映射依据; 硬编码路径已移除)
+    static const char* asset_id_for(DoorState s);
+    // DoorState → overlay 色 (LOCKED 按 manifest 规则; 其他透明 = 无色罩)
+    static Color overlay_for(DoorState s);
+
     Texture2D _tex_open   = {0};
     Texture2D _tex_closed = {0};
     Texture2D _tex_locked = {0};
