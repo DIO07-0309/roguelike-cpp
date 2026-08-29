@@ -56,6 +56,10 @@
       "closed": { "file": "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0022.png", "source": "kenney_tiny_dungeon", "render": { "scale_base": 16 } },
       "locked": { "file": "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0022.png", "source": "kenney_tiny_dungeon", "render": { "scale_base": 16, "overlay": "#B03030", "overlay_alpha": 0.35 } },
       "sealed": { "file": "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0018.png", "source": "kenney_tiny_dungeon", "render": { "scale_base": 16 } }
+    },
+    "audio": {
+      "timestop":      { "file": "assets/jojo_timestop.mp3",  "source": "external", "fallback": "synth:bolt" },
+      "domain_expand": { "file": "assets/domain_expand.mp3", "source": "external" }
     }
   },
   "lifecycle": {

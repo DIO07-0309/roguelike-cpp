@@ -1,5 +1,6 @@
 #include "audio_server.h"
 #include "wave_synth.h"
+#include "resource_manager.h"   // G10.2-B3A: 音频路径经 Asset ID 查询
 #include "core/logger.h"
 #include <cmath>
 #include <random>
@@ -250,14 +251,20 @@ void AudioServer::init() {
     _sfx["ui_click"]    = _compile_ui_click();     // Q4.5: UI 点击
     _sfx["ui_confirm"]  = _compile_ui_confirm();   // Q4.5: UI 确认
 
-    // timestop: 优先外部 MP3
-    const char* mp3 = "assets/jojo_timestop.mp3";
-    if (FileExists(mp3)) _sfx["timestop"] = LoadSound(mp3);
-    else _sfx["timestop"] = _compile_bolt();
+    // G10.2-B3A: 外部 MP3 路径唯一来源 = manifest (audio.<name>); 硬编码路径已移除
+    auto load_external = [](const char* id) -> Sound {
+        const AssetDef* d = ResourceManager::inst().asset_by_id(id);
+        if (d && !d->path.empty() && FileExists(d->path.c_str()))
+            return LoadSound(d->path.c_str());
+        return Sound{0};
+    };
+    // timestop: 优先外部 MP3, 缺失 → fallback synth:bolt (与 manifest 声明一致)
+    Sound ts = load_external("audio.timestop");
+    _sfx["timestop"] = (ts.frameCount > 0) ? ts : _compile_bolt();
 
-    // G10: domain expand SFX
-    const char* domain_mp3 = "assets/domain_expand.mp3";
-    if (FileExists(domain_mp3)) _sfx["domain_expand"] = LoadSound(domain_mp3);
+    // domain_expand: 外部 MP3 — 无合成回退 (真缺口, 如实在 manifest/报告标注)
+    Sound de = load_external("audio.domain_expand");
+    if (de.frameCount > 0) _sfx["domain_expand"] = de;
 
     // BGM
     LOG_INFO("音频: 合成BGM(4支)...");

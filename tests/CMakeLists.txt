@@ -211,6 +211,7 @@ add_roguelike_test(door_truth_table_test   world/door_truth_table_test.cpp)  # G
 add_roguelike_test(asset_manifest_test   world/asset_manifest_test.cpp)   # G10.2-B1: Asset Manifest 校验 (ERROR/WARNING/INFO 分级)
 add_roguelike_test(door_visual_mapping_test world/door_visual_mapping_test.cpp)  # G10.2-B2: 门视觉资产映射 (与 Truth Table 分层)
 
+add_roguelike_test(audio_manifest_test    world/audio_manifest_test.cpp)  # G10.2-B3A: 音频清单化 + fallback 声明化
 
 
 
