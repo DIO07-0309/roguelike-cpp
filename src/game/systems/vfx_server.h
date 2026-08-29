@@ -105,4 +105,7 @@ public:
     // ── G5.8: Boss Phase2 transition VFX ──
     void boss_phase2_flash(float cx, float cy, Color tint);
     void boss_gravity_pull(float cx, float cy, float px, float py);
+
+    void portal_entry(float cx, float cy);
+    void portal_return(float cx, float cy);
 };

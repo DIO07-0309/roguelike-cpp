@@ -12,16 +12,7 @@ float RelicEffectProcessor::_rng_float() {
 
 void RelicEffectProcessor::tick(Player* player, float dt) {
     if (!_enabled || !player) return;
-
-    for (auto& relic : player->relics) {
-        auto* def = get_relic_def(relic.id);
-        if (!def || def->effects.empty()) continue;
-        for (auto& eff : def->effects) {
-            if (eff.trigger == RelicTrigger::PASSIVE) {
-                _apply_passive_stat(player, eff);
-            }
-        }
-    }
+    // Batch 3H: PASSIVE stats no longer applied per-frame (moved to on_floor_enter)
 }
 
 void RelicEffectProcessor::on_kill(
@@ -88,6 +79,7 @@ void RelicEffectProcessor::on_floor_enter(Player* player) {
             }
         }
     }
+    // Batch 3H: PASSIVE stats NOT re-applied here — handled by on_relic_acquired
 }
 
 void RelicEffectProcessor::_apply_passive_stat(
@@ -159,6 +151,53 @@ void RelicEffectProcessor::_apply_on_floor_enter(
     }
 }
 
+// Batch 3H: Apply PASSIVE stats once when relic is acquired
+void RelicEffectProcessor::on_relic_acquired(
+    Player* player, const std::string& relic_id)
+{
+    if (!_enabled || !player) return;
+    auto* def = get_relic_def(relic_id);
+    if (!def || def->effects.empty()) return;
+    for (auto& eff : def->effects) {
+        if (eff.trigger == RelicTrigger::PASSIVE) {
+            _apply_passive_stat(player, eff);
+        }
+    }
+    _passive_applied.insert(relic_id);
+}
+
+// Batch 3H: Remove PASSIVE stats when relic is removed
+void RelicEffectProcessor::on_relic_removed(
+    Player* player, const std::string& relic_id)
+{
+    if (!_enabled || !player) return;
+    auto it = _passive_applied.find(relic_id);
+    if (it == _passive_applied.end()) return;
+    _passive_applied.erase(it);
+    auto* def = get_relic_def(relic_id);
+    if (!def || def->effects.empty()) return;
+    for (auto& eff : def->effects) {
+        if (eff.trigger == RelicTrigger::PASSIVE) {
+            _remove_passive_stat(player, eff);
+        }
+    }
+}
+
+void RelicEffectProcessor::_remove_passive_stat(
+    Player* player, const RelicEffectDef& eff)
+{
+    if (eff.stat == "physical_defense") {
+        player->combat.physical_defense -= static_cast<int>(eff.value);
+    } else if (eff.stat == "magical_defense") {
+        player->combat.magical_defense -= static_cast<int>(eff.value);
+    } else if (eff.stat == "max_hp") {
+        int bonus = static_cast<int>(eff.value);
+        player->combat.max_hp -= bonus;
+        player->combat.current_hp = std::min(
+            player->combat.current_hp, player->combat.max_hp);
+    }
+}
+
 // ── Static entry points ──
 
 void RelicEffectProcessor::static_on_hit(Player* player, Monster* target) {
@@ -211,6 +250,48 @@ void RelicEffectProcessor::static_on_pre_damage(
                             ctx.final_damage * (1.0f - eff.value));
                     }
                 }
+            }
+        }
+    }
+}
+
+// Batch 3H: static PASSIVE apply/remove — called from RewardManager etc.
+void RelicEffectProcessor::apply_passive_for_relic(
+    Player* player, const std::string& relic_id)
+{
+    if (!player || relic_id.empty()) return;
+    auto* def = get_relic_def(relic_id);
+    if (!def || def->effects.empty()) return;
+    for (auto& eff : def->effects) {
+        if (eff.trigger == RelicTrigger::PASSIVE) {
+            if (eff.stat == "physical_defense")
+                player->combat.physical_defense += static_cast<int>(eff.value);
+            else if (eff.stat == "magical_defense")
+                player->combat.magical_defense += static_cast<int>(eff.value);
+            else if (eff.stat == "max_hp") {
+                player->combat.max_hp += static_cast<int>(eff.value);
+                player->combat.current_hp += static_cast<int>(eff.value);
+            }
+        }
+    }
+}
+
+void RelicEffectProcessor::remove_passive_for_relic(
+    Player* player, const std::string& relic_id)
+{
+    if (!player || relic_id.empty()) return;
+    auto* def = get_relic_def(relic_id);
+    if (!def || def->effects.empty()) return;
+    for (auto& eff : def->effects) {
+        if (eff.trigger == RelicTrigger::PASSIVE) {
+            if (eff.stat == "physical_defense")
+                player->combat.physical_defense -= static_cast<int>(eff.value);
+            else if (eff.stat == "magical_defense")
+                player->combat.magical_defense -= static_cast<int>(eff.value);
+            else if (eff.stat == "max_hp") {
+                player->combat.max_hp -= static_cast<int>(eff.value);
+                player->combat.current_hp = std::min(
+                    player->combat.current_hp, player->combat.max_hp);
             }
         }
     }

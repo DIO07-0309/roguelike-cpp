@@ -145,7 +145,7 @@ void QuestManager::grant_reward(const QuestReward& r, Player* player, WorldState
     if (!r.relic_id.empty()) {
         const RelicDef* def = get_relic_def(r.relic_id);
         if (def && !player_has_relic(player, r.relic_id))
-            player->relics.push_back({r.relic_id, PersistenceScope::FLOOR});
+            player->add_relic(r.relic_id, PersistenceScope::FLOOR);
     }
     if (!r.buff_id.empty()) apply_buff(player, r.buff_id, r.buff_stacks);
     if (r.set_flag != WorldFlag::NONE) ws.set(r.set_flag);

@@ -276,7 +276,7 @@ std::string execute_event(DungeonEvent& ev, Player* player, int floor) {
                 if (!player_has_relic(player, id)) avail.push_back(id);
             if (!avail.empty()) {
                 std::string chosen = avail[rng() % avail.size()];
-                player->relics.push_back({chosen, PersistenceScope::FLOOR});
+                player->add_relic(chosen, PersistenceScope::FLOOR);
                 return "RELIC:" + std::string(get_relic_def(chosen)->name);
             }
             return "MSG:商人已无货可卖。";
@@ -296,7 +296,7 @@ std::string execute_event(DungeonEvent& ev, Player* player, int floor) {
             if (!player_has_relic(player, id)) avail.push_back(id);
         if (!avail.empty()) {
             std::string chosen = avail[rng() % avail.size()];
-            player->relics.push_back({chosen, PersistenceScope::FLOOR});
+            player->add_relic(chosen, PersistenceScope::FLOOR);
             return "RELIC:" + std::string(get_relic_def(chosen)->name) + " (受诅咒:中毒)";
         }
         return "MSG:你拒绝了诅咒的诱惑。";
@@ -334,7 +334,7 @@ std::string execute_event(DungeonEvent& ev, Player* player, int floor) {
             if (!player_has_relic(player, id)) avail.push_back(id);
         if (!avail.empty() && r == 3) {
             std::string ch = avail[rng() % avail.size()];
-            player->relics.push_back({ch, PersistenceScope::FLOOR});
+            player->add_relic(ch, PersistenceScope::FLOOR);
             return "RELIC:" + std::string(get_relic_def(ch)->name);
         }
         return "MSG:雕像似乎什么都没有发生。";
@@ -364,7 +364,7 @@ std::string execute_event(DungeonEvent& ev, Player* player, int floor) {
             if (!player_has_relic(player, id)) avail.push_back(id);
         if (!avail.empty()) {
             std::string ch = avail[rng() % avail.size()];
-            player->relics.push_back({ch, PersistenceScope::FLOOR});
+            player->add_relic(ch, PersistenceScope::FLOOR);
             return "RELIC:" + std::string(get_relic_def(ch)->name);
         }
         return "RELIC:宝库之剑";
@@ -460,7 +460,7 @@ std::string execute_event(DungeonEvent& ev, Player* player, int floor) {
             for (auto& id : ids) if (!player_has_relic(player, id)) avail.push_back(id);
             if (!avail.empty()) {
                 std::string ch = avail[rng() % avail.size()];
-                player->relics.push_back({ch, PersistenceScope::FLOOR});
+                player->add_relic(ch, PersistenceScope::FLOOR);
                 return "RELIC:" + std::string(get_relic_def(ch)->name) + " (来自NPC)";
             }
             return "MSG:陌生人与你分享了故事——但没什么实质的东西。";
@@ -472,7 +472,7 @@ std::string execute_event(DungeonEvent& ev, Player* player, int floor) {
         for (auto& id : ids) if (!player_has_relic(player, id)) avail.push_back(id);
         if (!avail.empty()) {
             std::string ch = avail[rng() % avail.size()];
-            player->relics.push_back({ch, PersistenceScope::FLOOR});
+            player->add_relic(ch, PersistenceScope::FLOOR);
             return "RELIC:" + std::string(get_relic_def(ch)->name);
         }
         return "MSG:圣物祭坛已经空了——你已经集齐了所有圣物。";
@@ -497,7 +497,7 @@ std::string execute_event(DungeonEvent& ev, Player* player, int floor) {
             for (auto& id : ids) if (!player_has_relic(player, id)) avail.push_back(id);
             if (!avail.empty()) {
                 std::string ch = avail[rng() % avail.size()];
-                player->relics.push_back({ch, PersistenceScope::FLOOR});
+                player->add_relic(ch, PersistenceScope::FLOOR);
                 return "RELIC:" + std::string(get_relic_def(ch)->name) + " (宝箱中)";
             }
             return "MSG:宝箱虽空，但金币仍能让你会心一笑。";

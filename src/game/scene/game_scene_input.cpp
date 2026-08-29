@@ -44,31 +44,63 @@ void GameSceneInput::handle_input(const InputMap& input) {
         return;
     }
 
+    // Batch 3I: Challenge choice UI
+    if (_s.challenge_choice_active) {
+        if (_s._is_action_just_pressed(input, "ui_up") || IsKeyPressed(KEY_UP)) {
+            _s.challenge_choice_cursor = (_s.challenge_choice_cursor + 1) % 2;
+            _s.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        }
+        if (_s._is_action_just_pressed(input, "ui_down") || IsKeyPressed(KEY_DOWN)) {
+            _s.challenge_choice_cursor = (_s.challenge_choice_cursor + 1) % 2;
+            _s.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        }
+        if (IsKeyPressed(KEY_E) || IsKeyPressed(KEY_SPACE)) {
+            if (_s.challenge_choice_cursor == 0) {
+                if (_s._challenge.consume_key_for_challenge(*_s.player)) {
+                    _s.enter_challenge_arena();
+                    _s.get_tree()->get_audio()->play_sfx("door_open", 0.6f);
+                } else {
+                    _s._presentation.room_msg = "需要钥匙才能开启挑战。";
+                    _s._presentation.room_msg_timer = 2.0f;
+                }
+            }
+            _s.challenge_choice_active = false;
+            _s.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        }
+        if (_s._is_action_just_pressed(input, "cancel") || IsKeyPressed(KEY_ESCAPE)) {
+            _s.challenge_choice_active = false;
+            _s.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        }
+        return;
+    }
+
     if (_s._is_action_just_pressed(input,"cancel")) {
         if (_s.state == GameState::PLAYING && _s.player->combat.is_alive) {
-            _s.max_unlocked_floor = std::max(_s.max_unlocked_floor, _s.current_floor);
-            std::vector<bool> spr, spd;
-            if (_s.game_map) for (auto& sr : _s.game_map->special_rooms) {
-                spr.push_back(sr.triggered);
-                spd.push_back(sr.discovered);
+            if (!_s.is_save_blocked()) {
+                _s.max_unlocked_floor = std::max(_s.max_unlocked_floor, _s.current_floor);
+                std::vector<bool> spr, spd;
+                if (_s.game_map) for (auto& sr : _s.game_map->special_rooms) {
+                    spr.push_back(sr.triggered);
+                    spd.push_back(sr.discovered);
+                }
+                std::unordered_map<std::string, int> rcm;
+                static const char* ALL_RULES[] = {
+                    "rule_shadow_charge","rule_summon_priority","rule_arena_movement",
+                    "rule_shield_patience","rule_rule_override", nullptr
+                };
+                for (int i = 0; ALL_RULES[i]; i++) {
+                    int v = _s._gameplay.world_state.counter(ALL_RULES[i]);
+                    if (v > 0) rcm[ALL_RULES[i]] = v;
+                }
+                std::vector<float> mirror_alpha, mirror_beta;
+                _s._boss.export_mirror_memory(mirror_alpha, mirror_beta);
+                SaveManager::save_game(_s.player.get(), _s.current_floor,
+                    _s.max_unlocked_floor, _s._dungeon_seed, spr, spd, rcm,
+                    _s._gameplay.quest_mgr.export_states(),
+                    _s._gameplay.ending_dir.unlocked(),
+                    mirror_alpha, mirror_beta);
+                LOG_INFO("Save→第%d层", _s.current_floor);
             }
-            std::unordered_map<std::string, int> rcm;
-            static const char* ALL_RULES[] = {
-                "rule_shadow_charge","rule_summon_priority","rule_arena_movement",
-                "rule_shield_patience","rule_rule_override", nullptr
-            };
-            for (int i = 0; ALL_RULES[i]; i++) {
-                int v = _s._gameplay.world_state.counter(ALL_RULES[i]);
-                if (v > 0) rcm[ALL_RULES[i]] = v;
-            }
-            std::vector<float> mirror_alpha, mirror_beta;
-            _s._boss.export_mirror_memory(mirror_alpha, mirror_beta);
-            SaveManager::save_game(_s.player.get(), _s.current_floor,
-                _s.max_unlocked_floor, _s._dungeon_seed, spr, spd, rcm,
-                _s._gameplay.quest_mgr.export_states(),
-                _s._gameplay.ending_dir.unlocked(),
-                mirror_alpha, mirror_beta);
-            LOG_INFO("Save→第%d层", _s.current_floor);
         }
         auto ts = std::make_shared<TitleScene>();
         ts->name = "TitleScene";

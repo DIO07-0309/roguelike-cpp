@@ -299,3 +299,13 @@ void VFXServer::boss_gravity_pull(float cx, float cy, float px, float py) {
     beam(px, py, cx, cy, {120,40,180,160}, 0.40f);
     spark_burst(cx, cy, 12, {140,60,200,200}, 0.45f);
 }
+
+void VFXServer::portal_entry(float cx, float cy) {
+    aura_ring(cx, cy, 18.0f, {80, 180, 255, 200}, 1.2f);
+    spark_burst(cx, cy, 6, {120, 200, 255, 180}, 0.4f);
+}
+
+void VFXServer::portal_return(float cx, float cy) {
+    aura_ring(cx, cy, 18.0f, {100, 255, 150, 200}, 1.2f);
+    spark_burst(cx, cy, 6, {150, 255, 180, 180}, 0.4f);
+}

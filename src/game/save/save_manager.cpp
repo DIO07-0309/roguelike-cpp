@@ -287,7 +287,7 @@ SaveData* SaveManager::load_save() {
                 int scope_val = std::atoi(tok.substr(comma + 1).c_str());
                 if (scope_val == static_cast<int>(PersistenceScope::RUN) && !rid.empty()) {
                     const RelicDef* def = get_relic_def(rid);
-                    if (def) p->relics.push_back({rid, PersistenceScope::RUN});
+                    if (def) p->add_relic(rid, PersistenceScope::RUN);
                 }
             }
             pos = (semi != std::string::npos) ? semi + 1 : std::string::npos;

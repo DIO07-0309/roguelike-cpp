@@ -288,12 +288,15 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     _presentation.room_msg_timer = 0.0f;
 
     // Batch 3A: FLOOR relics removed on floor transition
-    player->relics.erase(
-        std::remove_if(player->relics.begin(), player->relics.end(),
-            [](const RelicInstance& r) {
-                return r.scope == PersistenceScope::FLOOR;
-            }),
-        player->relics.end());
+    std::vector<std::string> floor_relic_ids;
+    for (auto& r : player->relics) {
+        if (r.scope == PersistenceScope::FLOOR) {
+            floor_relic_ids.push_back(r.id);
+        }
+    }
+    for (auto& id : floor_relic_ids) {
+        player->remove_relic(id);
+    }
 
     // D4 Step1: 重置事件状态
     if (game_map) {
@@ -388,6 +391,14 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
         };
         _room_mgr.set_callbacks(cb);
         _room_mgr.build(game_map.get(), gen.get_room_rects(), is_boss_floor(floor));
+    }
+
+    for (auto& sr : game_map->special_rooms) {
+        if (sr.type == SpecialRoomType::CHALLENGE) {
+            _challenge.setup_portal(sr.portal_tx, sr.portal_ty);
+            _challenge.set_room_rect(sr.rx, sr.ry, sr.rw, sr.rh);
+            break;
+        }
     }
 
     stairs_pos = rooms.back();
@@ -965,14 +976,9 @@ void GameScene::_process(double delta) {
         return;
     }
 
-    // D6 Step7: 玩家移动/交互/怪物AI — 委托给 PlayerController
-    _player_ctrl.tick(dt);
-
-    // Batch 2C: Room Encounter 状态机 (进有怪房→封门→清房→开门)
-    if (player && game_map) _room_mgr.tick(game_map.get(), player.get(), monsters);
-
-    // Batch 3F: Challenge Room tick
-    if (player && game_map && _challenge.phase() != ChallengePhase::INACTIVE &&
+    // Batch 3F: Challenge Room tick (runs in both DUNGEON and CHALLENGE_ARENA)
+    if (player && game_map && _world_mode == WorldMode::DUNGEON &&
+        _challenge.phase() != ChallengePhase::INACTIVE &&
         _challenge.phase() != ChallengePhase::CLEARED) {
         int room_idx = 0;
         for (int i = 0; i < (int)game_map->special_rooms.size(); i++) {
@@ -980,18 +986,88 @@ void GameScene::_process(double delta) {
                 { room_idx = i; break; }
         }
         _challenge.tick(dt, game_map.get(), player.get(), monsters,
-                        current_floor, _dungeon_seed, room_idx);
-        // When ARMED, lock doors and transition
+                        current_floor, _dungeon_seed, room_idx, ground_items);
         if (_challenge.phase() == ChallengePhase::ARMED) {
             auto& sr = game_map->special_rooms[room_idx];
             game_map->lock_room_doors({});
             _challenge.on_doors_locked();
         }
-        // When CLEARED, open doors
         if (_challenge.phase() == ChallengePhase::CLEARED) {
             game_map->open_room_doors({});
         }
     }
+
+    if (_challenge.phase() == ChallengePhase::PORTAL_ACTIVE ||
+        _challenge.phase() == ChallengePhase::CLEARED ||
+        _world_mode == WorldMode::CHALLENGE_ARENA) {
+        _portal_pulse_timer += dt;
+    }
+    if (_teleport_fade_timer > 0) {
+        _teleport_fade_timer -= dt;
+        if (_teleport_fade_timer <= 0) {
+            _teleport_fade_timer = 0;
+            if (_portal_fade_in && _world_mode == WorldMode::CHALLENGE_ARENA) {
+                int cx = _challenge.room_rx() + _challenge.room_rw() / 2;
+                int cy = _challenge.room_ry() + _challenge.room_rh() / 2;
+                auto [px, py] = _arena_map->tile_to_pixel(cx, cy);
+                player->entity.position = {(float)px, (float)py};
+                player->entity.sync_rect();
+                _arena_map->update_fov(cx, cy, _fov_radius);
+                _challenge.set_phase_for_test(ChallengePhase::ARMED);
+            }
+        }
+    }
+
+    if (_world_mode == WorldMode::CHALLENGE_ARENA) {
+        _challenge.tick(dt, game_map.get(), player.get(), monsters,
+                        current_floor, _dungeon_seed, 0, ground_items);
+        if (_challenge.phase() == ChallengePhase::ARMED) {
+            _challenge.on_doors_locked();
+        }
+        if (_challenge.phase() == ChallengePhase::CLEARED) {
+            _return_portal_tx_arena = _challenge.return_portal_tx();
+            _return_portal_ty_arena = _challenge.return_portal_ty();
+        }
+        // Player movement/attack/input — monsters is already arena monsters
+        _player_ctrl.tick(dt);
+        // Weapon cooldown tick (needed so weapon.can_attack works next frame)
+        if (player) {
+            player->weapon.tick(dt);
+            if (player->weapon.range_indicator_timer > 0.0f)
+                player->weapon.range_indicator_timer -= dt;
+        }
+        // Monster AI
+        {
+            std::vector<Monster*> mlist;
+            for (auto& m : monsters) if (m && m->combat.is_alive) mlist.push_back(m.get());
+            for (auto& m : monsters) {
+                if (m && m->combat.is_alive)
+                    m->update_ai(player.get(), game_map.get(), dt, game_time, &mlist, &active_effects, 0, 0, nullptr);
+            }
+        }
+        _cleanup_dead_monsters();
+        _apply_pending_damage();
+        // VFX tick — must run in arena too or effects stick forever
+        for (auto& fx : active_effects) fx.elapsed += dt;
+        active_effects.erase(std::remove_if(active_effects.begin(), active_effects.end(),
+            [](auto& fx) { return fx.elapsed >= fx.duration + fx.start_delay; }),
+            active_effects.end());
+        if (player && game_map) {
+            auto [tx, ty] = game_map->pixel_to_tile(
+                player->entity.rect.x + player->entity.rect.width / 2,
+                player->entity.rect.y + player->entity.rect.height / 2);
+            game_map->update_fov(tx, ty, _fov_radius);
+        }
+        player->combo.tick(dt);
+        _presentation.tick(dt);
+        return;
+    }
+
+    // D6 Step7: 玩家移动/交互/怪物AI — 委托给 PlayerController
+    _player_ctrl.tick(dt);
+
+    // Batch 2C: Room Encounter 状态机 (进有怪房→封门→清房→开门)
+    if (player && game_map) _room_mgr.tick(game_map.get(), player.get(), monsters);
 
     // Door animation update
     DoorRenderer::inst().update(dt);
@@ -1170,6 +1246,9 @@ void GameScene::_process(double delta) {
 
     // B10: 房间消息计时器
     if (_presentation.room_msg_timer > 0) _presentation.room_msg_timer -= dt;
+
+    // Batch 3H: Gamble result timer decay
+    if (gamble_result_timer > 0) gamble_result_timer -= dt;
 
     // D4 Step2: 事件演出 tick
     _tick_event_ui(dt);
@@ -1830,9 +1909,26 @@ void GameScene::_render() {
     _cam_x += shake_ox; _cam_y += shake_oy;
 
     _draw_map();
-    _draw_ground_items();
+    if (_world_mode != WorldMode::CHALLENGE_ARENA) _draw_ground_items();
     _draw_entities();
     _renderer.draw_effects(active_effects, _cam_x, _cam_y);
+    // Batch 3I: Challenge portal VFX (entry in DUNGEON, return in CHALLENGE_ARENA)
+    if (_challenge.phase() == ChallengePhase::PORTAL_ACTIVE && game_map) {
+        for (auto& sr : game_map->special_rooms) {
+            if (sr.type == SpecialRoomType::CHALLENGE) {
+                _renderer.draw_challenge_portal(_cam_x, _cam_y,
+                    sr.portal_tx, sr.portal_ty, _portal_pulse_timer, true);
+                break;
+            }
+        }
+    }
+    if (_challenge.phase() == ChallengePhase::CLEARED &&
+        _world_mode == WorldMode::CHALLENGE_ARENA &&
+        _challenge.return_portal_tx() >= 0) {
+        _renderer.draw_challenge_portal(_cam_x, _cam_y,
+            _challenge.return_portal_tx(), _challenge.return_portal_ty(),
+            _portal_pulse_timer, false);
+    }
     // D5 Step4: Boss战场绘制
     _boss.arena.draw(_cam_x, _cam_y);
 
@@ -1938,6 +2034,12 @@ void GameScene::_render() {
         float fade = _presentation.hit_flash_timer / 0.18f;
         DrawRectangle(0, 0, sw, sh,
             {ft.r, ft.g, ft.b, (unsigned char)(ft.a * fade * 0.35f)});
+    }
+    // Batch 3I: Teleport fade overlay (full-screen black)
+    _renderer.draw_teleport_fade(sw, sh, _teleport_fade_timer, _portal_fade_in);
+
+    if (challenge_choice_active) {
+        _renderer.draw_challenge_choice(sw, sh, challenge_choice_cursor);
     }
 
     // F15.5.1: Build echo mirror panel data
@@ -2086,6 +2188,7 @@ void GameScene::_render() {
 #endif
 
     if (inventory_open) _renderer.draw_inventory_panel(player.get(), inventory_cursor, sw, sh);
+    if (gamble_open) _renderer.draw_gamble_panel(player.get(), gamble_result_msg, gamble_result_timer, sw, sh);
 
     // D4.6 Step1: F8 Growth Curve debug
     // F15.2: F9 — print player behavior stats
@@ -2508,6 +2611,35 @@ void GameScene::_draw_ground_items() {
     }
 }
 
+void GameScene::_draw_arena_map() {
+    if (!_arena_map) return;
+    for (int y = 0; y < _arena_map->height; y++)
+        for (int x = 0; x < _arena_map->width; x++) {
+            float sx = x * TILE_SIZE - _cam_x;
+            float sy = y * TILE_SIZE - _cam_y;
+            if (sx + TILE_SIZE < 0 || sx > get_tree()->width() ||
+                sy + TILE_SIZE < 0 || sy > get_tree()->height()) continue;
+            TileType t = _arena_map->tile_at(x, y);
+            if (t == TileType::WALL) DrawRectangle((int)sx, (int)sy, TILE_SIZE, TILE_SIZE, {40, 40, 60, 255});
+            else if (t == TileType::FLOOR) DrawRectangle((int)sx, (int)sy, TILE_SIZE, TILE_SIZE, {80, 75, 65, 255});
+        }
+}
+
+void GameScene::_draw_arena_entities() {
+    if (!player || !_arena_map) return;
+    player->draw_no_cam(_cam_x, _cam_y);
+    for (auto& m : _arena_monsters) {
+        if (m && m->combat.is_alive) m->draw(_cam_x, _cam_y);
+    }
+}
+
+void GameScene::_cleanup_dead_arena_monsters() {
+    _arena_monsters.erase(
+        std::remove_if(_arena_monsters.begin(), _arena_monsters.end(),
+            [](const std::unique_ptr<Monster>& m) { return !m || !m->combat.is_alive; }),
+        _arena_monsters.end());
+}
+
 // _draw_hud 已迁移到 GameRenderer
 // _draw_* methods migrated to GameRenderer
 
@@ -2621,3 +2753,75 @@ void GameScene::_draw_mirror_analysis_panel(int sw, int sh) {
 // _draw_monster_buffs, _draw_inventory_panel 已迁移到 GameRenderer
 // _draw_effects, _draw_time_stop_overlay, _draw_boss_cinematic_overlay, _draw_boss_intro
 // 已迁移到 GameRenderer
+
+// Batch 3I: WorldMode + Challenge Arena transition
+void GameScene::enter_challenge_arena() {
+    if (_world_mode != WorldMode::DUNGEON) return;
+    _saved_player_x = player->entity.position.x;
+    _saved_player_y = player->entity.position.y;
+
+    // Save dungeon state
+    _saved_dungeon_map = game_map;
+    _saved_dungeon_monsters = std::move(monsters);
+    monsters.clear();
+
+    // Create a 15x15 arena map
+    const int AW = 15, AH = 15, TS = TILE_SIZE;
+    _arena_map = std::make_shared<GameMap>(AW, AH, TS);
+    for (int y = 0; y < AH; y++)
+        for (int x = 0; x < AW; x++)
+            _arena_map->set_tile(x, y, (x == 0 || x == AW-1 || y == 0 || y == AH-1)
+                ? TileType::WALL : TileType::FLOOR);
+
+    // Switch to arena map
+    game_map = _arena_map;
+
+    // Teleport player to center
+    auto [px, py] = _arena_map->tile_to_pixel(AW/2, AH/2);
+    player->entity.position = {(float)px, (float)py};
+    player->entity.sync_rect();
+    _arena_map->update_fov(AW/2, AH/2, _fov_radius);
+
+    // Setup challenge controller for arena
+    _challenge.set_room_rect(1, 1, AW-2, AH-2);
+    _challenge.set_return_portal(AW/2, AH/2);
+
+    _world_mode = WorldMode::CHALLENGE_ARENA;
+    _teleport_fade_timer = 0.3f;
+    _portal_fade_in = true;
+    _portal_pulse_timer = 0.0f;
+}
+
+void GameScene::exit_challenge_arena() {
+    if (_world_mode != WorldMode::CHALLENGE_ARENA) return;
+    player->entity.position = {_saved_player_x, _saved_player_y};
+    player->entity.sync_rect();
+
+    // Save arena monsters for potential re-entry
+    _arena_monsters = std::move(monsters);
+    monsters.clear();
+
+    // Restore dungeon state
+    game_map = _saved_dungeon_map;
+    monsters = std::move(_saved_dungeon_monsters);
+    _saved_dungeon_monsters.clear();
+    _saved_dungeon_map.reset();
+
+    game_map->reset_visibility();
+    auto [tx, ty] = game_map->pixel_to_tile(
+        player->entity.rect.x + player->entity.rect.width/2,
+        player->entity.rect.y + player->entity.rect.height/2);
+    game_map->update_fov(tx, ty, _fov_radius);
+    _world_mode = WorldMode::DUNGEON;
+    _teleport_fade_timer = 0.3f;
+    _portal_fade_in = false;
+    _challenge.reset();
+}
+
+bool GameScene::is_save_blocked() const {
+    auto ph = _challenge.phase();
+    return ph == ChallengePhase::ARMED ||
+           ph == ChallengePhase::WAVE_SPAWNING ||
+           ph == ChallengePhase::COMBAT ||
+           ph == ChallengePhase::WAIT_NEXT_WAVE;
+}

@@ -5,7 +5,7 @@
 > 随机生成 15 层地牢，击败 Boss「终焉回响」通关。
 > 五项 Stable 冻结验收通过：**API / Save / Mod / Regression / Performance**（报告 `docs/V1_0_0_ACCEPTANCE.md`）
 >
-> **v1.0.0 后新增**（Phase 1-3 + Batch A-F，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞 · **经济系统（金币/钥匙/圣物持久化/背包出售）· 赌徒房 · 挑战房（波次战斗）**
+> **v1.0.0 后新增**（Phase 1-3 + Batch A-H，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞 · **经济系统（金币/钥匙/圣物持久化/背包出售）· 赌徒房 · 挑战房（传送门 + 选择面板 + 波次战斗 + 独立竞技场）**
 
 本项目定位：
 
@@ -704,3 +704,5 @@ python tools/extract_chars.py      # 提取 CJK 字符 → 字体码点表
 | Batch 3D | 挑战房架构审计: SpecialRoom/Key/Room/Monster/Reward 全系统审查 + 最终实现计划 | ✅ |
 | Batch 3E | 挑战房设计冻结: 7阶段状态机 + ChallengeRoomController + 3×4波次 + 确定性RNG + 奖励背包满fallback | ✅ |
 | Batch 3F | 挑战房 MVP: ChallengeRoomController + 7-phase state machine + 出口附近放置 + 波次战斗 + HUD wave 显示 + 14 测试 | ✅ |
+| Batch 3G | 挑战房 HUD: 进度条 + 击杀计数 + 剩余波次 + floor 横幅 + Boss 变体 (精英/双怪) + 10 测试 | ✅ |
+| Batch 3H | 赌徒房 UI 重做 + 挑战房完整 MVP: 传送门系统 + E键交互 + 选择面板 + 返回传送门 + 独立竞技场地图 + 53/53 测试 + 桌面同步 | ✅ |

@@ -26,7 +26,7 @@
 8. 不允许一次生成超过 300 行代码
 9. 如果有更好的设计方案，请先讨论，再编码
 10. 永远以可维护性优先
-11. 每次代码/配置更新并验证通过后，必须同步桌面打包版 `C:\Users\HP\Desktop\Roguelike-CPP版`：镜像 `src/ resources/ tools/ tests/ docs/ assets/ .github/ vendor/` + 根文件（CMakeLists.txt README.md CLAUDE.md CMakePresets.json .gitignore），重编译 exe 复制过去（保留桌面独有的 `python_edition/` `saves/` 等）
+11. 每次代码/配置更新并验证通过后，必须同步桌面打包版 `C:\Users\HP\Desktop\Roguelike-CPP版`：镜像 `src/ resources/ tools/ tests/ docs/ assets/ .github/ vendor/` + 根文件（CMakeLists.txt README.md CLAUDE.md CMakePresets.json .gitignore），**exe 必须复制到桌面包根目录**（用户测试只点根目录的 `roguelike_cpp.exe`，不进 build/ 子目录）。保留桌面独有的 `python_edition/` `saves/` 等
 
 ## 代码风格
 - 使用 `PascalCase` 类名，`camelCase` 方法名，`snake_case` 变量名

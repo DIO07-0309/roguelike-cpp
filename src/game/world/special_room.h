@@ -18,6 +18,7 @@ struct SpecialRoom {
     bool discovered = false;   // B10: 玩家是否已走进过该房间
     std::string landmark_id;   // G6.2: "" = normal, "broken_cell" = landmark
     std::string biome_id;      // G6.2: biome filter
+    int portal_tx = 0, portal_ty = 0;
 };
 
 // 生成时用: 把索引映射到类型 (0→ALTAR, 1→TREASURE, 2→FOUNTAIN)

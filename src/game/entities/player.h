@@ -86,6 +86,10 @@ public:
     bool spend_key(int amount);
     int  get_key_count() const;
 
+    // Batch 3H: 统一圣物入口 (自动应用/移除 PASSIVE 加成)
+    void add_relic(const std::string& id, PersistenceScope scope);
+    void remove_relic(const std::string& id);
+
     // 渲染
     void render(Camera2D& cam);
     void draw_no_cam(float cam_x, float cam_y);

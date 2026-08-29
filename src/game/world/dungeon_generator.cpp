@@ -35,7 +35,6 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_r
     gm->load_from_template(tmpl);
 
     _assign_special_rooms(special_room_count, biome_id);
-    gm->special_rooms = _special_rooms;
 
     // Batch 3G: Challenge Room placement near exit (non-boss floors)
     // Side branch: pick closest unassigned room to exit (not blocking main path since
@@ -67,9 +66,22 @@ std::shared_ptr<GameMap> DungeonGenerator::generate(uint32_t seed, int special_r
             sr.rx = rx; sr.ry = ry; sr.rw = rw; sr.rh = rh;
             sr.type = SpecialRoomType::CHALLENGE;
             sr.triggered = false;
+            // Find first door on room border, place portal one tile inside the room
+            for (int dy = -1; dy <= sr.rh && sr.portal_tx == 0; dy++) {
+                for (int dx = -1; dx <= sr.rw && sr.portal_tx == 0; dx++) {
+                    int tx = sr.rx + dx, ty = sr.ry + dy;
+                    if (gm->door_state_at(tx, ty) != DoorState::NONE) {
+                        if (dx < 0) { sr.portal_tx = sr.rx; sr.portal_ty = ty; }
+                        else if (dx >= sr.rw) { sr.portal_tx = sr.rx + sr.rw - 1; sr.portal_ty = ty; }
+                        else if (dy < 0) { sr.portal_tx = tx; sr.portal_ty = sr.ry; }
+                        else { sr.portal_tx = tx; sr.portal_ty = sr.ry + sr.rh - 1; }
+                    }
+                }
+            }
             _special_rooms.push_back(sr);
         }
     }
+    gm->special_rooms = _special_rooms;
 
     if (arena_density > 0) _assign_arena_objects(gm.get(), arena_density);
 
@@ -162,7 +174,8 @@ void DungeonGenerator::_assign_special_rooms(int count, const std::string& biome
         }
     }
 
-    int scount = std::min(count, (int)candidates.size());
+    // Reserve 1 candidate for challenge room placement below
+    int scount = std::min(count, (int)candidates.size() - 1);
     int placed_lm = 0;
     for (int i = 0; i < scount; i++) {
         auto [rx, ry, rw, rh] = _rooms[candidates[i]];

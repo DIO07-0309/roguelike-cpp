@@ -4,6 +4,7 @@
 #include "raylib.h"
 #include "node.h"
 #include "input_map.h"
+#include "config.h"
 
 class AudioServer;
 class VFXServer;
@@ -21,9 +22,9 @@ public:
     InputMap& get_input() { return _input; }
     AudioServer* get_audio() { return _audio.get(); }
 
-    // 动态尺寸 (跟随窗口缩放) — 两个名字都可用
-    int width()  const { return GetScreenWidth(); }
-    int height() const { return GetScreenHeight(); }
+    // 逻辑分辨率 (始终 960×640，全屏时由 RenderTexture 缩放)
+    int width()  const { return WINDOW_WIDTH; }
+    int height() const { return WINDOW_HEIGHT; }
     int get_width()  const { return width(); }
     int get_height() const { return height(); }
 
@@ -42,6 +43,8 @@ private:
     Node* _current_scene = nullptr;
 
     std::unique_ptr<AudioServer> _audio;
+
+    RenderTexture2D _target = {0};  // Batch 3H: 960×640 render target
 
     std::shared_ptr<Node> _pending_scene;
     bool _scene_changed = false;

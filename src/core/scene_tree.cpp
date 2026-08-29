@@ -2,25 +2,25 @@
 #include "logger.h"
 #include "win_center.h"
 #include "audio_server.h"
-#include "config.h"
-#include "rlgl.h"
 #include <algorithm>
 #include <cstring>
 #include <cmath>
 
 SceneTree::SceneTree(int w, int h, const char* title) {
     InitWindow(w, h, title);
-    SetExitKey(0);  // 禁用默认Esc退出，由场景自行处理
+    SetExitKey(0);
     center_active_window();
     SetTargetFPS(60);
     _input.setup_defaults();
     _audio = std::make_unique<AudioServer>();
     _audio->init();
+    _target = LoadRenderTexture(WINDOW_WIDTH, WINDOW_HEIGHT);
     _running = true;
 }
 
 SceneTree::~SceneTree() {
     if (_root) { _root->_propagate_exit_tree(); _root.reset(); }
+    UnloadRenderTexture(_target);
     CloseWindow();
 }
 
@@ -77,33 +77,29 @@ void SceneTree::run() {
         if (dt > 0.1) dt = 0.1;
         _handle_input();
         process_frame(dt);
+
+        // Batch 3H: Render to 960×640 texture, then blit scaled
+        BeginTextureMode(_target);
+        ClearBackground(BLACK);
+        if (_root) _root->_render();
+        EndTextureMode();
+
         BeginDrawing();
         ClearBackground(BLACK);
-        // Batch 3G: Fullscreen proportional scaling (letterbox/pillarbox)
+        // Source: entire texture (flipped vertically because OpenGL)
+        Rectangle src = {0, 0, (float)_target.texture.width, -(float)_target.texture.height};
         if (IsWindowFullscreen()) {
             int mw = GetMonitorWidth(0);
             int mh = GetMonitorHeight(0);
             float scale = fminf((float)mw / WINDOW_WIDTH, (float)mh / WINDOW_HEIGHT);
-            int vpW = (int)(WINDOW_WIDTH * scale);
-            int vpH = (int)(WINDOW_HEIGHT * scale);
-            int vpX = (mw - vpW) / 2;
-            int vpY = (mh - vpH) / 2;
-            rlViewport(vpX, vpY, vpW, vpH);
-            rlMatrixMode(RL_PROJECTION);
-            rlLoadIdentity();
-            rlOrtho(0, WINDOW_WIDTH, WINDOW_HEIGHT, 0, 0, 1);
-            rlMatrixMode(RL_MODELVIEW);
-            rlLoadIdentity();
-        }
-        if (_root) _root->_render();
-        // Restore default viewport after scaled render
-        if (IsWindowFullscreen()) {
-            rlViewport(0, 0, GetScreenWidth(), GetScreenHeight());
-            rlMatrixMode(RL_PROJECTION);
-            rlLoadIdentity();
-            rlOrtho(0, GetScreenWidth(), GetScreenHeight(), 0, 0, 1);
-            rlMatrixMode(RL_MODELVIEW);
-            rlLoadIdentity();
+            float dw = WINDOW_WIDTH * scale;
+            float dh = WINDOW_HEIGHT * scale;
+            Rectangle dst = {(mw - dw) / 2, (mh - dh) / 2, dw, dh};
+            DrawTexturePro(_target.texture, src, dst, {0, 0}, 0, WHITE);
+        } else {
+            DrawTexturePro(_target.texture, src,
+                {0, 0, (float)GetScreenWidth(), (float)GetScreenHeight()},
+                {0, 0}, 0, WHITE);
         }
         EndDrawing();
     }

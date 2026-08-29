@@ -520,11 +520,11 @@ void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw
             DrawTextEx(g_font_small, page_buf,
                        {pr.x + 30, pr.y + ph - 52}, 14, 1, {160, 160, 200, 255});
         }
-        // Batch 3A: Gold total in inventory
+        // Batch 3A: Gold + Batch 3H: Key count (same line)
         char gold_buf[32];
-        snprintf(gold_buf, sizeof(gold_buf), "金币: %d", player->gold);
+        snprintf(gold_buf, sizeof(gold_buf), "金币:%d  钥匙:%d", player->gold, player->key_count);
         DrawTextEx(g_font_small, gold_buf,
-                   {pr.x + pw - 120, pr.y + ph - 52}, 14, 1, Color{220, 200, 100, 220});
+                   {pr.x + pw - 160, pr.y + ph - 52}, 14, 1, Color{220, 200, 100, 220});
         // Show sell value of selected item
         if (cursor >= 0 && cursor < item_count) {
             int sv = get_sell_value(inv.items[cursor].get());
@@ -536,6 +536,109 @@ void GameRenderer::draw_inventory_panel(const Player* player, int cursor, int sw
         DrawTextEx(g_font_small, "^v选择 X装备 T出售 U使用 D丢弃 B关闭",
                    {pr.x + (pw - 260) / 2, pr.y + ph - 18}, 16, 1, {140, 140, 140, 255});
     }
+}
+
+// ============================================================
+// Batch 3H: Gamble Room UI panel
+// ============================================================
+void GameRenderer::draw_gamble_panel(const Player* player, const std::string& result_msg,
+                                     float result_timer, int sw, int sh) {
+    DrawRectangle(0, 0, sw, sh, {0, 0, 0, 180});
+    float pw = 420, ph = 340;
+    Rectangle pr = {sw / 2.0f - pw / 2, sh / 2.0f - ph / 2, pw, ph};
+    draw_panel(pr, "赌徒的轮盘");
+
+    if (!g_font_loaded) return;
+
+    float x0 = pr.x + 30;
+    float y = pr.y + 50;
+    float max_w = pw - 60;
+
+    // Player gold
+    char gold_buf[32];
+    snprintf(gold_buf, sizeof(gold_buf), "金币: %d", player->gold);
+    DrawTextEx(g_font_small, gold_buf, {x0, y}, 18, 1, Color{220, 200, 100, 255});
+    y += 30;
+
+    // Odds table
+    DrawTextEx(g_font_small, "— 奖池概率 —", {x0, y}, 16, 1, {160, 160, 200, 255});
+    y += 24;
+    DrawTextEx(g_font_small, "65%  随机装备", {x0, y}, 14, 1, {200, 200, 200, 255});
+    y += 18;
+    DrawTextEx(g_font_small, "20%  钥匙 x1", {x0, y}, 14, 1, {200, 200, 200, 255});
+    y += 18;
+    DrawTextEx(g_font_small, "10%  金币 x10", {x0, y}, 14, 1, {200, 200, 200, 255});
+    y += 18;
+    DrawTextEx(g_font_small, " 5%  圣物", {x0, y}, 14, 1, {255, 220, 100, 255});
+    y += 28;
+
+    // Cost
+    DrawTextEx(g_font_small, "每次抽奖: 20 金币", {x0, y}, 16, 1, {255, 255, 100, 255});
+    y += 28;
+
+    // Result message
+    if (result_timer > 0 && !result_msg.empty()) {
+        Color rc = (result_msg.find("RELIC:") == 0)
+            ? Color{255, 220, 80, 255} : Color{180, 255, 180, 255};
+        std::string display = result_msg;
+        if (display.find("RELIC:") == 0)
+            display = "圣物: " + display.substr(6);
+        _draw_wrapped_text(display, x0, y, max_w, 18, 18.0f, rc);
+        y += 36;
+    }
+
+    // Controls
+    DrawTextEx(g_font_small, "[E] 抽奖   [B] 关闭",
+               {pr.x + (pw - 180) / 2, pr.y + ph - 20}, 14, 1, {140, 140, 140, 255});
+}
+
+void GameRenderer::draw_challenge_portal(float cam_x, float cam_y,
+    int portal_tx, int portal_ty, float pulse_timer, bool is_entry)
+{
+    float px = portal_tx * 32.0f + 16.0f - cam_x;
+    float py = portal_ty * 32.0f + 16.0f - cam_y;
+    float pulse = 0.8f + 0.2f * sinf(pulse_timer * 3.0f);
+    Color outer = is_entry ? Color{80, 180, 255, (unsigned char)(200 * pulse)}
+                           : Color{100, 255, 150, (unsigned char)(200 * pulse)};
+    Color inner = is_entry ? Color{150, 220, 255, (unsigned char)(220 * pulse)}
+                           : Color{180, 255, 200, (unsigned char)(220 * pulse)};
+    DrawCircleV({px, py}, 12.0f, outer);
+    DrawCircleV({px, py}, 8.0f, inner);
+    if (g_font_loaded) {
+        const char* label = is_entry ? "按 [E] 开始挑战" : "按 [E] 返回";
+        float tw = MeasureTextEx(g_font_small, label, 12, 1).x;
+        DrawTextEx(g_font_small, label, {px - tw / 2, py - 24}, 12, 1,
+                   is_entry ? Color{200, 220, 255, 220} : Color{180, 255, 200, 220});
+    }
+}
+
+void GameRenderer::draw_teleport_fade(int sw, int sh, float fade_timer, bool fading_in) {
+    if (fade_timer <= 0) return;
+    float alpha = fading_in ? (0.5f - fade_timer) / 0.5f : fade_timer / 0.5f;
+    if (alpha < 0) alpha = 0;
+    if (alpha > 1) alpha = 1;
+    DrawRectangle(0, 0, sw, sh, {0, 0, 0, (unsigned char)(255 * alpha)});
+}
+
+void GameRenderer::draw_challenge_choice(int sw, int sh, int cursor) {
+    if (!g_font_loaded) return;
+    float pw = 320, ph = 140;
+    float cx = sw/2.0f - pw/2, cy = sh/2.0f - ph/2;
+    DrawRectangleRounded({cx, cy, pw, ph}, 0.1f, 8, {20, 20, 40, 230});
+    DrawRectangleRoundedLines({cx-1, cy-1, pw+2, ph+2}, 0.1f, 8, 2.0f, {80, 180, 255, 200});
+    const char* title = "挑战房间";
+    float tw = MeasureTextEx(g_font_small, title, 18, 1).x;
+    DrawTextEx(g_font_small, title, {cx + pw/2 - tw/2, cy + 12}, 18, 1, {255, 220, 100, 255});
+    const char* opts[] = {"开始挑战 (消耗1把钥匙)", "离开"};
+    for (int i = 0; i < 2; i++) {
+        float oy = cy + 50 + i * 36;
+        Color c = (i == cursor) ? Color{255, 255, 200, 255} : Color{180, 180, 200, 200};
+        if (i == cursor) DrawRectangleRounded({cx + 15, oy - 2, pw - 30, 30}, 0.1f, 4, {60, 60, 100, 120});
+        DrawTextEx(g_font_small, opts[i], {cx + 30, oy + 4}, 14, 1, c);
+    }
+    const char* hint = "[↑↓选择] [E确认] [ESC离开]";
+    float hw = MeasureTextEx(g_font_small, hint, 11, 1).x;
+    DrawTextEx(g_font_small, hint, {cx + pw/2 - hw/2, cy + ph - 22}, 11, 1, {120, 120, 160, 180});
 }
 
 // ============================================================

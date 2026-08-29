@@ -127,3 +127,83 @@ TEST(ChallengeRoomTest, IsClearedFalseWhenActive) {
     c.try_activate(p);
     EXPECT_FALSE(c.is_cleared());
 }
+
+// --- Batch 3I: Portal State Machine ---
+
+TEST(ChallengeRoomPortal, SetupPortal) {
+    ChallengeRoomController c;
+    c.setup_portal(10, 5);
+    EXPECT_EQ(c.phase(), ChallengePhase::PORTAL_ACTIVE);
+    EXPECT_EQ(c.portal_tx(), 10);
+    EXPECT_EQ(c.portal_ty(), 5);
+}
+
+TEST(ChallengeRoomPortal, ConsumeKeySuccess) {
+    ChallengeRoomController c;
+    c.setup_portal(10, 5);
+    Player p = make_player(1);
+    EXPECT_TRUE(c.consume_key_for_challenge(p));
+    EXPECT_EQ(p.key_count, 0);
+}
+
+TEST(ChallengeRoomPortal, ConsumeKeyFailNoKey) {
+    ChallengeRoomController c;
+    c.setup_portal(10, 5);
+    Player p = make_player(0);
+    EXPECT_FALSE(c.consume_key_for_challenge(p));
+}
+
+TEST(ChallengeRoomPortal, ConsumeKeyFailWrongPhase) {
+    ChallengeRoomController c;
+    Player p = make_player(1);
+    EXPECT_FALSE(c.consume_key_for_challenge(p));
+}
+
+TEST(ChallengeRoomPortal, SetRoomRect) {
+    ChallengeRoomController c;
+    c.set_room_rect(5, 5, 8, 6);
+    EXPECT_EQ(c.room_rx(), 5);
+    EXPECT_EQ(c.room_ry(), 5);
+    EXPECT_EQ(c.room_rw(), 8);
+    EXPECT_EQ(c.room_rh(), 6);
+}
+
+TEST(ChallengeRoomPortal, SetReturnPortal) {
+    ChallengeRoomController c;
+    c.set_return_portal(8, 12);
+    EXPECT_EQ(c.return_portal_tx(), 8);
+    EXPECT_EQ(c.return_portal_ty(), 12);
+}
+
+TEST(ChallengeRoomPortal, MarkCleared) {
+    ChallengeRoomController c;
+    c.setup_portal(10, 5);
+    c.mark_cleared();
+    EXPECT_EQ(c.phase(), ChallengePhase::CLEARED);
+    EXPECT_TRUE(c.is_cleared());
+}
+
+TEST(ChallengeRoomPortal, ResetClearsPortal) {
+    ChallengeRoomController c;
+    c.setup_portal(10, 5);
+    c.set_return_portal(8, 12);
+    c.reset();
+    EXPECT_EQ(c.portal_tx(), -1);
+    EXPECT_EQ(c.return_portal_tx(), -1);
+}
+
+TEST(ChallengeRoomPortal, FullFlow) {
+    ChallengeRoomController c;
+    c.setup_portal(10, 5);
+    EXPECT_EQ(c.phase(), ChallengePhase::PORTAL_ACTIVE);
+
+    Player p = make_player(1);
+    EXPECT_TRUE(c.consume_key_for_challenge(p));
+    EXPECT_EQ(p.key_count, 0);
+
+    c.mark_cleared();
+    EXPECT_EQ(c.phase(), ChallengePhase::CLEARED);
+
+    c.set_return_portal(8, 12);
+    EXPECT_GT(c.return_portal_tx(), 0);
+}

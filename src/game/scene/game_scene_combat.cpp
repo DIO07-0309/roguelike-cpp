@@ -135,7 +135,7 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
                 candidates.push_back(id);
         if (!candidates.empty()) {
             std::string chosen = candidates[rng() % candidates.size()];
-            _s.player->relics.push_back({chosen, PersistenceScope::RUN});
+            _s.player->add_relic(chosen, PersistenceScope::RUN);
             const RelicDef* def = get_relic_def(chosen);
             if (def) {
                 _s._presentation.room_msg = "RELIC:" + def->name;

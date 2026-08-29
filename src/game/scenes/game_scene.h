@@ -85,6 +85,12 @@ struct EventPresentation {
 enum class GameState { TITLE, PLAYING, BOSS_INTRO, BOSS_CINEMATIC,
                        FLOOR_SELECT, TUTORIAL, DEATH, VICTORY };
 
+// Batch 3I: WorldMode — 主地牢 / 挑战竞技场 切换
+enum class WorldMode : uint8_t {
+    DUNGEON,           // 正常地牢探索
+    CHALLENGE_ARENA    // 挑战竞技场 (主地牢冻结)
+};
+
 class GameScene : public Node {
     friend class GameFlowDirector;
     friend class PlayerController;
@@ -122,6 +128,12 @@ public:
     bool stairs_active = false;
     std::pair<int,int> stairs_pos{0, 0};
     float game_time = 0.0f;
+
+    // Batch 3H: Gamble Room UI state
+    bool gamble_open = false;
+    int  gamble_cursor = 0;
+    std::string gamble_result_msg;
+    float gamble_result_timer = 0.0f;
 
     // 时停
     float time_stop_remaining = 0.0f;
@@ -288,12 +300,37 @@ private:
     RoomManager _room_mgr;
     // Batch 3F: Challenge Room Controller
     ChallengeRoomController _challenge;
+
+    // Batch 3I: WorldMode + Challenge Arena transition state
+    WorldMode _world_mode = WorldMode::DUNGEON;
+    float _saved_player_x = 0, _saved_player_y = 0;
+    float _teleport_fade_timer = 0.0f;
+    float _portal_pulse_timer = 0.0f;
+    bool _portal_fade_in = false;
+    void enter_challenge_arena();
+    void exit_challenge_arena();
+    bool is_save_blocked() const;
+    WorldMode world_mode() const { return _world_mode; }
+
+    // Batch 3I: Challenge choice UI
+    bool challenge_choice_active = false;
+    int challenge_choice_cursor = 0;
+
+    // Batch 3I: Independent arena — saved dungeon state during arena
+    std::shared_ptr<GameMap> _arena_map;
+    std::vector<std::unique_ptr<Monster>> _arena_monsters;
+    std::shared_ptr<GameMap> _saved_dungeon_map;
+    std::vector<std::unique_ptr<Monster>> _saved_dungeon_monsters;
+    int _return_portal_tx_arena = -1, _return_portal_ty_arena = -1;
     std::pair<int,int> _boss_last_known{-1,-1};  // Boss 最后已知可见位置（已发现才记录）
 
     // 渲染辅助 (保留 GameScene 中的轻量级方法)
     void _draw_map();
     void _draw_entities();
     void _draw_ground_items();
+    void _draw_arena_map();
+    void _draw_arena_entities();
+    void _cleanup_dead_arena_monsters();
 
     float _cam_x = 0, _cam_y = 0;
 

@@ -20,6 +20,8 @@
 #include "scene_tree.h"
 #include "audio_server.h"
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.2
+#include "reward_manager.h"
+#include "relic_progression.h"
 #include <cmath>
 #include <algorithm>
 
@@ -216,9 +218,6 @@ void PlayerController::handle_input(const InputMap& input) {
         int max_page = std::max(0, (item_count + kPage - 1) / kPage - 1);
         int page = gs.inventory_cursor / kPage;
         int rel = gs.inventory_cursor % kPage;
-        // Q3.16: 背包内导航与动作键解耦 — 原翻页走 move_right(绑定了 D) 会抢占丢弃,
-        // 且 D 同时承担"丢弃"与"右移"双重语义。现在: WS/↑↓ 移光标, ←→ 翻页,
-        // X/U/D 动作键优先判定, 彻底消除 D 的二义性。
         if (gs._is_action_just_pressed(input,"inventory") || gs._is_action_just_pressed(input,"cancel"))
             gs.inventory_open = false;
         else if (IsKeyPressed(KEY_X))
@@ -238,6 +237,95 @@ void PlayerController::handle_input(const InputMap& input) {
             gs.inventory_cursor = (page - 1) * kPage + rel;
         else if (IsKeyPressed(KEY_RIGHT) && page < max_page)
             gs.inventory_cursor = std::min((page + 1) * kPage + rel, item_count - 1);
+        return;
+    }
+
+    // Batch 3H: Gamble Room UI — E to spin, B/ESC to close
+    if (gs.gamble_open) {
+        if (gs._is_action_just_pressed(input,"inventory") || gs._is_action_just_pressed(input,"cancel")) {
+            gs.gamble_open = false;
+            gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        } else if (gs._is_action_just_pressed(input,"pickup")) {
+            // E key: spin
+            constexpr int kGambleCost = 20;
+            if (gs.player->gold < kGambleCost) {
+                gs.gamble_result_msg = "金币不足！需要 " + std::to_string(kGambleCost) + " 金币。";
+                gs.gamble_result_timer = 2.0f;
+                gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+            } else {
+                gs.player->spend_gold(kGambleCost);
+                int roll = rng() % 100;
+                if (roll < 65) {
+                    // 65% Equipment
+                    auto item = generate_random_item();
+                    if (item && RewardManager::grant_item(*gs.player, item))
+                        gs.gamble_result_msg = "运气不错！获得了 " + item->get_description();
+                    else
+                        gs.gamble_result_msg = "赌徒摊手：今天没货了。";
+                } else if (roll < 85) {
+                    // 20% Key
+                    RewardManager::grant_key(*gs.player, 1);
+                    gs.gamble_result_msg = "获得了一把钥匙！";
+                } else if (roll < 95) {
+                    // 10% Gold return
+                    RewardManager::grant_gold(*gs.player, 10);
+                    gs.gamble_result_msg = "获得 10 金币！";
+                } else {
+                    // 5% RUN Relic
+                    auto all_ids = get_all_relic_ids();
+                    std::vector<std::string> candidates;
+                    for (auto& id : all_ids)
+                        if (!player_has_relic(gs.player.get(), id))
+                            candidates.push_back(id);
+                    if (!candidates.empty()) {
+                        std::string chosen = candidates[rng() % candidates.size()];
+                        if (RewardManager::grant_relic(*gs.player, chosen, PersistenceScope::RUN)) {
+                            const RelicDef* def = get_relic_def(chosen);
+                            gs.gamble_result_msg = def ? ("RELIC:" + def->name) : "获得了一件圣物！";
+                        } else {
+                            RewardManager::grant_key(*gs.player, 1);
+                            gs.gamble_result_msg = "圣物库已满，获得钥匙作为替代。";
+                        }
+                    } else {
+                        RewardManager::grant_key(*gs.player, 1);
+                        gs.gamble_result_msg = "圣物库已满，获得钥匙作为替代。";
+                    }
+                }
+                gs.gamble_result_timer = 2.5f;
+                gs.get_tree()->get_audio()->play_sfx("pickup", 0.55f);
+            }
+        }
+        return;
+    }
+
+    // Batch 3I: Challenge choice UI
+    if (gs.challenge_choice_active) {
+        if (gs._is_action_just_pressed(input, "ui_up")) {
+            gs.challenge_choice_cursor = (gs.challenge_choice_cursor + 1) % 2;
+            gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        }
+        if (gs._is_action_just_pressed(input, "ui_down")) {
+            gs.challenge_choice_cursor = (gs.challenge_choice_cursor + 1) % 2;
+            gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        }
+        if (gs._is_action_just_pressed(input, "confirm") || gs._is_action_just_pressed(input, "interact")) {
+            if (gs.challenge_choice_cursor == 0) {
+                // Start challenge
+                if (gs._challenge.consume_key_for_challenge(*gs.player)) {
+                    gs.enter_challenge_arena();
+                    gs.get_tree()->get_audio()->play_sfx("door_open", 0.6f);
+                } else {
+                    gs._presentation.room_msg = "需要钥匙才能开启挑战。";
+                    gs._presentation.room_msg_timer = 2.0f;
+                }
+            }
+            gs.challenge_choice_active = false;
+            gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        }
+        if (gs._is_action_just_pressed(input, "cancel")) {
+            gs.challenge_choice_active = false;
+            gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+        }
         return;
     }
 
@@ -308,23 +396,46 @@ void PlayerController::handle_input(const InputMap& input) {
                 return;
             }
         }
-        // Batch 3F: Challenge Room — E key to activate (before regular interaction)
+        // Batch 3I: Challenge Room — Portal interaction (portal is on wall OUTSIDE room rect)
         {
             auto [ptx, pty] = gs.game_map->pixel_to_tile(
                 gs.player->entity.rect.x + gs.player->entity.rect.width/2,
                 gs.player->entity.rect.y + gs.player->entity.rect.height/2);
-            SpecialRoom* room = gs.game_map->get_special_room_at(ptx, pty);
-            if (room && room->type == SpecialRoomType::CHALLENGE) {
-                if (gs._challenge.try_activate(*gs.player)) {
-                    gs._presentation.room_msg = "挑战开始！消灭所有怪物。";
-                    gs._presentation.room_msg_timer = 3.0f;
-                    gs.get_tree()->get_audio()->play_sfx("door_open", 0.5f);
-                    return;
-                } else if (gs._challenge.phase() == ChallengePhase::INACTIVE) {
-                    gs._presentation.room_msg = "需要钥匙才能开启挑战。";
-                    gs._presentation.room_msg_timer = 2.0f;
+            // Arena return portal (arena map has no special_rooms, check controller directly)
+            if (gs._world_mode == WorldMode::CHALLENGE_ARENA &&
+                gs._challenge.phase() == ChallengePhase::CLEARED &&
+                gs._challenge.return_portal_tx() >= 0) {
+                int dx = abs(ptx - gs._challenge.return_portal_tx());
+                int dy = abs(pty - gs._challenge.return_portal_ty());
+                if (dx + dy <= 1) {
+                    gs.exit_challenge_arena();
+                    gs.get_tree()->get_audio()->play_sfx("door_open", 0.6f);
                     return;
                 }
+            }
+            for (auto& sr : gs.game_map->special_rooms) {
+                if (sr.type != SpecialRoomType::CHALLENGE) continue;
+                if (gs._challenge.phase() == ChallengePhase::PORTAL_ACTIVE) {
+                    int dx = abs(ptx - sr.portal_tx);
+                    int dy = abs(pty - sr.portal_ty);
+                    if (dx + dy <= 1) {
+                        if (!gs.challenge_choice_active) {
+                            gs.challenge_choice_active = true;
+                            gs.challenge_choice_cursor = 0;
+                            gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+                        }
+                        return;
+                    }
+                }
+            }
+            SpecialRoom* room = gs.game_map->get_special_room_at(ptx, pty);
+            if (room && room->type == SpecialRoomType::GAMBLER) {
+                if (!gs.gamble_open) {
+                    gs.gamble_open = true;
+                    gs.gamble_cursor = 0;
+                    gs.get_tree()->get_audio()->play_sfx("ui_click", 0.35f);
+                }
+                return;
             }
         }
         std::string result = gs._interact.try_interact(gs.player.get(), gs.game_map.get(), gs.ground_items);

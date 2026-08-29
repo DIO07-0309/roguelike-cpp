@@ -4,6 +4,7 @@
 #include "config.h"
 #include "resource_manager.h"                 // M4f.2
 #include "game/rendering/sprite_renderer.h"   // M4f.2
+#include "systems/relic_effect_processor.h"
 #include <cmath>
 #include <algorithm>
 
@@ -341,3 +342,17 @@ bool Player::spend_key(int amount) {
 }
 
 int Player::get_key_count() const { return key_count; }
+
+// Batch 3H: 统一圣物入口
+void Player::add_relic(const std::string& id, PersistenceScope scope) {
+    relics.push_back({id, scope});
+    RelicEffectProcessor::apply_passive_for_relic(this, id);
+}
+
+void Player::remove_relic(const std::string& id) {
+    RelicEffectProcessor::remove_passive_for_relic(this, id);
+    relics.erase(
+        std::remove_if(relics.begin(), relics.end(),
+            [&](const RelicInstance& r) { return r.id == id; }),
+        relics.end());
+}

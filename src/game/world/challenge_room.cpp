@@ -34,6 +34,9 @@ void ChallengeRoomController::reset() {
     _current_wave = 0;
     _wave_timer = 0.0f;
     _monsters_alive_this_wave = 0;
+    _portal_tx = _portal_ty = -1;
+    _return_portal_tx = _return_portal_ty = -1;
+    _room_rx = _room_ry = _room_rw = _room_rh = 0;
 }
 
 void ChallengeRoomController::on_player_entered() {
@@ -59,13 +62,42 @@ bool ChallengeRoomController::try_activate(Player& player) {
     return true;
 }
 
+// Batch 3I: Portal state machine methods (GameScene 消费 Key, Controller 只记录状态)
+void ChallengeRoomController::setup_portal(int tx, int ty) {
+    _portal_tx = tx;
+    _portal_ty = ty;
+    _phase = ChallengePhase::PORTAL_ACTIVE;
+}
+
+bool ChallengeRoomController::consume_key_for_challenge(Player& player) {
+    if (_phase != ChallengePhase::PORTAL_ACTIVE) return false;
+    if (player.key_count <= 0) return false;
+    player.spend_key(1);
+    return true;
+}
+
+void ChallengeRoomController::set_room_rect(int rx, int ry, int rw, int rh) {
+    _room_rx = rx; _room_ry = ry; _room_rw = rw; _room_rh = rh;
+}
+
+void ChallengeRoomController::set_return_portal(int tx, int ty) {
+    _return_portal_tx = tx;
+    _return_portal_ty = ty;
+}
+
+void ChallengeRoomController::mark_cleared() {
+    _phase = ChallengePhase::CLEARED;
+}
+
 void ChallengeRoomController::tick(
     float dt, GameMap* map, Player* player,
     std::vector<std::unique_ptr<Monster>>& monsters,
-    int floor, uint32_t dungeon_seed, int room_index) {
+    int floor, uint32_t dungeon_seed, int room_index,
+    std::vector<DroppedItem>& ground_items) {
 
     if (_phase == ChallengePhase::INACTIVE ||
         _phase == ChallengePhase::UNLOCKED ||
+        _phase == ChallengePhase::PORTAL_ACTIVE ||
         _phase == ChallengePhase::CLEARED) return;
 
     // ARMED: waiting for RoomManager to lock doors
@@ -93,9 +125,10 @@ void ChallengeRoomController::tick(
             _current_wave++;
             if (_current_wave >= _total_waves) {
                 _phase = ChallengePhase::REWARD;
-                _grant_rewards(*player, map, floor);
+                _grant_rewards(*player, map, floor, ground_items);
+                _return_portal_tx = _room_rx + _room_rw / 2;
+                _return_portal_ty = _room_ry + _room_rh / 2;
                 _phase = ChallengePhase::CLEARED;
-                map->open_room_doors({});  // doors handled by RoomManager
                 LOG_INFO("[CHALLENGE] All waves cleared!");
             } else {
                 _wave_timer = 3.0f;
@@ -158,7 +191,8 @@ void ChallengeRoomController::_spawn_wave(
              wave_index + 1, _monsters_alive_this_wave);
 }
 
-void ChallengeRoomController::_grant_rewards(Player& player, GameMap* map, int floor) {
+void ChallengeRoomController::_grant_rewards(Player& player, GameMap* map, int floor,
+                                              std::vector<DroppedItem>& ground_items) {
     int granted = 0;
     for (int i = 0; i < 3; i++) {
         auto item = generate_random_item();
@@ -172,16 +206,13 @@ void ChallengeRoomController::_grant_rewards(Player& player, GameMap* map, int f
         if (player.inventory.add(item, &player)) {
             granted++;
         } else {
-            // Inventory full → ground drop at room center
             int cx = _room_rx + _room_rw / 2;
             int cy = _room_ry + _room_rh / 2;
-            auto [px, py] = map->tile_to_pixel(cx, cy);
             DroppedItem di;
-            di.item = item;
+            di.item = std::move(item);
             di.tile_x = cx;
             di.tile_y = cy;
-            // Note: ground_items managed by GameScene, logged here
-            LOG_INFO("[CHALLENGE] Inventory full, item dropped at (%d,%d)", cx, cy);
+            ground_items.push_back(std::move(di));
         }
     }
 

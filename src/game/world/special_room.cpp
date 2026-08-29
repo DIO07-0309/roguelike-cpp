@@ -186,7 +186,7 @@ static std::string _try_grant_random_relic(Player* player, float drop_chance) {
         chosen = all_candidates[(int)(rng() % (uint32_t)all_candidates.size())];
     }
 
-    player->relics.push_back({chosen, PersistenceScope::FLOOR});
+    player->add_relic(chosen, PersistenceScope::FLOOR);
     const RelicDef* def = get_relic_def(chosen);
     std::string name = def ? def->name : chosen;
     LOG_INFO("[RELIC] 获得圣物: %s (%s)", name.c_str(), def ? def->rarity.c_str() : "?");

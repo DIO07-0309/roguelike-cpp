@@ -88,6 +88,13 @@ public:
     void draw_monster_buffs(const Monster& m, float draw_x, float draw_y);
     void draw_inventory_panel(const Player* player, int cursor, int sw, int sh);
     void draw_relic_panel(const Player* player, int sw);
+    // Batch 3H: Gamble Room UI panel
+    void draw_gamble_panel(const Player* player, const std::string& result_msg,
+                           float result_timer, int sw, int sh);
+    void draw_challenge_portal(float cam_x, float cam_y, int portal_tx, int portal_ty,
+                               float pulse_timer, bool is_entry);
+    void draw_teleport_fade(int sw, int sh, float fade_timer, bool fading_in);
+    void draw_challenge_choice(int sw, int sh, int cursor);
 
 private:
     static Color _relic_rarity_color(const std::string& rarity);
