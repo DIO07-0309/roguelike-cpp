@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "source": "Kenney Tiny Dungeon (CC0) + Tiny Creatures (CC0)",
   "sprites": {
     "player_poison":  { "file": "assets/sprites/player_poison.png",  "frame_w": 16, "frame_h": 16 },
@@ -49,5 +49,17 @@
     "item_potion_red":    { "file": "assets/sprites/item_potion_red.png",    "frame_w": 16, "frame_h": 16 },
     "item_potion_blue":   { "file": "assets/sprites/item_potion_blue.png",   "frame_w": 16, "frame_h": 16 },
     "item_charm":         { "file": "assets/sprites/item_charm.png",         "frame_w": 16, "frame_h": 16 }
+  },
+  "assets": {
+    "door": {
+      "open":   { "file": "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0003.png", "source": "kenney_tiny_dungeon", "render": { "scale_base": 16 } },
+      "closed": { "file": "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0022.png", "source": "kenney_tiny_dungeon", "render": { "scale_base": 16 } },
+      "locked": { "file": "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0022.png", "source": "kenney_tiny_dungeon", "render": { "scale_base": 16, "overlay": "#B03030", "overlay_alpha": 0.35 } },
+      "sealed": { "file": "assets/vendor/kenney_tiny_dungeon/Tiles/tile_0018.png", "source": "kenney_tiny_dungeon", "render": { "scale_base": 16 } }
+    }
+  },
+  "lifecycle": {
+    "vendor_candidate": ["assets/vendor/tiny_creatures", "assets/vendor/kenney_tiny_dungeon"],
+    "deprecated": []
   }
 }

@@ -281,3 +281,46 @@ Texture2D ResourceManager::sprite_by_key(const char* key, SpriteDef& out_def) {
     out_def = it->second;
     return load_texture(out_def.path.c_str());
 }
+
+// ── G10.2-B1: Asset Manifest (schema v2 "assets" 段) ─────────
+bool ResourceManager::load_assets_config() {
+    if (_assets_cfg_ok) return true;                 // 幂等
+    std::string text = load_json_text("resources/sprites.json");
+    if (text.empty()) { LOG_WARN("sprites.json 缺失, Asset Manifest 未装载"); return false; }
+    try {
+        auto j = nlohmann::json::parse(text);
+        if (!j.contains("assets")) return false;
+        for (auto& [cat, entries] : j["assets"].items())
+            for (auto& [name, def] : entries.items()) {
+                AssetDef ad;
+                ad.path     = def.value("file", "");
+                ad.source   = def.value("source", "");
+                ad.fallback = def.value("fallback", "");
+                if (def.contains("render")) {
+                    auto& r = def["render"];
+                    ad.frame_w = r.value("frame_w", 16);
+                    ad.frame_h = r.value("frame_h", 16);
+                    ad.overlay = r.value("overlay", "");
+                    ad.overlay_alpha = r.value("overlay_alpha", 0.0f);
+                }
+                _asset_defs[cat + "." + name] = std::move(ad);
+            }
+        _assets_cfg_ok = true;
+        LOG_INFO("Asset Manifest: %d 个资产定义", (int)_asset_defs.size());
+    } catch (const std::exception& e) {
+        LOG_ERROR("Asset Manifest 解析失败: %s", e.what());
+        return false;
+    }
+    return _assets_cfg_ok;
+}
+
+const AssetDef* ResourceManager::asset_by_id(const char* id) {
+    if (!_assets_cfg_ok && !load_assets_config()) return nullptr;
+    auto it = _asset_defs.find(id ? id : "");
+    return (it != _asset_defs.end()) ? &it->second : nullptr;
+}
+
+Texture2D ResourceManager::tex_by_id(const char* id) {
+    const AssetDef* d = asset_by_id(id);
+    return d ? load_texture(d->path.c_str()) : Texture2D{0};
+}

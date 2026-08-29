@@ -10,6 +10,17 @@
 // 所有 Font/JSON/Sound 加载/缓存/释放集中于此
 // ============================================================
 
+// G10.2-B1: Asset Manifest 条目 (schema v2 "assets" 段, 类别化)
+// 六要素: Source/ID/Path/RenderRule/PixelScale/Fallback → 字段映射
+struct AssetDef {
+    std::string path;             // Asset Path
+    std::string source;           // Asset Source (kenney_* / self / procedural)
+    std::string fallback;         // Fallback Policy ("procedural" / "synth:key" / "" )
+    int  frame_w = 16, frame_h = 16;   // Pixel Scale 基数 (16 → 2×=32)
+    std::string overlay;          // Render Rule: 色罩 "#RRGGBB" (空=无, D3)
+    float overlay_alpha = 0.0f;
+};
+
 class ResourceManager {
 public:
     // ── 单例 ──
@@ -46,6 +57,15 @@ public:
     // 命中 sprites.json 返回纹理并填出参 def; 未命中返回 {0} (调用方回退程序化)
     Texture2D sprite_by_key(const char* key, SpriteDef& out_def);
 
+    // ── G10.2-B1: Asset Manifest (schema v2 "assets" 段, 类别化) ──
+    // Asset ID = "<category>.<name>" (如 door.closed); Asset Path 只允许存在于清单。
+    // 解析 "assets" 段 (类别化: doors/sprites/audio/fonts); 幂等
+    bool load_assets_config();
+    // ID → 定义 (未装载/未命中返回 nullptr; 纯解析层, 不触发纹理加载 — headless 可测)
+    const AssetDef* asset_by_id(const char* id);
+    // ID → 纹理 (asset_by_id + load_texture; B2 起供渲染器迁移使用)
+    Texture2D tex_by_id(const char* id);
+
 private:
     ResourceManager() = default;
     ~ResourceManager();
@@ -67,4 +87,7 @@ private:
     // M4f.4: 数据驱动精灵定义 (key → SpriteDef)
     std::unordered_map<std::string, SpriteDef> _sprite_defs;
     bool _sprite_cfg_ok = false;
+    // G10.2-B1: Asset Manifest (ID → AssetDef)
+    std::unordered_map<std::string, AssetDef> _asset_defs;
+    bool _assets_cfg_ok = false;
 };
