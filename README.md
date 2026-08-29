@@ -1,6 +1,6 @@
 # 地牢肉鸽 — Roguelike C++
 
-> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **295+ 源文件** | Windows 实机验证
+> **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **297 源文件** | Windows 实机验证
 >
 > 随机生成 15 层地牢，击败 Boss「终焉回响」通关。
 > 五项 Stable 冻结验收通过：**API / Save / Mod / Regression / Performance**（报告 `docs/V1_0_0_ACCEPTANCE.md`）
