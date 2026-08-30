@@ -121,12 +121,7 @@ void ResourceManager::unload_all() {
 
 void ResourceManager::_init_font() {
     const char* font_paths[] = {
-        "assets/simhei.ttf",
-        "assets/msyh.ttc",
-        "C:/Windows/Fonts/simhei.ttf",
-        "C:/Windows/Fonts/msyh.ttc",
-        "C:/Windows/Fonts/simsun.ttc",
-        "C:/Windows/Fonts/msyhbd.ttc",
+        "assets/fonts/NotoSansCJKsc-Regular.otf",
         nullptr
     };
 

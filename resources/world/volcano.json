@@ -24,7 +24,7 @@
   },
   "landmarks": [
     {"id":"lava_rift","weight":30,"tile_color":[60,15,5],"icon":"≈","message":"熔岩在裂缝中缓缓流动，空气中弥漫着硫磺的气味。","discovery_msg":"地面裂开了一道灼热的伤口，熔岩的光芒照亮了整个洞窟。"},
-    {"id":"forge_ruins","weight":25,"tile_color":[55,25,10],"icon":"⚔","message":"远古的铁砧已经被熔岩半埋，但炉火仍然未熄。","discovery_msg":"一座废弃的铁匠铺半沉在凝固的岩浆中。"},
+    {"id":"forge_ruins","weight":25,"tile_color":[55,25,10],"icon":"剑","message":"远古的铁砧已经被熔岩半埋，但炉火仍然未熄。","discovery_msg":"一座废弃的铁匠铺半沉在凝固的岩浆中。"},
     {"id":"fire_pillar","weight":20,"tile_color":[70,20,5],"icon":"☀","message":"巨大的火柱从地底喷涌而出，将洞顶烧得通红。","discovery_msg":"一根火焰柱拔地而起，热浪让你几乎无法呼吸。"}
   ],
   "hazards": [

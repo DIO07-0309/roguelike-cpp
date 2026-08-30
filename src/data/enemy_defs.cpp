@@ -1,4 +1,4 @@
-﻿#include "data/enemy_defs.h"
+#include "data/enemy_defs.h"
 #include "core/merge_patch.h"   // G4.3
 #include <nlohmann/json.hpp>
 #include <fstream>

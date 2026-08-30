@@ -1,4 +1,4 @@
-﻿#include "room_manager.h"
+#include "room_manager.h"
 #include "game_map.h"
 #include "config.h"
 #include "monster.h"

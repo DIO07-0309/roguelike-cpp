@@ -1,4 +1,4 @@
-﻿#include "data/skill_defs.h"
+#include "data/skill_defs.h"
 #include "core/merge_patch.h"
 #include <nlohmann/json.hpp>
 #include <fstream>

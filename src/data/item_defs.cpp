@@ -1,4 +1,4 @@
-﻿#include "data/item_defs.h"
+#include "data/item_defs.h"
 #include "core/merge_patch.h"
 #include <nlohmann/json.hpp>
 #include <fstream>

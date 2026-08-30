@@ -4,7 +4,7 @@
     "biome": "forgotten_prison",
     "weight": 30,
     "tile_color": [40, 25, 20],
-    "icon": "⚒",
+    "icon": "锤",
     "message": "墙上的抓痕仍然清晰可见……这里似乎发生过暴乱。",
     "discovery_msg": "你推开一间被遗忘的牢房，空气中弥漫着铁锈味。"
   },
@@ -40,7 +40,7 @@
     "biome": "ash_volcano",
     "weight": 25,
     "tile_color": [55, 25, 10],
-    "icon": "⚔",
+    "icon": "剑",
     "message": "远古的铁砧已经被熔岩半埋，但炉火仍然未熄。",
     "discovery_msg": "一座废弃的铁匠铺半沉在凝固的岩浆中。"
   },
