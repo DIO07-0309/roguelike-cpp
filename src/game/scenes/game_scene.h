@@ -332,6 +332,7 @@ private:
     std::vector<std::unique_ptr<Monster>> _arena_monsters;
     std::shared_ptr<GameMap> _saved_dungeon_map;
     std::vector<std::unique_ptr<Monster>> _saved_dungeon_monsters;
+    std::vector<DroppedItem> _saved_dungeon_ground_items;
     int _return_portal_tx_arena = -1, _return_portal_ty_arena = -1;
     std::pair<int,int> _boss_last_known{-1,-1};  // Boss 最后已知可见位置（已发现才记录）
 

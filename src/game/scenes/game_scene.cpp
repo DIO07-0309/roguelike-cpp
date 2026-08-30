@@ -1927,7 +1927,7 @@ void GameScene::_render() {
     _cam_x += shake_ox; _cam_y += shake_oy;
 
     _draw_map();
-    if (_world_mode != WorldMode::CHALLENGE_ARENA) _draw_ground_items();
+    _draw_ground_items();
     _draw_entities();
     _renderer.draw_effects(active_effects, _cam_x, _cam_y);
     // Batch 3I: Challenge portal VFX (entry in DUNGEON, return in CHALLENGE_ARENA)
@@ -2781,7 +2781,9 @@ void GameScene::enter_challenge_arena() {
     // Save dungeon state
     _saved_dungeon_map = game_map;
     _saved_dungeon_monsters = std::move(monsters);
+    _saved_dungeon_ground_items = std::move(ground_items);
     monsters.clear();
+    ground_items.clear();
 
     // Create a 15x15 arena map
     const int AW = 15, AH = 15, TS = TILE_SIZE;
@@ -2823,6 +2825,8 @@ void GameScene::exit_challenge_arena() {
     game_map = _saved_dungeon_map;
     monsters = std::move(_saved_dungeon_monsters);
     _saved_dungeon_monsters.clear();
+    ground_items = std::move(_saved_dungeon_ground_items);
+    _saved_dungeon_ground_items.clear();
     _saved_dungeon_map.reset();
 
     // G9.2 (audit LIFE-003): 不调用 reset_visibility — 它会清空 is_explored,

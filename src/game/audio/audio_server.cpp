@@ -258,9 +258,8 @@ void AudioServer::init() {
             return LoadSound(d->path.c_str());
         return Sound{0};
     };
-    // timestop: 优先外部 MP3, 缺失 → fallback synth:bolt (与 manifest 声明一致)
-    Sound ts = load_external("audio.timestop");
-    _sfx["timestop"] = (ts.frameCount > 0) ? ts : _compile_bolt();
+    // timestop: 始终使用合成音效 (MP3 via LoadSound 在部分环境无声)
+    _sfx["timestop"] = _compile_bolt();
 
     // domain_expand: 外部 MP3 — 无合成回退 (真缺口, 如实在 manifest/报告标注)
     Sound de = load_external("audio.domain_expand");
