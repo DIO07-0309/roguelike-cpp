@@ -19,7 +19,7 @@ public:
     static void check_unlock(Player* player);
 
     // 查询
-    static const char* evo_name(const Player* player, int skill_index);
+    static std::string evo_name(const Player* player, int skill_index);
     static int  evo_level(const Player* player, int skill_index);
 
     // SKILL_EVOLVED payload unpacking

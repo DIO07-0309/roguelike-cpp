@@ -60,10 +60,10 @@ bool SkillEvolutionManager::_try_evolve_skill(Player* player, int idx) {
     return false;
 }
 
-const char* SkillEvolutionManager::evo_name(const Player* player, int idx) {
+std::string SkillEvolutionManager::evo_name(const Player* player, int idx) {
     if (!player || idx < 0 || idx >= (int)player->skills.active_skills.size()) return "";
     auto& sk = player->skills.active_skills[idx];
-    return sk->get_evolution_text().c_str();
+    return sk->get_evolution_text();
 }
 
 int SkillEvolutionManager::evo_level(const Player* player, int idx) {

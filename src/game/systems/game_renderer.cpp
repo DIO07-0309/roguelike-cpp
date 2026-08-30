@@ -876,11 +876,11 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
             y += 16;
         }
         for (int si = 0; si < (int)player->skills.active_skills.size(); si++) {
-            const char* ev = SkillEvolutionManager::evo_name(player, si);
-            if (ev && ev[0] && g_font_loaded) {
+            std::string ev = SkillEvolutionManager::evo_name(player, si);
+            if (!ev.empty() && g_font_loaded) {
                 char buf[64];
                 snprintf(buf, sizeof(buf), "%s: %s",
-                         player->skills.active_skills[si]->name.c_str(), ev);
+                         player->skills.active_skills[si]->name.c_str(), ev.c_str());
                 DrawTextEx(g_font_small, buf, {12, y}, 11, 1, {180, 220, 255, 220});
                 y += 14;
             }

@@ -1046,20 +1046,25 @@ void GameScene::_process(double delta) {
             _return_portal_ty_arena = _challenge.return_portal_ty();
         }
         // Player movement/attack/input — monsters is already arena monsters
-        _player_ctrl.tick(dt);
-        // Weapon cooldown tick (needed so weapon.can_attack works next frame)
+        _player_ctrl.tick(dt);  // includes monster AI (gated by time_stop_remaining)
+        // Weapon cooldown tick + specials + projectiles
         if (player) {
             player->weapon.tick(dt);
             if (player->weapon.range_indicator_timer > 0.0f)
                 player->weapon.range_indicator_timer -= dt;
-        }
-        // Monster AI
-        {
             std::vector<Monster*> mlist;
             for (auto& m : monsters) if (m && m->combat.is_alive) mlist.push_back(m.get());
-            for (auto& m : monsters) {
-                if (m && m->combat.is_alive)
-                    m->update_ai(player.get(), game_map.get(), dt, game_time, &mlist, &active_effects, 0, 0, nullptr);
+            auto spec_results = WeaponExecutor::tick_specials(player.get(), mlist, dt);
+            auto proj_results = WeaponExecutor::tick_projectiles(projectiles, mlist, dt, game_map.get());
+            for (auto& r : spec_results) {
+                _boss.dmg_done += r.damage;
+                _presentation.spawn_damage(r.hit_point.x, r.hit_point.y, r.damage,
+                    r.is_crit ? Color{255,220,30,255} : Color{100,200,255,255}, 0.5f);
+            }
+            for (auto& r : proj_results) {
+                _boss.dmg_done += r.damage;
+                _presentation.spawn_damage(r.hit_point.x, r.hit_point.y, r.damage,
+                    Color{255,180,50,255}, 0.5f);
             }
         }
         _cleanup_dead_monsters();
