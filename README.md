@@ -125,7 +125,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 | 图形/输入 | Raylib 5.0（窗口/绘制/输入/音频），sprite atlas + 程序化像素占位 |
 | JSON | nlohmann/json（header-only），20+ 配置文件全数据驱动 |
 | 构建 | CMake 3.16+ + CMakePresets + MinGW（UTF-8 编译标志），Release/Debug + 测试三配置 |
-| 测试 | GoogleTest（60 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
+| 测试 | GoogleTest（59 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
 | Python 工具 | `tools/`：world_validator（JSON 交叉引用）/ extract_chars（中文字体码点） |
 
 ### 工程与架构技术
@@ -280,7 +280,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 
 ### 测试与验证
 
-- **60 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip / font_manifest）
+- **59 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip / font_manifest）
 - World Validator：20+ JSON 交叉引用 **0 errors 0 warnings**
 - 木桶闭环实测：200 局 sim **38 次 点燃→爆炸 完全成对**（伤害随楼层缩放）
 - 收官体检：编译 0 警告（bgm narrowing 修复后）

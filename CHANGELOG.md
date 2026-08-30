@@ -52,7 +52,7 @@
 
 ## 验证
 
-- **60/60 ctest 全绿**（+8 测试，含 font_manifest_test）
+- **59/59 ctest 全绿**（新增 font_manifest_test 等资产管线测试）
 - 音效验证：时停/领域展开 WAV 在 Release 构建下正常播放
 - 竞技场验证：地面掉落可见可拾取、退出后地牢物品恢复
 
