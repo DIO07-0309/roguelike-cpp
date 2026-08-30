@@ -258,8 +258,24 @@ void AudioServer::init() {
             return LoadSound(d->path.c_str());
         return Sound{0};
     };
-    // timestop: 始终使用合成音效 (MP3 via LoadSound 在部分环境无声)
-    _sfx["timestop"] = _compile_bolt();
+    // timestop: WAV 格式 (Raylib LoadSound 对部分 MP3 无声, WAV 最稳定)
+    _sfx["timestop"] = _compile_bolt();  // fallback
+    {
+        const AssetDef* d = ResourceManager::inst().asset_by_id("audio.timestop");
+        if (d && !d->path.empty()) {
+            // 优先 .wav, 回退 .mp3
+            std::string wav_path = d->path;
+            auto dot = wav_path.rfind('.');
+            if (dot != std::string::npos) wav_path = wav_path.substr(0, dot) + ".wav";
+            if (FileExists(wav_path.c_str())) {
+                Sound ts = LoadSound(wav_path.c_str());
+                if (ts.frameCount > 0) _sfx["timestop"] = ts;
+            } else if (FileExists(d->path.c_str())) {
+                Sound ts = LoadSound(d->path.c_str());
+                if (ts.frameCount > 0) _sfx["timestop"] = ts;
+            }
+        }
+    }
 
     // domain_expand: 外部 MP3 — 无合成回退 (真缺口, 如实在 manifest/报告标注)
     Sound de = load_external("audio.domain_expand");
