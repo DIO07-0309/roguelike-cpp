@@ -258,7 +258,7 @@ void AudioServer::init() {
             return LoadSound(d->path.c_str());
         return Sound{0};
     };
-    // timestop: WAV 格式 (Raylib LoadSound 对部分 MP3 无声, WAV 最稳定)
+    // timestop: WAV 格式 — 加载到内存再解码 (绕过 LoadSound 文件 I/O 问题)
     _sfx["timestop"] = _compile_bolt();  // fallback
     {
         const AssetDef* d = ResourceManager::inst().asset_by_id("audio.timestop");
@@ -266,33 +266,50 @@ void AudioServer::init() {
             std::string wav_path = d->path;
             auto dot = wav_path.rfind('.');
             if (dot != std::string::npos) wav_path = wav_path.substr(0, dot) + ".wav";
-            if (FileExists(wav_path.c_str())) {
-                Sound ts = LoadSound(wav_path.c_str());
-                LOG_INFO("音频: timestop WAV load frameCount=%d", ts.frameCount);
-                if (ts.frameCount > 0) _sfx["timestop"] = ts;
-            } else if (FileExists(d->path.c_str())) {
-                Sound ts = LoadSound(d->path.c_str());
-                LOG_INFO("音频: timestop MP3 load frameCount=%d", ts.frameCount);
-                if (ts.frameCount > 0) _sfx["timestop"] = ts;
-            } else {
-                LOG_WARN("音频: timestop 文件未找到 (WAV: %s, MP3: %s)", wav_path.c_str(), d->path.c_str());
+            const char* try_path = nullptr;
+            if (FileExists(wav_path.c_str())) try_path = wav_path.c_str();
+            else if (FileExists(d->path.c_str())) try_path = d->path.c_str();
+            if (try_path) {
+                int dataSize = 0;
+                unsigned char* fileData = LoadFileData(try_path, &dataSize);
+                LOG_INFO("音频: timestop LoadFileData path=%s dataSize=%d", try_path, dataSize);
+                if (fileData && dataSize > 0) {
+                    Wave wave = LoadWaveFromMemory(".wav", fileData, dataSize);
+                    LOG_INFO("音频: timestop Wave frameCount=%d sampleRate=%d channels=%d",
+                             wave.frameCount, wave.sampleRate, wave.channels);
+                    if (wave.frameCount > 0) {
+                        _sfx["timestop"] = LoadSoundFromWave(wave);
+                        LOG_INFO("音频: timestop Sound frameCount=%d", _sfx["timestop"].frameCount);
+                    }
+                    UnloadWave(wave);
+                    UnloadFileData(fileData);
+                } else {
+                    LOG_WARN("音频: timestop LoadFileData 失败 path=%s", try_path);
+                }
             }
         }
     }
 
-    // domain_expand: WAV 优先, MP3 回退, 无合成回退 (真缺口)
+    // domain_expand: WAV 优先, MP3 回退
     {
         const AssetDef* d = ResourceManager::inst().asset_by_id("audio.domain_expand");
         if (d && !d->path.empty()) {
             std::string wav_path = d->path;
             auto dot = wav_path.rfind('.');
             if (dot != std::string::npos) wav_path = wav_path.substr(0, dot) + ".wav";
-            if (FileExists(wav_path.c_str())) {
-                Sound de = LoadSound(wav_path.c_str());
-                if (de.frameCount > 0) _sfx["domain_expand"] = de;
-            } else if (FileExists(d->path.c_str())) {
-                Sound de = LoadSound(d->path.c_str());
-                if (de.frameCount > 0) _sfx["domain_expand"] = de;
+            const char* try_path = nullptr;
+            if (FileExists(wav_path.c_str())) try_path = wav_path.c_str();
+            else if (FileExists(d->path.c_str())) try_path = d->path.c_str();
+            if (try_path) {
+                int dataSize = 0;
+                unsigned char* fileData = LoadFileData(try_path, &dataSize);
+                if (fileData && dataSize > 0) {
+                    Wave wave = LoadWaveFromMemory(".wav", fileData, dataSize);
+                    if (wave.frameCount > 0)
+                        _sfx["domain_expand"] = LoadSoundFromWave(wave);
+                    UnloadWave(wave);
+                    UnloadFileData(fileData);
+                }
             }
         }
     }
