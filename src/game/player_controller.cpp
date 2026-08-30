@@ -641,10 +641,19 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
             vfx.shockwave(px, py, 30.0f, {180,180,140,180}, 2, 0.30f);
             vfx.slash_arc(fx, fy, p.direction, 60.0f, {200,200,100,230}, 0.35f);
             vfx.smoke_puff(px, py, 16.0f, {140,130,100,120}, 4, 0.40f);
+            // G10.3-B2: 命中点像素反馈 — 攻击→命中→像素爆点
+            for (auto& r : results) {
+                vfx.hit_flash(r.hit_point.x, r.hit_point.y, 14.0f);
+                vfx.spark_burst(r.hit_point.x, r.hit_point.y, 4, {230,230,200,220}, 0.22f);
+            }
         } else if (stage == 1) {
             vfx.slash_arc(px, py, p.direction, 70.0f, {220,220,120,220}, 0.38f);
             vfx.slash_arc(px + 15, py - 10, p.direction, 55.0f, {200,200,80,200}, 0.32f);
             vfx.spark_burst(px, py, 10, {200,200,100,220}, 0.35f);
+            for (auto& r : results) {
+                vfx.hit_flash(r.hit_point.x, r.hit_point.y, 18.0f);
+                vfx.spark_burst(r.hit_point.x, r.hit_point.y, 6, {240,220,120,220}, 0.25f);
+            }
         } else {
             vfx.shockwave(px, py, 80.0f, {220,200,80,200}, 4, 0.55f);
             vfx.explosion(px, py, 36.0f, {240,220,100,220}, 14, 0.45f);
@@ -652,6 +661,7 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
             vfx.flash(px, py, 20.0f, {255,240,200,200}, 0.12f);
             for (auto& r : results) {
                 vfx.ring(r.hit_point.x, r.hit_point.y, 28.0f, {240,200,60,200}, 3, 0.40f);
+                vfx.explosion(r.hit_point.x, r.hit_point.y, 20.0f, {255,220,120,230}, 8, 0.30f);
             }
         }
         break;

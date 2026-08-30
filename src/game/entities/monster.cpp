@@ -23,6 +23,7 @@ static int _sprite_variant_for(bool is_boss, MonsterType type,
 }
 
 // M4f.4: MonsterType/名字 → 素材精灵 key; 空 = 程序化占位
+// G10.3-B1: 名字规则扩展 — 骨系→mon_skeleton, 萨满→mon_shaman
 static const char* _monster_sprite_key(MonsterType type,
                                        const std::string& name, bool is_boss) {
     if (is_boss) return nullptr;
@@ -30,11 +31,15 @@ static const char* _monster_sprite_key(MonsterType type,
         case MonsterType::BOMBER:      return "mon_bomber";
         case MonsterType::TANK:        return "mon_tank";
         case MonsterType::CHARGER:     return "mon_charger";
-        case MonsterType::SUMMONER:
-        case MonsterType::SHAMAN:      return "mon_summoner";
+        case MonsterType::SUMMONER:   return "mon_summoner";
+        case MonsterType::SHAMAN:     return "mon_shaman";
         default:                       break;
     }
-    return (name.find("史莱姆") != std::string::npos) ? "mon_slime" : "mon_orc";
+    if (name.find("史莱姆") != std::string::npos) return "mon_slime";
+    if (name.find("骨") != std::string::npos)     return "mon_skeleton";
+    if (name.find("骷髅") != std::string::npos)   return "mon_skeleton";
+    if (name.find("萨满") != std::string::npos)   return "mon_shaman";
+    return "mon_orc";
 }
 
 // M4f.12: 怪物持械 — 按类型映射武器素材 (Boss持剑/冲锋持矛/弓手持弩/重装持剑)

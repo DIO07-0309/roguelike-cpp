@@ -11,6 +11,8 @@
     "mon_tank":       { "file": "assets/sprites/mon_tank.png",       "frame_w": 16, "frame_h": 16 },
     "mon_charger":    { "file": "assets/sprites/mon_charger.png",    "frame_w": 16, "frame_h": 16 },
     "mon_summoner":   { "file": "assets/sprites/mon_summoner.png",   "frame_w": 16, "frame_h": 16 },
+    "mon_skeleton":   { "file": "assets/sprites/mon_skeleton.png",   "frame_w": 16, "frame_h": 16 },
+    "mon_shaman":     { "file": "assets/sprites/mon_shaman.png",     "frame_w": 16, "frame_h": 16 },
     "boss_f5":        { "file": "assets/sprites/boss_f5.png",        "frame_w": 16, "frame_h": 16 },
     "boss_f10":       { "file": "assets/sprites/boss_f10.png",       "frame_w": 16, "frame_h": 16 },
     "wall":           { "file": "assets/sprites/wall.png",           "frame_w": 16, "frame_h": 16 },

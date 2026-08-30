@@ -48,6 +48,24 @@ void GameRenderer::draw_progress_bar(Rectangle r, float ratio, Color fill, Color
     DrawRectangleLinesEx(r, 1, {60, 60, 90, 255});
 }
 
+// G10.3-B3: HUD 像素图标 — 16px 网格风格代码绘制 (与 gen_pixel_blast 同管线风格)
+static void _draw_gold_icon(float x, float y, float s) {
+    // 金币: 外圈金 + 内圈亮金 + 阴影底
+    DrawRectangleRec({x, y + s * 0.25f, s, s * 0.75f}, Color{0, 0, 0, 70});
+    DrawCircle(x + s / 2, y + s / 2, s * 0.42f, Color{212, 160, 40, 255});
+    DrawCircle(x + s / 2, y + s / 2, s * 0.28f, Color{255, 214, 90, 255});
+    DrawCircle(x + s * 0.38f, y + s * 0.38f, s * 0.08f, Color{255, 240, 180, 255});
+}
+
+static void _draw_key_icon(float x, float y, float s) {
+    // 钥匙: 铜色圆环头 + 柄 + 齿
+    DrawRectangleRec({x, y + s * 0.25f, s, s * 0.75f}, Color{0, 0, 0, 70});
+    DrawCircleLines((int)(x + s * 0.3f), (int)(y + s * 0.42f), s * 0.18f, Color{190, 160, 90, 255});
+    DrawRectangleRec({x + s * 0.42f, y + s * 0.36f, s * 0.5f, s * 0.12f}, Color{190, 160, 90, 255});
+    DrawRectangleRec({x + s * 0.72f, y + s * 0.48f, s * 0.1f, s * 0.16f}, Color{190, 160, 90, 255});
+    DrawRectangleRec({x + s * 0.58f, y + s * 0.48f, s * 0.08f, s * 0.12f}, Color{190, 160, 90, 255});
+}
+
 // ============================================================
 // 摄像机
 // ============================================================
@@ -779,13 +797,17 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
     if (!player) return;
     auto& c = player->combat;
 
-    // HP bar
+    // HP bar (G10.3-B3: 像素风双层边框 + 高光顶线)
     int eff_max_hp = get_effective_max_hp(player);
     float hp_r = eff_max_hp > 0 ? (float)c.current_hp / eff_max_hp : 0.0f;
     if (hp_r > 1.0f) hp_r = 1.0f;
     Color hp_c = hp_r > 0.5f ? Color{50, 200, 50, 255}
                : hp_r > 0.25f ? Color{200, 200, 50, 255} : Color{200, 50, 50, 255};
-    draw_progress_bar({10, 10, 200, 16}, hp_r, hp_c, {40, 20, 20, 255});
+    DrawRectangleRec({10, 10, 200, 16}, {40, 20, 20, 255});
+    DrawRectangleRec({10, 10, 200 * hp_r, 16}, hp_c);
+    DrawRectangleRec({11, 11, 198 * hp_r, 2}, Color{255, 255, 255, 60});  // 高光
+    DrawRectangleLinesEx({9, 9, 202, 18}, 1, {25, 20, 30, 255});         // 外框
+    DrawRectangleLinesEx({10, 10, 200, 16}, 1, {80, 70, 90, 200});        // 内框
 
     if (g_font_loaded) {
         char buf[128];
@@ -898,13 +920,22 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
                        {14.0f, (float)screen_h - 48.0f},
                        12, 1, Color{255, 100, 100, 230});
         }
-        // Batch 3A: Gold / Key HUD (bottom-left)
+        // Batch 3A: Gold / Key HUD (bottom-left) — G10.3-B3: 像素图标替代纯文本
         if (player) {
-            char buf[32];
-            snprintf(buf, sizeof(buf), "G: %d  K: %d", player->gold, player->key_count);
-            DrawTextEx(g_font_small, buf,
-                       {14.0f, (float)screen_h - 26.0f},
-                       12, 1, Color{220, 200, 100, 220});
+            float icon_s = 14.0f;
+            _draw_gold_icon(14.0f, (float)screen_h - 27.0f, icon_s);
+            char gbuf[16];
+            snprintf(gbuf, sizeof(gbuf), "%d", player->gold);
+            DrawTextEx(g_font_small, gbuf,
+                       {14.0f + icon_s + 4.0f, (float)screen_h - 26.0f},
+                       12, 1, Color{255, 214, 90, 230});
+            float gw = MeasureTextEx(g_font_small, gbuf, 12, 1).x;
+            _draw_key_icon(14.0f + icon_s + 12.0f + gw, (float)screen_h - 27.0f, icon_s);
+            char kbuf[16];
+            snprintf(kbuf, sizeof(kbuf), "%d", player->key_count);
+            DrawTextEx(g_font_small, kbuf,
+                       {14.0f + icon_s * 2 + 16.0f + gw + 4.0f, (float)screen_h - 26.0f},
+                       12, 1, Color{190, 160, 90, 230});
         }
         const char* hint = "[R]圣物  [B]背包  [F1]日志  [M]地图  [ESC]保存";
         float hw = MeasureTextEx(g_font_small, hint, 12, 1).x;
