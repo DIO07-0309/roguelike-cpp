@@ -5,7 +5,7 @@
 > 随机生成 15 层地牢，击败 Boss「终焉回响」通关。
 > 五项 Stable 冻结验收通过：**API / Save / Mod / Regression / Performance**（报告 `docs/V1_0_0_ACCEPTANCE.md`）
 >
-> **v1.0.0 后新增**（Phase 1-3 + Batch A-H，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞 · **经济系统（金币/钥匙/圣物持久化/背包出售）· 赌徒房 · 挑战房（传送门 + 选择面板 + 波次战斗 + 独立竞技场）**
+> **v1.0.0 后新增**（Phase 1-3 + Batch 3A-3I + G9/G10 审计，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞 · **经济系统（金币/钥匙/圣物持久化/背包出售）· 赌徒房 · 挑战房（传送门 + 选择面板 + 波次战斗 + 独立竞技场）· G9 技术审计闭环 · Asset Manifest 资源管线 · 思源黑体字体迁移 · 外部 WAV 音效**
 
 本项目定位：
 
@@ -96,7 +96,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 | 技能 | 22 (16 主动 + 6 被动) | 任务 | 12 |
 | 武器 | 21 | 结局 | 5 |
 | 对话 | 34 (Boss 自适应) | 遭遇 | 9 |
-| 配置 JSON | 20+ | 中文字体码点 | 1769 (1663 CJK) |
+| 配置 JSON | 20+ | 中文字体码点 | 1831 (1729 CJK) |
 
 ### 系统能力
 
@@ -108,8 +108,8 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 - **赌徒房** — 金币开房（40+floor×10），75% 装备 / 20% 钥匙 / 5% RUN 圣物，耗尽回退钥匙
 - **挑战房** — 钥匙开启，3 波 × 4 怪物波次战斗，ChallengeModifier（HP×1.5 ATK×1.3），通关 3×RARE+ 奖励
 - **Mod 系统** — `mods/` 扫描 + 依赖解析 + MergeMode{Skip/Replace/MergePatch} 字段级合并
-- **中文 UI** — 生成字体图集全中文渲染，`tools/extract_chars.py` 自动维护码点
-- **音频** — 程序化合成（wave_synth）：14 SFX（hit/hurt/melee/slash/bolt/heal/timestop/domain_expand/victory/ui 等）+ 5 BGM（title/select/dungeon/boss/victory + biome 动态变体）+ 交叉淡入 + Boss Phase2 cue
+- **中文 UI** — NotoSansCJKsc 字体图集全中文渲染，`tools/extract_chars.py` 自动维护码点（1831）
+- **音频** — 程序化合成（wave_synth）：15 SFX（hit/hurt/melee/slash/bolt/heal/victory/ui 等）+ 外部 WAV 音效（timestop/domain_expand）+ 5 BGM（title/select/dungeon/boss/victory + biome 动态变体）+ 交叉淡入 + Boss Phase2 cue
 - **回放/确定性** — Replay 录制 + hash 链逐帧校验（`--record/--replay`）
 - **批量评估** — `--sim N` headless 模拟 + 平衡报告（`reports/balance_report.json`）
 
@@ -125,7 +125,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 | 图形/输入 | Raylib 5.0（窗口/绘制/输入/音频），sprite atlas + 程序化像素占位 |
 | JSON | nlohmann/json（header-only），20+ 配置文件全数据驱动 |
 | 构建 | CMake 3.16+ + CMakePresets + MinGW（UTF-8 编译标志），Release/Debug + 测试三配置 |
-| 测试 | GoogleTest（52 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
+| 测试 | GoogleTest（60 ctest 条目）+ GitHub Actions CI + `world_validator.py` 数据校验 |
 | Python 工具 | `tools/`：world_validator（JSON 交叉引用）/ extract_chars（中文字体码点） |
 
 ### 工程与架构技术
@@ -137,7 +137,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 - **确定性游戏技术** — `CountingRng`（mt19937 + 掷骰计数）· 种子公式 `seed_start + run*1234567` · **replay hash 链**逐帧校验（mixer 黄金比例常量）· 指针键 → instance_id 防跨进程分叉（Q3.14 对拍逐字节一致）
 - **存档兼容工程** — v1→v4 追加式字段 + `getV` 默认值 + 旧技能名映射 + SaveStable 3 验收测试；三份数据独立：save.json（局内）/ meta_save.json（局外成长）/ relic_archive.json（收藏）
 - **内存安全实践** — 全智能指针 + 工厂方法（`spawn_monster`/`boss_factory_create`），无裸 `new`；SEH 异常捕获 → crash.log
-- **中文字体管线** — `extract_chars.py` 精确码位扫描（1769 码点）→ 生成字体图集 → `GuiFont::DrawTextCH()`（Raylib DrawText 不支持中文）
+- **中文字体管线** — NotoSansCJKsc-Regular.otf（思源黑体，OFL-1.1）+ `extract_chars.py` 精确码位扫描（1831 码点）→ `GuiFont::DrawTextCH()`（Raylib DrawText 不支持中文）
 
 ### 算法与 AI 技术
 
@@ -153,7 +153,7 @@ BSP 二分划分随机地图，3 章 × 5 层（F1-5 地牢入口 / F6-10 幽暗
 
 ### 表现与内容技术
 
-- **程序化音频合成** — wave_synth 波形合成 14 SFX + 5 BGM（零音频素材），交叉淡入 + Boss Phase2 cue
+- **程序化音频合成** — wave_synth 波形合成 15 SFX + 外部 WAV 音效（timestop/domain_expand）+ 5 BGM，交叉淡入 + Boss Phase2 cue
 - **VFX 图元系统** — 10 基础图元（ring/beam/lightning/explosion/slash/smoke/spark/aura/flash/shockwave）+ JSON recipe 派发 + BuildTheme 主题调制（VFX/Camera/ScreenFX/Audio 四类）
 - **打击感工程** — HitStop 冻结帧 / 震屏 / 伤害数字 / 受击红闪 / 连击评分（CameraDirector 常量调参）
 - **数值验证流水线** — 胜率目标区间 6-10% + 500 局回归 + 死亡分布监控 + World Validator 4 类检查
@@ -280,7 +280,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 
 ### 测试与验证
 
-- **52 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip）
+- **60 个 ctest 条目全绿**（含 SaveStable 3 验收测试：v1 旧档兼容 / 坏条目容错 / 全字段 roundtrip / font_manifest）
 - World Validator：20+ JSON 交叉引用 **0 errors 0 warnings**
 - 木桶闭环实测：200 局 sim **38 次 点燃→爆炸 完全成对**（伤害随楼层缩放）
 - 收官体检：编译 0 警告（bgm narrowing 修复后）
@@ -297,7 +297,7 @@ ML 插槽(默认关) → 战术链(n-gram) → RL(Q 表 exploit) → 克隆(行�
 - **Boss 决策链** — D5 决策系统 → `boss_decision_to_command` → `boss_execute_command` 完整链路（含攻击/技能/移动/领域命令），同时 HUD 展示决策名称
 - **导航** — 运行时模拟用 BFS（`_bfs_toward/_bfs_away`）；A* pathfinder 已接入 BT Agent 的 MoveToTarget 叶节点（`bt_move_to_target.h`）
 - **环境物** — 原 hazards.json（环境危险物）为死链路已移除（v0.9.33）；当前环境机制为 ArenaObject（毒池/尖刺/图腾/木桶）+ 熔岩地砖
-- **中文渲染** — 依赖生成字体图集（1769 码点），新增中文文案需重跑 `extract_chars.py`
+- **中文渲染** — NotoSansCJKsc-Regular.otf（思源黑体，1831 码点），新增中文文案需重跑 `extract_chars.py`
 - **平台** — Windows 实机验证；macOS/Linux 构建规范见 `docs/G4_PLATFORM_BIBLE.md`，未实机验证
 - **输入** — 键盘 only，无手柄/触摸
 - **RL 资产** — Q 表生成于本地 `saves/`（训练产物，非仓库内置）；首次运行无 Q 表时镜像自动降级

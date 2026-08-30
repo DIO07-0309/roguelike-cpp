@@ -1,3 +1,63 @@
+# v1.3.1 — G9 审计闭环 + Asset Manifest + 字体迁移 + 竞技场/音效修复 (2026-08-30)
+
+> v1.3.0 之后的技术债清理与基础设施升级批次，涵盖 G9 生命周期审计、
+> 资源管理管线重构、中文字体替换、竞技场战斗修复与外部音效加载。
+
+## G9.2–G9.4 技术审计闭环 (`b3143ec`)
+
+- **G9.2 生命周期残留修复** — 清理 Monster/Player 析构顺序问题，UAF 防护补全
+- **G9.3 RNG 边界隔离** — `CountingRng` 边界检查 + 确定性回归验证
+- **G9.4 DoorState Truth Table** — 门状态转移表形式化验证，覆盖 4×4 状态组合
+
+## G10.2-B1 Asset Manifest 基础 (`8f24e58`)
+
+- `resources/sprites.json` schema v2：新增 `"assets"` 段，声明外部资源路径/来源/回退
+- `ResourceManager::asset_by_id()` ID 查询 API + `load_assets_config()` 懒加载
+- `world_validator.py` 新增 assets 段校验规则
+
+## G10.2-B2 Door 迁移 (`683cee0`)
+
+- DoorRenderer 4 种贴图从硬编码路径迁移至 Asset Manifest（`door.open/closed/locked/sealed`）
+- 消除 4 处硬编码 `.png` 路径
+
+## G10.2-B3A Audio Manifest + WAV 转换 (`9b8bd91` · `6e6c6a4` · `eaadd9a` · `8a559a5`)
+
+- `sprites.json` 新增 `"audio"` 段：`timestop` / `domain_expand` 声明外部音频路径与回退
+- **根因修复**：`InitAudioDevice()` 原在 `InitWindow()` 之前调用，导致 `LoadSound()` 对外部文件静默失败 → 移入 `SceneTree` 构造函数 `InitWindow()` 之后
+- **MP3→WAV 转换**：`jojo_timestop.mp3` → `.wav`（44100Hz stereo 3.55s），`domain_expand.mp3` → `.wav`（5.47s）
+- **ResourceManager 时序修复**：`AudioServer::init()` 在 `ResourceManager` 加载 `sprites.json` 之前运行，`asset_by_id()` 返回 nullptr → 改为硬编码相对路径直接加载，WAV 优先 MP3 回退
+- 加载链：`LoadFileData()` → `LoadWaveFromMemory()` → `LoadSoundFromWave()`（绕过 `LoadSound()` 文件 I/O 问题）
+
+## G10.2-B3B 字体迁移 (`3a902b1`)
+
+- 替换系统字体为 `assets/fonts/NotoSansCJKsc-Regular.otf`（思源黑体，OFL-1.1 许可）
+- 1831 码位（1729 CJK + 102 符号），per-codepoint 逐字验证 100% 覆盖
+- `ResourceManager::_init_font()` 简化为单一字体路径，零系统字体依赖
+- `font_codepoints.h` 移除 4 个不支持符号（☠⚔✗❄ + BOM），`tools/extract_chars.py` 同步更新
+- `resources/landmarks.json` 等 JSON 中 ⚒→锤、⚔→剑 符号替换
+
+## 挑战房怪物多样化 (`c6b4b02`)
+
+- 新增 `_pick_monster_type(floor, wave, rng)` 按楼层/生态群落/波次分池：
+  - 地牢 F1-5：slime/skeleton → orc/shadow → elite/charger/summoner
+  - 熔岩 F6-10：fire_imp/bomber → orc/shaman → storm/golem/necro
+  - 虚空 F11-15：shadow/void/dark_mage → ice_warden/priest → guardian/sentinel
+
+## 竞技场修复 (`afb002e` · `0359b7f`)
+
+- **时停修复**：竞技场 `m->update_ai()` 未检查 `time_stop_remaining` → 移除重复 AI 调用，由 `_player_ctrl.tick()` 内部门控统一管理
+- **WeaponExecutor 补全**：竞技场新增 `tick_specials()` + `tick_projectiles()`（弩箭/矛/双节棍特殊攻击状态不再卡死）
+- **进化名乱码修复**：`evo_name()` 返回 `const char*` 但内部 `get_evolution_text()` 返回临时 `std::string`，`.c_str()` 为悬垂指针（use-after-free）→ 改为返回 `std::string`
+- **地面掉落修复**：`_draw_ground_items()` 在竞技场被 `WorldMode::CHALLENGE_ARENA` 门控跳过 → 开启渲染 + `enter/exit_challenge_arena()` 保存恢复 `ground_items` 防止坐标污染
+
+## 验证
+
+- **60/60 ctest 全绿**（+8 测试，含 font_manifest_test）
+- 音效验证：时停/领域展开 WAV 在 Release 构建下正常播放
+- 竞技场验证：地面掉落可见可拾取、退出后地牢物品恢复
+
+---
+
 # v1.3.0 — Batch 3: 经济系统 + 赌徒房 + 挑战房 (2026-08-29)
 
 > v1.2.x 门/房间遭遇系统之上的内容扩展批次（3A→3I），引入金币经济与两类可重复特殊房。
