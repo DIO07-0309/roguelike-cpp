@@ -251,66 +251,46 @@ void AudioServer::init() {
     _sfx["ui_click"]    = _compile_ui_click();     // Q4.5: UI 点击
     _sfx["ui_confirm"]  = _compile_ui_confirm();   // Q4.5: UI 确认
 
-    // G10.2-B3A: 外部 MP3 路径唯一来源 = manifest (audio.<name>); 硬编码路径已移除
-    auto load_external = [](const char* id) -> Sound {
-        const AssetDef* d = ResourceManager::inst().asset_by_id(id);
-        if (d && !d->path.empty() && FileExists(d->path.c_str()))
-            return LoadSound(d->path.c_str());
-        return Sound{0};
-    };
-    // timestop: WAV 格式 — 加载到内存再解码 (绕过 LoadSound 文件 I/O 问题)
+    // timestop: 直接从已知路径加载 (ResourceManager 在 AudioServer 之后初始化)
     _sfx["timestop"] = _compile_bolt();  // fallback
     {
-        const AssetDef* d = ResourceManager::inst().asset_by_id("audio.timestop");
-        if (d && !d->path.empty()) {
-            std::string wav_path = d->path;
-            auto dot = wav_path.rfind('.');
-            if (dot != std::string::npos) wav_path = wav_path.substr(0, dot) + ".wav";
-            const char* try_path = nullptr;
-            if (FileExists(wav_path.c_str())) try_path = wav_path.c_str();
-            else if (FileExists(d->path.c_str())) try_path = d->path.c_str();
-            if (try_path) {
-                int dataSize = 0;
-                unsigned char* fileData = LoadFileData(try_path, &dataSize);
-                LOG_INFO("音频: timestop LoadFileData path=%s dataSize=%d", try_path, dataSize);
-                if (fileData && dataSize > 0) {
-                    Wave wave = LoadWaveFromMemory(".wav", fileData, dataSize);
-                    LOG_INFO("音频: timestop Wave frameCount=%d sampleRate=%d channels=%d",
-                             wave.frameCount, wave.sampleRate, wave.channels);
-                    if (wave.frameCount > 0) {
-                        _sfx["timestop"] = LoadSoundFromWave(wave);
-                        LOG_INFO("音频: timestop Sound frameCount=%d", _sfx["timestop"].frameCount);
-                    }
-                    UnloadWave(wave);
-                    UnloadFileData(fileData);
-                } else {
-                    LOG_WARN("音频: timestop LoadFileData 失败 path=%s", try_path);
+        const char* paths[] = {"assets/jojo_timestop.wav", "assets/jojo_timestop.mp3"};
+        for (auto p : paths) {
+            if (!FileExists(p)) continue;
+            int dataSize = 0;
+            unsigned char* data = LoadFileData(p, &dataSize);
+            if (data && dataSize > 0) {
+                Wave wave = LoadWaveFromMemory(".wav", data, dataSize);
+                if (wave.frameCount > 0) {
+                    _sfx["timestop"] = LoadSoundFromWave(wave);
+                    LOG_INFO("音频: timestop loaded frameCount=%d path=%s", _sfx["timestop"].frameCount, p);
                 }
+                UnloadWave(wave);
+                UnloadFileData(data);
+                break;
             }
+            if (data) UnloadFileData(data);
         }
     }
 
-    // domain_expand: WAV 优先, MP3 回退
+    // domain_expand: 直接从已知路径加载
     {
-        const AssetDef* d = ResourceManager::inst().asset_by_id("audio.domain_expand");
-        if (d && !d->path.empty()) {
-            std::string wav_path = d->path;
-            auto dot = wav_path.rfind('.');
-            if (dot != std::string::npos) wav_path = wav_path.substr(0, dot) + ".wav";
-            const char* try_path = nullptr;
-            if (FileExists(wav_path.c_str())) try_path = wav_path.c_str();
-            else if (FileExists(d->path.c_str())) try_path = d->path.c_str();
-            if (try_path) {
-                int dataSize = 0;
-                unsigned char* fileData = LoadFileData(try_path, &dataSize);
-                if (fileData && dataSize > 0) {
-                    Wave wave = LoadWaveFromMemory(".wav", fileData, dataSize);
-                    if (wave.frameCount > 0)
-                        _sfx["domain_expand"] = LoadSoundFromWave(wave);
-                    UnloadWave(wave);
-                    UnloadFileData(fileData);
+        const char* paths[] = {"assets/domain_expand.wav", "assets/domain_expand.mp3"};
+        for (auto p : paths) {
+            if (!FileExists(p)) continue;
+            int dataSize = 0;
+            unsigned char* data = LoadFileData(p, &dataSize);
+            if (data && dataSize > 0) {
+                Wave wave = LoadWaveFromMemory(".wav", data, dataSize);
+                if (wave.frameCount > 0) {
+                    _sfx["domain_expand"] = LoadSoundFromWave(wave);
+                    LOG_INFO("音频: domain_expand loaded frameCount=%d path=%s", _sfx["domain_expand"].frameCount, p);
                 }
+                UnloadWave(wave);
+                UnloadFileData(data);
+                break;
             }
+            if (data) UnloadFileData(data);
         }
     }
 
