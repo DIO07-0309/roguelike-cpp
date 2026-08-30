@@ -290,12 +290,23 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
             if (t.type == TileType::WALL) {
                 if (wall_tex.id > 0) {
                     SpriteDef& wd = wall_data.id > 0 ? wall_def : sd;
+                    // G10.4-A Fix1: 群系 tint (无 palette 回退白, 兼容竞技场等)
+                    Color wall_tint = _has_palette ? _palette.wall_face
+                                                   : Color{255, 255, 255, 255};
                     SpriteRenderer::draw_sprite(wall_tex, wd, 0,
                         {dx, dy, (float)tile_size, (float)tile_size},
-                        _dim({255,255,255,255}, bright));
+                        _dim(wall_tint, bright));
                 } else
                     DrawRectangle(dx, dy, tile_size, tile_size, _dim(wall_c, bright));
                 DrawRectangleLines(dx, dy, tile_size, tile_size, _dim({40, 40, 55, 255}, bright));
+                // G10.4-A Fix3: 墙顶受光高光 — WALL 下方为 FLOOR 时画底边 2px
+                // (轻量立体感, 不涉光照系统/碰撞/门渲染)
+                if (y + 1 < height && _tiles[y + 1][x].type == TileType::FLOOR) {
+                    Color top_c = _has_palette ? _palette.wall_top
+                                               : Color{255, 255, 255, 60};
+                    DrawRectangle(dx, dy + tile_size - 2, tile_size, 2,
+                                  _dim(Color{top_c.r, top_c.g, top_c.b, 90}, bright));
+                }
             } else if (t.type == TileType::FLOOR) {
                 const SpecialRoom* sr = get_special_room_at(x, y);
                 if (sr) {
@@ -364,9 +375,22 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
                 } else {
                     if (floor_tex.id > 0) {
                         SpriteDef& fd = floor_data.id > 0 ? floor_def : sd;
+                        // G10.4-A Fix1+Fix2: 群系 tint + 确定性 (x,y) 哈希变体
+                        // 哈希与 gameplay RNG 完全隔离 — 同 seed 同视觉, 不影响
+                        // 碰撞/导航/FOV/生成逻辑 (6% 污渍 / 4% 石块 / 90% 基础)
+                        Color floor_tint = _has_palette
+                            ? _palette.floor_base
+                            : Color{255, 255, 255, 255};
+                        if (_has_palette) {
+                            unsigned int h = (unsigned int)x * 73856093u
+                                           ^ (unsigned int)y * 19349663u;
+                            h = (h ^ (h >> 13)) % 100u;
+                            if (h < 6u)      floor_tint = _palette.floor_dirt;
+                            else if (h < 10u) floor_tint = _palette.floor_b;
+                        }
                         SpriteRenderer::draw_sprite(floor_tex, fd, 0,
                             {dx, dy, (float)tile_size, (float)tile_size},
-                            _dim({255,255,255,255}, bright));
+                            _dim(floor_tint, bright));
                     } else
                         DrawRectangle(dx, dy, tile_size, tile_size, _dim(floor_c, bright));
                     // 细微网格线
