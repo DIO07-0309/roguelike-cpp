@@ -145,17 +145,30 @@ void GameSceneCombat::on_monster_killed(Monster* m) {
             }
             _s._presentation.room_msg_timer = 3.5f;
         }
-        auto [btx, bty] = _s.game_map->pixel_to_tile(m->entity.position.x, m->entity.position.y);
         auto extra_item = generate_random_item();
-        if (extra_item) _s.ground_items.push_back({extra_item, btx + 3, bty});
+        if (extra_item) {
+            if (_s._world_mode == WorldMode::CHALLENGE_ARENA) {
+                _s.player->inventory.add(extra_item, _s.player.get());
+            } else {
+                auto [btx, bty] = _s.game_map->pixel_to_tile(m->entity.position.x, m->entity.position.y);
+                _s.ground_items.push_back({extra_item, btx + 3, bty});
+            }
+        }
     }
     // Normal loot
     else {
         float drop_chance = m->is_elite ? LOOT_DROP_CHANCE * 1.5f : LOOT_DROP_CHANCE;
         drop_chance *= g_growth.gold_scale(_s.current_floor);
         if ((float)(rng() % 1000) / 1000.0f < drop_chance) {
-            auto [tx, ty] = _s.game_map->pixel_to_tile(m->entity.position.x, m->entity.position.y);
-            _s.ground_items.push_back({generate_random_item(), tx, ty});
+            auto item = generate_random_item();
+            if (item) {
+                if (_s._world_mode == WorldMode::CHALLENGE_ARENA) {
+                    _s.player->inventory.add(item, _s.player.get());
+                } else {
+                    auto [tx, ty] = _s.game_map->pixel_to_tile(m->entity.position.x, m->entity.position.y);
+                    _s.ground_items.push_back({item, tx, ty});
+                }
+            }
         }
     }
 
