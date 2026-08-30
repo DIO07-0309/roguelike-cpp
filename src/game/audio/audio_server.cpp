@@ -263,23 +263,39 @@ void AudioServer::init() {
     {
         const AssetDef* d = ResourceManager::inst().asset_by_id("audio.timestop");
         if (d && !d->path.empty()) {
-            // 优先 .wav, 回退 .mp3
             std::string wav_path = d->path;
             auto dot = wav_path.rfind('.');
             if (dot != std::string::npos) wav_path = wav_path.substr(0, dot) + ".wav";
             if (FileExists(wav_path.c_str())) {
                 Sound ts = LoadSound(wav_path.c_str());
+                LOG_INFO("音频: timestop WAV load frameCount=%d", ts.frameCount);
                 if (ts.frameCount > 0) _sfx["timestop"] = ts;
             } else if (FileExists(d->path.c_str())) {
                 Sound ts = LoadSound(d->path.c_str());
+                LOG_INFO("音频: timestop MP3 load frameCount=%d", ts.frameCount);
                 if (ts.frameCount > 0) _sfx["timestop"] = ts;
+            } else {
+                LOG_WARN("音频: timestop 文件未找到 (WAV: %s, MP3: %s)", wav_path.c_str(), d->path.c_str());
             }
         }
     }
 
-    // domain_expand: 外部 MP3 — 无合成回退 (真缺口, 如实在 manifest/报告标注)
-    Sound de = load_external("audio.domain_expand");
-    if (de.frameCount > 0) _sfx["domain_expand"] = de;
+    // domain_expand: WAV 优先, MP3 回退, 无合成回退 (真缺口)
+    {
+        const AssetDef* d = ResourceManager::inst().asset_by_id("audio.domain_expand");
+        if (d && !d->path.empty()) {
+            std::string wav_path = d->path;
+            auto dot = wav_path.rfind('.');
+            if (dot != std::string::npos) wav_path = wav_path.substr(0, dot) + ".wav";
+            if (FileExists(wav_path.c_str())) {
+                Sound de = LoadSound(wav_path.c_str());
+                if (de.frameCount > 0) _sfx["domain_expand"] = de;
+            } else if (FileExists(d->path.c_str())) {
+                Sound de = LoadSound(d->path.c_str());
+                if (de.frameCount > 0) _sfx["domain_expand"] = de;
+            }
+        }
+    }
 
     // BGM
     LOG_INFO("音频: 合成BGM(4支)...");

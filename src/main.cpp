@@ -184,8 +184,6 @@ int main(int argc, char** argv) {
         LOG_INFO("Sim: %d runs", sim_runs);
     }
 
-    InitAudioDevice();
-
     SceneTree tree(WINDOW_WIDTH, WINDOW_HEIGHT, "Roguelike - C++ Edition");
     ServiceLocator::provide(&tree);  // Q4.4: 事件回调访问音频
     LOG_INFO("窗口创建");

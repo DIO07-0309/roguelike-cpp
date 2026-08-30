@@ -8,6 +8,7 @@
 
 SceneTree::SceneTree(int w, int h, const char* title) {
     InitWindow(w, h, title);
+    InitAudioDevice();
     SetExitKey(0);
     center_active_window();
     SetTargetFPS(60);
