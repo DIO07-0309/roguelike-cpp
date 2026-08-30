@@ -92,4 +92,5 @@ private:
                         std::vector<DroppedItem>& ground_items);
     bool _room_contains(int tx, int ty) const;
     uint32_t _deterministic_seed(uint32_t dungeon_seed, int room_index, int wave_index) const;
+    static const char* _pick_monster_type(int floor, int wave, uint32_t rng);
 };
