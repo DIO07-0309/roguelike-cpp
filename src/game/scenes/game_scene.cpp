@@ -2585,7 +2585,7 @@ void GameScene::_draw_entities() {
             DrawLineEx({x1, y1}, {x2, y2}, 1.5f, {60, 140, 255, 100});
         }
     }
-    if (player) player->draw_no_cam(_cam_x, _cam_y);
+    if (player) player->draw_no_cam(_cam_x, _cam_y, game_map.get());
 
     // D4 Step4: NPC — sprite (floor-based lookup) + name label
     static const struct { int floor; const char* name; } _npc_lookup[] = {
@@ -2696,7 +2696,7 @@ void GameScene::_draw_arena_map() {
 
 void GameScene::_draw_arena_entities() {
     if (!player || !_arena_map) return;
-    player->draw_no_cam(_cam_x, _cam_y);
+    player->draw_no_cam(_cam_x, _cam_y, game_map.get());
     for (auto& m : _arena_monsters) {
         if (m && m->combat.is_alive) m->draw(_cam_x, _cam_y);
     }

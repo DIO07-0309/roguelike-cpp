@@ -5,6 +5,7 @@
 #include "resource_manager.h"                 // M4f.2
 #include "game/rendering/sprite_renderer.h"   // M4f.2
 #include "systems/relic_effect_processor.h"
+#include "world/game_map.h"                    // G10.6-B C1: 朝墙视觉查询
 #include <cmath>
 #include <algorithm>
 
@@ -182,7 +183,8 @@ static float _weapon_angle(WeaponType wt, bool attacking, float p, Direction dir
 // G9.4: 武器握持 — 手腕锚点 + 待机/挥砍角度 + 朝向镜像
 // 素材朝向: 刀/剑尖朝下(柄在顶), 矛尖朝上(柄在底), 弩弓臂朝上(托在底)
 static void _draw_player_weapon(Player* self, Direction dir,
-                                float hx, float hy, float hw, float hh) {
+                                float hx, float hy, float hw, float hh,
+                                bool wall_ahead) {   // G10.6-B C1
     const char* wkey = weapon_sprite_key(self->weapon.weapon_type());
     if (!wkey) return;
     SpriteDef wdef;
@@ -206,7 +208,7 @@ static void _draw_player_weapon(Player* self, Direction dir,
              : (is_crossbow ? 13.0f
              : (wt == WeaponType::DAGGER ? 14.0f : 18.0f));
 
-    // 手腕锚点 (身体中心 + 朝向偏移)
+    // 手腕锚点 (身体中心 + 朝向偏移) — G10.6-B C1: 朝墙时横向偏移减半
     float cx = hx + hw / 2, cy = hy + hh * 0.55f;
     float ox = 0.0f;
     switch (dir) {
@@ -215,6 +217,7 @@ static void _draw_player_weapon(Player* self, Direction dir,
         case Direction::LEFT:  ox = -hw * 0.42f; break;
         case Direction::RIGHT: ox = hw * 0.42f;  break;
     }
+    if (wall_ahead) ox *= 0.5f;
 
     // 角度: 每类武器独立待机姿态 + 攻击轨迹 (见 _weapon_angle)
     float p = 0.0f;
@@ -246,6 +249,26 @@ static Rectangle _attack_pose_rect(Direction dir, Rectangle base, float p,
     return {base.x + dx, base.y + dy, base.width, base.height};
 }
 
+// G10.6-B C1: 朝墙检测 — facing 前方 tile 是否不可走 (纯视觉查询)
+// 边界: 不阻止攻击/不改判定, 仅限制身体模型的视觉进入墙体
+static bool _facing_tile_blocked(const struct GameMap* map, Vector2 player_center,
+                                 Direction dir) {
+    if (!map) return false;
+    float probe_x = player_center.x;
+    float probe_y = player_center.y;
+    const float PROBE_DIST = 20.0f;   // 视觉盒半径 16 + 前倾峰值 7 缓冲
+    switch (dir) {
+        case Direction::UP:    probe_y -= PROBE_DIST; break;
+        case Direction::DOWN: probe_y += PROBE_DIST; break;
+        case Direction::LEFT:  probe_x -= PROBE_DIST; break;
+        case Direction::RIGHT: probe_x += PROBE_DIST; break;
+    }
+    int tx = (int)(probe_x / 32);
+    int ty = (int)(probe_y / 32);
+    if (tx < 0 || ty < 0) return true;
+    return !map->is_walkable(tx, ty);
+}
+
 // D2: 连击段数 → 身体颜色渐变 (程序化占位用)
 static Color _combo_body_color(int count) {
     if (count >= 4) return Color{255, 200, 40, 255};
@@ -266,20 +289,30 @@ static void _draw_combo_indicator(int count, float timer, float hx, float hy,
     DrawText(buf, (int)(hx + hw/2 - 4), (int)(hy - 18), fsize, cc);
 }
 
-void Player::draw_no_cam(float cam_x, float cam_y) {
+void Player::draw_no_cam(float cam_x, float cam_y, const GameMap* view_map) {
     Rectangle dr = entity.draw_rect(cam_x, cam_y);
+
+    // G10.6-B C1: 朝墙姿态衰减 — 攻击照常, 仅限制视觉进入墙体
+    // 朝墙时: 前倾 x0.3, 重击缩放 1.25 -> 1.08 (峰值 13px 嵌入 -> ~3px)
+    Vector2 center = { dr.x + dr.width / 2, dr.y + dr.height / 2 };
+    bool wall_ahead = _facing_tile_blocked(view_map, center, direction);
 
     // D2: 重击时身体变大
     float heavy_scale = combo.is_heavy() ? 1.25f : 1.0f;
+    if (wall_ahead && heavy_scale > 1.0f) heavy_scale = 1.08f;
     float hw = dr.width * heavy_scale, hh = dr.height * heavy_scale;
     float hx = dr.x - (hw - dr.width) / 2, hy = dr.y - (hh - dr.height) / 2;
 
-    // G9.4: 攻击前倾位移 (p=挥砍进度)
+    // G9.4: 攻击前倾位移 (p=挥砍进度) — 朝墙时衰减至 30%
     float p = 0.0f;
     if (_swing_start >= 0.0f)
         p = std::min(1.0f, (float)(GetTime() - _swing_start) / 0.35f);
     Rectangle pose = _attack_pose_rect(direction, {hx, hy, hw, hh}, p,
                                        combo.is_heavy());
+    if (wall_ahead) {
+        pose.x = hx + (pose.x - hx) * 0.3f;
+        pose.y = hy + (pose.y - hy) * 0.3f;
+    }
     hx = pose.x;
     hy = pose.y;
 
@@ -308,7 +341,7 @@ void Player::draw_no_cam(float cam_x, float cam_y) {
     }
 
     // G9.4: 装备武器握持效果 (徒手/无素材时静默)
-    _draw_player_weapon(this, direction, hx, hy, hw, hh);
+    _draw_player_weapon(this, direction, hx, hy, hw, hh, wall_ahead);
 
     // D2: Combo 指示器 (连击数显示在头顶)
     _draw_combo_indicator(combo.count, combo.timer, hx, hy, hw);
