@@ -26,6 +26,8 @@ public:
     void start(const Player* player);
     void tick();
     void set_time(double t) { _game_time = t; }
+    // P0-M2: room domain context (set once per scene by GameScene)
+    void set_room_manager(const class RoomManager* rm) { _rooms = rm; }
 
     // ── Main entry: returns the best action for this frame ──
     std::string best_action(const Player* player,
@@ -49,6 +51,7 @@ private:
     float _dir_timer = 0;
     int  _current_dir = -1;
     double _game_time = 0;
+    const class RoomManager* _rooms = nullptr;   // P0-M2
 
     // Q3.1: 帧级 best_action 缓存 — 同帧多次查询(每动作名一次)结果必须一致
     int _cached_frame = -1;

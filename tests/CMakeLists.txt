@@ -109,6 +109,10 @@ target_include_directories(simulation_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 copy_test_runtime_dlls(simulation_test)
 add_test(NAME simulation_test COMMAND simulation_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+# P0-M2: SimAI teleport room-domain contract regression (locks F1 deadlock)
+# sim_ai_teleport.cpp is auto-included via roguelike_lib GLOB
+add_roguelike_test(p0_teleport_test sim/p0_teleport_test.cpp)
+
 # G8.1: Behavior Tree test (pure C++, no game deps)
 add_executable(behavior_tree_test ai/behavior_tree_test.cpp)
 target_link_libraries(behavior_tree_test PRIVATE gtest_main gtest)
