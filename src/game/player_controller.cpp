@@ -144,14 +144,27 @@ void PlayerController::tick(float dt) {
         _record_move(move.x, move.y);
         float speed_mul = (gs._tw_speed_boost > 0) ? 1.25f : 1.0f;
         float s = get_effective_speed(gs.player.get()) * speed_mul * dt;
-        e.position.x += move.x * s; e.sync_rect();
-        if (!gs.game_map->is_rect_walkable(e.rect)) {
-            e.position.x -= move.x * s; e.sync_rect();
-        }
-        e.position.y += move.y * s; e.sync_rect();
-        if (!gs.game_map->is_rect_walkable(e.rect)) {
-            e.position.y -= move.y * s; e.sync_rect();
-        }
+        // G10.6-B C2: 停靠贴合 — 整步失败改为二分逼近最大合法位移
+        // 边界: 判定函数 is_rect_walkable 不变, 仅提升移动 resolution 精度
+        // (原实现停靠间隙 [0,s) 帧间抖动 -> 二分 6 次后 <s/64 稳定贴边)
+        auto _try_move_axis = [&](bool is_x, float delta) {
+            float start = is_x ? e.position.x : e.position.y;
+            if (is_x) e.position.x += delta; else e.position.y += delta;
+            e.sync_rect();
+            if (gs.game_map->is_rect_walkable(e.rect)) return;
+            float lo = 0.0f, hi = delta;
+            for (int i = 0; i < 6; i++) {
+                float mid = (lo + hi) * 0.5f;
+                if (is_x) e.position.x = start + mid; else e.position.y = start + mid;
+                e.sync_rect();
+                if (gs.game_map->is_rect_walkable(e.rect)) lo = mid;
+                else hi = mid;
+            }
+            if (is_x) e.position.x = start + lo; else e.position.y = start + lo;
+            e.sync_rect();
+        };
+        _try_move_axis(true,  move.x * s);
+        _try_move_axis(false, move.y * s);
 
         // ── 房间发现 ──
         std::string disc = gs._interact.check_special_discovery(gs.player.get(), gs.game_map.get());

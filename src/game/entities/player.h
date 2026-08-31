@@ -92,7 +92,8 @@ public:
 
     // 渲染
     void render(Camera2D& cam);
-    void draw_no_cam(float cam_x, float cam_y);
+    void draw_no_cam(float cam_x, float cam_y,
+                     const struct GameMap* view_map = nullptr);  // G10.6-B C1: 朝墙姿态衰减用
 
     // D2: 连击状态
     ComboState combo;
