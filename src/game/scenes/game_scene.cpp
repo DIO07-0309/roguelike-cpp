@@ -218,6 +218,7 @@ void GameScene::new_game() {
             DecisionAgent::g_use_mcts = (g_sim_ai_type == "mcts");
             _sim_ai = std::make_unique<DecisionAgent>();
             _sim_ai->start(player.get());
+            _sim_ai->set_room_manager(&_room_mgr);   // P0-M2: room-domain teleport
             _use_bt_agent = false;
         }
         seed_rng(_dungeon_seed ? _dungeon_seed : (uint32_t)(SimRunner::inst().current_run() * 1234567));
@@ -977,6 +978,34 @@ void GameScene::_process(double delta) {
     // Q3.2: sim 单局时间上限 — 防止罕见卡死拖死整个批量 (正常对局 ~50s, 上限 900s)
     if (_sim_mode && game_time > 900.0f) {
         LOG_INFO("[SIM] 单局超时 t=%.0f 第%d层 — 强制结算", game_time, current_floor);
+        // P0-M1 诊断: 超时现场快照 (玩家位置/朝向/存活怪/最近怪距离/楼梯状态)
+        {
+            float px = player->entity.rect.x + player->entity.rect.width/2;
+            float py = player->entity.rect.y + player->entity.rect.height/2;
+            LOG_INFO("[P0DIAG] player@(%.0f,%.0f) dir=%d hp=%d/%d stairs=%d monsters=%zu",
+                px, py, (int)player->direction, player->combat.current_hp,
+                player->combat.max_hp, (int)stairs_active, monsters.size());
+            for (auto& m : monsters) {
+                if (!m || !m->combat.is_alive) continue;
+                float d = hypotf(m->entity.rect.x + 14 - px, m->entity.rect.y + 14 - py);
+                LOG_INFO("[P0DIAG] monster '%s' hp=%d/%d dist=%.0f pos=(%.0f,%.0f)",
+                    m->name.c_str(), m->combat.current_hp, m->combat.max_hp,
+                    d, m->entity.rect.x, m->entity.rect.y);
+            }
+            // P0-M1 诊断: 全部门 tile 状态 (经公共 API, 不触私有 _tiles)
+            if (game_map) {
+                for (int y = 0; y < game_map->height; y++)
+                    for (int x = 0; x < game_map->width; x++)
+                        if (game_map->is_door(x, y))
+                            LOG_INFO("[P0DIAG] door@(%d,%d) state=%d walkable=%d",
+                                x, y, (int)game_map->door_state_at(x, y),
+                                (int)game_map->is_walkable(x, y));
+                auto [stx, sty] = game_map->pixel_to_tile(px, py);
+                LOG_INFO("[P0DIAG] player tile=(%d,%d) type=%d walkable=%d",
+                    stx, sty, (int)game_map->tile_at(stx, sty),
+                    (int)game_map->is_walkable(stx, sty));
+            }
+        }
         _collect_sim_stats();
         return;
     }

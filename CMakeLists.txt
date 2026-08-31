@@ -65,7 +65,7 @@ elseif(MINGW)
     set(RAYLIB_LIB "${RAYLIB_DIR}/lib/libraylibdll.a")
     set(RAYLIB_DLL "${RAYLIB_DIR}/lib/raylib.dll")
     target_link_libraries(${PROJECT_NAME} PRIVATE
-        "${RAYLIB_LIB}" winmm gdi32 opengl32
+        "${RAYLIB_LIB}" winmm gdi32 opengl32 dbghelp   # P0-M1: dbghelp 崩溃栈符号化
     )
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${RAYLIB_DLL}"
