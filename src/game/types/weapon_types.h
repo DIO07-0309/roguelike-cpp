@@ -194,6 +194,21 @@ struct WeaponSpecialState {
     void reset();
 };
 
+// ═══════════════════════════════════════════════════════════════
+// G10.5-B: AttackGeometry — 单段攻击的唯一空间真相 (SSOT)
+// hit_detection 与 VFX 必须消费同一份几何, 禁止两侧各自估像素
+//   origin/direction: executor 计算的玩家碰撞中心与朝向
+//   shape/range/width: weapons.json 每段定义 (px 换算后)
+//   视觉允许 shape 忠实呈现 + 少量表现边缘 (如 x1.1 弧外沿)
+// ═══════════════════════════════════════════════════════════════
+struct AttackGeometry {
+    Vector2 origin{};      // 攻击原点 (= 玩家碰撞盒中心, px)
+    Vector2 direction{};   // 单位朝向向量
+    HitShape shape = HitShape::CIRCLE;
+    float range_px = 0.0f;  // 主尺寸: 半径/前伸长度 (px)
+    float width_px = 0.0f;  // 副尺寸: 扇形半角(deg) / 矩形半宽 / 胶囊半径 (px/deg)
+};
+
 // ── Shared result type for weapon attack execution ──
 struct WeaponAttackResult {
     Monster* target = nullptr;
@@ -202,6 +217,7 @@ struct WeaponAttackResult {
     bool is_killing_blow = false;
     Vector2 hit_point{};
     bool from_special = false;  // G9.1: true if from tick-based multi-hit
+    AttackGeometry geometry{};   // G10.5-B: 本段判定几何 — VFX 消费此真相
 };
 
 // ═══════════════════════════════════════════════════════════════

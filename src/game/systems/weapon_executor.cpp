@@ -82,6 +82,17 @@ static Vector2 _player_origin(const Player* p) {
              p->entity.rect.y + p->entity.rect.height / 2 };
 }
 
+// ── G10.5-B: forward vec (mirror of hit_detection.cpp _forward_vec) ──
+static Vector2 _we_forward_vec(Direction dir) {
+    switch (dir) {
+    case Direction::UP:    return {0.0f, -1.0f};
+    case Direction::DOWN:  return {0.0f, 1.0f};
+    case Direction::LEFT:  return {-1.0f, 0.0f};
+    case Direction::RIGHT: return {1.0f, 0.0f};
+    default: return {0.0f, 1.0f};
+    }
+}
+
 // ── Resolve one hit into a result (damage + kill check) ──
 static WeaponAttackResult _resolve_one(Player* p, Monster* m,
     const Vector2& hp, float mult, AttackType atype = AttackType::PHYSICAL)
@@ -163,7 +174,8 @@ static void _crossbow_normal(Player* p, const AttackStageDef& st,
     Vector2 origin, int stage_idx, std::vector<Projectile>* projs);
 static std::vector<WeaponAttackResult> _melee_normal(
     Player* p, const WeaponDef* def, const AttackStageDef& st,
-    Vector2 origin, float rpx, float wp, const std::vector<Monster*>& rt);
+    Vector2 origin, float rpx, float wp, const std::vector<Monster*>& rt,
+    const AttackGeometry& geo);
 
 // ═══════════════════════════════════════════════════════════════
 // WeaponExecutor — execute
@@ -213,8 +225,23 @@ std::vector<WeaponAttackResult> WeaponExecutor::execute(
     if (!is_special) {
         if (def->type == WeaponType::CROSSBOW && projectiles)
             _crossbow_normal(player, stage, origin, w.combo_index(), projectiles);
-        else
-            results = _melee_normal(player, def, stage, origin, rpx, wp, rt);
+        else {
+            // G10.5-B: 构建 SSOT 几何 — range_boost/legendary 膨胀后的真实值
+            float eff_rpx = rpx;
+            if (w.combo_index() == 2 && def->stage_count >= 3) {
+                if (def->affix.type == "range_boost")
+                    eff_rpx *= (1.0f + def->affix.value);
+                if (def->legendary_effect == "sword_wave")
+                    eff_rpx *= 1.3f;
+            }
+            AttackGeometry geo;
+            geo.origin = origin;
+            geo.direction = _we_forward_vec(player->direction);
+            geo.shape = stage.hit_shape;
+            geo.range_px = eff_rpx;
+            geo.width_px = wp;
+            results = _melee_normal(player, def, stage, origin, rpx, wp, rt, geo);
+        }
     }
 
     // ── G9.3: set attack context for skill synergy ──
@@ -348,9 +375,11 @@ static void _crossbow_normal(Player* p, const AttackStageDef& st,
 }
 
 // ── Melee normal: instant hit detection + affix + legendary effects ──
+// G10.5-B: geo 为本段 SSOT 几何, 命中结果携带供 VFX 消费
 static std::vector<WeaponAttackResult> _melee_normal(
     Player* p, const WeaponDef* def, const AttackStageDef& st,
-    Vector2 origin, float rpx, float wp, const std::vector<Monster*>& rt)
+    Vector2 origin, float rpx, float wp, const std::vector<Monster*>& rt,
+    const AttackGeometry& geo)
 {
     std::vector<WeaponAttackResult> results;
     // ── Affix: sword range_boost on stage-3 ──
@@ -377,6 +406,7 @@ static std::vector<WeaponAttackResult> _melee_normal(
 
         results.push_back(_resolve_one(p, h.target, h.hit_point, mult,
             (AttackType)st.damage_type));
+        results.back().geometry = geo;   // G10.5-B: 命中结果携带判定几何真相
     }
     // Sword stage-3 stun
     if (is_stage3 && def->type == WeaponType::SWORD)

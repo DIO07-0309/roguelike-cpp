@@ -85,17 +85,20 @@ void GameRenderer::update_camera(float& cam_x, float& cam_y, const Player* playe
 // ============================================================
 
 // G5.8.8-fix: 方向斩弧（含刃线与散点）
+// G10.5-B B2: 平分线=玩家朝向角 (原四朝向恒偏 30°, 与 SECTOR 判定角平分线不一致)
+// 屏幕角: DOWN=90 UP=270 RIGHT=0 LEFT=180; 弧扫 facing±60°
 static void _draw_slash_arc(const Effect& e, float sx, float sy,
                             float prog, Color c) {
     float arc_r = e.radius * (0.6f + 0.4f * prog);
-    float startAngle = 0;
+    float facing = 90;   // DOWN
     switch (e.direction) {
-        case Direction::DOWN:  startAngle = 0;   break;
-        case Direction::UP:    startAngle = 180; break;
-        case Direction::RIGHT: startAngle = 270; break;
-        case Direction::LEFT:  startAngle = 90;  break;
+        case Direction::DOWN:  facing = 90;  break;
+        case Direction::UP:    facing = 270; break;
+        case Direction::RIGHT: facing = 0;   break;
+        case Direction::LEFT:  facing = 180; break;
     }
-    float endAngle = startAngle + 120;
+    float startAngle = facing - 60;
+    float endAngle = facing + 60;
     // 贴图地板较亮: 先画深色厚底弧保证亮色弧可见
     DrawRing({sx, sy}, arc_r * 0.4f - 1.5f, arc_r + 1.5f, startAngle, endAngle, 12,
              {0, 0, 0, 130});

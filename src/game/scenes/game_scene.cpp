@@ -1061,6 +1061,10 @@ void GameScene::_process(double delta) {
                 _boss.dmg_done += r.damage;
                 _presentation.spawn_damage(r.hit_point.x, r.hit_point.y, r.damage,
                     r.is_crit ? Color{255,220,30,255} : Color{100,200,255,255}, 0.5f);
+                // G10.5-B B4: 特殊段每击命中 VFX (原 5/10 连击零反馈)
+                VFXServer svfx;
+                svfx.hit_flash(r.hit_point.x, r.hit_point.y, 12.0f);
+                for (auto& e : svfx.effects) active_effects.push_back(e);
             }
             for (auto& r : proj_results) {
                 _boss.dmg_done += r.damage;
@@ -1194,6 +1198,17 @@ void GameScene::_process(double delta) {
                 apply_buff(r.target, "electrified", 1);
             }
             for (auto& e : svfx.effects) active_effects.push_back(e);
+        }
+
+        // G10.5-B B4: 非长矛特殊段 (双节棍 5 连击) 每击命中 VFX
+        if (player->weapon.runtime().special.active
+            && player->weapon.weapon_type() == WeaponType::NUNCHAKU) {
+            VFXServer nvfx;
+            for (auto& r : spec_results) {
+                nvfx.hit_flash(r.hit_point.x, r.hit_point.y, 12.0f);
+                nvfx.spark_burst(r.hit_point.x, r.hit_point.y, 4, {255,200,80,220}, 0.20f);
+            }
+            for (auto& e : nvfx.effects) active_effects.push_back(e);
         }
 
         for (auto& r : spec_results) {

@@ -611,6 +611,29 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
     const WeaponDef* def = p.weapon.current_def();
     WeaponType wt = def ? def->type : WeaponType::FIST;
 
+    // G10.5-B: SSOT 几何 — 与 executor execute() 同公式推导当段判定几何
+    // 空挥(results 空)也要画真实攻击空间; 命中特效另用 r.geometry/r.hit_point
+    AttackGeometry stage_geo{};
+    stage_geo.origin = {px, py};
+    float geo_fwd_x = (p.direction == Direction::RIGHT) ? 1.0f
+                     : (p.direction == Direction::LEFT) ? -1.0f : 0.0f;
+    float geo_fwd_y = (p.direction == Direction::DOWN) ? 1.0f
+                     : (p.direction == Direction::UP) ? -1.0f : 0.0f;
+    stage_geo.direction = {geo_fwd_x, geo_fwd_y};
+    if (def) {
+        const AttackStageDef& geo_st = p.weapon.current_stage();
+        stage_geo.shape = geo_st.hit_shape;
+        stage_geo.range_px = geo_st.range * TILE_SIZE;
+        if (p.weapon.combo_index() == 2 && def->stage_count >= 3) {
+            if (def->affix.type == "range_boost")
+                stage_geo.range_px *= (1.0f + def->affix.value);
+            if (def->legendary_effect == "sword_wave")
+                stage_geo.range_px *= 1.3f;
+        }
+        stage_geo.width_px = (geo_st.hit_shape == HitShape::SECTOR)
+            ? geo_st.width : geo_st.width * TILE_SIZE;
+    }
+
     switch (wt) {
     case WeaponType::FIST: {
         vfx.ring(px, py, 28.0f, {200,200,200,180}, 2, 0.25f);
@@ -618,16 +641,19 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
         break;
     }
     case WeaponType::DAGGER: {
+        // G10.5-B: 视觉=判定 x1.1 表现边缘 (SECTOR rpx/弧半径)
+        float dag_r = stage_geo.range_px * 1.1f;
         Color dc = {220,180,80,230};
-        vfx.slash_arc(px, py, p.direction, 50.0f, dc, 0.30f);
+        vfx.slash_arc(px, py, p.direction, dag_r, dc, 0.30f);
         vfx.spark_burst(px, py, 4, dc, 0.25f);
         if (stage >= 1) {
-            vfx.slash_arc(px, py, p.direction, 55.0f, {240,200,60,220}, 0.32f);
+            vfx.slash_arc(px, py, p.direction, dag_r * 1.1f, {240,200,60,220}, 0.32f);
             vfx.spark_burst(px + 20, py - 10, 5, {240,200,80,200}, 0.28f);
         }
         if (stage >= 2) {
-            float tx = px + (p.direction == Direction::RIGHT ? 60 : p.direction == Direction::LEFT ? -60 : 0);
-            float ty = py + (p.direction == Direction::DOWN ? 60 : p.direction == Direction::UP ? -60 : 0);
+            // CAPSULE: beam 长 = 判定 length, 视觉忠实覆盖突刺距离
+            float tx = px + geo_fwd_x * stage_geo.range_px;
+            float ty = py + geo_fwd_y * stage_geo.range_px;
             vfx.beam(px, py, tx, ty, {255,150,40,230}, 0.30f);
             for (auto& r : results) {
                 vfx.ring(r.hit_point.x, r.hit_point.y, 22.0f, {255,140,30,220}, 2, 0.35f);
@@ -637,28 +663,35 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
         break;
     }
     case WeaponType::SWORD: {
+        // G10.5-B: 全段视觉忠实判定几何
         if (stage == 0) {
-            float fx = px + (p.direction == Direction::RIGHT ? 32 : p.direction == Direction::LEFT ? -32 : 0);
-            float fy = py + (p.direction == Direction::DOWN ? 32 : p.direction == Direction::UP ? -32 : 0);
+            // RECTANGLE: 弧心 = 盒中心前移 length/2 (与 hit_detect_rectangle 同公式)
+            float fx = px + geo_fwd_x * stage_geo.range_px * 0.5f;
+            float fy = py + geo_fwd_y * stage_geo.range_px * 0.5f;
             vfx.shockwave(px, py, 30.0f, {180,180,140,180}, 2, 0.30f);
-            vfx.slash_arc(fx, fy, p.direction, 60.0f, {200,200,100,230}, 0.35f);
+            vfx.slash_arc(fx, fy, p.direction, stage_geo.range_px * 1.1f,
+                          {200,200,100,230}, 0.35f);
             vfx.smoke_puff(px, py, 16.0f, {140,130,100,120}, 4, 0.40f);
-            // G10.3-B2: 命中点像素反馈 — 攻击→命中→像素爆点
             for (auto& r : results) {
                 vfx.hit_flash(r.hit_point.x, r.hit_point.y, 14.0f);
                 vfx.spark_burst(r.hit_point.x, r.hit_point.y, 4, {230,230,200,220}, 0.22f);
             }
         } else if (stage == 1) {
-            vfx.slash_arc(px, py, p.direction, 70.0f, {220,220,120,220}, 0.38f);
-            vfx.slash_arc(px + 15, py - 10, p.direction, 55.0f, {200,200,80,200}, 0.32f);
+            // SECTOR: 弧半径 = rpx x1.1
+            vfx.slash_arc(px, py, p.direction, stage_geo.range_px * 1.1f,
+                          {220,220,120,220}, 0.38f);
+            vfx.slash_arc(px + geo_fwd_x * 12, py + geo_fwd_y * 12 - 10, p.direction,
+                          stage_geo.range_px * 0.9f, {200,200,80,200}, 0.32f);
             vfx.spark_burst(px, py, 10, {200,200,100,220}, 0.35f);
             for (auto& r : results) {
                 vfx.hit_flash(r.hit_point.x, r.hit_point.y, 18.0f);
                 vfx.spark_burst(r.hit_point.x, r.hit_point.y, 6, {240,220,120,220}, 0.25f);
             }
         } else {
-            vfx.shockwave(px, py, 80.0f, {220,200,80,200}, 4, 0.55f);
-            vfx.explosion(px, py, 36.0f, {240,220,100,220}, 14, 0.45f);
+            // CAPSULE: 冲击波半径 = length + radius (覆盖前伸判定)
+            float sw_r = stage_geo.range_px + stage_geo.width_px;
+            vfx.shockwave(px, py, sw_r, {220,200,80,200}, 4, 0.55f);
+            vfx.explosion(px, py, sw_r * 0.45f, {240,220,100,220}, 14, 0.45f);
             vfx.smoke_puff(px, py, 24.0f, {160,140,100,140}, 6, 0.50f);
             // G10.4-B Fix3: stage2 终结感 — flash 加长, 命中爆炸增强
             vfx.flash(px, py, 20.0f, {255,240,200,200}, 0.18f);
@@ -672,15 +705,20 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
     case WeaponType::NUNCHAKU: {
         Color nc = {220,160,80,220};
         if (stage == 0) {
-            vfx.slash_arc(px, py, p.direction, 90.0f, nc, 0.30f);
+            // G10.5-B: 弧半径 = CAPSULE 判定 length x1.1 (忠实 134px 前伸)
+            vfx.slash_arc(px, py, p.direction, stage_geo.range_px * 1.1f, nc, 0.30f);
             vfx.spark_burst(px, py, 6, nc, 0.28f);
         } else if (stage == 1) {
-            vfx.slash_arc(px, py, p.direction, 95.0f, {240,180,60,220}, 0.33f);
+            vfx.slash_arc(px, py, p.direction, stage_geo.range_px * 1.1f,
+                          {240,180,60,220}, 0.33f);
             vfx.slash_arc(px - 20, py + 10, (Direction)(((int)p.direction + 2) % 4),
-                70.0f, {200,140,50,180}, 0.28f);
+                stage_geo.range_px * 0.8f, {200,140,50,180}, 0.28f);
             vfx.ring(px, py, 40.0f, nc, 1, 0.30f);
         } else {
+            // G10.5-B P1-3: s2 = CIRCLE 判定 128px + 追踪 192px —
+            // 攻击范围 ring 让玩家看到真实打击半径 (原 32px pulse 严重不足)
             vfx.play_recipe("skill_chain_lightning", px, py, p.direction, 0, 0, 3);
+            vfx.ring(px, py, stage_geo.range_px, {255,200,80,200}, 3, 0.35f);
             for (auto& r : results) {
                 vfx.ring(r.hit_point.x, r.hit_point.y, 20.0f, {240,160,40,200}, 2, 0.30f);
             }
@@ -688,13 +726,17 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
         break;
     }
     case WeaponType::SPEAR: {
-        // Stage1: thick blue beam + ring at hit
-        // Stage2: beam + explosion + double ring
-        // Stage3: shockwave at origin (rapid hits handled by tick_specials)
-        vfx.play_recipe("skill_slash", px, py, p.direction, 0, 0, stage + 1);
+        // G10.5-B P1-1/P1-2: 突刺视觉必须覆盖 224px 判定 —
+        // thrust trail (半程 beam) + attack-range beam (全程) + 命中点特效
         Color sc = {80,170,255,255};
+        float sp_len = stage_geo.range_px;
+        float tip_x = px + geo_fwd_x * sp_len;
+        float tip_y = py + geo_fwd_y * sp_len;
+        // 全长突刺轨迹: 玩家 → 判定最远端
+        vfx.beam(px, py, tip_x, tip_y, {100,180,255,180}, 0.22f);
+        vfx.play_recipe("skill_slash", px, py, p.direction, 0, 0, stage + 1);
         for (auto& r : results) {
-            // Double beam for thickness visibility
+            // 命中特效落实际 hit_point (B3: 玩家→命中点连线+爆点)
             vfx.beam(px, py, r.hit_point.x, r.hit_point.y, sc, 0.40f);
             vfx.beam(px - 2, py - 2, r.hit_point.x - 2, r.hit_point.y - 2,
                 {60,150,240,200}, 0.38f);
@@ -705,22 +747,21 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
                 vfx.lightning(px, py, r.hit_point.x, r.hit_point.y, 3,
                     {80,160,255,220}, 0.25f);
             }
-            if (stage >= 2) {
-                // Stage-3 initiation: shockwave + flash at origin
-                vfx.shockwave(px, py, 50.0f, {80,160,255,180}, 3, 0.40f);
-                vfx.flash(px, py, 16.0f, {100,180,255,180}, 0.10f);
-            }
+        }
+        if (stage >= 2) {
+            // s2 特殊段: SECTOR 192px ±30° ×10击 — 范围 ring 可视化扇形半径
+            vfx.ring(px, py, stage_geo.range_px, {80,160,255,160}, 3, 0.40f);
+            vfx.flash(px, py, 16.0f, {100,180,255,180}, 0.10f);
         }
         break;
     }
     case WeaponType::CROSSBOW: {
-        if (stage == 2) {
-            vfx.play_recipe("boss_cone_attack", px, py, p.direction, 0, 0, 3);
+        // G10.5-B P1-5: 删除与飞行弹体无关的脚下 recipe (弹体 pos 本身是 SSOT 视觉)
+        // 仅保留发射口小尺寸反馈: muzzle flash + 短 ring
+        vfx.flash(px + geo_fwd_x * 14, py + geo_fwd_y * 14, 12.0f,
+                  {255,220,150,200}, 0.10f);
+        if (stage == 2)
             vfx.ring(px, py, 24.0f, {255,180,50,200}, 2, 0.35f);
-            vfx.shockwave(px, py, 60.0f, {255,140,30,150}, 2, 0.40f);
-        } else {
-            vfx.play_recipe("skill_chain_lightning", px, py, p.direction, 0, 0, stage + 1);
-        }
         break;
     }
     default: break;

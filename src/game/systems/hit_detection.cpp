@@ -113,8 +113,10 @@ std::vector<HitResult> hit_detect_rectangle(
         // Transform target to rectangle's local space
         float local_x = (mc.x - rect_center.x) * fwd.x + (mc.y - rect_center.y) * fwd.y;
         float local_y = (mc.x - rect_center.x) * perp.x + (mc.y - rect_center.y) * perp.y;
-        if (std::abs(local_x) <= length_px / 2 + 16 &&
-            std::abs(local_y) <= half_w + 16) {
+        // G10.5-B B4: fudge +16 -> MONSTER_HALF(14) — 判定框按怪物半宽扩
+        // (原 +16 使玩家身后 16px 也被前向挥砍命中, 且两侧膨胀 32px)
+        if (std::abs(local_x) <= length_px / 2 + 14 &&
+            std::abs(local_y) <= half_w + 14) {
             HitResult hr;
             hr.target = m;
             hr.distance = std::sqrt(_dist_sq(origin, mc));

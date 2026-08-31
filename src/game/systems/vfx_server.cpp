@@ -125,12 +125,16 @@ static void _emit_step(VFXServer& vfx, const VFXStep& step, float cx, float cy,
     else if (step.type == "beam" || step.type == "bolt") {
         float btx = tx ? tx : cx + cosf(step.direction_rad) * step.target_dist;
         float bty = ty ? ty : cy + sinf(step.direction_rad) * step.target_dist;
-        vfx.beam(cx, cy, btx, bty, c, step.duration);
+        // G10.5-B B5: 零长 beam/bolt 跳过 (tx=0 且 target_dist=0 时退化为不可见点)
+        float blen = hypotf(btx - cx, bty - cy);
+        if (blen > 1.0f) vfx.beam(cx, cy, btx, bty, c, step.duration);
     }
     else if (step.type == "lightning") {
         float ltx = tx ? tx : cx + cosf(step.direction_rad) * step.target_dist;
         float lty = ty ? ty : cy + sinf(step.direction_rad) * step.target_dist;
-        vfx.lightning(cx, cy, ltx, lty, cnt, c, step.duration);
+        float llen = hypotf(ltx - cx, lty - cy);
+        if (llen > 1.0f)
+            vfx.lightning(cx, cy, ltx, lty, cnt, c, step.duration);
     }
     else if (step.type == "explosion")
         vfx.explosion(cx, cy, step.radius, c, cnt, step.duration);
