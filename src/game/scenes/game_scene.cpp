@@ -1,4 +1,4 @@
-#include "game_scene.h"
+﻿#include "game_scene.h"
 #include "title_scene.h"
 #include "death_scene.h"
 #include "victory_scene.h"
@@ -6,6 +6,7 @@
 #include "boss.h"
 #include "skill.h"
 #include "combat_system.h"
+#include "combat_feel.h"   // G10.4-B Fix2: DMG_FLOAT_SCALE_CRIT
 #include "dungeon_generator.h"
 #include "world/biome.h"   // M4f: get_biome_for_floor
 #include "scene_tree.h"
@@ -699,7 +700,7 @@ void GameScene::_process(double delta) {
                     _presentation.damage_floats.push_back({
                         m->entity.rect.x + m->entity.rect.width/2,
                         m->entity.rect.y - 8,
-                        0.6f, ev.value,
+                        0.6f, 0.6f, ev.value,
                         dmg_color_for(ev.value, false, true)
                     });
                     // G10.3: poison tick VFX at monster position
@@ -886,7 +887,7 @@ void GameScene::_process(double delta) {
                     player->combat.take_damage(sd);
                     player->combat.mark_damage_logged();
                     LOG_INFO("[DMG] 尖刺 造成 %d 伤害 → 玩家", sd);
-                    _presentation.damage_floats.push_back({px, py-8, 0.4f, sd, {255, 60, 40, 255}});
+                    _presentation.damage_floats.push_back({px, py-8, 0.4f, 0.4f, sd, {255, 60, 40, 255}});
                 }
                 for (auto& m : monsters)
                     if (m->combat.is_alive && hypotf(m->entity.rect.x + m->entity.rect.width/2 - ax,
@@ -912,7 +913,7 @@ void GameScene::_process(double delta) {
                 player->combat.take_damage(ld);
                 player->combat.mark_damage_logged();
                 LOG_INFO("[DMG] 熔岩灼烧 造成 %d 伤害 → 玩家", ld);
-                _presentation.damage_floats.push_back({px, py-8, 0.4f, ld, {255, 90, 30, 255}});
+                _presentation.damage_floats.push_back({px, py-8, 0.4f, 0.4f, ld, {255, 90, 30, 255}});
             }
             for (auto& m : monsters) {
                 if (!m->combat.is_alive || m->is_boss) continue;
@@ -1253,7 +1254,7 @@ void GameScene::_process(double delta) {
             player->combat.take_damage(dmg);
             _presentation.damage_floats.push_back({
                 player->entity.rect.x + player->entity.rect.width/2,
-                player->entity.rect.y - 12, 0.6f, dmg,
+                player->entity.rect.y - 12, 0.6f, 0.6f, dmg,
                 dmg_color_for(dmg, p.damage_type != 0, false)
             });
             _presentation.trigger_shake(dmg > 20 ? 8.0f : 3.0f);
@@ -1565,7 +1566,7 @@ void GameScene::_explode_barrel(const ArenaObject& ao) {
     if (hypotf(px - cx, py - cy) <= kBarrelRadius) {
         player->combat.take_damage(dmg);
         player->combat.mark_damage_logged();
-        _presentation.damage_floats.push_back({px, py - 8, 0.4f, dmg, {255, 60, 40, 255}});
+        _presentation.damage_floats.push_back({px, py - 8, 0.4f, 0.4f, dmg, {255, 60, 40, 255}});
     }
     for (auto& m : monsters) {
         if (!m->combat.is_alive) continue;
@@ -1573,7 +1574,7 @@ void GameScene::_explode_barrel(const ArenaObject& ao) {
         float my = m->entity.rect.y + m->entity.rect.height / 2.0f;
         if (hypotf(mx - cx, my - cy) <= kBarrelRadius) {
             m->combat.take_damage(dmg);
-            _presentation.damage_floats.push_back({mx, my - 8, 0.4f, dmg, {255, 140, 40, 255}});
+            _presentation.damage_floats.push_back({mx, my - 8, 0.4f, 0.4f, dmg, {255, 140, 40, 255}});
         }
     }
 }
@@ -2032,15 +2033,21 @@ void GameScene::_render() {
 
     // C1: 伤害数字 (世界坐标→屏幕)
     for (auto& df : _presentation.damage_floats) {
-        float sx = df.x - _cam_x, sy = df.y - _cam_y - (0.6f - df.lifetime) * 30;
-        unsigned char a = (unsigned char)(df.color.a * (df.lifetime / 0.6f));
+        // G10.4-B Fix2: alpha 按自身 max_lifetime 计算 (修复暴击 0.85s 溢出隐形 bug)
+        float life_ratio = df.max_lifetime > 0.0f ? df.lifetime / df.max_lifetime : 0.0f;
+        if (life_ratio < 0.0f) life_ratio = 0.0f;
+        float sx = df.x - _cam_x, sy = df.y - _cam_y - (df.max_lifetime - df.lifetime) * 30;
+        unsigned char a = (unsigned char)(df.color.a * life_ratio);
         Color c = df.color; c.a = a;
         if (df.label) {
             // G10: element effect label (缓/冻/毒/暴)
             GameRenderer::draw_glow_text(df.label, sx, sy, 18, c, true);
         } else {
             char buf[16]; snprintf(buf, sizeof(buf), "%d", df.value);
-            GameRenderer::draw_glow_text(buf, sx, sy, 16 + df.value / 10, c, true);
+            // G10.4-B Fix2: 暴击/重击数字 1.6x 字号 (接线 DMG_FLOAT_SCALE_CRIT)
+            float size = (16 + df.value / 10) * (df.max_lifetime > 0.7f
+                ? CombatFeelSystem::DMG_FLOAT_SCALE_CRIT : 1.0f);
+            GameRenderer::draw_glow_text(buf, sx, sy, size, c, true);
         }
     }
 

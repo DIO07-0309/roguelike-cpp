@@ -70,7 +70,10 @@ struct BuildTheme {
 class PresentationSystemDirector {
 public:
     // ── Damage Float ──
-    struct DamageFloat { float x, y; float lifetime; int value; Color color; const char* label = nullptr; };
+    // G10.4-B Fix2: max_lifetime 记录初始寿命 — alpha 按自身生命周期计算
+    // (修复暴击 0.85s 除数硬编码 0.6f 的 alpha 溢出: 361→105 前段隐形)
+    struct DamageFloat { float x, y; float lifetime; float max_lifetime = 0.6f;
+                         int value; Color color; const char* label = nullptr; };
     std::vector<DamageFloat> damage_floats;
     void  spawn_damage(float wx, float wy, int dmg, Color c, float lifetime = 0.6f);
     void  spawn_label(float wx, float wy, const char* text, Color c, float lifetime = 0.8f);

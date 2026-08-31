@@ -37,12 +37,15 @@ Color dmg_color_for(int dmg, bool is_magic, bool is_poison) {
 // ============================================================
 
 void PresentationSystemDirector::spawn_damage(float wx, float wy, int dmg, Color c, float lt) {
-    damage_floats.push_back({wx, wy, lt, dmg, c});
+    DamageFloat df;
+    df.x = wx; df.y = wy; df.lifetime = lt; df.max_lifetime = lt;
+    df.value = dmg; df.color = c;
+    damage_floats.push_back(df);
 }
 
 void PresentationSystemDirector::spawn_label(float wx, float wy, const char* text, Color c, float lt) {
     DamageFloat df;
-    df.x = wx; df.y = wy; df.lifetime = lt; df.value = 0;
+    df.x = wx; df.y = wy; df.lifetime = lt; df.max_lifetime = lt; df.value = 0;
     df.color = c; df.label = text;
     damage_floats.push_back(df);
 }

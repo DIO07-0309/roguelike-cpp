@@ -112,7 +112,7 @@ void PlayerController::tick(float dt) {
             if (dmg_taken > 0 && gs.player->combat.is_alive) {
                 gs._presentation.damage_floats.push_back({
                     gs.player->entity.rect.x + gs.player->entity.rect.width/2,
-                    gs.player->entity.rect.y - 12, 0.6f, dmg_taken,
+                    gs.player->entity.rect.y - 12, 0.6f, 0.6f, dmg_taken,
                     dmg_taken >= 30 ? Color{255, 60, 30, 255} : Color{255, 80, 80, 255}
                 });
                 float shake = dmg_taken >= 30 ? 12.0f : dmg_taken > 15 ? 5.0f : 2.0f;
@@ -188,7 +188,7 @@ void PlayerController::tick(float dt) {
             if (dmg_taken > 0 && gs.player->combat.is_alive) {
                 gs._presentation.damage_floats.push_back({
                     gs.player->entity.rect.x + gs.player->entity.rect.width/2,
-                    gs.player->entity.rect.y - 12, 0.6f, dmg_taken,
+                    gs.player->entity.rect.y - 12, 0.6f, 0.6f, dmg_taken,
                     dmg_taken >= 30 ? Color{255, 60, 30, 255} : Color{255, 80, 80, 255}
                 });
                 float shake = dmg_taken >= 30 ? 12.0f : dmg_taken > 15 ? 5.0f : 2.0f;
@@ -546,6 +546,7 @@ void PlayerController::player_attack() {
         gs._presentation.damage_floats.push_back({
             target->entity.rect.x + target->entity.rect.width/2,
             target->entity.rect.y,
+            (is_crit || is_heavy) ? 0.85f : 0.6f,
             (is_crit || is_heavy) ? 0.85f : 0.6f, dmg, dc
         });
         _apply_attack_feedback(gs, p, target, is_crit, is_heavy);
@@ -574,6 +575,7 @@ void PlayerController::_process_weapon_result(GameScene& gs, Player& p,
              : dmg_color_for(r.damage, false, false);
     gs._presentation.damage_floats.push_back({
         r.hit_point.x, r.hit_point.y,
+        r.is_crit ? 0.85f : 0.6f,
         r.is_crit ? 0.85f : 0.6f, r.damage, dc
     });
     (void)p;
@@ -658,10 +660,11 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
             vfx.shockwave(px, py, 80.0f, {220,200,80,200}, 4, 0.55f);
             vfx.explosion(px, py, 36.0f, {240,220,100,220}, 14, 0.45f);
             vfx.smoke_puff(px, py, 24.0f, {160,140,100,140}, 6, 0.50f);
-            vfx.flash(px, py, 20.0f, {255,240,200,200}, 0.12f);
+            // G10.4-B Fix3: stage2 终结感 — flash 加长, 命中爆炸增强
+            vfx.flash(px, py, 20.0f, {255,240,200,200}, 0.18f);
             for (auto& r : results) {
                 vfx.ring(r.hit_point.x, r.hit_point.y, 28.0f, {240,200,60,200}, 3, 0.40f);
-                vfx.explosion(r.hit_point.x, r.hit_point.y, 20.0f, {255,220,120,230}, 8, 0.30f);
+                vfx.explosion(r.hit_point.x, r.hit_point.y, 20.0f, {255,220,120,230}, 12, 0.30f);
             }
         }
         break;
@@ -730,6 +733,21 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
     gs._gameplay.flow.mark_combat();
     gs._boss.behavior.memory.record_attack();
     gs._boss.replay_mem.melee_hits++;
+
+    // G10.4-B Fix1: 命中结果驱动的分级 HitStop + 命中音
+    // 聚合取最高等级 (KILL > CRITICAL > HEAVY > LIGHT), 单次触发不叠加
+    float freeze_t = 0.0f;
+    bool has_kill = false, has_crit = false;
+    for (auto& r : results) {
+        if (r.is_killing_blow) has_kill = true;
+        if (r.is_crit)         has_crit = true;
+    }
+    if (has_kill)                    freeze_t = CombatFeelSystem::KILL_SLOWMO;
+    else if (has_crit)               freeze_t = CombatFeelSystem::CRITICAL_HIT;
+    else if (stage == 2)             freeze_t = CombatFeelSystem::HEAVY_HIT;
+    else                             freeze_t = CombatFeelSystem::LIGHT_HIT;
+    if (freeze_t > 0.0f) gs._presentation.trigger_freeze(freeze_t);
+    if (auto* audio = gs.get_tree()->get_audio()) audio->play_sfx("hit");
 
     for (auto& r : results) {
         gs._boss.dmg_done += r.damage;
