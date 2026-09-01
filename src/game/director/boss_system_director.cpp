@@ -210,11 +210,22 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
     int p_hp = get_effective_max_hp(player);
     int p_atk = player->combat.get_effective_attack();
     int p_pdef = player->combat.get_effective_defense(AttackType::PHYSICAL);
-    boss->combat.max_hp   = (int)(p_hp * 2.5f);
+    // G10.7-fix: 数值膨胀护栏 — 镜像公式对高养成存档会把 Echo 放大成
+    // 万攻战神 (实测 atk=11119 单击 3883, 任何 build 被一击秒杀)。
+    // 威胁模型: 玩家应在 6-8 击内死亡 (PDEF 后 12% maxHP/击), 而非一击。
+    // HP 上限 2000: 防止"玩家 HP×2.5"在高血量存档下变成血条刷不动。
+    const int kMirrorHpCap = 2000;
+    int hp_target = (int)(p_hp * 2.5f);
+    if (hp_target > kMirrorHpCap) hp_target = kMirrorHpCap;
+    if (hp_target < 200) hp_target = 200;          // 下限: 不让小号把 Echo 削成纸
+    boss->combat.max_hp   = hp_target;
     boss->combat.current_hp = boss->combat.max_hp;
-    // ATK = max(玩家ATK×0.85, 玩家PDEF×0.85) — 确保 calculate_damage 不归1
+    // ATK = max(玩家ATK×0.85, PDEF×0.85) — 但不得超过 6击致死线 (12% maxHP 经防前 raw)
     int min_atk = (int)(p_pdef * 0.85f);
-    boss->combat.attack   = std::max((int)(p_atk * 0.85f), min_atk);
+    int atk_target = std::max((int)(p_atk * 0.85f), min_atk);
+    int atk_cap = std::max(20, p_hp / 8);          // raw 上限 ≈ 玩家 8 击线
+    if (atk_target > atk_cap) atk_target = atk_cap;
+    boss->combat.attack   = atk_target;
     boss->combat.physical_defense = player->combat.physical_defense + 5;
     boss->combat.magical_defense  = player->combat.magical_defense + 3;
     boss->attack_cooldown = 1.2f;  // 镜像攻击间隔
@@ -247,6 +258,10 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
 
     // ── 初始化 MirrorCombatDirector (替代旧BossAI补丁) ──
     _mirror_combat.init(player, boss, bai, _mirror_agent.get());
+    // G10.7-fix: 数值护栏可观测 — 实机一查便知 Echo 最终面板
+    LOG_INFO("[MIRROR] Echo stats: HP=%d ATK=%d (player HP=%d ATK=%d PDEF=%d, caps hp<=2000 atk<=HP/8)",
+             boss->combat.max_hp, boss->combat.attack,
+             p_hp, p_atk, p_pdef);
     _mirror_agent->begin_battle();   // 验收: 每场战斗重置 AI 调用链统计
     _mirror_stats_logged = false;
 
