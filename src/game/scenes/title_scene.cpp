@@ -1,4 +1,4 @@
-#include "title_scene.h"
+﻿#include "title_scene.h"
 #include "floor_select_scene.h"
 #include "tutorial_scene.h"
 #include "game_scene.h"
@@ -7,6 +7,8 @@
 #include "config.h"
 #include "save/save_manager.h"
 #include "core/logger.h"
+#include "resources/resource_manager.h"     // G10.7-B2: 舞台层素材
+#include "game/rendering/sprite_renderer.h"  // G10.7-B2: draw_sprite
 #include <cmath>
 
 extern Font g_font, g_font_small;
@@ -102,13 +104,150 @@ void TitleScene::_process(double delta) {
     anim_time += (float)delta;
 }
 
+// ══════════════════════════════════════════════════════════════
+// G10.7-B2: 电影海报舞台层 — 先建舞台, 角色层 B3 再上
+// 纵深渐变 → 透视地板 → 两侧石墙 → 尽头拱门 → 火光余烬 → 径向 vignette
+// 全部使用游戏内素材与色板 (wall/floor/door 纹理 + kenney 色系)
+// ══════════════════════════════════════════════════════════════
+void TitleScene::_draw_stage() {
+    auto* tree = get_tree();
+    if (!tree) return;
+    const int sw = tree->get_width(), sh = tree->get_height();
+
+    // ── 懒加载舞台素材 (一次) ──
+    if (!_stage_tex.loaded) {
+        auto& rm = ResourceManager::inst();
+        SpriteDef d;
+        _stage_tex.wall  = rm.sprite_by_key("wall", d);
+        _stage_tex.floor = rm.sprite_by_key("floor", d);
+        _stage_tex.door  = rm.sprite_by_key("door", d);
+        _stage_tex.loaded = true;
+    }
+
+    // ── 层1: 纵深渐变 — 顶黑 → 中部地牢暖暗 (蓝紫 15,12,24 → 34,26,48) ──
+    const int GRAD_STEPS = 12;
+    for (int i = 0; i < GRAD_STEPS; i++) {
+        float t = (float)i / (GRAD_STEPS - 1);          // 0=顶 1=底
+        float k = 0.35f + 0.65f * sinf(t * 3.14159f);   // 中部最亮 (bell)
+        Color c = {
+            (unsigned char)(14 + 24 * k),
+            (unsigned char)(10 + 18 * k),
+            (unsigned char)(22 + 32 * k), 255 };
+        DrawRectangle(0, (int)(sh * t) - sh / GRAD_STEPS / 2,
+                      sw, sh / GRAD_STEPS + 2, c);
+    }
+
+    // ── 层2: 透视地板 — 下半屏 floor 平铺, 行高逐行压缩 (近大远小) ──
+    if (_stage_tex.floor.id > 0) {
+        SpriteDef fd; fd.frame_w = 32; fd.frame_h = 32;
+        float floor_top = sh * 0.52f;                    // 地平线
+        int rows = 9;
+        float y = floor_top;
+        for (int r = 0; r < rows; r++) {
+            float depth = (float)r / (rows - 1);          // 0=远 1=近
+            float row_h = 22 + 46 * depth * depth;        // 行高: 远 22px → 近 68px
+            float dim = 0.30f + 0.70f * depth;             // 远暗近亮
+            int cols = (int)(sw / 44) + 2;
+            for (int c = 0; c < cols; c++) {
+                float x = c * 44.0f - (r % 2) * 22.0f;    // 交错砖缝
+                SpriteRenderer::draw_sprite(_stage_tex.floor, fd, 0,
+                    {x, y, 46.0f, row_h},
+                    Color{255, 255, 255, (unsigned char)(dim * 235)});
+            }
+            y += row_h;
+            if (y > sh) break;
+        }
+    }
+
+    // ── 层3: 两侧石墙 — 竖排贴墙, 越靠外越暗 (对峙走廊感) ──
+    if (_stage_tex.wall.id > 0) {
+        SpriteDef wd; wd.frame_w = 32; wd.frame_h = 32;
+        const int wall_cols = 3;                          // 每侧 3 列渐隐
+        for (int side = 0; side < 2; side++)
+            for (int col = 0; col < wall_cols; col++) {
+                float dim = 0.85f - col * 0.28f;         // 0.85 → 0.29
+                float col_w = 54 + col * 10;
+                float x = (side == 0) ? col * col_w : sw - (col + 1) * col_w;
+                for (int ry = 0; ry < sh; ry += 44)
+                    SpriteRenderer::draw_sprite(_stage_tex.wall, wd, 0,
+                        {x, (float)ry, col_w, 46.0f},
+                        Color{255, 255, 255, (unsigned char)(dim * 240)});
+            }
+    }
+
+    // ── 层4: 尽头拱门 — 中央地平线上, 门内深黑 + 微红光 ──
+    if (_stage_tex.door.id > 0) {
+        SpriteDef dd; dd.frame_w = 32; dd.frame_h = 32;
+        float door_w = 96, door_h = 120;
+        float dx = sw / 2.0f - door_w / 2, dy = sh * 0.52f - door_h;
+        // 门洞深黑
+        DrawRectangle((int)dx + 8, (int)dy + 10, (int)door_w - 16, (int)door_h - 10,
+                      Color{8, 6, 12, 255});
+        // 门框
+        SpriteRenderer::draw_sprite(_stage_tex.door, dd, 0, {dx, dy, door_w, door_h},
+                                   Color{210, 210, 210, 255});
+        // 门内微红光 (深处岩浆/危险暗示)
+        float glow = 0.5f + 0.5f * sinf(anim_time * 1.2f);
+        DrawRectangle((int)dx + 14, (int)dy + 18, (int)door_w - 28, (int)door_h - 26,
+                      Color{60, 16, 14, (unsigned char)(60 + 30 * glow)});
+    }
+
+    // ── 层5: 火光余烬 — 拱门两侧光晕 + 上升暖色微粒 ──
+    {
+        float glow = 0.6f + 0.4f * sinf(anim_time * 2.3f);
+        float door_w = 96;
+        float tx[2] = {sw / 2.0f - door_w / 2 - 26, sw / 2.0f + door_w / 2 + 26};
+        for (int t = 0; t < 2; t++) {
+            Vector2 c = {tx[t], sh * 0.52f - 34};
+            for (int ring = 3; ring >= 1; ring--) {
+                float rad = 10 + ring * 14;
+                DrawCircleV(c, rad,
+                    Color{255, 120, 40, (unsigned char)(26 * glow / ring)});
+            }
+            // 火芯
+            DrawCircleV(c, 4.5f, Color{255, 200, 90, (unsigned char)(150 + 60 * glow)});
+        }
+        // 上升余烬粒子 (12 颗, 确定性伪随机 — 与原粒子同手法)
+        for (int i = 0; i < 12; i++) {
+            float px = fmodf((float)(i * 97 + 13) * 1.7f + anim_time * 6.0f, (float)sw);
+            float py = sh * 0.55f - fmodf(anim_time * 26.0f + i * 53.0f, sh * 0.4f);
+            DrawCircle(px, py, 1.2f + (i % 3) * 0.5f,
+                       Color{255, 150, 60, (unsigned char)(70 + 40 * glow)});
+        }
+    }
+
+    // ── 层6: 径向 vignette — 四边向中心暗化, 聚焦中央 ──
+    {
+        const int V_STEPS = 7;
+        // 上/下边
+        for (int i = 0; i < V_STEPS; i++) {
+            float k = 1.0f - (float)i / V_STEPS;          // 越外越暗
+            unsigned char a = (unsigned char)(120 * k * k);
+            int band = sh / 14;
+            DrawRectangle(0, i * band, sw, band + 1, Color{6, 5, 10, a});
+            DrawRectangle(0, sh - (i + 1) * band, sw, band + 1, Color{6, 5, 10, a});
+        }
+        // 左/右边
+        for (int i = 0; i < V_STEPS; i++) {
+            float k = 1.0f - (float)i / V_STEPS;
+            unsigned char a = (unsigned char)(120 * k * k);
+            int band = sw / 12;
+            DrawRectangle(i * band, 0, band + 1, sh, Color{6, 5, 10, a});
+            DrawRectangle(sw - (i + 1) * band, 0, band + 1, sh, Color{6, 5, 10, a});
+        }
+    }
+}
+
 void TitleScene::_render() {
     ClearBackground(BLACK);
     auto* tree = get_tree();
     if (!tree) return;
     int sw = tree->get_width(), sh = tree->get_height();
 
-    // 背景粒子
+    // G10.7-B2: 电影海报舞台层 (渐变/透视地板/石墙/拱门/火光/vignette)
+    _draw_stage();
+
+    // 背景粒子 (舞台之上的飘浮尘埃)
     for (int i = 0; i < 20; i++) {
         float x = fmodf((float)(i * 127 + 31) * 1.3f + anim_time * 20 * (i % 3 + 1), (float)sw);
         float y = fmodf((float)(i * 53 + 17), (float)sh);

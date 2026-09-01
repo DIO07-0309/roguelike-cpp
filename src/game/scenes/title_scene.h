@@ -24,4 +24,7 @@ public:
 
 private:
     bool _activate(const std::string& action);  // Q4.5: 键盘/鼠标共用动作分发
+    void _draw_stage();   // G10.7-B2: 电影海报舞台层 (渐变/透视地板/拱门/vignette)
+    struct StageTex { Texture2D wall{}, floor{}, door{}; bool loaded = false; }
+        _stage_tex;
 };
