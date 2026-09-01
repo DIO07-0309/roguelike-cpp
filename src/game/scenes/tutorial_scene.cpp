@@ -26,6 +26,13 @@ void TutorialScene::_ready() {
     monsters.clear();
     monsters.push_back(create_tutorial_dummy(8, 4));
     ground_items = create_tutorial_items(6, 5);
+
+    // G10.8-fix: 教程漆黑回归 — G10.4 后地图渲染依赖 is_explored,
+    // 教程从未调用 update_fov → 全部 tile 被可见性剔除 → 黑屏
+    auto [px, py] = game_map->pixel_to_tile(
+        player->entity.rect.x + player->entity.rect.width/2,
+        player->entity.rect.y + player->entity.rect.height/2);
+    game_map->update_fov(px, py, 12);   // 大半径: 小沙箱全亮, 教学无视野迷雾
 }
 
 void TutorialScene::_process(double delta) {
@@ -76,6 +83,14 @@ void TutorialScene::_process(double delta) {
     // 摄像机
     cam_x = player->entity.rect.x + player->entity.rect.width/2 - get_tree()->get_width()/2;
     cam_y = player->entity.rect.y + player->entity.rect.height/2 - get_tree()->get_height()/2;
+
+    // G10.8-fix: 每帧同步 FOV (渲染依赖 is_explored/is_visible)
+    if (game_map) {
+        auto [px, py] = game_map->pixel_to_tile(
+            player->entity.rect.x + player->entity.rect.width/2,
+            player->entity.rect.y + player->entity.rect.height/2);
+        game_map->update_fov(px, py, 12);
+    }
 }
 
 void TutorialScene::_render() {

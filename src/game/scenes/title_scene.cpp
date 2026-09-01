@@ -299,20 +299,20 @@ void TitleScene::_draw_characters() {
     // ── 菜单安全区: 中央 340×450 (x 310-650, y 60-510) 保持净空 ──
     // 布局原则: 全画布散布 (海报式), 近大远小, 允许少量边缘覆盖
 
-    // 左侧纵深队列 (x 递减 = 越左越近)
+    // 左侧纵深队列 (老师反馈修: 拉开间距消除互相遮盖, 纵深阶梯)
     float floor_y = sh * 0.78f;
-    draw_char(_char_tex.p_fire, 88, floor_y + 26, 128, 1.0f, 0.0f);      // 前景领队 8×
-    draw_char(_char_tex.p_poison, 175, floor_y - 12, 84, 0.72f, 0.7f);   // 中景
-    draw_char(_char_tex.p_ice, 108, floor_y - 66, 76, 0.55f, 1.3f);      // 中远
-    draw_char(_char_tex.orc, 205, floor_y - 96, 60, 0.40f, 1.8f);        // 远景压阵
-    draw_char(_char_tex.blacksmith, 155, floor_y - 140, 44, 0.32f, 2.4f);// 左上远处
+    draw_char(_char_tex.p_fire, 70, floor_y + 30, 128, 1.0f, 0.0f);      // 前景领队 (6-134)
+    draw_char(_char_tex.p_poison, 190, floor_y - 14, 72, 0.72f, 0.7f);   // 中景 (154-226) 与 fire 净距 20
+    draw_char(_char_tex.p_ice, 122, floor_y - 118, 56, 0.50f, 1.3f);     // 中远更高 (94-150) 与 poison 上错位
+    draw_char(_char_tex.orc, 248, floor_y - 96, 52, 0.38f, 1.8f);        // 远景 (222-274) 独立位
+    draw_char(_char_tex.blacksmith, 55, floor_y - 168, 40, 0.30f, 2.4f); // 左上远处独立 (35-75)
 
-    // 右侧纵深队列 (镜像布局)
-    draw_char(_char_tex.boss_f10, 872, floor_y + 26, 128, 1.0f, 0.0f);   // 前景领队
-    draw_char(_char_tex.shaman, 785, floor_y - 12, 84, 0.72f, 2.6f);
-    draw_char(_char_tex.skeleton, 852, floor_y - 66, 76, 0.55f, 1.9f);
-    draw_char(_char_tex.tank, 755, floor_y - 96, 60, 0.40f, 2.2f);      // 远景坦克
-    draw_char(_char_tex.slime, 805, floor_y - 140, 44, 0.32f, 3.1f);    // 右上远处
+    // 右侧纵深队列 (镜像布局, 同样间距)
+    draw_char(_char_tex.boss_f10, 890, floor_y + 30, 128, 1.0f, 0.0f);   // 前景领队 (826-954)
+    draw_char(_char_tex.shaman, 770, floor_y - 14, 72, 0.72f, 2.6f);     // (734-806)
+    draw_char(_char_tex.skeleton, 838, floor_y - 118, 56, 0.50f, 1.9f);  // (810-866)
+    draw_char(_char_tex.tank, 712, floor_y - 96, 52, 0.38f, 2.2f);        // (686-738)
+    draw_char(_char_tex.slime, 905, floor_y - 168, 40, 0.30f, 3.1f);      // 右上远处 (885-925)
 
     // 顶部两角: 中怪剪影带 (半透明, 不抢主)
     // 老师反馈修: 移至标题带之下的无字区 (y≈218-252), 更靠外避标题
