@@ -10,7 +10,7 @@
 inline constexpr int WINDOW_WIDTH = 960;
 inline constexpr int WINDOW_HEIGHT = 640;
 inline constexpr int FPS = 60;
-inline constexpr const char* WINDOW_TITLE = "Roguelike — C++ Edition";
+inline constexpr const char* WINDOW_TITLE = "回响深渊 Abyssal Echo";
 
 // ---- 字体 ----
 // 自动检测：开发环境用 msyh.ttc，打包后放在 assets/ 目录

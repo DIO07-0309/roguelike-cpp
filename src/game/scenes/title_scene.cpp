@@ -315,9 +315,11 @@ void TitleScene::_draw_characters() {
     draw_char(_char_tex.slime, 805, floor_y - 140, 44, 0.32f, 3.1f);    // 右上远处
 
     // 顶部两角: 中怪剪影带 (半透明, 不抢主)
-    draw_char(_char_tex.summoner, 250, 150, 52, 0.30f, 3.6f);
-    draw_char(_char_tex.charger, 700, 150, 52, 0.30f, 4.1f);
-    draw_char(_char_tex.bomber, 292, 118, 40, 0.25f, 4.6f);
+    // 老师反馈修: 移至标题带之下的无字区 (y≈218-252), 更靠外避标题
+    draw_char(_char_tex.summoner, 160, 252, 52, 0.30f, 3.6f);
+    draw_char(_char_tex.charger, 800, 252, 52, 0.30f, 4.1f);
+    draw_char(_char_tex.bomber, 122, 218, 40, 0.25f, 4.6f);
+    draw_char(_char_tex.orc, 838, 218, 38, 0.25f, 5.0f);   // 右上角补一只暗兽人
 
     // 左上晕角: 暗影骑士 (boss_f5) 大剪影 — 第三个 Boss 也是素材
     if (_char_tex.boss_f5.id > 0) {
@@ -380,42 +382,45 @@ void TitleScene::_render() {
         DrawCircle(x, y, 1.5f + (i % 3), {60, 60, 100, 100});
     }
 
-    // 标题
+    // 标题 (G10.7-C: 定名「回响深渊」— 老师反馈: 去掉品类词大字 + 提高字号)
     if (g_font_loaded) {
         float pulse = 1.0f + sinf(anim_time * 2) * 0.02f;
-        float title_size = 52 * pulse;
-        float w = MeasureTextEx(g_font, "Roguelike 肉鸽游戏", title_size, 1).x;
-        DrawTextEx(g_font, "Roguelike 肉鸽游戏", {sw/2.0f - w/2, 80}, title_size, 1, {255, 255, 220, 255});
-        w = MeasureTextEx(g_font_small, "- 地牢深处 -", 18, 1).x;
-        DrawTextEx(g_font_small, "- 地牢深处 -", {sw/2.0f - w/2, 140}, 18, 1, {180, 180, 180, 255});
+        float title_size = 62 * pulse;
+        float w = MeasureTextEx(g_font, "回响深渊", title_size, 2).x;
+        float tx = sw/2.0f - w/2, ty = 96;
+        DrawTextEx(g_font, "回响深渊", {tx + 3, ty + 3}, title_size, 2, {0, 0, 0, 160});
+        DrawTextEx(g_font, "回响深渊", {tx, ty}, title_size, 2, {255, 214, 90, 255});
+        w = MeasureTextEx(g_font_small, "ABYSSAL ECHO · 地牢肉鸽", 20, 1).x;
+        DrawTextEx(g_font_small, "ABYSSAL ECHO · 地牢肉鸽",
+                   {sw/2.0f - w/2, 168}, 20, 1, {200, 200, 220, 240});
     } else {
-        DrawRectangle(sw/2 - 180, 65, 360, 60, {40, 40, 60, 255});
-        DrawRectangleLines(sw/2 - 180, 65, 360, 60, {100, 100, 180, 255});
-        DrawText("Roguelike (No CJK Font)", sw/2 - 120, 85, 20, {200, 200, 200, 255});
+        DrawRectangle(sw/2 - 180, 90, 360, 60, {40, 40, 60, 255});
+        DrawRectangleLines(sw/2 - 180, 90, 360, 60, {100, 100, 180, 255});
+        DrawText("Abyssal Echo", sw/2 - 80, 105, 28, {255, 214, 90, 255});
     }
 
-    // 面板
-    float pw = 340, ph = 270;
-    Rectangle pr = {sw/2.0f - pw/2, 170, pw, ph};
+    // 面板 (老师反馈: 菜单字号 16→20, 面板加宽加高, 下移让出标题区)
+    float pw = 360, ph = 320;
+    Rectangle pr = {sw/2.0f - pw/2, 205, pw, ph};
     DrawRectangleRounded(pr, 0.08f, 8, {20, 20, 40, 230});
     DrawRectangleRoundedLines(pr, 0.08f, 8, 2, {100, 100, 180, 255});
 
     if (g_font_loaded)
-        DrawTextEx(g_font_small, "选 单", {pr.x + 12, pr.y + 8}, 20, 1, {200, 200, 255, 255});
+        DrawTextEx(g_font_small, "选 单", {pr.x + 14, pr.y + 10}, 24, 1, {200, 200, 255, 255});
     else
-        DrawText("Menu", (int)pr.x + 12, (int)pr.y + 10, 20, {200, 200, 255, 255});
+        DrawText("Menu", (int)pr.x + 14, (int)pr.y + 12, 24, {200, 200, 255, 255});
 
     // 存档状态
-    float y = pr.y + 35;
+    float y = pr.y + 44;
     if (g_font_loaded) {
         char buf[64];
         snprintf(buf, sizeof(buf), has_save ? "存档已存在（已解锁第%d层）" : "暂无存档", max_floor);
-        float w = MeasureTextEx(g_font_small, buf, 14, 1).x;
-        DrawTextEx(g_font_small, buf, {(float)(pr.x + (pw - w)/2), y}, 14, 1, {160, 160, 160, 255});
+        float w = MeasureTextEx(g_font_small, buf, 16, 1).x;
+        DrawTextEx(g_font_small, buf, {(float)(pr.x + (pw - w)/2), y}, 16, 1, {160, 160, 160, 255});
     } else {
-        DrawText(has_save ? "Save exists" : "No save", (int)pr.x + 60, (int)y, 14, {160, 160, 160, 255});
+        DrawText(has_save ? "Save exists" : "No save", (int)pr.x + 60, (int)y, 16, {160, 160, 160, 255});
     }
-    y += 25;
+    y += 34;
 
     // 菜单项 (Q4.5: 鼠标悬停高亮 + hover 音效)
     Vector2 mouse = GetMousePosition();
@@ -426,7 +431,7 @@ void TitleScene::_render() {
         if (mi.action == "continue" && !has_save) c = {80, 80, 80, 255};
         if (mi.action == "select" && !has_save) c = {80, 80, 80, 255};
 
-        Rectangle item_rect = {(float)(pr.x + 40), y, pw - 80, 32};
+        Rectangle item_rect = {(float)(pr.x + 40), y, pw - 80, 38};
         if (CheckCollisionPointRec(mouse, item_rect)
             && !(mi.action == "continue" && !has_save)
             && !(mi.action == "select" && !has_save)) {
@@ -438,12 +443,12 @@ void TitleScene::_render() {
 
         if (g_font_loaded) {
             std::string txt = "[" + mi.key + "] " + mi.label;
-            DrawTextEx(g_font_small, txt.c_str(), {(float)(pr.x + 60), y + 6}, 16, 1, c);
+            DrawTextEx(g_font_small, txt.c_str(), {(float)(pr.x + 66), y + 8}, 20, 1, c);
         } else {
             std::string txt = "[" + mi.key + "] " + mi.action;
-            DrawText(txt.c_str(), (int)(pr.x + 60), (int)y + 6, 16, c);
+            DrawText(txt.c_str(), (int)pr.x + 66, (int)y + 8, 20, c);
         }
-        y += 36;
+        y += 42;
     }
     if (new_hover != hover_index) {
         if (new_hover >= 0 && get_tree())
@@ -461,28 +466,28 @@ void TitleScene::_render() {
             "R - 圣物   M - 小地图   G - 全屏",
             "ESC - 保存并返回",
         };
-        float guide_x = sw - 240.0f;
-        float guide_y = 180.0f;
-        float guide_w = 220.0f;
-        float guide_h = 145.0f;
+        float guide_x = sw - 260.0f;
+        float guide_y = 215.0f;
+        float guide_w = 240.0f;
+        float guide_h = 165.0f;
         DrawRectangleRounded({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, Color{15, 15, 30, 200});
         DrawRectangleRoundedLines({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, 1, Color{70, 70, 100, 180});
         for (int i = 0; i < 6; i++) {
-            Color lc = (i == 0) ? Color{255, 210, 80, 255} : Color{180, 180, 200, 255};
-            DrawTextEx(g_font_small, lines[i], {guide_x + 12, guide_y + 8 + i * 23.0f}, 14, 1, lc);
+            Color lc = (i == 0) ? Color{255, 210, 80, 255} : Color{190, 190, 210, 255};
+            DrawTextEx(g_font_small, lines[i], {guide_x + 14, guide_y + 10 + i * 25.0f}, 16, 1, lc);
         }
     }
 
-    // 底部版权
+    // 底部版权 (老师反馈: 字号 12/14→14/16)
     if (g_font_loaded) {
-        float w = MeasureTextEx(g_font_small, "重庆大学大数据与软件学院 · 程序设计实训", 12, 1).x;
+        float w = MeasureTextEx(g_font_small, "重庆大学大数据与软件学院 · 程序设计实训", 14, 1).x;
         DrawTextEx(g_font_small, "重庆大学大数据与软件学院 · 程序设计实训",
-                   {sw/2.0f - w/2, (float)(sh - 50)}, 12, 1, {80, 80, 80, 255});
-        w = MeasureTextEx(g_font_small, "开发者：ruozhiDIO  C++版", 14, 1).x;
-        DrawTextEx(g_font_small, "开发者：ruozhiDIO  C++版",
-                   {sw/2.0f - w/2, (float)(sh - 30)}, 14, 1, {140, 140, 160, 255});
+                   {sw/2.0f - w/2, (float)(sh - 52)}, 14, 1, {100, 100, 100, 255});
+        w = MeasureTextEx(g_font_small, "回响深渊 Abyssal Echo · 开发者：ruozhiDIO", 16, 1).x;
+        DrawTextEx(g_font_small, "回响深渊 Abyssal Echo · 开发者：ruozhiDIO",
+                   {sw/2.0f - w/2, (float)(sh - 30)}, 16, 1, {150, 150, 170, 255});
     } else {
-        DrawText("CQU PT | ruozhiDIO | C++ Edition", sw/2 - 100, sh - 30, 14, {140, 140, 160, 255});
+        DrawText("Abyssal Echo | ruozhiDIO", sw/2 - 100, sh - 30, 16, {140, 140, 160, 255});
     }
 }
 

@@ -17,12 +17,12 @@ BEGIN
     BEGIN
         BLOCK "080404b0"
         BEGIN
-            VALUE "FileDescription", "Roguelike - C++ Edition"
+            VALUE "FileDescription", "Abyssal Echo - Roguelike"
             VALUE "InternalName", "roguelike_cpp"
             VALUE "OriginalFilename", "roguelike_cpp.exe"
-            VALUE "ProductName", "Roguelike - C++ Edition"
-            VALUE "FileVersion", "1.3.1"
-            VALUE "ProductVersion", "1.3.1"
+            VALUE "ProductName", "Abyssal Echo (回响深渊)"
+            VALUE "FileVersion", "1.3.2"
+            VALUE "ProductVersion", "1.3.2"
         END
     END
     BLOCK "VarFileInfo"
