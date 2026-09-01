@@ -6,6 +6,8 @@
 #include "item.h"
 #include "game_map.h"
 #include "tutorial_guide.h"
+#include "combat_feel.h"    // G10.8-B1: HitStop 常量
+#include "systems/weapon_executor.h"  // G10.8-B1: 正式战斗链
 #include <memory>
 #include <vector>
 
@@ -26,4 +28,5 @@ public:
     bool gave_skill = false;
     float game_time = 0;
     float cam_x = 0, cam_y = 0;
+    float _tutorial_hitstop = 0.0f;   // G10.8-B1: 轻量打击停顿
 };

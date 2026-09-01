@@ -31,6 +31,12 @@ void TutorialScene::_ready() {
 void TutorialScene::_process(double delta) {
     if (!player) return;
     float dt = (float)delta;
+
+    // G10.8-B1: HitStop 冻结期间暂停模拟 (表现层停顿)
+    if (_tutorial_hitstop > 0.0f) {
+        _tutorial_hitstop -= dt;
+        return;
+    }
     game_time += dt;
 
     if (guide.stage == TutorialStage::WELCOME) return;
@@ -190,16 +196,22 @@ void TutorialScene::_input(const InputMap& input) {
 
     // 游戏操作
     if (input.is_action_just_pressed("attack")) {
-        if (!player->can_attack(game_time)) return;
-        std::vector<Monster*> ml;
-        for (auto& m : monsters) ml.push_back(m.get());
-        auto* target = find_attack_target(player->entity.rect, ml, PLAYER_ATTACK_RANGE);
-        if (target) {
-            int dmg = calculate_damage(player->combat.get_effective_attack(),
-                target->combat.get_effective_defense(AttackType::PHYSICAL));
-            player->_last_attack_time = game_time;
-            target->combat.take_damage(dmg);
-            get_tree()->get_audio()->play_sfx("melee");
+        // G10.8-B1: 接入 WeaponExecutor — 教程与正式游戏共享同一战斗链
+        // (三段连击/HitShape/元素/HitStop 全一致, 消除 legacy fist 体验断层)
+        if (player->weapon.can_attack(game_time)) {
+            std::vector<Monster*> ml;
+            for (auto& m : monsters) ml.push_back(m.get());
+            auto results = WeaponExecutor::execute(
+                player.get(), ml, game_time,
+                get_tree()->get_audio(), nullptr, game_map.get());
+            for (auto& r : results) {
+                // 命中反馈: 伤害数字 + HitStop (走正式游戏的 PresentationDirector)
+                get_tree()->get_audio()->play_sfx("hit");
+            }
+            if (!results.empty()) {
+                // 轻量打击停顿 — 复用正式游戏 CombatFeelSystem 常量
+                _tutorial_hitstop = CombatFeelSystem::LIGHT_HIT;
+            }
         }
     }
     if (input.is_action_just_pressed("pickup")) {
