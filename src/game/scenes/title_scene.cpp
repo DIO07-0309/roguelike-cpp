@@ -467,7 +467,7 @@ void TitleScene::_render() {
             "ESC - 保存并返回",
         };
         float guide_x = sw - 260.0f;
-        float guide_y = 215.0f;
+        float guide_y = 88.0f;    // 老师反馈修: 上移避让右侧怪物队列 (原 y215 挡骷髅/史莱姆)
         float guide_w = 240.0f;
         float guide_h = 165.0f;
         DrawRectangleRounded({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, Color{15, 15, 30, 200});

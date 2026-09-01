@@ -135,6 +135,45 @@ void TutorialScene::_render() {
         }
     }
 
+    // G10.8-B2: ELEMENT 步骤 — 真实三卡片选择 UI (与正式游戏同款交互)
+    if (guide.stage == TutorialStage::ELEMENT) {
+        const char* names[] = {"[火] 火焰核心", "[冰] 冰霜核心", "[毒] 剧毒核心"};
+        const char* descs[] = {"攻击概率火焰暴击\n暴击伤害 x1.5",
+                               "每击附加减速\n累计触发冻结",
+                               "每击附加持续毒伤\nDOT 按伤害比例"};
+        const Color ecolors[] = {{255,120,30,255},{100,200,255,255},{80,220,80,255}};
+        float cw = 240, chh = 190, gap = 16;
+        float sx = sw/2.0f - (cw*3 + gap*2)/2.0f;
+        for (int i = 0; i < 3; i++) {
+            float cx = sx + i * (cw + gap);
+            float cy = sh * 0.36f;
+            bool sel = (element_cursor == i);
+            DrawRectangleRounded({cx, cy, cw, chh}, 0.1f, 8,
+                sel ? Color{50,50,80,255} : Color{25,25,45,255});
+            DrawRectangleRoundedLines({cx-1, cy-1, cw+2, chh+2}, 0.1f, 8, 2.5f,
+                sel ? ecolors[i] : Color{50,50,75,220});
+            float nw = MeasureTextEx(g_font_small, names[i], 22, 1).x;
+            DrawTextEx(g_font_small, names[i], {cx + cw/2 - nw/2, cy + 18}, 22, 1, ecolors[i]);
+            float dy = cy + 58;
+            std::string line;
+            for (const char* p = descs[i]; *p; p++) {
+                if (*p == '\n') {
+                    float lw = MeasureTextEx(g_font_small, line.c_str(), 14, 1).x;
+                    DrawTextEx(g_font_small, line.c_str(), {cx + cw/2 - lw/2, dy}, 14, 1, {200,210,200,220});
+                    dy += 22; line.clear();
+                } else line += *p;
+            }
+            if (!line.empty()) {
+                float lw = MeasureTextEx(g_font_small, line.c_str(), 14, 1).x;
+                DrawTextEx(g_font_small, line.c_str(), {cx + cw/2 - lw/2, dy}, 14, 1, {200,210,200,220});
+            }
+            if (sel) {
+                DrawTextEx(g_font_small, "[A/D选择] [空格确认]",
+                    {cx + cw/2 - 78, cy + chh - 26}, 13, 1, {255,255,180,220});
+            }
+        }
+    }
+
     // 教程提示框
     auto lines = guide.get_instructions();
     if (!lines.empty()) {
@@ -192,20 +231,19 @@ void TutorialScene::_input(const InputMap& input) {
         return;
     }
 
-    // G10.8-B2: ELEMENT 步骤 — 数字 1/2/3 选择元素（与正式游戏一致的字段）
+    // G10.8-B2: ELEMENT 步骤 — 卡片导航 (与正式游戏同款 左右选+确认)
     if (guide.stage == TutorialStage::ELEMENT) {
-        if (input.is_action_just_pressed("skill_1")) {
-            player->element.select(ElementType::FIRE);
+        if (input.is_action_just_pressed("move_left"))
+            element_cursor = (element_cursor + 2) % 3;
+        if (input.is_action_just_pressed("move_right"))
+            element_cursor = (element_cursor + 1) % 3;
+        if (input.is_action_just_pressed("attack") || input.is_action_just_pressed("pickup")) {
+            static const ElementType choices[] = {
+                ElementType::FIRE, ElementType::ICE, ElementType::POISON };
+            player->element.select(choices[element_cursor]);
             get_tree()->get_audio()->play_sfx("ui_confirm");
         }
-        if (input.is_action_just_pressed("skill_2")) {
-            player->element.select(ElementType::ICE);
-            get_tree()->get_audio()->play_sfx("ui_confirm");
-        }
-        if (input.is_action_just_pressed("skill_3")) {
-            player->element.select(ElementType::POISON);
-            get_tree()->get_audio()->play_sfx("ui_confirm");
-        }
+        return;
     }
 
     // G10.8-B2: COOLDOWN 步骤 — 1.5s 后自动通过（玩家观察蓝条变化）

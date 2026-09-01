@@ -29,4 +29,5 @@ public:
     float game_time = 0;
     float cam_x = 0, cam_y = 0;
     float _tutorial_hitstop = 0.0f;   // G10.8-B1: 轻量打击停顿
+    int element_cursor = 0;           // G10.8-B2: 元素选择光标
 };
