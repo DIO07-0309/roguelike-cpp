@@ -108,6 +108,9 @@ public:
     // Batch 2C: Room Encounter 通知 — 由 RoomManager 调用 (显示房间消息)
     void show_room_message(const char* msg);
 
+    // G10.8-B4: 首次提示转发 (first_hint.h 使用; 简单转给 show_message)
+    void show_hint(const char* msg, float duration = 4.5f);
+
     // 核心数据
     std::unique_ptr<Player> player;
     std::shared_ptr<GameMap> game_map;

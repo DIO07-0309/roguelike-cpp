@@ -127,6 +127,15 @@ bool MetaSystem::save() const {
     for (int i = 0; i < _node_count; i++) {
         fprintf(f, "%d%s", _save.node_levels[i], (i < _node_count-1) ? "," : "");
     }
+    fprintf(f, "],\n");
+    // G10.8-B3: 首次提示标记
+    fprintf(f, "  \"hints\":[");
+    bool first = true;
+    for (auto& [id, shown] : _save.first_hints_shown) {
+        if (!shown) continue;
+        fprintf(f, "%s\"%s\"", first ? "" : ",", id.c_str());
+        first = false;
+    }
     fprintf(f, "]\n}\n");
     fclose(f);
     return true;
@@ -135,8 +144,8 @@ bool MetaSystem::save() const {
 bool MetaSystem::load() {
     FILE* f = fopen("saves/meta_save.json", "r");
     if (!f) return false;
-    // 简易解析
-    char buf[512];
+    // 简易解析 (G10.8-B3: 512→2048 容纳 hints 数组)
+    char buf[2048];
     fread(buf, 1, sizeof(buf)-1, f); fclose(f); buf[sizeof(buf)-1]=0;
     auto parse_int = [&](const char* key, int def) {
         const char* p = strstr(buf, key);
@@ -159,8 +168,50 @@ bool MetaSystem::load() {
             while (*np && *np != ',' && *np != ']') np++;
             if (*np == ',') np++;
     }}}
-    LOG_INFO("[META] Loaded: runs=%d soul=%d", _save.total_runs, _save.currency.soul_fragments);
+    // G10.8-B3: 解析 hints 数组 ("hints":["a","b"] — 只关心存在性)
+    _save.first_hints_shown.clear();
+    if (const char* hp = strstr(buf, "\"hints\"")) {
+        if ((hp = strstr(hp, "[")) != nullptr) {
+            hp++;
+            while (*hp && *hp != ']') {
+                if (*hp == '"') {
+                    char id[32]; int k = 0;
+                    hp++;
+                    while (*hp && *hp != '"' && k < 31) id[k++] = *hp++;
+                    id[k] = 0;
+                    if (k > 0) _save.first_hints_shown[id] = true;
+                }
+                hp++;
+            }
+        }
+    }
+    LOG_INFO("[META] Loaded: runs=%d soul=%d hints=%zu",
+             _save.total_runs, _save.currency.soul_fragments,
+             _save.first_hints_shown.size());
     return true;
+}
+
+// ══════════════════════════════════════════════════════════════
+// G10.8-B3: First Encounter Hint — 跨 run 持久化的"首次提示"标记
+// 用法: if (!MetaSystem::hint_already_shown("encounter_lock")) {
+//           show_hint("房间已封锁..."); MetaSystem::mark_hint_shown("encounter_lock"); }
+// ══════════════════════════════════════════════════════════════
+static const char* HINT_IDS[] = {
+    "element_select", "hud_intro", "combo_stage3", "encounter_lock",
+    "skill_cooldown", "skill_evolution", "boss_hp_bar", "biome_shift",
+    "challenge_portal", "gold_key", "relic_first", "stairs_descend",
+};
+
+bool MetaSystem::hint_already_shown(const std::string& hint_id) {
+    // 未存盘的新档 — 内存表为空 = 全部视为未显示
+    return g_meta.data().first_hints_shown.count(hint_id) > 0;
+}
+
+void MetaSystem::mark_hint_shown(const std::string& hint_id) {
+    // Q3.1: sim 模式不标记（保持每次真实玩家首遇都触发）
+    if (g_readonly) return;
+    g_meta._save.first_hints_shown[hint_id] = true;
+    g_meta.save();
 }
 
 // 计算本局奖励

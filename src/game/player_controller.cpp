@@ -21,6 +21,7 @@
 #include "audio_server.h"
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.2
 #include "reward_manager.h"
+#include "systems/first_hint.h"      // G10.8-B4: 首遇提示
 #include "relic_progression.h"
 #include <cmath>
 #include <algorithm>
@@ -784,6 +785,12 @@ void PlayerController::_weapon_attack(GameScene& gs, Player& p) {
 
     if (results.empty()) return; // whiff: VFX + shake played
 
+    // G10.8-B4: 首次三段重击教学 (stage2 命中时; 跨 run 一次)
+    if (stage == 2) {
+        first_hint(gs, "combo_stage3",
+                   "三段连击完成!", "连续普攻: 轻→强→最重, 第三段伤害最高");
+    }
+
     gs._gameplay.flow.mark_combat();
     gs._boss.behavior.memory.record_attack();
     gs._boss.replay_mem.melee_hits++;
@@ -865,6 +872,11 @@ void PlayerController::use_skill(int index) {
     CombatCoordinator::use_skill(index, gs.player.get(), gs.monsters, gs.game_map.get(),
         gs.active_effects, gs.get_tree()->get_audio(), gs.game_time,
         gs.time_stop_remaining, gs.pending_damage, was_heavy);
+
+    // G10.8-B4: 首次技能冷却教学 (放完技能后提示看蓝条)
+    if (!gs._sim_mode)
+        first_hint(gs, "skill_cooldown",
+                   "技能进入冷却", "技能栏下方的蓝色进度条恢复后才能再次释放");
 
     if (was_heavy) {
         gs._presentation.trigger_shake(10.0f);

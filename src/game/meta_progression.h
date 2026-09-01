@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <unordered_map>
 
 // ============================================================
 // D4.6 Step5: Meta Progression — 永久成长系统
@@ -51,6 +52,8 @@ struct MetaSave {
     MetaCurrency currency;
     int node_levels[10] = {0};  // 每个MetaNode的等级
     int total_runs = 0;
+    // G10.8-B3: 首次事件提示标记 (hint_id → 已显示; 跨 run 持久化)
+    std::unordered_map<std::string, bool> first_hints_shown;
 };
 
 // ---- 全局单例 ----
@@ -86,6 +89,10 @@ public:
 
     // Q3.1: --sim 模式禁止写 meta 存档
     static bool g_readonly;
+
+    // G10.8-B3: First Encounter Hint — 返回 false 表示首次（调用方显示提示并标记）
+    static bool hint_already_shown(const std::string& hint_id);
+    static void mark_hint_shown(const std::string& hint_id);
 
 private:
     MetaSave _save;

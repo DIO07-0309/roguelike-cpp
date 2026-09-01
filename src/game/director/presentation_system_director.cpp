@@ -1,6 +1,7 @@
 #include "presentation_system_director.h"
 #include "event_bus.h"
 #include "service_locator.h"   // G1: access presentation from static callback
+#include "meta_progression.h" // G10.8-B4: 首次进化提示
 #include "skill_evolution.h"   // G1 Step3
 #include "rule_chain.h"         // G1 Step4: rule_display_name
 #include "player.h"            // G1 Step3: access skills
@@ -271,6 +272,11 @@ void PresentationSystemDirector::init_events() {
                     snprintf(buf, sizeof(buf), "%s 进化: %s",
                              sk->name.c_str(), sk->get_evolution_text().c_str());
                     pres->show_message(buf, 2.5f);
+                    // G10.8-B4: 首次进化教学 — "技能越用越强"规则 (跨 run 一次)
+                    if (!MetaSystem::hint_already_shown("skill_evolution")) {
+                        MetaSystem::mark_hint_shown("skill_evolution");
+                        pres->show_message("技能会随使用次数进化变强!", 3.0f);
+                    }
                 }
             }
         }, "Presentation", this);

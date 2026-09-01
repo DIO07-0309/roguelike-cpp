@@ -22,6 +22,7 @@
 #include "data/boss_defs.h"     // G1 Step6
 #include "core/replay/state_hash.h"  // G4.5
 #include "systems/weapon_executor.h"  // G9.1
+#include "systems/first_hint.h"       // G10.8-B4: 首遇提示
 #include "vfx_server.h"              // G9: spear lightning VFX
 #include "data/weapon_defs.h"        // G9: Boss drop
 #include "data/element_defs.h"       // G10: element select screen
@@ -402,6 +403,9 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
         RoomEncounterCallbacks cb;
         cb.on_locked = [this](int) {
             show_room_message("房间封锁了!");
+            // G10.8-B4: 首次封门教学 — 新手最大断崖 (P0 调查证明连 SimAI 都会困住)
+            first_hint(*this, "encounter_lock",
+                       "房间已封锁!", "击败房内所有敌人后门自动打开");
             EventBus::inst().emit(GameEventType::ROOM_LOCKED, this, 0, 0.0f, nullptr);
         };
         cb.on_cleared = [this](int) {
@@ -496,6 +500,14 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
         LOG_INFO("进入第%d层 [%s] - %d只怪物, HPx%.2f ATKx%.2f",
             floor, fcfg->chapter_label, (int)monsters.size(),
             fcfg->hp_mult, fcfg->atk_mult);
+    }
+    // G10.8-B4: 首层首遇提示 (元素已选 + HUD 元素速览; 跨 run 只弹一次)
+    if (floor == 1 && !g_sim_mode && !element_select_active) {
+        first_hint(*this, "element_select",
+                   "你已选择元素!", "攻击会触发元素效果（暴击/冻结/毒伤）");
+        first_hint(*this, "hud_intro",
+                   "HUD: 左上 HP/XP | 技能栏有冷却 | 左下金币钥匙",
+                   "按 R 看圣物 · M 看地图 · F1 看日志");
     }
     EventBus::inst().emit(GameEventType::FLOOR_ENTER, this, floor,
                            fcfg->is_boss ? 1.0f : 0.0f);
@@ -1428,6 +1440,11 @@ void GameScene::on_door_opened() {
 // ── Batch 2C: Room Encounter 通知 ──
 void GameScene::show_room_message(const char* msg) {
     if (msg) _presentation.show_message(msg, 1.5f);
+}
+
+// G10.8-B4: 首次提示转发 — 教学性提示用更长的 4.5s
+void GameScene::show_hint(const char* msg, float duration) {
+    if (msg) _presentation.show_message(msg, duration);
 }
 
 
