@@ -22,11 +22,14 @@ public:
     InputMap& get_input() { return _input; }
     AudioServer* get_audio() { return _audio.get(); }
 
-    // 逻辑分辨率 (始终 960×640，全屏时由 RenderTexture 缩放)
+    // 逻辑分辨率 (始终 960×640，全屏/缩放时由 RenderTexture blit 保持比例)
     int width()  const { return WINDOW_WIDTH; }
     int height() const { return WINDOW_HEIGHT; }
     int get_width()  const { return width(); }
     int get_height() const { return height(); }
+
+    // G10.9: 鼠标物理坐标 → 960×640 逻辑坐标 (经 blit 矩阵逆映射)
+    Vector2 get_mouse_logical() const;
 
     void process_frame(double delta);
     bool is_running() const { return _running; }  // Q3.1: headless sim 循环
@@ -34,6 +37,9 @@ public:
 
 private:
     void _handle_input();
+
+    // G10.9: 当前 blit 目标矩形 (窗口客户区 letterbox 矩形, 鼠标逆映射共用)
+    Rectangle _blit_dst(Rectangle window_rect, bool fullscreen) const;
 
     bool _running = false;
     double _time = 0.0;

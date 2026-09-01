@@ -423,7 +423,8 @@ void TitleScene::_render() {
     y += 34;
 
     // 菜单项 (Q4.5: 鼠标悬停高亮 + hover 音效)
-    Vector2 mouse = GetMousePosition();
+    // G10.9: 窗口可缩放后物理鼠标 ≠ 960×640 逻辑坐标, 经 blit 矩阵逆映射
+    Vector2 mouse = get_tree()->get_mouse_logical();
     int new_hover = -1;
     for (int i = 0; i < (int)items.size(); i++) {
         auto& mi = items[i];

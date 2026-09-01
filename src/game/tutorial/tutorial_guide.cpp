@@ -40,7 +40,7 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
     case TutorialStage::ATTACK_COMBO:
         return {
             "第3步：攻击与三段连击",
-            "连续按 空格 攻击木桩（先按X装备短剑）",
+            "走到绿色木桩旁，连续按 空格 攻击！",
             "第1段轻→第2段强→第3段最重（屏幕震动+爆炸）",
             "连续攻击3次触发完整连击！"
         };

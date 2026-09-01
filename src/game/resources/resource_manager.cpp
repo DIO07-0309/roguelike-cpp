@@ -144,8 +144,8 @@ void ResourceManager::_init_font() {
 
     for (int i = 0; font_paths[i]; i++) {
         if (!FileExists(font_paths[i])) { LOG_INFO("  跳过: %s", font_paths[i]); continue; }
-        _font = LoadFontEx(font_paths[i], 32, cp_data, cp_count_val);
-        _font_small_ = LoadFontEx(font_paths[i], 18, cp_data, cp_count_val);
+        _font = LoadFontEx(font_paths[i], 40, cp_data, cp_count_val);
+        _font_small_ = LoadFontEx(font_paths[i], 24, cp_data, cp_count_val);
         LOG_INFO("  尝试: %s -> 字形:%d/%d", font_paths[i], _font.glyphCount, cp_count_val);
         if (_font.texture.id > 0 && _font.glyphCount > 200) {
             _font_ok = true;

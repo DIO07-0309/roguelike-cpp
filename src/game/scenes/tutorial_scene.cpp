@@ -23,6 +23,10 @@ void TutorialScene::_ready() {
     player = std::make_unique<Player>(2 * TILE_SIZE, 4 * TILE_SIZE, PLAYER_SPEED,
         50, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);  // 教程用50HP方便检测药水使用
 
+    // G10.8-fix: 教程 ATTACK_COMBO 需要武器 — 预装短剑
+    // (注意: id 必须是 weapons.json 里的 dagger_common, "dagger" 不存在会静默失败)
+    player->weapon.equip("dagger_common");
+
     monsters.clear();
     monsters.push_back(create_tutorial_dummy(8, 4));
     ground_items = create_tutorial_items(6, 5);
@@ -45,6 +49,10 @@ void TutorialScene::_process(double delta) {
         return;
     }
     game_time += dt;
+
+    // G10.8-fix: 空格连击无效根因 — 教程从不 tick WeaponComponent,
+    // recovery_timer 永不归零 → 首击后 can_act() 恒 false
+    player->weapon.tick(dt);
 
     if (guide.stage == TutorialStage::WELCOME) return;
 
