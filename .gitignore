@@ -28,4 +28,10 @@ build_sym/
 baseline_*
 nerf_verify_*
 repro_*
+# 大字体二进制 (50MB+) — 桌面包靠复制同步, 不进 git
+assets/fonts/*.otf
+assets/fonts/*.ttf
+# 临时垃圾
+temp_hex.txt
+ersHPanaconda3shellcondabinconda-hook.ps1*
 

@@ -120,7 +120,11 @@ void ResourceManager::unload_all() {
 }
 
 void ResourceManager::_init_font() {
+    // G10.9: 用户提供的思源黑体优先 (Bold 标题更清晰), 多级后备
     const char* font_paths[] = {
+        "assets/fonts/source_hans_bold.otf",
+        "assets/fonts/source_hans_regular.otf",
+        "assets/fonts/game_regular.ttf",
         "assets/fonts/NotoSansCJKsc-Regular.otf",
         nullptr
     };
