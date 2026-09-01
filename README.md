@@ -7,7 +7,7 @@
 > 随机生成 15 层地牢，击败 Boss「终焉回响」通关。
 > 五项 Stable 冻结验收通过：**API / Save / Mod / Regression / Performance**（报告 `docs/V1_0_0_ACCEPTANCE.md`）
 >
-> **v1.0.0 后新增**（Phase 1-3 + Batch 3A-3I + G9/G10 审计，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞 · **经济系统（金币/钥匙/圣物持久化/背包出售）· 赌徒房 · 挑战房（传送门 + 选择面板 + 波次战斗 + 独立竞技场）· G9 技术审计闭环 · Asset Manifest 资源管线 · 思源黑体字体迁移 · 外部 WAV 音效**
+> **v1.0.0 后新增**（Phase 1-3 + Batch 3A-3I + G9/G10 审计 + G10 视觉链，见 CHANGELOG）：FOV 可见性系统 · Room→Door→Corridor 地牢拓扑 · Minimap 小地图 · 碰撞/视觉分离 · E 键门交互 · 门视觉动画 · Boss FOV · 弹幕墙体碰撞 · **经济系统（金币/钥匙/圣物持久化/背包出售）· 赌徒房 · 挑战房（传送门 + 选择面板 + 波次战斗 + 独立竞技场 + 专属 BGM）· G9 技术审计闭环 · Asset Manifest 资源管线 · 思源黑体字体迁移 · 外部 WAV 音效 · 群系色相地图 + 战斗空间统一（AttackGeometry SSOT）+ 玩家环境真实感 + 电影海报主菜单（20 素材全画布散布）+ 剑与门游戏图标**
 
 本项目定位：
 

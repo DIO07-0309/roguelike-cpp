@@ -70,6 +70,12 @@ bool TitleScene::_activate(const std::string& action) {
         LOG_INFO("进入教程");
         return true;
     }
+    if (action == "fullscreen") {
+        // G10.7-B4: 修复鼠标点击"全屏切换"无反应 — _activate 缺此分支,
+        // 只有全局 G 键响应 (审计发现的 bug #2)
+        ToggleFullscreen();
+        return true;
+    }
     if (action == "quit") {
         tree->quit();
         return true;
