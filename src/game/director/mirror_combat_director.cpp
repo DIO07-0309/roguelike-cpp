@@ -1,4 +1,4 @@
-#include "mirror_combat_director.h"
+﻿#include "mirror_combat_director.h"
 #include "monster.h"
 #include "player.h"
 #include "boss.h"
@@ -135,7 +135,10 @@ void MirrorCombatDirector::init(const Player* player, Monster* boss,
     for (int i = 0; i < _total_stages && i < 3; i++) {
         if (wdef) {
             _stage_mults[i]  = wdef->stages[i].damage_multiplier;
-            _stage_ranges[i] = wdef->stages[i].range * 32.0f;
+            // G10.7-fix: Echo 近战射程钳 96px — 镜像 Boss 不得复制玩家长枪
+            // 224px 矩形判定在屏幕上形成"超视距瞬杀"体感 (用户实测反馈)
+            float mr = wdef->stages[i].range * 32.0f;
+            _stage_ranges[i] = (mr > 96.0f) ? 96.0f : mr;
         } else {
             _stage_mults[i]  = 1.0f;
             _stage_ranges[i] = 48.0f;  // 拳头范围
@@ -158,7 +161,10 @@ void MirrorCombatDirector::init(const Player* player, Monster* boss,
     for (int i = 0; i < 3; i++) {
         if (bow && i < bow->stage_count) {
             _slot_ranged.mults[i]  = bow->stages[i].damage_multiplier * 0.8f; // 远程略弱
-            _slot_ranged.ranges[i] = bow->stages[i].range * 32.0f;
+            // G10.7-fix: 弩射程钳 220px (~7 tile 屏内可辨) — 原值 320-384px
+            // 屏幕边缘外/刚入视野即三连发 = "超视距瞬间杀" (满血即杀体感)
+            float br = bow->stages[i].range * 32.0f;
+            _slot_ranged.ranges[i] = (br > 220.0f) ? 220.0f : br;
         } else {
             _slot_ranged.mults[i]  = 0.8f;
             _slot_ranged.ranges[i] = 220.0f;
@@ -315,6 +321,9 @@ void MirrorCombatDirector::_weapon_attack(Monster* boss, Player* player,
 
     float mult = _stage_mults[stage];
     int raw = (int)(boss->combat.attack * mult * _aggression_bonus);
+    // G10.7-fix: Echo 时停期间伤害减半 — 原设计冻结玩家1.5s且自身可输出,
+    // 弩三连+技能连发在同一冻结窗口叠加 = "满血瞬间杀"体感 (Q3.12 平衡红线)
+    if (_freeze_timer > 0.0f) raw /= 2;
     int dmg = calculate_damage(raw,
         player->combat.get_effective_defense(AttackType::PHYSICAL));
     player->combat.take_damage(dmg);
@@ -363,6 +372,7 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
     case 0: { // melee — 扇形/矩形近战
         if (dist > ms.range) { if (_agent) _agent->report_outcome(false, 0.0f); break; }
         int raw = (int)(atk * ms.dmg_mult * _aggression_bonus);
+        if (_freeze_timer > 0.0f) raw /= 2;   // G10.7-fix: Echo 时停窗口伤害减半
         int dmg = calculate_damage(raw,
             player->combat.get_effective_defense(AttackType::PHYSICAL));
         player->combat.take_damage(dmg);
@@ -397,6 +407,7 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
     case 3: { // aoe — 范围伤害 (需在范围半径内)
         if (dist > ms.range) { if (_agent) _agent->report_outcome(false, 0.0f); break; }
         int raw = (int)(atk * ms.dmg_mult * _aggression_bonus);
+        if (_freeze_timer > 0.0f) raw /= 2;   // G10.7-fix: Echo 时停窗口伤害减半
         int dmg = calculate_damage(raw,
             player->combat.get_effective_defense(AttackType::MAGICAL),
             AttackType::MAGICAL);
