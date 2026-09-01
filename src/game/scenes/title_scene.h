@@ -30,7 +30,10 @@ private:
         _stage_tex;
     struct CharTex {
         Texture2D p_fire{}, p_ice{}, p_poison{}, blacksmith{};
-        Texture2D boss_f10{}, shaman{}, skeleton{}, orc{}, slime{};
+        Texture2D boss_f10{}, boss_f5{}, shaman{}, skeleton{}, orc{}, slime{};
+        Texture2D tank{}, summoner{}, bomber{}, charger{};
+        Texture2D w_sword{}, w_spear{}, w_crossbow{}, w_dagger{};
+        Texture2D armor{}, potion_red{}, potion_blue{}, charm{};
         bool loaded = false;
     } _char_tex;
 };

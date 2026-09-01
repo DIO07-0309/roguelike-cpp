@@ -255,10 +255,23 @@ void TitleScene::_draw_characters() {
         _char_tex.p_poison = rm.sprite_by_key("player_poison", d);
         _char_tex.blacksmith = rm.sprite_by_key("npc_blacksmith", d);
         _char_tex.boss_f10 = rm.sprite_by_key("boss_f10", d);
+        _char_tex.boss_f5  = rm.sprite_by_key("boss_f5", d);
         _char_tex.shaman  = rm.sprite_by_key("mon_shaman", d);
         _char_tex.skeleton = rm.sprite_by_key("mon_skeleton", d);
         _char_tex.orc     = rm.sprite_by_key("mon_orc", d);
         _char_tex.slime   = rm.sprite_by_key("mon_slime", d);
+        _char_tex.tank    = rm.sprite_by_key("mon_tank", d);
+        _char_tex.summoner = rm.sprite_by_key("mon_summoner", d);
+        _char_tex.bomber  = rm.sprite_by_key("mon_bomber", d);
+        _char_tex.charger = rm.sprite_by_key("mon_charger", d);
+        _char_tex.w_sword = rm.sprite_by_key("weapon_sword", d);
+        _char_tex.w_spear = rm.sprite_by_key("weapon_spear", d);
+        _char_tex.w_crossbow = rm.sprite_by_key("weapon_crossbow", d);
+        _char_tex.w_dagger = rm.sprite_by_key("weapon_dagger", d);
+        _char_tex.armor   = rm.sprite_by_key("item_armor_iron", d);
+        _char_tex.potion_red = rm.sprite_by_key("item_potion_red", d);
+        _char_tex.potion_blue = rm.sprite_by_key("item_potion_blue", d);
+        _char_tex.charm   = rm.sprite_by_key("item_charm", d);
         _char_tex.loaded = true;
     }
 
@@ -277,40 +290,69 @@ void TitleScene::_draw_characters() {
                                    Color{255, 255, 255, a});
     };
 
-    // ── 左侧: 玩家阵营 (由远到近绘制, 近景最暗框上) ──
-    float left_cx = sw * 0.14f;
-    float floor_y = sh * 0.78f;
-    // 远景: 铁匠 NPC 3×, 暗
-    draw_char(_char_tex.blacksmith, left_cx + 92, floor_y - 58, 48, 0.42f, 2.4f);
-    // 中景: 冰/毒玩家 5×
-    draw_char(_char_tex.p_ice,   left_cx + 66, floor_y - 26, 80, 0.62f, 1.3f);
-    draw_char(_char_tex.p_poison, left_cx + 12, floor_y - 18, 80, 0.66f, 0.7f);
-    // 前景: 火系主角 8× (最亮最大, 队伍领队)
-    draw_char(_char_tex.p_fire, left_cx + 40, floor_y + 26, 128, 1.0f, 0.0f);
+    // ── 菜单安全区: 中央 340×450 (x 310-650, y 60-510) 保持净空 ──
+    // 布局原则: 全画布散布 (海报式), 近大远小, 允许少量边缘覆盖
 
-    // ── 右侧: 敌方阵营 (镜像布局, Boss 领队) ──
-    float right_cx = sw * 0.86f;
-    // 远景: 史莱姆 3×
-    draw_char(_char_tex.slime, right_cx - 92, floor_y - 58, 48, 0.42f, 3.1f);
-    // 中景: 骷髅 + 萨满 5×
-    draw_char(_char_tex.skeleton, right_cx - 66, floor_y - 26, 80, 0.66f, 1.9f);
-    draw_char(_char_tex.shaman,  right_cx - 12, floor_y - 18, 80, 0.62f, 2.6f);
-    // 前景: 红魔 Boss 8× (暗红 tint 压场)
+    // 左侧纵深队列 (x 递减 = 越左越近)
+    float floor_y = sh * 0.78f;
+    draw_char(_char_tex.p_fire, 88, floor_y + 26, 128, 1.0f, 0.0f);      // 前景领队 8×
+    draw_char(_char_tex.p_poison, 175, floor_y - 12, 84, 0.72f, 0.7f);   // 中景
+    draw_char(_char_tex.p_ice, 108, floor_y - 66, 76, 0.55f, 1.3f);      // 中远
+    draw_char(_char_tex.orc, 205, floor_y - 96, 60, 0.40f, 1.8f);        // 远景压阵
+    draw_char(_char_tex.blacksmith, 155, floor_y - 140, 44, 0.32f, 2.4f);// 左上远处
+
+    // 右侧纵深队列 (镜像布局)
+    draw_char(_char_tex.boss_f10, 872, floor_y + 26, 128, 1.0f, 0.0f);   // 前景领队
+    draw_char(_char_tex.shaman, 785, floor_y - 12, 84, 0.72f, 2.6f);
+    draw_char(_char_tex.skeleton, 852, floor_y - 66, 76, 0.55f, 1.9f);
+    draw_char(_char_tex.tank, 755, floor_y - 96, 60, 0.40f, 2.2f);      // 远景坦克
+    draw_char(_char_tex.slime, 805, floor_y - 140, 44, 0.32f, 3.1f);    // 右上远处
+
+    // 顶部两角: 中怪剪影带 (半透明, 不抢主)
+    draw_char(_char_tex.summoner, 250, 150, 52, 0.30f, 3.6f);
+    draw_char(_char_tex.charger, 700, 150, 52, 0.30f, 4.1f);
+    draw_char(_char_tex.bomber, 292, 118, 40, 0.25f, 4.6f);
+
+    // 左上晕角: 暗影骑士 (boss_f5) 大剪影 — 第三个 Boss 也是素材
+    if (_char_tex.boss_f5.id > 0) {
+        SpriteDef sd; sd.frame_w = 16; sd.frame_h = 16;
+        SpriteRenderer::draw_sprite(_char_tex.boss_f5, sd, 0,
+            {-30.0f, -34.0f, 110.0f, 110.0f},
+            Color{190, 190, 210, 60});   // 深蓝灰剪影, 出血裁切
+    }
+
+    // 右前景 Boss 眼部红光脉冲 (精灵已由 draw_char 绘制, 此处只补光效)
     if (_char_tex.boss_f10.id > 0) {
         float bob = sinf(anim_time * 1.1f) * 1.8f;
         float size = 128;
-        float x = right_cx - 40 - size / 2, y = floor_y + 26 - size + bob;
-        DrawEllipse(right_cx - 40, floor_y + 30, size * 0.34f, size * 0.1f,
-                    Color{0, 0, 0, 90});
-        SpriteDef sd; sd.frame_w = 16; sd.frame_h = 16;
-        SpriteRenderer::draw_sprite(_char_tex.boss_f10, sd, 0, {x, y, size, size},
-                                   Color{255, 210, 210, 255});   // 暖红 tint 压场
-        // Boss 眼部红光脉冲 (威压感)
+        float bx = 872 - size / 2, by = floor_y + 26 - size + bob;
         float glow = 0.4f + 0.6f * (0.5f + 0.5f * sinf(anim_time * 3.2f));
-        DrawCircle(x + size * 0.38f, y + size * 0.34f, 3.5f + glow * 2,
+        DrawCircle(bx + size * 0.38f, by + size * 0.34f, 3.5f + glow * 2,
                    Color{255, 60, 40, (unsigned char)(140 * glow)});
-        DrawCircle(x + size * 0.62f, y + size * 0.34f, 3.5f + glow * 2,
+        DrawCircle(bx + size * 0.62f, by + size * 0.34f, 3.5f + glow * 2,
                    Color{255, 60, 40, (unsigned char)(140 * glow)});
+    }
+
+    // ── 底部战利品带 (y ≈ 594+, 菜单面板下方, 不挡任何交互) ──
+    {
+        SpriteDef sd; sd.frame_w = 16; sd.frame_h = 16;
+        auto draw_item = [&](Texture2D tex, float cx, float cy, float size) {
+            if (tex.id <= 0) return;
+            SpriteRenderer::draw_sprite(tex, sd, 0,
+                {cx - size / 2, cy - size / 2, size, size},
+                Color{255, 255, 255, 200});
+        };
+        float band_y = sh - 46.0f;
+        // 左半: 武器列 (剑/矛/弩/匕首)
+        draw_item(_char_tex.w_sword,    180, band_y, 56);
+        draw_item(_char_tex.w_spear,    252, band_y - 6, 48);
+        draw_item(_char_tex.w_crossbow, 322, band_y, 52);
+        draw_item(_char_tex.w_dagger,   388, band_y + 2, 44);
+        // 右半: 装备列 (护符/甲/双药水)
+        draw_item(_char_tex.charm,       572, band_y + 2, 44);
+        draw_item(_char_tex.armor,       640, band_y, 46);
+        draw_item(_char_tex.potion_red,  706, band_y - 2, 42);
+        draw_item(_char_tex.potion_blue, 768, band_y + 2, 42);
     }
 }
 
