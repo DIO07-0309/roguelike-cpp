@@ -14,6 +14,8 @@ saves/save.json
 saves/meta_save.json
 saves/rl_qtable.json
 saves/rl_mirror_q_*.json
+saves/*.user_backup
+saves/*.bak.user_backup
 reports/
 build_mingw/
 build_test/
