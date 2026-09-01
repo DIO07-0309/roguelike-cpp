@@ -24,47 +24,71 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
             "",
             "按 Enter 开始练习！"
         };
+    case TutorialStage::ELEMENT:
+        return {
+            "第1步：选择元素",
+            "开局三选一（游戏开始时也会出现）",
+            "按 1 选火（暴击）· 按 2 选冰（冻结）· 按 3 选毒（持续伤害）",
+            "元素影响你整个冒险的战斗方式"
+        };
     case TutorialStage::MOVE:
         return {
-            "第1步：移动",
+            "第2步：移动",
             "W 上  S 下  A 左  D 右",
             "试试走几步吧！"
         };
-    case TutorialStage::ATTACK:
+    case TutorialStage::ATTACK_COMBO:
         return {
-            "第2步：普通攻击",
-            "走近绿色木桩，按 空格 攻击！",
-            "(金色圆圈 = 攻击范围)"
+            "第3步：攻击与三段连击",
+            "连续按 空格 攻击木桩（先按X装备短剑）",
+            "第1段轻→第2段强→第3段最重（屏幕震动+爆炸）",
+            "连续攻击3次触发完整连击！"
         };
     case TutorialStage::PICKUP:
         return {
-            "第3步：拾取物品",
+            "第4步：拾取物品",
             "走过去按 E 键拾取地面物品，也能与 NPC 对话！"
         };
     case TutorialStage::INVENTORY:
         return {
-            "第4步：背包与使用物品",
+            "第5步：背包与使用物品",
             "按 B 打开背包 → 上下选择药水",
             "→ 按 U 使用它来回复血量！"
         };
     case TutorialStage::EQUIP:
         return {
-            "第5步：装备武器",
+            "第6步：装备武器",
             "按 B 打开背包 → 选中武器",
             "→ 按 X 装备它！",
             "装备后左上角 ATK/DEF 会变化"
         };
     case TutorialStage::SKILL:
         return {
-            "第6步：使用技能",
+            "第7步：使用技能",
             "你已习得【斩击】技能",
             "走到木桩旁按 数字 1 释放！"
+        };
+    case TutorialStage::COOLDOWN:
+        return {
+            "第8步：技能冷却",
+            "技能释放后需要等待冷却",
+            "HUD 技能栏下方的蓝色进度条 = 冷却进度",
+            "再按几次 1 观察蓝条变化！"
+        };
+    case TutorialStage::WEAPON_INFO:
+        return {
+            "第9步：武器差异（小知识）",
+            "匕首=快速扇形 · 长剑=均衡三段 · 长矛=远距离突刺",
+            "双节棍=范围乱舞 · 弩=远程弹幕 · 每种手感完全不同",
+            "按下 P 进入正式游戏后试试各种武器！",
+            "",
+            "按 Enter 完成教程"
         };
     case TutorialStage::COMPLETE:
         return {
             "恭喜完成所有训练！",
             "WASD移动 | 空格攻击 | 1-4技能",
-            "E交互 | B背包 | X装备 | U使用",
+            "E交互 | B背包 | X装备 | U使用 | R圣物 | M地图",
             "",
             "按 Enter 返回标题，开始冒险！"
         };
@@ -77,25 +101,30 @@ void TutorialGuide::check_and_advance(Player* p, bool inv_open,
                                        std::vector<Monster*>& monsters,
                                        std::vector<DroppedItem>& items) {
     switch (stage) {
+    case TutorialStage::ELEMENT:     _check_element(p); break;
     case TutorialStage::MOVE:     _check_move(p); break;
-    case TutorialStage::ATTACK:    _check_attack(monsters); break;
+    case TutorialStage::ATTACK_COMBO: _check_attack(monsters); break;
     case TutorialStage::PICKUP:    _check_pickup(items); break;
     case TutorialStage::INVENTORY: _check_inventory(p); break;
     case TutorialStage::EQUIP:     _check_equip(p); break;
     case TutorialStage::SKILL:     _check_skill(); break;
+    case TutorialStage::COOLDOWN:   _check_cooldown(p); break;
     default: break;
     }
 }
 
 void TutorialGuide::advance_stage() {
     switch (stage) {
-    case TutorialStage::WELCOME:   stage = TutorialStage::MOVE; break;
-    case TutorialStage::MOVE:      stage = TutorialStage::ATTACK; attack_hits = 0; break;
-    case TutorialStage::ATTACK:    stage = TutorialStage::PICKUP; break;
+    case TutorialStage::WELCOME:   stage = TutorialStage::ELEMENT; break;
+    case TutorialStage::ELEMENT:   stage = TutorialStage::MOVE; break;
+    case TutorialStage::MOVE:      stage = TutorialStage::ATTACK_COMBO; attack_hits = 0; break;
+    case TutorialStage::ATTACK_COMBO: stage = TutorialStage::PICKUP; break;
     case TutorialStage::PICKUP:    stage = TutorialStage::INVENTORY; break;
     case TutorialStage::INVENTORY: stage = TutorialStage::EQUIP; break;
     case TutorialStage::EQUIP:     stage = TutorialStage::SKILL; break;
-    case TutorialStage::SKILL:     stage = TutorialStage::COMPLETE; break;
+    case TutorialStage::SKILL:     stage = TutorialStage::COOLDOWN; break;
+    case TutorialStage::COOLDOWN:  stage = TutorialStage::WEAPON_INFO; break;
+    case TutorialStage::WEAPON_INFO: stage = TutorialStage::COMPLETE; break;
     default: break;
     }
 }
@@ -136,6 +165,17 @@ void TutorialGuide::_check_equip(Player* p) {
 
 void TutorialGuide::_check_skill() {
     if (_skill_used) advance_stage();
+}
+
+void TutorialGuide::_check_element(Player* p) {
+    // G10.8-B2: 元素选择步骤 — 玩家任选其一即通过
+    if (p && p->element.initialized) { element_picked = true; advance_stage(); }
+}
+
+void TutorialGuide::_check_cooldown(Player* p) {
+    // G10.8-B2: 冷却步骤 — 简单等待 1.5s 自动推进（玩家观察蓝条）
+    (void)p;
+    if (cooldown_waited) advance_stage();
 }
 
 // ---- factory ----

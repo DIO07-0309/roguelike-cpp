@@ -13,7 +13,8 @@ struct DroppedItem;
 // TutorialGuide — 6阶段新手教程 (与 Python 版一致)
 // ============================================================
 enum class TutorialStage {
-    WELCOME, MOVE, ATTACK, PICKUP, INVENTORY, EQUIP, SKILL, COMPLETE
+    WELCOME, ELEMENT, MOVE, ATTACK_COMBO, PICKUP, INVENTORY, EQUIP,
+    SKILL, COOLDOWN, WEAPON_INFO, COMPLETE
 };
 
 class TutorialGuide {
@@ -34,6 +35,10 @@ public:
     float move_distance = 0;
     int attack_hits = 0;
     bool picked_up = false, item_used = false, equipped = false, _skill_used = false;
+    // G10.8-B2 新步状态
+    bool element_picked = false;
+    int combo_reached = 0;
+    bool cooldown_waited = false;
 
 private:
     float _last_px = 0, _last_py = 0;
@@ -45,6 +50,8 @@ private:
     void _check_inventory(Player* p);
     void _check_equip(Player* p);
     void _check_skill();
+    void _check_element(Player* p);       // G10.8-B2
+    void _check_cooldown(Player* p);      // G10.8-B2
 };
 
 // 工厂函数

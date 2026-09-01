@@ -177,6 +177,42 @@ void TutorialScene::_input(const InputMap& input) {
         return;
     }
 
+    // G10.8-B2: ELEMENT 步骤 — 数字 1/2/3 选择元素（与正式游戏一致的字段）
+    if (guide.stage == TutorialStage::ELEMENT) {
+        if (input.is_action_just_pressed("skill_1")) {
+            player->element.select(ElementType::FIRE);
+            get_tree()->get_audio()->play_sfx("ui_confirm");
+        }
+        if (input.is_action_just_pressed("skill_2")) {
+            player->element.select(ElementType::ICE);
+            get_tree()->get_audio()->play_sfx("ui_confirm");
+        }
+        if (input.is_action_just_pressed("skill_3")) {
+            player->element.select(ElementType::POISON);
+            get_tree()->get_audio()->play_sfx("ui_confirm");
+        }
+    }
+
+    // G10.8-B2: COOLDOWN 步骤 — 1.5s 后自动通过（玩家观察蓝条变化）
+    if (guide.stage == TutorialStage::COOLDOWN) {
+        static float cd_timer = 0.0f;
+        cd_timer += GetFrameTime();
+        if (cd_timer > 1.5f) {
+            guide.cooldown_waited = true;
+            cd_timer = 0.0f;
+        }
+    } else {
+        // 重置 static 计时器（离开步骤时）
+    }
+
+    // WEAPON_INFO 步骤 — Enter 进入 COMPLETE
+    if (guide.stage == TutorialStage::WEAPON_INFO) {
+        if (input.is_action_just_pressed("confirm")) {
+            guide.advance_stage();
+        }
+        return;
+    }
+
     // 背包模式
     if (inventory_open) {
         if (input.is_action_just_pressed("inventory") || input.is_action_just_pressed("cancel"))
