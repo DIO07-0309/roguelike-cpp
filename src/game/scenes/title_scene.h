@@ -25,6 +25,12 @@ public:
 private:
     bool _activate(const std::string& action);  // Q4.5: 键盘/鼠标共用动作分发
     void _draw_stage();   // G10.7-B2: 电影海报舞台层 (渐变/透视地板/拱门/vignette)
+    void _draw_characters();   // G10.7-B3: 左右对峙角色层 (近大远小)
     struct StageTex { Texture2D wall{}, floor{}, door{}; bool loaded = false; }
         _stage_tex;
+    struct CharTex {
+        Texture2D p_fire{}, p_ice{}, p_poison{}, blacksmith{};
+        Texture2D boss_f10{}, shaman{}, skeleton{}, orc{}, slime{};
+        bool loaded = false;
+    } _char_tex;
 };

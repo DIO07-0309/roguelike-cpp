@@ -2463,6 +2463,14 @@ void GameScene::_render() {
     // M4.2: 镜像冻结 overlay (优先级高于玩家时停 — 显示红霜)
     if (player_frozen_by_mirror()) {
         _renderer.draw_mirror_freeze_overlay(sw, sh, _boss.mirror_freeze_remaining());
+        // G10.7-fix: 冻结期间 Echo 常驻紫环 — 玩家看到"谁在维持时停"
+        if (_get_boss() && _get_boss()->combat.is_alive) {
+            auto* mb = _get_boss();
+            float pulse = 34 + sinf((float)GetTime() * 8.0f) * 6;
+            DrawRing({mb->entity.rect.x + mb->entity.rect.width/2 - _cam_x,
+                      mb->entity.rect.y + mb->entity.rect.height/2 - _cam_y},
+                     pulse, pulse + 5, 0, 360, 20, Color{130, 80, 220, 170});
+        }
     } else if (time_stop_remaining > 0) {
         _renderer.draw_time_stop_overlay(sw, sh, time_stop_remaining);
     }

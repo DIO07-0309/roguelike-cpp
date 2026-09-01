@@ -8,6 +8,8 @@
 #include "data/weapon_defs.h"   // M4.3: CROSSBOW 槽查询
 #include "vfx_server.h"
 #include "core/logger.h"
+#include "core/service_locator.h"        // G10.7-fix: 时停演出音效
+#include "game/audio/audio_server.h"
 #include <cmath>
 
 MirrorCombatDirector::MirrorCombatDirector() = default;
@@ -424,7 +426,24 @@ void MirrorCombatDirector::_mirror_skill(Monster* boss, Player* player,
             LOG_INFO("[MIRROR] 镜像时停 [%s]: 观察期仅减速", ms.name.c_str());
         } else {
             _freeze_timer = 1.5f;   // Q3.10: 冻结 3s→1.5s (原 3s 占战斗一半时长, 免费输出窗口过大)
-            LOG_INFO("[MIRROR] 镜像时停 [%s]: 玩家冻结 3s", ms.name.c_str());
+            LOG_INFO("[MIRROR] 镜像时停 [%s]: 玩家冻结", ms.name.c_str());
+            // G10.7-fix: 发动演出 — 玩家必须"看到时停全过程"而非只承受结果
+            // (起手三重扩散环 + 专属音效; 冻结期间 Boss 常驻紫环由渲染层叠加)
+            if (effects) {
+                float bx = boss->entity.rect.x + boss->entity.rect.width / 2;
+                float by = boss->entity.rect.y + boss->entity.rect.height / 2;
+                for (int ring_i = 0; ring_i < 3; ring_i++) {
+                    Effect ef;
+                    ef.kind = "ring";
+                    ef.world_x = bx; ef.world_y = by;
+                    ef.radius = 60.0f + ring_i * 50.0f;
+                    ef.duration = 0.5f; ef.start_delay = ring_i * 0.12f;
+                    ef.color = Color{130, 80, 220, 200};
+                    effects->push_back(ef);
+                }
+            }
+            if (auto* audio = ServiceLocator::get<AudioServer>())
+                audio->play_sfx("timestop", 0.9f);   // 玩家自己的时停音效 — 听感同源
         }
         if (_agent) {
             _agent->report_outcome(true, 0.0f);     // 验收: 执行成功正反馈

@@ -238,6 +238,82 @@ void TitleScene::_draw_stage() {
     }
 }
 
+// ══════════════════════════════════════════════════════════════
+// G10.7-B3: 对峙角色层 — 左玩家阵营 / 右敌方阵营, 近大远小
+// 中央留白给标题与菜单 (可读性优先); 全部现有 16×16 素材放大
+// ══════════════════════════════════════════════════════════════
+void TitleScene::_draw_characters() {
+    auto* tree = get_tree();
+    if (!tree) return;
+    const int sw = tree->get_width(), sh = tree->get_height();
+
+    if (!_char_tex.loaded) {
+        auto& rm = ResourceManager::inst();
+        SpriteDef d;
+        _char_tex.p_fire  = rm.sprite_by_key("player_fire", d);
+        _char_tex.p_ice   = rm.sprite_by_key("player_ice", d);
+        _char_tex.p_poison = rm.sprite_by_key("player_poison", d);
+        _char_tex.blacksmith = rm.sprite_by_key("npc_blacksmith", d);
+        _char_tex.boss_f10 = rm.sprite_by_key("boss_f10", d);
+        _char_tex.shaman  = rm.sprite_by_key("mon_shaman", d);
+        _char_tex.skeleton = rm.sprite_by_key("mon_skeleton", d);
+        _char_tex.orc     = rm.sprite_by_key("mon_orc", d);
+        _char_tex.slime   = rm.sprite_by_key("mon_slime", d);
+        _char_tex.loaded = true;
+    }
+
+    // 单角色绘制: 阴影 + 精灵 (16×16 -> size px) + 轻微呼吸浮动
+    auto draw_char = [&](Texture2D tex, float cx, float base_y, float size,
+                         float dim, float bob_phase) {
+        if (tex.id <= 0) return;
+        float bob = sinf(anim_time * 1.4f + bob_phase) * size * 0.012f;
+        float x = cx - size / 2, y = base_y - size + bob;
+        // 脚下阴影
+        DrawEllipse(cx, base_y + 4, size * 0.32f, size * 0.09f,
+                    Color{0, 0, 0, (unsigned char)(70 * dim)});
+        SpriteDef sd; sd.frame_w = 16; sd.frame_h = 16;
+        unsigned char a = (unsigned char)(255 * dim);
+        SpriteRenderer::draw_sprite(tex, sd, 0, {x, y, size, size},
+                                   Color{255, 255, 255, a});
+    };
+
+    // ── 左侧: 玩家阵营 (由远到近绘制, 近景最暗框上) ──
+    float left_cx = sw * 0.14f;
+    float floor_y = sh * 0.78f;
+    // 远景: 铁匠 NPC 3×, 暗
+    draw_char(_char_tex.blacksmith, left_cx + 92, floor_y - 58, 48, 0.42f, 2.4f);
+    // 中景: 冰/毒玩家 5×
+    draw_char(_char_tex.p_ice,   left_cx + 66, floor_y - 26, 80, 0.62f, 1.3f);
+    draw_char(_char_tex.p_poison, left_cx + 12, floor_y - 18, 80, 0.66f, 0.7f);
+    // 前景: 火系主角 8× (最亮最大, 队伍领队)
+    draw_char(_char_tex.p_fire, left_cx + 40, floor_y + 26, 128, 1.0f, 0.0f);
+
+    // ── 右侧: 敌方阵营 (镜像布局, Boss 领队) ──
+    float right_cx = sw * 0.86f;
+    // 远景: 史莱姆 3×
+    draw_char(_char_tex.slime, right_cx - 92, floor_y - 58, 48, 0.42f, 3.1f);
+    // 中景: 骷髅 + 萨满 5×
+    draw_char(_char_tex.skeleton, right_cx - 66, floor_y - 26, 80, 0.66f, 1.9f);
+    draw_char(_char_tex.shaman,  right_cx - 12, floor_y - 18, 80, 0.62f, 2.6f);
+    // 前景: 红魔 Boss 8× (暗红 tint 压场)
+    if (_char_tex.boss_f10.id > 0) {
+        float bob = sinf(anim_time * 1.1f) * 1.8f;
+        float size = 128;
+        float x = right_cx - 40 - size / 2, y = floor_y + 26 - size + bob;
+        DrawEllipse(right_cx - 40, floor_y + 30, size * 0.34f, size * 0.1f,
+                    Color{0, 0, 0, 90});
+        SpriteDef sd; sd.frame_w = 16; sd.frame_h = 16;
+        SpriteRenderer::draw_sprite(_char_tex.boss_f10, sd, 0, {x, y, size, size},
+                                   Color{255, 210, 210, 255});   // 暖红 tint 压场
+        // Boss 眼部红光脉冲 (威压感)
+        float glow = 0.4f + 0.6f * (0.5f + 0.5f * sinf(anim_time * 3.2f));
+        DrawCircle(x + size * 0.38f, y + size * 0.34f, 3.5f + glow * 2,
+                   Color{255, 60, 40, (unsigned char)(140 * glow)});
+        DrawCircle(x + size * 0.62f, y + size * 0.34f, 3.5f + glow * 2,
+                   Color{255, 60, 40, (unsigned char)(140 * glow)});
+    }
+}
+
 void TitleScene::_render() {
     ClearBackground(BLACK);
     auto* tree = get_tree();
@@ -246,6 +322,8 @@ void TitleScene::_render() {
 
     // G10.7-B2: 电影海报舞台层 (渐变/透视地板/石墙/拱门/火光/vignette)
     _draw_stage();
+    // G10.7-B3: 左右对峙角色层 (近大远小, 中央留白给标题/菜单)
+    _draw_characters();
 
     // 背景粒子 (舞台之上的飘浮尘埃)
     for (int i = 0; i < 20; i++) {
