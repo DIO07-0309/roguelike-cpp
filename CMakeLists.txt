@@ -44,7 +44,8 @@ include_directories("${CMAKE_SOURCE_DIR}/src/ai")          # G8.1
 file(GLOB_RECURSE SOURCES src/*.cpp)
 
 # ---- Executable ----
-add_executable(${PROJECT_NAME} ${SOURCES})
+# G10.7-B1: WIN32 subsystem (no console window) + game icon/version resource
+add_executable(${PROJECT_NAME} WIN32 ${SOURCES} src/game_icon.rc)
 
 # MSVC: vendored raylib dll/lib
 if(MSVC)

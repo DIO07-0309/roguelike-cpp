@@ -5,6 +5,7 @@
 // ============================================================
 #include "raylib.h"
 #include "core/scene_tree.h"
+#include "core/win_center.h"     // G10.7-B1: gui_sanitize_stdio
 #include "game/audio/audio_server.h"   // Q3.1: --sim 静音
 #include "core/logger.h"
 #include "scenes/game_scene.h"
@@ -114,6 +115,7 @@ int main(int argc, char** argv) {
 #ifdef _WIN32
     _fix_working_dir(argc > 0 ? argv[0] : "");
     install_seh_handler();
+    gui_sanitize_stdio();   // G10.7-B1: WIN32 GUI 子系统下 stdout/stderr 保活
 #endif
     std::set_terminate(_terminate_handler);
 
@@ -184,7 +186,7 @@ int main(int argc, char** argv) {
         LOG_INFO("Sim: %d runs", sim_runs);
     }
 
-    SceneTree tree(WINDOW_WIDTH, WINDOW_HEIGHT, "Roguelike - C++ Edition");
+    SceneTree tree(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);  // G10.7-B1: 统一 config.h 常量
     ServiceLocator::provide(&tree);  // Q4.4: 事件回调访问音频
     LOG_INFO("窗口创建");
 

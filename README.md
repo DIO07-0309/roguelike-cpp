@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/brand/roguelike.png" width="160" alt="Roguelike C++ 剑与门图标"></p>
+
 # 地牢肉鸽 — Roguelike C++
 
 > **v1.0.0 正式版** — C++17 + Raylib 5.0 | CMake | **297 源文件** | Windows 实机验证

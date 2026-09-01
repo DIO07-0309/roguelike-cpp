@@ -8,6 +8,14 @@
 
 SceneTree::SceneTree(int w, int h, const char* title) {
     InitWindow(w, h, title);
+    // G10.7-B1: 窗口图标 — 与 exe 图标同源 (剑与门, assets/brand/roguelike.png)
+    {
+        Image icon = LoadImage("assets/brand/roguelike.png");
+        if (icon.width > 0) {
+            SetWindowIcon(icon);
+            UnloadImage(icon);
+        }
+    }
     InitAudioDevice();
     SetExitKey(0);
     center_active_window();
