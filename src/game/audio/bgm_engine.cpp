@@ -76,6 +76,20 @@ Sound BGMEngine::_compile_bgm(const std::string& name) {
         chords = {{"C4",1.6f},{"G3",1.6f},{"A3",1.6f},{"F3",1.6f},{"C4",1.6f},{"G3",1.6f},{"F3",1.6f},{"C4",2.4f}};
         melody = {{"C5",0.3f},{"E5",0.2f},{"G5",0.3f},{"C6",0.4f},{0,0.2f},{"G5",0.2f},{"E5",0.3f},{"C5",0.3f},{"D5",0.2f},{0,0.1f},{"C6",0.3f},{"B5",0.2f},{"A5",0.3f},{"G5",0.2f},{"E5",0.3f},{"F5",0.3f},{"G5",0.3f},{"C6",0.4f},{0,0.3f},{"C6",0.3f},{"B5",0.2f},{"C6",0.3f},{"G5",0.4f},{"E5",0.3f},{"C5",0.3f},{"D5",0.3f},{"C5",0.6f}};
         bass  = {{"C3",0.8f},{"G2",0.8f},{"A2",0.8f},{"F2",0.8f},{"C3",0.8f},{"G2",0.8f},{"F2",0.8f},{"C3",1.2f}};
+    } else if (name == "challenge") {
+        // G10.7-B: 竞技场专属 — 比 boss 更急促的波次战斗曲
+        // C 小调 i-VI-VII-v 紧张循环 + 短促顿音旋律 (三连冲锋感)
+        bpm = 160; beat = 60.0f / bpm;
+        chords = {{"C3",0.5f},{"Ab2",0.5f},{"Bb2",0.5f},{"G2",0.5f}};
+        melody = {{"C4",0.08f},{"Eb4",0.08f},{"G4",0.08f},{"C5",0.16f},
+                  {"Bb4",0.08f},{"G4",0.08f},{"Bb4",0.08f},{"C5",0.16f},
+                  {"F4",0.08f},{"Ab4",0.08f},{"C5",0.08f},{"Eb5",0.16f},
+                  {"D5",0.08f},{"Bb4",0.08f},{"G4",0.08f},{"C5",0.24f}};
+        bass  = {{"C2",0.125f},{"C2",0.125f},{"C2",0.125f},{"C2",0.125f},
+                 {"Ab1",0.125f},{"Ab1",0.125f},{"Ab1",0.125f},{"Ab1",0.125f},
+                 {"Bb1",0.125f},{"Bb1",0.125f},{"Bb1",0.125f},{"Bb1",0.125f},
+                 {"G1",0.125f},{"G1",0.125f},{"G1",0.125f},{"G1",0.125f}};
+        mw = "saw"; bw = "square";
     } else if (name == "select") {
         chords = {{"A3",2.0f},{"F3",2.0f},{"G3",2.0f},{"E3",2.0f},{"A3",2.0f},{"F3",1.5f},{"C4",1.0f},{"G3",1.5f}};
         melody = {{0,0.8f},{"A4",0.5f},{0,0.3f},{"C5",0.4f},{0,0.6f},{"E5",0.5f},{0,0.4f},{"D5",0.3f},{0,0.5f},{"C5",0.4f},{"B4",0.3f},{"A4",0.6f}};
@@ -134,7 +148,8 @@ Sound BGMEngine::_compile_bgm(const std::string& name) {
         for (auto& c : chords) {
             float dur = c.len * beat * 4;
             int root = note_midi(c.note);
-            std::vector<int> iv = (name == "dungeon" || name == "boss") ?
+            std::vector<int> iv = (name == "dungeon" || name == "boss"
+                               || name == "challenge") ?
                 std::vector<int>{0,3,7} : std::vector<int>{0,4,7};
             auto ch = render_chord(root, iv, dur, 0.18f);
             for (int i = 0; i < (int)ch.size() && (int)(pos*SR) + i < n; i++)
@@ -222,6 +237,7 @@ void BGMEngine::init() {
     _cache["dungeon"] = _compile_bgm("dungeon");
     _cache["boss"]    = _compile_bgm("boss");
     _cache["victory"] = _compile_bgm("victory");   // Q3.16: 通关动画专属
+    _cache["challenge"] = _compile_bgm("challenge");  // G10.7-B: 竞技场专属
 }
 
 void BGMEngine::close() { for (auto& [_, s] : _cache) UnloadSound(s); _cache.clear(); }

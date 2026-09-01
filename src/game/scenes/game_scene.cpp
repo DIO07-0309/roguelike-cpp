@@ -2861,6 +2861,9 @@ void GameScene::enter_challenge_arena() {
     _teleport_fade_timer = 0.3f;
     _portal_fade_in = true;
     _portal_pulse_timer = 0.0f;
+
+    // G10.7-B: 竞技场专属 BGM (160bpm 小调急促波次战斗曲)
+    if (get_tree()) get_tree()->get_audio()->play_bgm("challenge", 0.42f);
 }
 
 void GameScene::exit_challenge_arena() {
@@ -2890,6 +2893,13 @@ void GameScene::exit_challenge_arena() {
     _teleport_fade_timer = 0.3f;
     _portal_fade_in = false;
     _challenge.reset();
+
+    // G10.7-B: 退出竞技场 — 恢复当前楼层群系 BGM (走现有延迟播放管线)
+    if (get_tree()) {
+        const FloorConfig* fcfg = get_floor_config(current_floor);
+        if (fcfg && fcfg->bgm && fcfg->bgm[0])
+            _pending_bgm = fcfg->bgm;
+    }
 }
 
 bool GameScene::is_save_blocked() const {
