@@ -6,6 +6,7 @@
 #include "combat_system.h"
 #include "boss.h"
 #include "config.h"
+#include "save/save_manager.h"   // G10.9-C5: HUD 槽位提示
 #include "vfx_server.h"
 #include "boss.h"
 #include "build_score.h"
@@ -831,11 +832,14 @@ void GameRenderer::draw_hud(const Player* player, int current_floor, float game_
         DrawTextEx(g_font_small, buf, {12, 42}, 13, 1, {180, 200, 255, 255});
     }
 
-    // Floor
+    // Floor + G10.9-C5: 当前槽位轻量提示 (避免"我在玩哪个档?")
     if (g_font_loaded) {
         char buf[32];
         snprintf(buf, sizeof(buf), "第%d/%d层", current_floor, MAX_FLOORS);
         DrawTextEx(g_font_small, buf, {220, 42}, 16, 1, {200, 200, 50, 255});
+        char slot_buf[16];
+        snprintf(slot_buf, sizeof(slot_buf), "存档%d", SaveManager::active_slot());
+        DrawTextEx(g_font_small, slot_buf, {315, 44}, 13, 1, {150, 160, 180, 200});
     }
 
     // Boss HP bar — F15.5.1: hide for echo boss (HP shown in mirror panel)

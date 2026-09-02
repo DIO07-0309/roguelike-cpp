@@ -2,6 +2,7 @@
 #include "floor_select_scene.h"
 #include "tutorial_scene.h"
 #include "game_scene.h"
+#include "slot_select_scene.h"   // G10.9-C: 三档选择
 #include "scene_tree.h"
 #include "audio/audio_server.h"
 #include "config.h"
@@ -21,52 +22,30 @@ bool TitleScene::_activate(const std::string& action) {
     tree->get_audio()->play_sfx("ui_confirm", 0.5f);
 
     if (action == "new") {
-        auto gs = std::make_shared<GameScene>();
-        gs->name = "GameScene";
-        // G10.9-B2: 新游戏 → 第一个空档 (G10.9-C 覆盖为显式选档 UI; 满档处理也在 C)
-        int free_slot = 0;
-        for (auto& s : SaveManager::get_all_slots())
-            if (!s.exists) { free_slot = s.slot_id; break; }
-        if (free_slot) SaveManager::set_active_slot(free_slot);
-        gs->new_game();
-        tree->change_scene(gs);
-        LOG_INFO("开始新游戏 (slot %d)", SaveManager::active_slot());
+        // G10.9-C3: 新游戏 → 统一选档界面 (空档直选 / 满档删除流由场景内处理)
+        auto sss = std::make_shared<SlotSelectScene>();
+        sss->name = "SlotSelectScene";
+        sss->mode = SlotSelectScene::Mode::NEW_GAME;
+        tree->change_scene(sss);
+        LOG_INFO("新游戏 → 选档");
         return true;
     }
     if (action == "continue" && has_save) {
-        // G10.9-B2: 槽位化 — 读活跃槽 (G10.9-C 加选档 UI 后由那里 set_active_slot)
-        auto* data = SaveManager::load_save();
-        if (data) {
-            auto gs = std::make_shared<GameScene>();
-            gs->name = "GameScene";
-            int floor = data->current_floor;
-            int maxf = data->max_unlocked_floor;
-            if (data->player) {
-                gs->load_saved_game(floor, maxf, std::move(data->player),
-                                    data->dungeon_seed, data->special_triggered,
-                                    data->special_discovered, data->rule_counters,
-                                    data->quest_states, data->play_time);
-            } else {
-                auto p = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
-                    PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
-                gs->load_saved_game(floor, maxf, std::move(p),
-                                    data->dungeon_seed, data->special_triggered,
-                                    data->special_discovered, data->rule_counters,
-                                    data->quest_states, data->play_time);
-            }
-            gs->set_mirror_memory(data->mirror_prior_alpha,
-                                  data->mirror_prior_beta);
-            delete data;
-            tree->change_scene(gs);
-            LOG_INFO("继续游戏: 第%d层", floor);
-        }
+        // G10.9-C2: 继续游戏 → 选已有档
+        auto sss = std::make_shared<SlotSelectScene>();
+        sss->name = "SlotSelectScene";
+        sss->mode = SlotSelectScene::Mode::CONTINUE_GAME;
+        tree->change_scene(sss);
+        LOG_INFO("继续游戏 → 选档");
         return true;
     }
     if (action == "select") {
-        auto fs = std::make_shared<FloorSelectScene>();
-        fs->name = "FloorSelectScene";
-        fs->max_unlocked = max_floor;
-        tree->change_scene(fs);
+        // G10.9-C4: 选关 → 先选档 (读该档 maxf, 只解锁该档范围)
+        auto sss = std::make_shared<SlotSelectScene>();
+        sss->name = "SlotSelectScene";
+        sss->mode = SlotSelectScene::Mode::SELECT_FLOOR;
+        tree->change_scene(sss);
+        LOG_INFO("选关 → 选档");
         return true;
     }
     if (action == "tutorial") {
