@@ -22,10 +22,7 @@ void TutorialScene::_ready() {
     game_map = build_tutorial_map();
     player = std::make_unique<Player>(2 * TILE_SIZE, 4 * TILE_SIZE, PLAYER_SPEED,
         50, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);  // 教程用50HP方便检测药水使用
-
-    // G10.8-fix: 教程 ATTACK_COMBO 需要武器 — 预装短剑
-    // (注意: id 必须是 weapons.json 里的 dagger_common, "dagger" 不存在会静默失败)
-    player->weapon.equip("dagger_common");
+    // G10.10: 不再预装备武器 — 玩家在流程中真实走一遍 捡剑→装备→连击 闭环
 
     monsters.clear();
     monsters.push_back(create_tutorial_dummy(8, 4));

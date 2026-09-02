@@ -37,30 +37,31 @@ std::vector<std::string> TutorialGuide::get_instructions() const {
             "W 上  S 下  A 左  D 右",
             "试试走几步吧！"
         };
-    case TutorialStage::ATTACK_COMBO:
-        return {
-            "第3步：攻击与三段连击",
-            "走到绿色木桩旁，连续按 空格 攻击！",
-            "第1段轻→第2段强→第3段最重（屏幕震动+爆炸）",
-            "连续攻击3次触发完整连击！"
-        };
     case TutorialStage::PICKUP:
         return {
-            "第4步：拾取物品",
-            "走过去按 E 键拾取地面物品，也能与 NPC 对话！"
+            "第3步：拾取物品",
+            "走过去按 E 键拾取药水和训练短剑",
+            "（两件都要捡起来哦）"
         };
     case TutorialStage::INVENTORY:
         return {
-            "第5步：背包与使用物品",
+            "第4步：背包与使用物品",
             "按 B 打开背包 → 上下选择药水",
             "→ 按 U 使用它来回复血量！"
         };
     case TutorialStage::EQUIP:
         return {
-            "第6步：装备武器",
-            "按 B 打开背包 → 选中武器",
+            "第5步：装备武器",
+            "按 B 打开背包 → 选中训练用短剑",
             "→ 按 X 装备它！",
-            "装备后左上角 ATK/DEF 会变化"
+            "装备后才能发挥完整连击威力"
+        };
+    case TutorialStage::ATTACK_COMBO:
+        return {
+            "第6步：攻击与三段连击",
+            "走到绿色木桩旁，连续按 空格 攻击！",
+            "第1段轻→第2段强→第3段最重（屏幕震动+爆炸）",
+            "连续攻击3次触发完整连击！"
         };
     case TutorialStage::SKILL:
         return {
@@ -117,11 +118,12 @@ void TutorialGuide::advance_stage() {
     switch (stage) {
     case TutorialStage::WELCOME:   stage = TutorialStage::ELEMENT; break;
     case TutorialStage::ELEMENT:   stage = TutorialStage::MOVE; break;
-    case TutorialStage::MOVE:      stage = TutorialStage::ATTACK_COMBO; attack_hits = 0; break;
-    case TutorialStage::ATTACK_COMBO: stage = TutorialStage::PICKUP; break;
+    // G10.10: 重排 — 捡剑→用瓶→装备→连击, 攻击步不再要求"背包装备但背包是空的"
+    case TutorialStage::MOVE:      stage = TutorialStage::PICKUP; break;
     case TutorialStage::PICKUP:    stage = TutorialStage::INVENTORY; break;
     case TutorialStage::INVENTORY: stage = TutorialStage::EQUIP; break;
-    case TutorialStage::EQUIP:     stage = TutorialStage::SKILL; break;
+    case TutorialStage::EQUIP:      stage = TutorialStage::ATTACK_COMBO; attack_hits = 0; break;
+    case TutorialStage::ATTACK_COMBO: stage = TutorialStage::SKILL; break;
     case TutorialStage::SKILL:     stage = TutorialStage::COOLDOWN; break;
     case TutorialStage::COOLDOWN:  stage = TutorialStage::WEAPON_INFO; break;
     case TutorialStage::WEAPON_INFO: stage = TutorialStage::COMPLETE; break;
@@ -150,7 +152,8 @@ void TutorialGuide::_check_attack(std::vector<Monster*>& monsters) {
 }
 
 void TutorialGuide::_check_pickup(std::vector<DroppedItem>& items) {
-    if (items.size() < 2) advance_stage();  // 初始2个, 捡了至少1个
+    // G10.10: 初始 2 件 (药水+短剑), 全部捡起才过 — 否则短剑留地上, 装备步卡死
+    if (items.empty()) advance_stage();
 }
 
 void TutorialGuide::_check_inventory(Player* p) {
@@ -160,7 +163,10 @@ void TutorialGuide::_check_inventory(Player* p) {
 }
 
 void TutorialGuide::_check_equip(Player* p) {
-    if (p->inventory.equipped["weapon"]) advance_stage();
+    // G10.10: 必须 WeaponComponent 同步到真武器 (非空手 fist_basic) 才算过
+    // 防止只看 equipped["weapon"] 有值但 weapon_def_id 为空的假通过
+    if (p->inventory.equipped["weapon"] &&
+        p->weapon.current_weapon_id() != "fist_basic") advance_stage();
 }
 
 void TutorialGuide::_check_skill() {
@@ -212,7 +218,10 @@ std::unique_ptr<Monster> create_tutorial_dummy(int tx, int ty) {
 std::vector<DroppedItem> create_tutorial_items(int tx, int ty) {
     std::vector<DroppedItem> items;
     items.push_back({std::make_shared<ConsumableItem>("初级生命药水", Rarity::COMMON, "heal", 20), tx, ty});
-    items.push_back({std::make_shared<EquipmentItem>("训练用短剑", Rarity::COMMON, "weapon", 4, 1, 0), tx + 1, ty});
+    // G10.10: 训练短剑带真实 weapon_def_id — 否则装备后 WeaponComponent 不同步 (仍空手)
+    auto sword = std::make_shared<EquipmentItem>("训练用短剑", Rarity::COMMON, "weapon", 4, 1, 0);
+    sword->weapon_def_id = "dagger_common";
+    items.push_back({sword, tx + 1, ty});
     return items;
 }
 
