@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <functional>
 #include "types/weapon_types.h"
 #include "ai/player_behavior/player_action.h"
 
@@ -69,6 +70,10 @@ public:
     void reset_run() { _freeze_timer = 0.0f; }
     // ── M4.3: 当前武器槽只读 ──
     const char* active_weapon_name() const;
+    // M1: 适应播报回调 — GameScene 注入 show_message 通道 (战斗中"它在学我"话术)
+    void set_callout_sink(std::function<void(const char*, float)> sink) {
+        _callout_sink = std::move(sink);
+    }
   
 private:
     // M4.1: 战术层 — 画像驱动战术选择 + 技能映射
@@ -127,4 +132,9 @@ private:
     float _last_player_x = 0.0f;   // 玩家闪避检测
     float _last_player_y = 0.0f;
     float _last_player_hp = 0.0f;  // M2: 玩家喝药检测 (HP 上升判定)
+    // M1: 适应播报通道
+    std::function<void(const char*, float)> _callout_sink;
+    void _emit_callout(const char* msg, float dur = 3.0f) {
+        if (_callout_sink && msg) _callout_sink(msg, dur);
+    }
 };

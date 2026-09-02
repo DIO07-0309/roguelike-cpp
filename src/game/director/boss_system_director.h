@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <functional>
 #include "boss_narrative.h"
 #include "boss_evolution.h"
 #include "boss_behavior.h"
@@ -72,6 +73,8 @@ public:
                               std::vector<float>& beta) const;
     void inject_mirror_memory(const std::vector<float>& alpha,
                               const std::vector<float>& beta);
+    // M1: 镜像学习剧场接线 — GameScene 注入播报通道 (战术/阶段晋升 → 屏幕消息)
+    void connect_mirror_theater(std::function<void(const char*, float)> sink);
 
     std::string intro_text;
     std::string modifier_text;

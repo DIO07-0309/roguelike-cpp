@@ -284,6 +284,19 @@ void BossSystemDirector::inject_mirror_memory(
     if (_mirror_agent) _mirror_agent->import_memory(alpha, beta);
 }
 
+// M1: 学习剧场接线 — 战术播报 + 阶段晋升播报都走 GameScene 的 show_message
+void BossSystemDirector::connect_mirror_theater(
+    std::function<void(const char*, float)> sink) {
+    if (!sink) return;
+    _mirror_combat.set_callout_sink(sink);
+    if (_mirror_agent)
+        _mirror_agent->set_phase_sink(
+            [sink](int phase, const char* reason) {
+                (void)phase;
+                if (reason) sink(reason, 3.5f);
+            });
+}
+
 void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
     float game_time, const WorldState& ws, const RelationshipSystem& rels,
     StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters,

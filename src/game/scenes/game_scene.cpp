@@ -153,6 +153,10 @@ void GameScene::_ready() {
 }
 
 void GameScene::new_game() {
+    // M1: 新对局清空行为录制 — 修复跨局流污染
+    // (旧代码 g_behavior 从不清: 上一局的死亡记录混入本局镜像分析)
+    g_behavior.clear();
+
     player = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
         PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
 
@@ -1031,6 +1035,27 @@ void GameScene::_process(double delta) {
             return;
         }
         LOG_INFO("玩家死亡! 第%d层 Lv%d - 存档已保留", current_floor, player->level);
+        // M1-D1: 死亡也保存镜像学习 — "你怎么死的, 它都会记住"
+        // (F15 镜像战死亡时 agent 仍在, 本局学习成果随死亡落盘)
+        {
+            std::vector<float> fresh_alpha, fresh_beta;
+            _boss.export_mirror_memory(fresh_alpha, fresh_beta);
+            if (!fresh_alpha.empty()) {
+                _mirror_mem_alpha = fresh_alpha;
+                _mirror_mem_beta = fresh_beta;
+                std::vector<bool> spr, spd;
+                if (game_map) for (auto& sr : game_map->special_rooms) {
+                    spr.push_back(sr.triggered);
+                    spd.push_back(sr.discovered);
+                }
+                std::unordered_map<std::string, int> rcm;
+                SaveManager::save_game(SaveManager::active_slot(), player.get(),
+                    current_floor, max_unlocked_floor, _dungeon_seed,
+                    spr, spd, rcm, _gameplay.quest_mgr.export_states(),
+                    _mirror_mem_alpha, _mirror_mem_beta, (float)game_time);
+                LOG_INFO("[MIRROR] 死亡保留镜像记忆 (%zu 桶)", fresh_alpha.size());
+            }
+        }
         // G10.9-B1: end_run 只在 on_player_dead 内部执行一次
         // (旧代码这里再直接调 g_meta.end_run → runs 双计数/奖励双发)
         _gameplay.on_player_dead(current_floor, player->level, player.get());
@@ -1798,15 +1823,23 @@ void GameScene::_activate_stairs() {
             int v = _gameplay.world_state.counter(ALL_RULES[i]);
             if (v > 0) rcm[ALL_RULES[i]] = v;
         }
-        std::vector<float> mirror_alpha, mirror_beta;
-        _boss.export_mirror_memory(mirror_alpha, mirror_beta);
+        // M1-D1: last-known 镜像记忆 — Boss 存活时导出更新缓存; 否则透传上一已知值
+        // (修复: F15 前任意存档曾用空导出覆盖档, 抹掉上一局学习成果)
+        {
+            std::vector<float> fresh_alpha, fresh_beta;
+            _boss.export_mirror_memory(fresh_alpha, fresh_beta);
+            if (!fresh_alpha.empty()) {
+                _mirror_mem_alpha = fresh_alpha;
+                _mirror_mem_beta = fresh_beta;
+            }
+        }
         // G10.9-B2: 槽位化保存 — endings 不再入档 (Meta 侧落盘); 补记账号最高层
         // play_time 源 = game_time (本 run 进度内累计的帧时钟, 换层不清零)
         SaveManager::save_game(SaveManager::active_slot(), player.get(),
                                current_floor, max_unlocked_floor,
                                _dungeon_seed, spr, spd, rcm,
                                _gameplay.quest_mgr.export_states(),
-                               mirror_alpha, mirror_beta,
+                               _mirror_mem_alpha, _mirror_mem_beta,
                                (float)game_time);
         MetaSystem::record_floor_reached(max_unlocked_floor);
     }
@@ -2829,6 +2862,29 @@ void GameScene::_draw_mirror_analysis_panel(int sw, int sh) {
     ly += 25;
     snprintf(buf, sizeof(buf), "%s", profile.counter_strategy_text());
     DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly}, 13, 1, {200, 180, 160, 200});
+
+    // M1: 实数回执 — "你做了什么, 它看到什么" (镜像分析的具体凭证)
+    ly += 30;
+    {
+        const auto& bd = g_behavior.data();
+        snprintf(buf, sizeof(buf),
+                 "回执: 挥击x%d · 技能x%d · 闪避x%d · 累计承伤%d",
+                 bd.weapon_attacks_total, bd.skill_uses_total,
+                 bd.dodge_count, bd.total_damage_taken);
+        DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly}, 13, 1,
+                   {255, 150, 130, 220});
+        // 本命技能具体次数 (最爱技能在它手上的注脚)
+        if (fav >= 0 && fav < 4) {
+            static const char* skill_ids[] = {"slash", "fireball", "self_heal", "the_world"};
+            auto it = bd.skill_uses.find(skill_ids[fav]);
+            int uses = (it != bd.skill_uses.end()) ? it->second : 0;
+            ly += 22;
+            snprintf(buf, sizeof(buf), "「%s」共释放 %d 次 — 镜像已掌握",
+                     fav_name, uses);
+            DrawTextEx(g_font_small, buf, {cx - pw/2 + 40, ly}, 13, 1,
+                       {255, 120, 100, 200});
+        }
+    }
 
     // Aggression gauge
     ly += 35;

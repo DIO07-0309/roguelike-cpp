@@ -9,6 +9,8 @@
 #include "ai/mirror/tactical_chain_table.h"
 #include <vector>
 #include <memory>
+#include <functional>
+#include <string>
 #include <map>
 #include <string>
 #include <functional>
@@ -46,6 +48,15 @@ public:
     // ── Phase 1-2-3 behavior selection ──
     int  current_phase() const { return _phase; }   // 1=observe, 2=mirror, 3=evolve
     void set_phase(int p) { _phase = p; }
+    // M1: 阶段晋升播报 — GameScene 注入 show_message 通道 (晋升即播"它学会了")
+    void set_phase_sink(std::function<void(int, const char*)> sink) {
+        _phase_sink = std::move(sink);
+    }
+    void set_phase_announced(int p, const char* reason) {
+        bool changed = (p != _phase);
+        _phase = p;
+        if (changed && _phase_sink) _phase_sink(p, reason);
+    }
 
     // ── M2: 在线观测与动态阶段触发 ──
     // 预测后立即上报 (附上下文用于同桶命中统计); 玩家实际动作出现时上报比对
@@ -127,6 +138,7 @@ public:
 private:
     PlayerHabitProfile _profile;
     int  _phase = 1;
+    std::function<void(int, const char*)> _phase_sink;   // M1: 晋升播报
     float _preferred_distance = 250.0f;
     // M4e: 在线学习
     std::unique_ptr<OnlineAdaptivePolicy> _policy;

@@ -24,6 +24,22 @@ const char* MirrorCombatDirector::tactic_name() const {
     }
 }
 
+// M1: 适应播报 — 玩家可读的"它在学我"话术 (战术→反制文案)
+static const char* _tactic_callout(MirrorTactic t, const PlayerHabitProfile& p) {
+    switch (t) {
+    case MirrorTactic::KITE:
+        return "回响: 「你总在被打后反击 — 我不再硬拼」";
+    case MirrorTactic::OPEN_RANGED:
+        return p.face_enemy_rate > 0.7f
+            ? "回响: 「你从不回头 — 那我就从远处收割」" : nullptr;
+    case MirrorTactic::ENGAGE_MELEE:
+        return p.predict_low_dodge
+            ? "回响: 「你很少闪避 — 贴身就是死局」" : nullptr;
+    default:
+        return nullptr;
+    }
+}
+
 // ── M4.1: 画像 + 态势 → 战术状态 (带切换冷却防抖动) ──
 void MirrorCombatDirector::_update_tactic(const PlayerHabitProfile& profile,
                                           float dist, float player_hp_pct) {
@@ -33,6 +49,8 @@ void MirrorCombatDirector::_update_tactic(const PlayerHabitProfile& profile,
         _tactic = next;
         _tactic_timer = 3.0f;   // 3s 内不再切换
         LOG_INFO("[MIRROR] 战术切换 → %s", tactic_name());
+        // M1: 战术适应播报 (每个战术一次, 玩家可读)
+        _emit_callout(_tactic_callout(_tactic, profile), 3.5f);
     }
 }
 
@@ -216,6 +234,27 @@ void MirrorCombatDirector::init(const Player* player, Monster* boss,
         _skills.push_back(ms);
     }
     _attack_cd = 1.2f;
+
+    // ── M1: "它真的在学我" 三连 ──
+    if (agent) {
+        const auto& prof = agent->profile();
+        // 1) 最爱技能开局: Echo 首技 = 玩家本命技能 (面板承诺的"最爱技能"真上场)
+        //    skill_preference[0..3] 与玩家 skills 顺序对齐; 找最大偏好对应槽位
+        int fav = prof.predicted_fav_skill;
+        if (fav >= 0 && fav < (int)_skills.size()
+            && _skills[fav].skill_type != 2) {   // 自奶技能不作开场表演
+            _skill_idx = fav;
+            _skill_cd_timer = 1.5f;              // 开场 1.5s 后甩出本命技
+            LOG_INFO("[MIRROR] 开局本命技: %s (偏好%.0f%%)",
+                     _skills[fav].name.c_str(),
+                     prof.skill_preference[fav] * 100.0f);
+        }
+        // 2) 节奏模仿: 攻击 CD 从玩家 attack_frequency 派生 (乱拳玩家→乱拳镜像)
+        if (prof.attack_frequency > 0.1f) {
+            float cd = 1.0f / prof.attack_frequency;
+            _slot_melee.cd = (cd < 0.6f) ? 0.6f : (cd > 1.6f) ? 1.6f : cd;
+        }
+    }
     LOG_INFO("[MIRROR] Combat init: stages=%d skills=%d", _total_stages, (int)_skills.size());
 }
 

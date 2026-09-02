@@ -430,7 +430,11 @@ void MirrorAgent::tick_phase(float dt, const MirrorBattleState& st) {
         bool learned = (acc >= t.phase1_accuracy_threshold
                      && _observed_actions >= t.phase1_min_observations)
                     || _observed_actions >= t.phase1_obs_backstop;
-        if (learned || _battle_time >= t.phase1_time_backstop) set_phase(2);
+        // M1: 晋升播报 — 观察期结束 = "它已经摸清你的路数"
+        if (learned)
+            set_phase_announced(2, "镜像已摸清你的出招路数");
+        else if (_battle_time >= t.phase1_time_backstop)
+            set_phase_announced(2, "镜像停止观望 — 开始模仿你");
         break;
     }
     case 2: {
@@ -438,7 +442,11 @@ void MirrorAgent::tick_phase(float dt, const MirrorBattleState& st) {
                     && _rolling_accuracy.accuracy() >= t.phase2_accuracy_threshold;
         bool danger = st.player_hp_pct < t.phase2_hp_danger
                    || st.boss_hp_pct < t.phase2_hp_danger;
-        if (pattern || danger) set_phase(3);
+        // M1: 进化播报 — 命中同桶预测或濒危 = "它预判了你的习惯"
+        if (pattern)
+            set_phase_announced(3, "镜像已能预判你的习惯 — 进化!");
+        else if (danger)
+            set_phase_announced(3, "镜像进入濒死进化 — 全力反扑!");
         break;
     }
     default: break;

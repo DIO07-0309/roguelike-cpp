@@ -92,14 +92,21 @@ void GameSceneInput::handle_input(const InputMap& input) {
                     int v = _s._gameplay.world_state.counter(ALL_RULES[i]);
                     if (v > 0) rcm[ALL_RULES[i]] = v;
                 }
-                std::vector<float> mirror_alpha, mirror_beta;
-                _s._boss.export_mirror_memory(mirror_alpha, mirror_beta);
+                // M1-D1: last-known 镜像记忆 — Boss 存活则更新缓存, 否则透传
+                {
+                    std::vector<float> fresh_alpha, fresh_beta;
+                    _s._boss.export_mirror_memory(fresh_alpha, fresh_beta);
+                    if (!fresh_alpha.empty()) {
+                        _s._mirror_mem_alpha = fresh_alpha;
+                        _s._mirror_mem_beta = fresh_beta;
+                    }
+                }
                 // G10.9-B2: 槽位化 + play_time; endings 不再入档 (Meta 落盘)
                 SaveManager::save_game(SaveManager::active_slot(),
                     _s.player.get(), _s.current_floor,
                     _s.max_unlocked_floor, _s._dungeon_seed, spr, spd, rcm,
                     _s._gameplay.quest_mgr.export_states(),
-                    mirror_alpha, mirror_beta, (float)_s.game_time);
+                    _s._mirror_mem_alpha, _s._mirror_mem_beta, (float)_s.game_time);
                 LOG_INFO("Save→第%d层", _s.current_floor);
             }
         }
@@ -125,6 +132,13 @@ auto* boss = boss_factory_create(btype, _s.stairs_pos.first, _s.stairs_pos.secon
             // M4e: 跨对局镜像记忆注入 (空 vector 安全)
             _s._boss.inject_mirror_memory(_s._mirror_mem_alpha,
                                           _s._mirror_mem_beta);
+            // M1: 镜像播报接线 — 战术切换 / 阶段晋升 → 屏幕消息
+            // (仅 F15 镜像 Boss: agent 由 init_on_spawn 内部创建后才有意义,
+            //  每帧 tick 走 boss_system_director, 这里只挂 sink)
+            _s._boss.connect_mirror_theater(
+                [&s = _s](const char* msg, float dur) {
+                    if (msg) s._presentation.show_message(msg, dur);
+                });
             _s._presentation.boss_modifier_text = _s._boss.modifier_text;
 
             _s.boss_cinematic_timer = 1.0f;
