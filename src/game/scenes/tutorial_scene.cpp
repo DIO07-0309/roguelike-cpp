@@ -109,11 +109,28 @@ void TutorialScene::_render() {
     for (auto& m : monsters) m->draw(cam_x, cam_y);
     if (player) player->draw_no_cam(cam_x, cam_y);
 
-    // 掉落物 (简化绘制)
+    // 掉落物 (M3: 与主游戏同款 — 数据驱动精灵 + 稀有度光环, 替代纯色块)
     for (auto& d : ground_items) {
         float px = d.tile_x * TILE_SIZE - cam_x + 2;
         float py = d.tile_y * TILE_SIZE - cam_y + 2;
-        DrawRectangle(px, py, TILE_SIZE - 4, TILE_SIZE - 4, d.item->color);
+        float size = TILE_SIZE - 4;
+        float cx = px + size / 2, cy = py + size / 2;
+        const char* ikey = item_icon_key(d.item.get());
+        bool drew = false;
+        if (ikey) {
+            SpriteDef xd; xd.frame_w = 16; xd.frame_h = 16;
+            Texture2D itex = ResourceManager::inst().sprite_by_key(ikey, xd);
+            if (itex.id > 0) {
+                float pulse = 6 + sinf((float)GetTime() * 5 + px * 0.1f) * 3;
+                DrawRectangleLinesEx({cx - pulse, cy - pulse, pulse * 2, pulse * 2}, 1,
+                                     rarity_color(d.item->rarity));
+                SpriteRenderer::draw_sprite(itex, xd, 0,
+                    {cx - size/2, cy - size/2, size, size});
+                drew = true;
+            }
+        }
+        if (!drew)   // 贴图缺失 fallback: 原色块 + 光环
+            DrawRectangle(px, py, size, size, d.item->color);
     }
 
     // 背包面板

@@ -7,10 +7,19 @@ extern Font g_font, g_font_small;
 extern bool g_font_loaded;
 
 void DeathScene::_render() {
-    ClearBackground(BLACK);
+    // M3: 血色渐晕底 (脱离纯黑) — 上深下更暗, 中央微红
+    ClearBackground({12, 6, 8, 255});
     int sw = get_tree()->get_width(), sh = get_tree()->get_height();
+    for (int i = 0; i < 80; i++) {
+        float t = i / 80.0f;
+        DrawRectangle(0, i, sw, 1,
+            {(unsigned char)(12 + 26 * t), (unsigned char)(6 + 8 * t),
+             (unsigned char)(8 + 10 * t), 255});
+    }
     if (g_font_loaded) {
+        // M3: 大字投影 + 呼吸明度 (静字变尸碑)
         float w = MeasureTextEx(g_font, "你 死 了", 64, 1).x;
+        DrawTextEx(g_font, "你 死 了", {sw/2.0f - w/2 + 3, 63}, 64, 1, {0, 0, 0, 160});
         DrawTextEx(g_font, "你 死 了", {sw/2.0f - w/2, 60}, 64, 1, {220, 40, 40, 255});
 
         // D6: 结局信息

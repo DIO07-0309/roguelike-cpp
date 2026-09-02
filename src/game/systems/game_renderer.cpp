@@ -220,13 +220,68 @@ void GameRenderer::draw_boss_intro(int sw, int sh, const std::string& title,
     Rectangle pr = {sw / 2.0f - pw / 2, sh / 2.0f - ph / 2, pw, ph};
     draw_panel(pr, "! Boss 遭遇 !");
 
+    // M3: Boss 立绘 (按层数取 sprite, 48px 置于标题右上; 立绘随 Boss 类型变化)
+    {
+        auto& rm = ResourceManager::inst();
+        const char* key = (boss_floor >= 15) ? "boss_self"
+                       : (boss_floor >= 10) ? "boss_f10" : "boss_f5";
+        SpriteDef sd; sd.frame_w = 16; sd.frame_h = 16;
+        Texture2D tex = rm.sprite_by_key(key, sd);
+        if (tex.id > 0) {
+            Rectangle src = {0, 0, (float)tex.width, (float)tex.height};
+            Rectangle dst = {pr.x + pr.width - 70, pr.y + 8, 48, 48};
+            DrawTexturePro(tex, src, dst, {0, 0}, 0, WHITE);
+            DrawRectangleLinesEx({dst.x - 2, dst.y - 2, dst.width + 4, dst.height + 4},
+                                 1, {color.r, color.g, color.b, 160});
+        }
+    }
+
     draw_glow_text(title.c_str(), sw / 2.0f, pr.y + 45, 30, color, true);
 
     if (g_font_loaded) {
-        DrawTextEx(g_font_small, skills_text.c_str(), {pr.x + 80, pr.y + 160}, 16, 1,
-                   {180, 180, 180, 255});
-        DrawTextEx(g_font, lore.c_str(), {pr.x + 40, pr.y + 210}, 18, 1,
-                   {160, 160, 180, 255});
+        // M3: 技能行自动换行 (原固定单行溢出面板)
+        {
+            std::string s(skills_text);
+            float max_w = pw - 80;
+            size_t pos = 0; float ly = pr.y + 160;
+            while (pos < s.size() && ly < pr.y + ph - 130) {
+                size_t take = s.size() - pos;
+                while (take > 4 && MeasureTextEx(g_font_small,
+                        s.substr(pos, take).c_str(), 16, 1).x > max_w)
+                    take--;
+                std::string line = s.substr(pos, take);
+                // 尽量在逗号/句号处断行
+                if (pos + take < s.size()) {
+                    size_t cut = line.find_last_of("，。;；");
+                    if (cut != std::string::npos && cut > 4) take = cut + 1;
+                }
+                DrawTextEx(g_font_small, line.c_str(), {pr.x + 40, ly}, 16, 1,
+                           {180, 180, 180, 255});
+                ly += 24;
+                pos += take;
+            }
+        }
+        // M3: 剧情文本换行 (原单行溢出)
+        {
+            std::string s(lore);
+            float max_w = pw - 80;
+            size_t pos = 0; float ly = pr.y + 210;
+            while (pos < s.size() && ly < pr.y + ph - 60) {
+                size_t take = s.size() - pos;
+                while (take > 4 && MeasureTextEx(g_font,
+                        s.substr(pos, take).c_str(), 18, 1).x > max_w)
+                    take--;
+                std::string line = s.substr(pos, take);
+                if (pos + take < s.size()) {
+                    size_t cut = line.find_last_of("，。；!？");
+                    if (cut != std::string::npos && cut > 4) take = cut + 1;
+                }
+                DrawTextEx(g_font, line.c_str(), {pr.x + 40, ly}, 18, 1,
+                           {160, 160, 180, 255});
+                ly += 26;
+                pos += take;
+            }
+        }
     }
     draw_glow_text("按 Enter 进入战斗...", sw / 2.0f, (float)(sh - 60), 20,
                    {140, 20, 20, 255}, true);

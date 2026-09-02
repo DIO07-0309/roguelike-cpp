@@ -4,27 +4,45 @@
 #include "scene_tree.h"
 #include "core/logger.h"
 #include "meta_progression.h"
+#include <cmath>
 
 extern Font g_font, g_font_small;
 extern bool g_font_loaded;
 
 void VictoryScene::_render() {
-    ClearBackground(BLACK);
+    // M3: 结局色氛围渐变底 — 从结局色到暗 (每局画面随结局变色)
     int sw = get_tree()->get_width(), sh = get_tree()->get_height();
+    Color ec;
+    if (ending_name == "TRUE END" || ending_name == "ABSOLUTE END")
+        ec = {255, 220, 80, 255};
+    else if (ending_name == "GOOD END")
+        ec = {100, 255, 120, 255};
+    else if (ending_name == "BAD END")
+        ec = {220, 80, 60, 255};
+    else
+        ec = {200, 200, 200, 255};
+    ClearBackground({(unsigned char)(ec.r/14), (unsigned char)(ec.g/14),
+                     (unsigned char)(ec.b/14), 255});
+    for (int i = 0; i < 80; i++) {
+        float t = i / 80.0f;
+        DrawRectangle(0, i, sw, 1,
+            {(unsigned char)(ec.r/14 + ec.r/10 * t),
+             (unsigned char)(ec.g/14 + ec.g/10 * t),
+             (unsigned char)(ec.b/14 + ec.b/10 * t), 255});
+    }
+    // 顶部放射细线 (胜利光感, 结局色)
+    for (int i = 0; i < 24; i++) {
+        float a = i / 24.0f * 6.2832f;
+        DrawLine(sw/2, -20, sw/2 + cosf(a) * 900, -20 + sinf(a) * 900,
+                 {ec.r, ec.g, ec.b, 18});
+    }
 
     if (g_font_loaded) {
-        Color ec;
-        if (ending_name == "TRUE END" || ending_name == "ABSOLUTE END")
-            ec = {255, 220, 80, 255};
-        else if (ending_name == "GOOD END")
-            ec = {100, 255, 120, 255};
-        else if (ending_name == "BAD END")
-            ec = {220, 80, 60, 255};
-        else
-            ec = {200, 200, 200, 255};
-
+        // M3: 结局名投影
         float w = MeasureTextEx(g_font, ending_name.c_str(), 48, 1).x;
+        DrawTextEx(g_font, ending_name.c_str(), {sw/2.0f - w/2 + 3, 63}, 48, 1, {0,0,0,150});
         DrawTextEx(g_font, ending_name.c_str(), {sw/2.0f - w/2, 60}, 48, 1, ec);
+        DrawLine(sw/2 - w/2, 118, sw/2 + w/2, 118, {ec.r, ec.g, ec.b, 110});
 
         // 最终台词 (多行)
         auto draw_lines = [&](const char* text, float x, float y, int sz, Color c) {
@@ -41,7 +59,7 @@ void VictoryScene::_render() {
             }
         };
         if (!final_line.empty())
-            draw_lines(final_line.c_str(), sw/2.0f, 130, 18, {230, 230, 240, 255});
+            draw_lines(final_line.c_str(), sw/2.0f, 140, 18, {230, 230, 240, 255});
 
         char buf[128];
         snprintf(buf, sizeof(buf), "天空颜色: %s  |  Lv%d", sky_color.c_str(), final_level);
