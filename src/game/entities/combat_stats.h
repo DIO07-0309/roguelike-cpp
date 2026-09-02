@@ -59,6 +59,10 @@ struct CombatStats {
     int logged_hp = -1;
     void mark_damage_logged() { logged_hp = current_hp; }
 
+    // M2-B: 最后受伤来源 (死因归因) — 7 个 [DMG] 打点处赋值;
+    // 值语义 string 无悬垂, sim 收尾时读入 RunResult
+    std::string last_damage_source;
+
     CombatStats(int hp = 20, int atk = 5, int pdef = 0, int mdef = 0);
 
     int take_damage(int amount);

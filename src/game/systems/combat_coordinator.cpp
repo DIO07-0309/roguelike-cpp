@@ -12,41 +12,9 @@
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.1
 #include <cmath>
 
-void CombatCoordinator::player_attack(Player* player,
-                                       std::vector<std::unique_ptr<Monster>>& monsters,
-                                       std::vector<Effect>& effects, AudioServer* audio) {
-    if (!player || !player->can_attack(GetTime())) return;
-    player->_last_attack_time = (float)GetTime();
-
-    Monster* target = find_attack_target(player->entity.rect,
-        reinterpret_cast<const std::vector<Monster*>&>(monsters),
-        PLAYER_ATTACK_RANGE);
-    if (!target) return;
-
-    int dmg = calculate_damage(player->combat.get_effective_attack(),
-        target->combat.get_effective_defense(AttackType::PHYSICAL));
-    target->combat.take_damage(dmg);
-
-    if (audio) audio->play_sfx("melee");
-
-    // 命中 VFX
-    VFXServer vfx;
-    vfx.hit_flash(target->entity.rect.x + target->entity.rect.width / 2,
-                  target->entity.rect.y + target->entity.rect.height / 2,
-                  target->entity.rect.width);
-    vfx.player_attack(player->entity.rect.x + player->entity.rect.width / 2,
-                      player->entity.rect.y + player->entity.rect.height / 2,
-                      PLAYER_ATTACK_RANGE * TILE_SIZE);
-    for (auto& e : vfx.effects) effects.push_back(e);
-
-    // 清理死亡怪物 (不触发击杀逻辑，仅移除)
-    auto it = monsters.begin();
-    while (it != monsters.end()) {
-        if (!(*it)->combat.is_alive) {
-            it = monsters.erase(it);
-        } else ++it;
-    }
-}
+// M2-E: CombatCoordinator::player_attack 已删除 — P1 审计确认全工程 0 调用者
+// (真实玩家攻击走 PlayerController::player_attack, 用确定性 game_time),
+// 且该死路径用 GetTime() 计冷却 — 一旦被复活将污染 sim 确定性。landmine 排除。
 
 void CombatCoordinator::apply_attack_damage(Monster* target, int dmg,
                                             std::vector<Effect>& effects, AudioServer* audio) {

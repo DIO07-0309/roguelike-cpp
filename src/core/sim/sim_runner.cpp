@@ -53,6 +53,22 @@ void SimRunner::record_run(const RunResult& s) {
     // Enemy stats
     for (auto& eid : s.enemies_fought) {
         auto& e = _report.enemies[eid]; e.enemy_id = eid; e.appearances++;
+        // M2: 该敌人是击杀者 → 记 player_deaths (死因归因到 enemy 维度)
+        if (s.outcome == RunOutcome::DEATH_MONSTER && eid == s.death_cause)
+            e.player_deaths++;
+    }
+    // M2: 结果分类/死因/武器 汇总
+    _report.outcome_dist.counts[(int)s.outcome]++;
+    if (!s.death_cause.empty()) {
+        auto& c = _report.causes[s.death_cause];
+        c.cause = s.death_cause; c.deaths++;
+    }
+    {
+        auto& w = _report.weapons[s.weapon_id_final.empty() ? "none" : s.weapon_id_final];
+        w.weapon_id = s.weapon_id_final.empty() ? "none" : s.weapon_id_final;
+        w.games++;
+        if (s.victory) w.wins++;
+        w.avg_floor = (w.avg_floor * (w.games-1) + s.floor_reached) / w.games;
     }
     _report.win_rate = _report.total_runs > 0
         ? (float)_report.total_wins / _report.total_runs : 0;
@@ -178,6 +194,34 @@ std::string BalanceReport::to_json() const {
     json dd = json::array(); for (int i=0;i<15;i++) dd.push_back(death_floor_dist[i]);
     j["summary"]["death_floor_distribution"] = dd;
 
+    // ── M2 仪表盘: 结果分类 / 死因 Top10 / 武器表现 ──
+    {
+        json od = json::object();
+        const char* names[] = {"VICTORY","DEATH_MONSTER","DEATH_BOSS","DEATH_DOT",
+                               "DEATH_ENVIRONMENT","TIMEOUT_GAME","TIMEOUT_WALL","STUCK_RECOVERED"};
+        for (int i = 0; i < 8; i++) od[names[i]] = outcome_dist.counts[i];
+        j["summary"]["outcome_dist"] = od;
+        // cause_top10: 按死亡数排序
+        std::vector<std::pair<std::string,int>> cs;
+        for (auto& [k, v] : causes) cs.push_back({k, v.deaths});
+        std::sort(cs.begin(), cs.end(),
+                  [](auto& a, auto& b){ return a.second > b.second; });
+        json ct = json::array();
+        for (size_t i = 0; i < cs.size() && i < 10; i++) {
+            json c; c["cause"]=cs[i].first; c["deaths"]=cs[i].second;
+            ct.push_back(c);
+        }
+        j["summary"]["cause_top10"] = ct;
+        // weapon_perf
+        json wa = json::array();
+        for (auto& [id, w] : weapons) {
+            json wj; wj["id"]=w.weapon_id; wj["games"]=w.games; wj["wins"]=w.wins;
+            wj["win_rate"]=w.win_rate(); wj["avg_floor"]=w.avg_floor;
+            wa.push_back(wj);
+        }
+        j["weapons"] = wa;
+    }
+
     json barr = json::array();
     for (auto& [id, bs] : builds) {
         json bj; bj["id"]=bs.build_id; bj["games"]=bs.games; bj["wins"]=bs.wins;
@@ -211,6 +255,20 @@ std::string BalanceReport::to_json() const {
         rj["heal_total"]=r.heal_total; rj["kills"]=r.enemies_killed;
         rj["bosses"]=r.bosses_killed; rj["equip"]=r.equipment_count;
         rj["relics"]=r.relics_collected; rj["build"]=r.build_name;
+        // ── M2 仪表盘明细 ──
+        rj["outcome"] = run_outcome_name(r.outcome);
+        rj["cause"]   = r.death_cause;
+        rj["death_floor"] = r.death_floor;
+        rj["weapon"]  = r.weapon_id_final;
+        rj["element"] = r.element_type;
+        rj["level"]   = r.level_final;
+        rj["combat_pct"] = r.turns > 0 ? (float)r.combat_frames / r.turns : 0;
+        rj["rooms"]   = r.rooms_discovered;
+        rj["picks"]   = r.items_picked;
+        rj["gold"]    = r.gold_earned;
+        rj["stuck_tp"]= r.stuck_teleports;
+        rj["stuck_rot"] = r.stuck_rotations;
+        rj["loot_wd"] = r.loot_watchdog_descends;
         runarr.push_back(rj);
     }
     j["runs"] = runarr;

@@ -278,6 +278,7 @@ static void _tick_impl(std::vector<BuffInstance>& buffs,
                     // M4a-fix: 玩家 DOT 掉血日志 (定位"离老远死亡"来源)
                     if (strcmp(target_name, "Player") == 0) {
                         combat->mark_damage_logged();
+                        combat->last_damage_source = "dot:" + b.id;   // M2-B: 死因归因
                         LOG_INFO("[DMG] %s DOT 造成 %d 伤害 → 玩家", b.id.c_str(), dmg);
                     }
                 }

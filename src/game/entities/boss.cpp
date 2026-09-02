@@ -148,6 +148,7 @@ std::string WhirlwindSkill::execute(Monster* boss, Player* player,
         player->combat.take_damage(dmg);
         player->combat.mark_damage_logged();
         spin_hit_count++;
+        player->combat.last_damage_source = boss->name + ":旋风斩";   // M2-B
         LOG_INFO("[DMG] 旋风斩命中玩家 造成 %d 伤害", dmg);
     }
     if (spin_duration <= 0.3f) {
@@ -252,6 +253,7 @@ std::string BarrageSkill::execute(Monster* boss, Player* player,
             player->combat.mark_damage_logged();
             apply_buff(player, "slow", 1);
             hit_fx.push_back({it->x, it->y});   // M4a-fx: 记录命中点
+            player->combat.last_damage_source = boss->name + ":弹幕";   // M2-B
             LOG_INFO("[DMG] 弹幕命中玩家 造成 %d 伤害", dmg);
             dead = true;
         }
@@ -333,6 +335,7 @@ std::string ConeAttackSkill::execute(Monster* boss, Player* player,
     player->combat.take_damage(dmg);
     player->combat.mark_damage_logged();
     apply_buff(player, "poison2s", 1);
+    player->combat.last_damage_source = boss->name + ":扇形斩";   // M2-B
     LOG_INFO("[DMG] 扇形斩命中玩家 造成 %d 伤害 (中毒)", dmg);
     return "扇形斩命中！中毒 2 秒";
 }

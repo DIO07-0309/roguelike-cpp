@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <memory>
 #include <vector>
 #include <string>
@@ -368,10 +368,15 @@ private:
     bool _sim_mode = false;
     bool _use_bt_agent = false;        // G8.1: true = BT, false = DecisionAgent
     void _collect_sim_stats();
-    double _sim_wall_start = 0;        // Q3.10: 墙钟兜底超时 (game_time 可能被时停稀释)
+    int  _sim_wall_frames = 0;         // M2-E: 帧数兜底超时 (36000f=600s, 替代 GetTime 墙钟)
+    bool _sim_wall_timeout = false;    // M2-A: 本局是否因帧数兜底结算
+    bool _sim_game_timeout = false;    // M2-A: 本局是否因 900s 游戏时上限结算
 
     // Q3.2: sim 真实伤害统计 — HP 差值累计 (毒池/怪伤全计入, 替代 kills*10 估算)
     int _sim_hp_prev = -1;
+    // M2-C: sim 行为指标 (逐帧累计, _collect_sim_stats 快照)
+    int _sim_items_picked = 0;
+    int _sim_combat_frames = 0;
     double _sim_dmg_taken = 0;
     double _sim_dmg_dealt = 0;
     double _sim_heal_total = 0;
@@ -382,3 +387,4 @@ private:
     std::unordered_map<uint64_t, std::pair<int, int>> _unstuck_last_pos;
     std::unordered_map<uint64_t, double> _unstuck_since;
 };
+

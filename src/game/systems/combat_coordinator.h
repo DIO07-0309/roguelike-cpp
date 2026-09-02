@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <vector>
 #include <memory>
 #include <string>
@@ -22,9 +22,6 @@ struct Effect;
 // ============================================================
 class CombatCoordinator {
 public:
-    // 玩家普攻 (音频 + VFX + 伤害 + 清理)
-    static void player_attack(Player* player, std::vector<std::unique_ptr<Monster>>& monsters,
-                              std::vector<Effect>& effects, AudioServer* audio);
 
     // 施加普攻伤害并播放 VFX (不处理击杀结算)
     static void apply_attack_damage(Monster* target, int dmg,

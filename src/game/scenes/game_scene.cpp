@@ -188,7 +188,9 @@ void GameScene::new_game() {
         // Q3.8: 清空上一局的脱卡状态 — static 改实例成员后跨局残留的指针键必须清零
         _unstuck_last_pos.clear();
         _unstuck_since.clear();
-        _sim_wall_start = GetTime();   // Q3.10: 本局墙钟起点 (兜底超时)
+        _sim_wall_frames = 0;        // M2-E: 帧计数兜底 (替代 GetTime 墙钟, 确定性)
+        _sim_wall_timeout = false;
+        _sim_game_timeout = false;   // M2-A: 超时标记跨局清零
     }
 
     auto sk = random_active_skill({}, true);  // G9: first skill always base 4
@@ -526,10 +528,12 @@ void GameScene::_process(double delta) {
     if (!player) return;
     float dt = (float)delta;
 
-    // Q3.10: 墙钟兜底置顶 — 任何状态(BOSS_CINEMATIC/事件/对话/非PLAYING)都可能卡死
+    // Q3.10: 兜底超时置顶 — 任何状态(BOSS_CINEMATIC/事件/对话/非PLAYING)都可能卡死
     // 原置尾 870 行: state!=PLAYING 提前 return → 10min 墙钟永不触发 (v11 r8 进F14后静默150min)
-    if (_sim_mode && GetTime() - _sim_wall_start > 600.0) {
-        LOG_INFO("[SIM] 墙钟超时 第%d层 — 强制结算", current_floor);
+    // M2-E: GetTime()(真实墙钟, 慢机改变结果) → 帧计数 (600s×60fps=36000帧, 确定性)
+    if (_sim_mode && ++_sim_wall_frames > 36000) {
+        LOG_INFO("[SIM] 帧数兜底超时(36000f) 第%d层 — 强制结算", current_floor);
+        _sim_wall_timeout = true;
         _collect_sim_stats();
         return;
     }
@@ -905,6 +909,7 @@ void GameScene::_process(double delta) {
                 if (dist < 0.8f * TILE_SIZE) {
                     player->combat.take_damage(sd);
                     player->combat.mark_damage_logged();
+                    player->combat.last_damage_source = "env:尖刺";   // M2-B
                     LOG_INFO("[DMG] 尖刺 造成 %d 伤害 → 玩家", sd);
                     _presentation.damage_floats.push_back({px, py-8, 0.4f, 0.4f, sd, {255, 60, 40, 255}});
                 }
@@ -931,6 +936,7 @@ void GameScene::_process(double delta) {
                 int ld = (int)(3 * g_growth.arena_scale(current_floor));
                 player->combat.take_damage(ld);
                 player->combat.mark_damage_logged();
+                player->combat.last_damage_source = "env:熔岩";   // M2-B
                 LOG_INFO("[DMG] 熔岩灼烧 造成 %d 伤害 → 玩家", ld);
                 _presentation.damage_floats.push_back({px, py-8, 0.4f, 0.4f, ld, {255, 90, 30, 255}});
             }
@@ -1024,6 +1030,7 @@ void GameScene::_process(double delta) {
                     (int)game_map->is_walkable(stx, sty));
             }
         }
+        _sim_game_timeout = true;   // M2-A: 结算归 TIMEOUT_GAME
         _collect_sim_stats();
         return;
     }
@@ -1592,6 +1599,62 @@ void GameScene::_collect_sim_stats() {
     s.build_name = calculate_build(player.get()).build_name();
     for (auto& r : player->relics) s.relics_picked.push_back(r.id);
 
+    // ── M2-A: 结果分类 — 不再所有失败混成一个 victory=false ──
+    if (s.victory) {
+        s.outcome = RunOutcome::VICTORY;
+    } else if (_sim_game_timeout) {
+        s.outcome = RunOutcome::TIMEOUT_GAME;
+    } else if (_sim_wall_timeout) {
+        s.outcome = RunOutcome::TIMEOUT_WALL;
+    } else if (!player->combat.is_alive) {
+        s.death_cause = player->combat.last_damage_source;
+        s.death_floor = current_floor;
+        // 死因分类: 源前缀/楼层语义 → 4 类
+        if (s.death_cause.rfind("dot:", 0) == 0)
+            s.outcome = RunOutcome::DEATH_DOT;
+        else if (s.death_cause.rfind("env:", 0) == 0)
+            s.outcome = RunOutcome::DEATH_ENVIRONMENT;
+        else if (is_boss_floor(current_floor) && _get_boss())
+            s.outcome = RunOutcome::DEATH_BOSS;
+        else
+            s.outcome = RunOutcome::DEATH_MONSTER;
+    } else {
+        s.outcome = RunOutcome::STUCK_RECOVERED;  // 存活但被强制结算
+    }
+
+    // ── M2-D: 构筑/状态快照 (死亡瞬间) ──
+    if (player->weapon.current_def()) {
+        s.weapon_type_final = (int)player->weapon.current_def()->type;
+        s.weapon_id_final = player->weapon.current_weapon_id();
+    } else {
+        s.weapon_id_final = "fist_basic";
+    }
+    s.element_type = (int)player->element.type;
+    s.level_final = player->level;
+    s.relics_held = (int)player->relics.size();
+    s.buffs_held = (int)player->active_buffs.size();
+    s.gold_earned = player->gold;
+
+    // ── M2-C: 行为指标 ──
+    if (game_map) {
+        for (auto& sr : game_map->special_rooms)
+            if (sr.discovered) s.rooms_discovered++;
+    }
+    s.items_picked = _sim_items_picked;
+    s.combat_frames = _sim_combat_frames;
+    s.stuck_teleports = sim_stuck_teleports;   // M2-C: sim_ai 诊断计数 (读后清零)
+    s.stuck_rotations = sim_stuck_rotations;
+    s.loot_watchdog_descends = sim_stuck_loot_wd;
+    sim_stuck_teleports = 0; sim_stuck_rotations = 0; sim_stuck_loot_wd = 0;
+
+    // ── M2: enemies_fought 修复 — 字段一直存在但从未填充 (P1 审计) ──
+    for (auto& m : monsters) {
+        if (!m) continue;
+        bool dup = false;
+        for (auto& n : s.enemies_fought) if (n == m->name) { dup = true; break; }
+        if (!dup) s.enemies_fought.push_back(m->name);
+    }
+
     auto& sim = SimRunner::inst();
     sim.record_run(s);
 
@@ -1601,6 +1664,8 @@ void GameScene::_collect_sim_stats() {
     _sim_dmg_dealt = 0;
     _sim_heal_total = 0;
     _sim_mon_hp.clear();
+    _sim_items_picked = 0;
+    _sim_combat_frames = 0;
 
     if (sim.should_restart()) {
         // G7.4: all-builds rotation
@@ -1655,6 +1720,7 @@ void GameScene::_explode_barrel(const ArenaObject& ao) {
     if (hypotf(px - cx, py - cy) <= kBarrelRadius) {
         player->combat.take_damage(dmg);
         player->combat.mark_damage_logged();
+        player->combat.last_damage_source = "env:木桶爆炸";   // M2-B
         _presentation.damage_floats.push_back({px, py - 8, 0.4f, 0.4f, dmg, {255, 60, 40, 255}});
     }
     for (auto& m : monsters) {
@@ -1670,6 +1736,17 @@ void GameScene::_explode_barrel(const ArenaObject& ao) {
 
 void GameScene::_update_monsters(float dt) {
     int hp_before = player->combat.current_hp;
+    // M2-C: 战斗帧累计 — 近距离交战 (2 tile 内, 与攻击判定同量级)
+    // 注: 8 tile 感知半径会把"卡墙徘徊+远处怪"误计为战斗; 收紧到实际交战距离
+    if (_sim_mode && !monsters.empty()) {
+        float px = player->entity.rect.x + player->entity.rect.width / 2;
+        float py = player->entity.rect.y + player->entity.rect.height / 2;
+        for (auto& m : monsters) {
+            if (!m || !m->combat.is_alive) continue;
+            float d = hypotf(m->entity.rect.x - px, m->entity.rect.y - py);
+            if (d < 2.5f * TILE_SIZE) { _sim_combat_frames++; break; }
+        }
+    }
     std::vector<Monster*> mlist;
     for (auto& m : monsters) mlist.push_back(m.get());
     // D2: Pass projectiles vector to monsters for ranged attacks

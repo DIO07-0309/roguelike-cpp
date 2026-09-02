@@ -167,6 +167,7 @@ int Monster::attack_target(Player* target, double gt) {
     if (dmg > 0) {
         LOG_INFO("[DMG] %s普攻 造成 %d 伤害 → 玩家", name.c_str(), dmg);
         target->combat.mark_damage_logged();
+        target->combat.last_damage_source = name;   // M2-B: 死因归因
     }
     last_attack_time = (float)gt;
     last_attack_wall_time = (float)GetTime();

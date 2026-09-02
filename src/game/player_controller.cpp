@@ -460,6 +460,7 @@ void PlayerController::handle_input(const InputMap& input) {
             gs._presentation.room_msg_timer = is_relic ? 3.5f : 2.5f;
             // Q4.3: 拾取音效 + 拾取闪光
             if (result.find("拾取: ") == 0) {
+                gs._sim_items_picked++;   // M2-C: 拾取计数 (sim 仪表盘)
                 gs.get_tree()->get_audio()->play_sfx("pickup", 0.55f);
                 float px = gs.player->entity.rect.x + gs.player->entity.rect.width/2;
                 float py = gs.player->entity.rect.y + gs.player->entity.rect.height/2;

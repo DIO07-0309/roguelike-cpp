@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <vector>
 #include <string>
@@ -128,3 +128,10 @@ public:
 
 // ── Backward compat alias ──
 using SimAI = DecisionAgent;
+
+// M2-C: 卡墙恢复诊断计数 (定义在 sim_ai.cpp; GameScene::_collect_sim_stats 读取)
+// 只加不改 — 测量 M2 红线
+extern int sim_stuck_teleports;   // [PLAYER-FIX] 口袋传送次数
+extern int sim_stuck_rotations;   // 旋转脱困进入次数
+extern int sim_stuck_loot_wd;     // 搜刮看门狗强制下楼次数
+

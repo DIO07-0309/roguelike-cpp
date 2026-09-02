@@ -18,6 +18,11 @@
 bool DecisionAgent::g_use_mcts = false;
 int  DecisionAgent::g_mcts_iters = 100;
 
+// M2-C: sim 卡墙恢复诊断计数 (GameScene::_collect_sim_stats 快照; 单线程 sim)
+int sim_stuck_teleports = 0;   // [PLAYER-FIX] 口袋传送次数
+int sim_stuck_rotations = 0;   // 旋转脱困进入次数
+int sim_stuck_loot_wd = 0;     // 搜刮看门狗强制下楼次数
+
 // G8.3: Build SimulationState snapshot from live game state
 mcts::SimulationState DecisionAgent::build_sim_state(
     const Player* player, const std::vector<Monster*>& monsters, double game_time) {
@@ -564,6 +569,7 @@ std::string DecisionAgent::best_action(const Player* player,
             } else if (_loot_stuck_since < 0) {
                 _loot_stuck_since = (float)_game_time;
             } else if ((float)_game_time - _loot_stuck_since > 2.0f) {
+                sim_stuck_loot_wd++;   // M2-C: 搜刮看门狗强制下楼计数
                 return "descend";
             }
             return move_act;
@@ -605,6 +611,7 @@ std::string DecisionAgent::best_action(const Player* player,
             else if ((float)_game_time - _stuck_since > 8.0f) {
                 // Q3.10: ≥8s 原地徘徊 → 兜底传送 (口袋/毒池/隔墙死局, 不依赖怪距)
                 if (_teleport_player_to_nearest(const_cast<Player*>(player), monsters, map, _rooms)) {
+                    sim_stuck_teleports++;   // M2-C: [PLAYER-FIX] 传送计数
                     _stuck_since = -1; _escape_dir = -1;
                     _last_px = -999; _last_py = -999;   // 传送后重新锚定
                 }
@@ -612,7 +619,9 @@ std::string DecisionAgent::best_action(const Player* player,
             }
             else if ((float)_game_time - _stuck_since > 2.0f &&
                      _count_in_range(player, monsters, 1.5f * 32.0f) == 0) {
-                if (_escape_dir < 0) _escape_dir = 0;
+                // M2-C: 旋转脱困计数 — 仅首次进入脱困状态计 1 次
+                // (4 方向轮换每换向都触发本分支, 按事件计数而非按换向计数)
+                if (_escape_dir < 0) { sim_stuck_rotations++; _escape_dir = 0; }
                 float mdx = (_escape_dir == 2) ? -1.0f : (_escape_dir == 3) ? 1.0f : 0.0f;
                 float mdy = (_escape_dir == 0) ? -1.0f : (_escape_dir == 1) ? 1.0f : 0.0f;
                 Rectangle er = player->entity.rect;
