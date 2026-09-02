@@ -65,6 +65,10 @@ elseif(MINGW)
     add_compile_options(-finput-charset=UTF-8 -fexec-charset=UTF-8)
     set(RAYLIB_LIB "${RAYLIB_DIR}/lib/libraylibdll.a")
     set(RAYLIB_DLL "${RAYLIB_DIR}/lib/raylib.dll")
+    # G10.9-fix3: 全静态链接 MinGW 运行库 — exe 自包含, 不再依赖
+    # libgcc_s_seh-1.dll / libstdc++-6.dll / libwinpthread-1.dll 在目标机器 PATH
+    # (-static 覆盖 winpthread; raylib 走 import lib 不受影响, 仍需 raylib.dll 随包)
+    target_link_options(${PROJECT_NAME} PRIVATE -static)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         "${RAYLIB_LIB}" winmm gdi32 opengl32 dbghelp   # P0-M1: dbghelp 崩溃栈符号化
     )

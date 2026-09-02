@@ -7,17 +7,21 @@
 #include <cmath>
 
 SceneTree::SceneTree(int w, int h, const char* title) {
-    // G10.9: 高分屏 + 可缩放 — 必须在 InitWindow 前设置
-    SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+    // G10.9-fix2: 放弃 FLAG_WINDOW_HIGHDPI
+    // 探针实证 (tools/dpi_probe v4-v7): raylib5.0+GLFW+HIGHDPI 下窗口/FBO/绘图
+    // 三空间互不同步 (窗口物理 960x640, FBO 1440x960, TakeScreenshot 2160x1440,
+    // GetScreenWidth 恒报 960x640 旧值) — blit 矩形无法正确计算, 只见左上。
+    // 方案 B: 不开 HIGHDPI (DPI-unaware 窗口, OS 位图拉伸保证完整可见) +
+    // RESIZABLE + letterbox blit (dst 全程 GetScreen* 逻辑坐标, 自洽一致)
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(w, h, title);
-    // G10.9: 按 DPI 放大窗口物理尺寸 (960×640 逻辑 × DPI), 字体物理像素更清晰
+    // DPI-unaware + 系统缩放 150%: SetWindowSize(1440,960) 系统坐标 → OS 拉伸
+    // 到物理 2160x1440 显示; 960x640 逻辑纹理 blit 到 1440x960 绘图空间 (1.5x)
     {
         Vector2 dpi = GetWindowScaleDPI();
-        if (dpi.x > 1.0f) {
-            SetWindowSize((int)(w * dpi.x), (int)(h * dpi.y));
-        }
-        SetWindowMinSize(w / 2, h / 2);
+        if (dpi.x > 1.01f) SetWindowSize((int)(w * dpi.x), (int)(h * dpi.y));
     }
+    SetWindowMinSize(w / 2, h / 2);
     // G10.7-B1: 窗口图标 — 与 exe 图标同源 (剑与门, assets/brand/roguelike.png)
     {
         Image icon = LoadImage("assets/brand/roguelike.png");
@@ -83,28 +87,23 @@ void SceneTree::process_frame(double delta) {
     _time += delta;
 }
 
-// G10.9: 计算窗口客户区内保持 3:2 的 letterbox blit 矩形
+// G10.9-fix: letterbox blit 矩形 — 全程逻辑坐标空间
+// (HIGHDPI 下 raylib 绘图空间是逻辑 screen 坐标: 窗口 960x640 / 全屏 1024x768 均由
+//  GetScreenWidth 返回; GetMonitorWidth 返回物理像素, 混用会溢出绘图空间 → 只见左上)
 Rectangle SceneTree::_blit_dst(Rectangle window_rect, bool fullscreen) const {
-    if (fullscreen) {
-        // 全屏: 用显示器尺寸, 保持比例居中
-        int mw = GetMonitorWidth(GetCurrentMonitor());
-        int mh = GetMonitorHeight(GetCurrentMonitor());
-        float scale = fminf((float)mw / WINDOW_WIDTH, (float)mh / WINDOW_HEIGHT);
-        float dw = WINDOW_WIDTH * scale, dh = WINDOW_HEIGHT * scale;
-        return {(mw - dw) / 2, (mh - dh) / 2, dw, dh};
-    }
-    // 窗口模式: 客户区 (GetRenderWidth/Height 已含 HiDPI 物理像素)
-    float vw = (float)GetRenderWidth(), vh = (float)GetRenderHeight();
+    (void)fullscreen;  // 统一走 GetScreen* — raylib 全屏时同样反映当前绘图空间
+    float vw = (float)GetScreenWidth();
+    float vh = (float)GetScreenHeight();
     float scale = fminf(vw / WINDOW_WIDTH, vh / WINDOW_HEIGHT);
     float dw = WINDOW_WIDTH * scale, dh = WINDOW_HEIGHT * scale;
     return {(vw - dw) / 2, (vh - dh) / 2, dw, dh};
 }
 
 // G10.9: 鼠标物理坐标 → 960×640 逻辑坐标
+// (GetMousePosition 已是逻辑坐标, 再经 blit 矩阵逆映射到游戏缓冲)
 Vector2 SceneTree::get_mouse_logical() const {
     Vector2 raw = GetMousePosition();
-    bool fs = IsWindowFullscreen();
-    Rectangle dst = _blit_dst({}, fs);
+    Rectangle dst = _blit_dst({}, IsWindowFullscreen());
     if (dst.width <= 0 || dst.height <= 0) return raw;
     float lx = (raw.x - dst.x) * (WINDOW_WIDTH / dst.width);
     float ly = (raw.y - dst.y) * (WINDOW_HEIGHT / dst.height);
