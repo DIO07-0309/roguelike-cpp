@@ -265,6 +265,10 @@ int main(int argc, char** argv) {
         }
     }
     g_meta.load_from_defs();  // G3.1: MetaNode 需在 meta 模块加载后重建
+    // G10.9-B1: 启动即加载 meta — 修复"继续游戏路径从不 load → mark_hint_shown
+    // 用默认值整文件覆盖 meta_save.json (货币/runs 清零)" 的 Critical bug。
+    // 此后任意路径 (new_game/continue/选关) 的 g_meta.save 都基于已加载的真实数据。
+    g_meta.load();
     load_vfx_recipes("resources/vfx_recipes.json");  // G5.8.5: VFX recipe registry
 
     // G6.1-G6.7: World layer data loading
@@ -293,8 +297,11 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    bool has_save = SaveManager::save_exists();
-    if (has_save) { auto* d = SaveManager::load_save(); delete d; }
+    // G10.9-B3: 旧档安全迁移 — save.json → slot_1.json (验证+备份, 不删源)
+    SaveManager::migrate_legacy_save();
+    // G10.9-B2: has_save 语义 = 任一槽位有档 (continue 入口; 细粒度选择 G10.9-C 做)
+    bool has_save = false;
+    for (auto& s : SaveManager::get_all_slots()) if (s.exists) { has_save = true; break; }
     LOG_INFO(has_save ? "存档存在" : "暂无存档");
 
     // G5.6: sim 模式直接进 GameScene, 跳过标题画面

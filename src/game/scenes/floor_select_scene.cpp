@@ -73,12 +73,12 @@ void FloorSelectScene::_input(const InputMap& input) {
         if (floor <= max_unlocked || (floor == 15 && max_unlocked >= 14)) {
             auto gs = std::make_shared<GameScene>();
             gs->name = "GameScene";
-            // 尝试加载存档中的玩家数据
+            // G10.9-B2: 读活跃槽 (endings 从 meta 恢复, 不再传档内数据)
             auto* data = SaveManager::load_save();
             if (data && data->player) {
                 gs->load_saved_game(floor, max_unlocked, std::move(data->player),
                                     0, {}, {}, data->rule_counters, data->quest_states,
-                                    data->unlocked_endings);
+                                    data->play_time);
                 // M4e: 跨对局镜像记忆
                 gs->set_mirror_memory(data->mirror_prior_alpha,
                                       data->mirror_prior_beta);

@@ -176,13 +176,14 @@ public:
     void exit_challenge_arena();
     void new_game();
     // B13: Relic 不再跨层 (load_saved_game 不再接收 relics 参数)
+    // G10.9-B2: unlocked_endings 参数移除 (账号级, 从 meta 恢复); 新增 play_time
     void load_saved_game(int floor, int max_floor, std::unique_ptr<Player> p,
                          uint32_t seed = 0,
                          const std::vector<bool>& special_triggered = {},
                          const std::vector<bool>& special_discovered = {},
                          const std::unordered_map<std::string, int>& rule_counters = {},
                          const std::unordered_map<int, int>& quest_states = {},
-                         const std::vector<int>& unlocked_endings = {});
+                         float play_time = 0.0f);
 
     // 输入 (override Node::_input)
     void _input(const InputMap& input) override;

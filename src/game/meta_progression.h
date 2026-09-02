@@ -54,6 +54,9 @@ struct MetaSave {
     int total_runs = 0;
     // G10.8-B3: 首次事件提示标记 (hint_id → 已显示; 跨 run 持久化)
     std::unordered_map<std::string, bool> first_hints_shown;
+    // G10.9-B2: 账号级数据 (按审计归属矩阵从 save.json 迁入)
+    std::vector<int> unlocked_endings;   // EndingType 列表 (账号收集, 删档不丢)
+    int best_floor = 1;                  // 账号历史最高层 (展示用; 选关仍读 Slot maxf)
 };
 
 // ---- 全局单例 ----
@@ -93,6 +96,14 @@ public:
     // G10.8-B3: First Encounter Hint — 返回 false 表示首次（调用方显示提示并标记）
     static bool hint_already_shown(const std::string& hint_id);
     static void mark_hint_shown(const std::string& hint_id);
+
+    // G10.9-B2: 账号级结局收集 + 历史最高层
+    static void unlock_ending(int ending_type);      // 幂等: 已解锁不重复计
+    static bool ending_unlocked(int ending_type);
+    static void record_floor_reached(int floor);     // best_floor 更新 (只升不降)
+
+    // G10.9-B4: 测试钩子 — 清空账号收集 (仅测试清理用, 业务勿调)
+    static void debug_reset_collection();
 
 private:
     MetaSave _save;

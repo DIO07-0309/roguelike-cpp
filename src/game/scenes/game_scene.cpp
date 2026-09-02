@@ -239,7 +239,7 @@ void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
                                  const std::vector<bool>& special_discovered,
                                  const std::unordered_map<std::string, int>& rule_counters,
                                  const std::unordered_map<int, int>& quest_states,
-                                 const std::vector<int>& unlocked_endings) {
+                                 float play_time) {
     player = std::move(p);
     current_floor = floor;
     max_unlocked_floor = max_f;
@@ -251,8 +251,10 @@ void GameScene::load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
     // ── G2.4: 恢复 Quest states ──
     _gameplay.quest_mgr.restore_states(quest_states);
 
-    // ── G2.5: 恢复已解锁结局 ──
-    _gameplay.ending_dir.restore_unlocked(unlocked_endings);
+    // G10.9-B2: 结局解锁改为账号级 — 从 meta 恢复 (不再随档往返)
+    _gameplay.ending_dir.restore_unlocked(g_meta.data().unlocked_endings);
+    // G10.9-B2: 恢复本档累计时长 (进入楼层时钟的起点)
+    game_time = play_time;
 
     enter_floor(floor, seed);
 
@@ -1029,8 +1031,9 @@ void GameScene::_process(double delta) {
             return;
         }
         LOG_INFO("玩家死亡! 第%d层 Lv%d - 存档已保留", current_floor, player->level);
+        // G10.9-B1: end_run 只在 on_player_dead 内部执行一次
+        // (旧代码这里再直接调 g_meta.end_run → runs 双计数/奖励双发)
         _gameplay.on_player_dead(current_floor, player->level, player.get());
-        g_meta.end_run(_gameplay.run_stats);
         _flow.on_player_dead();
         return;
     }
@@ -1797,11 +1800,15 @@ void GameScene::_activate_stairs() {
         }
         std::vector<float> mirror_alpha, mirror_beta;
         _boss.export_mirror_memory(mirror_alpha, mirror_beta);
-        SaveManager::save_game(player.get(), current_floor, max_unlocked_floor,
+        // G10.9-B2: 槽位化保存 — endings 不再入档 (Meta 侧落盘); 补记账号最高层
+        // play_time 源 = game_time (本 run 进度内累计的帧时钟, 换层不清零)
+        SaveManager::save_game(SaveManager::active_slot(), player.get(),
+                               current_floor, max_unlocked_floor,
                                _dungeon_seed, spr, spd, rcm,
                                _gameplay.quest_mgr.export_states(),
-                               _gameplay.ending_dir.unlocked(),
-                               mirror_alpha, mirror_beta);
+                               mirror_alpha, mirror_beta,
+                               (float)game_time);
+        MetaSystem::record_floor_reached(max_unlocked_floor);
     }
     on_floor_cleared.emit();
 }

@@ -20,14 +20,29 @@
 #endif
 
 std::string SaveManager::_save_dir() { return "saves"; }
-std::string SaveManager::_save_path() { return _save_dir() + "/save.json"; }
+// G10.9-B2: 槽位路径 saves/slot_N.json (N = 1..3)
+std::string SaveManager::_slot_path(int slot_id) {
+    return _save_dir() + "/slot_" + std::to_string(slot_id) + ".json";
+}
+// B3 迁移专用: 旧单槽路�?
+std::string SaveManager::_legacy_save_path() { return _save_dir() + "/save.json"; }
 
 bool SaveManager::g_sim_readonly = false;  // Q3.1: --sim 只读
 
-bool SaveManager::save_exists() {
-    FILE* f = fopen(_save_path().c_str(), "r");
+// �?G10.9-B2: 活跃槽位 (进程内状�? 进游戏前由菜单设�? �?
+static int g_active_slot = 1;
+int  SaveManager::active_slot() { return g_active_slot; }
+void SaveManager::set_active_slot(int slot_id) {
+    if (slot_id >= 1 && slot_id <= SAVE_SLOT_COUNT) g_active_slot = slot_id;
+}
+
+bool SaveManager::slot_exists(int slot_id) {
+    FILE* f = fopen(_slot_path(slot_id).c_str(), "rb");
     if (!f) return false; fclose(f); return true;
 }
+
+// 旧接口兼�? 探测活跃�?(迁移�?save.json 不再使用)
+bool SaveManager::save_exists() { return slot_exists(active_slot()); }
 
 // ---- 辅助: trim ----
 static std::string trim(const std::string& s) {
@@ -39,24 +54,27 @@ static std::string trim(const std::string& s) {
 // ---- M4e: float 列表解析 (前置声明, 定义在文件末) ----
 static void _parse_float_list(const std::string& s, std::vector<float>& out);
 
-// ---- 序列化 ----
-bool SaveManager::save_game(Player* player, int floor, int max_f,
+// ---- 序列�?----
+bool SaveManager::save_game(int slot_id, Player* player, int floor, int max_f,
                               uint32_t dungeon_seed,
                               const std::vector<bool>& special_triggered,
                               const std::vector<bool>& special_discovered,
                               const std::unordered_map<std::string, int>& rule_counters,
                               const std::unordered_map<int, int>& quest_states,
-                              const std::vector<int>& unlocked_endings,
                               const std::vector<float>& mirror_prior_alpha,
-                              const std::vector<float>& mirror_prior_beta) {
+                              const std::vector<float>& mirror_prior_beta,
+                              float play_time) {
     if (g_sim_readonly) return false;  // Q3.1: sim 模式不写玩家存档
+    if (slot_id < 1 || slot_id > SAVE_SLOT_COUNT) return false;
     mkdir_impl(_save_dir().c_str());
-    FILE* f = fopen(_save_path().c_str(), "w");
-    if (!f) { LOG_ERROR("存档无法写入"); return false; }
+    FILE* f = fopen(_slot_path(slot_id).c_str(), "wb");
+    if (!f) { LOG_ERROR("存档无法写入 (slot %d)", slot_id); return false; }
     auto& c = player->combat;
     auto& inv = player->inventory;
 
-    fprintf(f, "v:4\n");
+    // G10.9-B2: v:5 �?首个真正被读取的版本�? 新增 time: 字段
+    // (v�? 老档�?load �?getV 默认值兜�? �?_load_impl)
+    fprintf(f, "v:5\n");
     fprintf(f, "floor:%d\n", floor);
     fprintf(f, "maxf:%d\n", max_f);
     fprintf(f, "lv:%d\n", player->level);
@@ -64,13 +82,14 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     fprintf(f, "xpt:%d\n", player->xp_to_next);
     fprintf(f, "mhp:%d\n", c.max_hp);
     fprintf(f, "chp:%d\n", c.current_hp);
-    fprintf(f, "atk:%d\n", c.attack);           // 基础值（每次升级+2）
+    fprintf(f, "atk:%d\n", c.attack);           // 基础值（每次升级+2�?
     fprintf(f, "pd:%d\n", c.physical_defense);
     fprintf(f, "md:%d\n", c.magical_defense);
     fprintf(f, "gld:%d\n", player->gold);
     fprintf(f, "key:%d\n", player->key_count);
+    fprintf(f, "time:%.0f\n", play_time);       // G10.9-B2: 本档累计时长(�?
 
-    // 主动技能: id,lv,evo,use;... (G3.2: _skill_id 替代 dynamic_cast)
+    // 主动技�? id,lv,evo,use;... (G3.2: _skill_id 替代 dynamic_cast)
     fprintf(f, "act:");
     for (auto& s : player->skills.active_skills) {
         const char* nm = s->_skill_id.empty() ? "slash" : s->_skill_id.c_str();
@@ -78,7 +97,7 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     }
     fprintf(f, "\n");
 
-    // 被动技能 (G3.2: _skill_id)
+    // 被动技�?(G3.2: _skill_id)
     fprintf(f, "pas:");
     for (auto& s : player->skills.passives) {
         const char* nm = s->_skill_id.empty() ? "iron_skin" : s->_skill_id.c_str();
@@ -130,7 +149,7 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     }
     fprintf(f, "\n");
 
-    // Buff 状态 (玩家)
+    // Buff 状�?(玩家)
     fprintf(f, "buf:");
     for (auto& b : player->active_buffs) {
         fprintf(f, "%s,%d,%.2f,%.2f;",
@@ -138,7 +157,7 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     }
     fprintf(f, "\n");
 
-    // B8: 特殊房间状态
+    // B8: 特殊房间状�?
     fprintf(f, "seed:%u\n", dungeon_seed);
     fprintf(f, "spr:%s\n", _encode_spr(special_triggered).c_str());
     fprintf(f, "spd:%s\n", _encode_spr(special_discovered).c_str());
@@ -175,20 +194,15 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     }
     fprintf(f, "\n");
 
-    // ── G10.1: Element Core (M4b-fix: 写 int 而非名字 — atoi("fire")=0 曾致元素类型读档丢失) ──
+    // ── G10.1: Element Core (M4b-fix: �?int 而非名字 �?atoi("fire")=0 曾致元素类型读档丢失) ──
     fprintf(f, "elem:%d,%d,%d,%d\n",
         (int)player->element.type,
         player->element.level,
         player->element.experience,
         player->element.initialized ? 1 : 0);
 
-    // ── G2.5: 已解锁结局 ──
-    fprintf(f, "end:");
-    for (size_t i = 0; i < unlocked_endings.size(); i++) {
-        if (i > 0) fprintf(f, ";");
-        fprintf(f, "%d", unlocked_endings[i]);
-    }
-    fprintf(f, "\n");
+    // G10.9-B2: end: 行已移除 �?unlocked_endings 迁移 meta_save.json (账号�?,
+    // 解锁时由 EndingDirector �?MetaSystem::unlock_ending 立即落盘
 
     // ── M4e: 跨对局镜像记忆 (逗号分隔 float) ──
     if (!mirror_prior_alpha.empty() && !mirror_prior_beta.empty()) {
@@ -207,7 +221,7 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
     }
 
     fclose(f);
-    LOG_INFO("存档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff seed:%u",
+    LOG_INFO("存档: �?d�?Lv%d HP:%d/%d %zu技�?%zu物品 %zuBuff seed:%u",
         floor, player->level, c.current_hp, c.max_hp,
         player->skills.active_skills.size(), inv.items.size(),
         player->active_buffs.size(), dungeon_seed);
@@ -215,9 +229,10 @@ bool SaveManager::save_game(Player* player, int floor, int max_f,
 }
 
 // ---- 反序列化 ----
-SaveData* SaveManager::load_save() {
-    if (!save_exists()) return nullptr;
-    FILE* f = fopen(_save_path().c_str(), "r");
+// G10.9-B2: 槽位化读�?�?load_game(slot) 为新入口, load_save() 转发活跃�?
+SaveData* SaveManager::load_game(int slot_id) {
+    if (!slot_exists(slot_id)) return nullptr;
+    FILE* f = fopen(_slot_path(slot_id).c_str(), "rb");
     if (!f) return nullptr;
 
     // 读取所有行
@@ -229,7 +244,7 @@ SaveData* SaveManager::load_save() {
     }
     fclose(f);
 
-    // 解析行: "key:value"
+    // 解析�? "key:value"
     auto getV = [&](const char* key, int def = 0) -> int {
         std::string prefix = std::string(key) + ":";
         for (auto& l : lines) {
@@ -248,6 +263,11 @@ SaveData* SaveManager::load_save() {
         }
         return def;
     };
+
+    // G10.9-B2: 版本号真正参与加�?�?v<5 老档�?time: (getV 默认 0), 其他字段本就逐键兜底
+    // 此处仅记�? 后续 v6+ 迁移在此分支处理
+    int save_version = getV("v", 4);
+    (void)save_version;
 
     int floor = getV("floor", 1);
     int maxf  = getV("maxf", 1);
@@ -294,8 +314,8 @@ SaveData* SaveManager::load_save() {
         }
     }
 
-    // 恢复主动技能 (G3.2: SkillFactory 替代 dynamic_cast, 兼容旧格式 name)
-    // G3.2: 旧 save 名映射 ("Slash"→"slash", "Fireball"→"fireball", etc.)
+    // 恢复主动技�?(G3.2: SkillFactory 替代 dynamic_cast, 兼容旧格�?name)
+    // G3.2: �?save 名映�?("Slash"�?slash", "Fireball"�?fireball", etc.)
     static auto _map_old_name = [](const std::string& nm) -> std::string {
         if (nm == "Slash")     return "slash";
         if (nm == "Fireball")  return "fireball";
@@ -333,7 +353,7 @@ SaveData* SaveManager::load_save() {
                 if (comma3 != std::string::npos)
                     use = atoi(tok.substr(comma3 + 1).c_str());
             }
-            // G3.2: SkillFactory::create — 替代 if-else 链
+            // G3.2: SkillFactory::create �?替代 if-else �?
             std::unique_ptr<Skill> sk = skill_factory_create(nm);
             if (!sk) continue;
             while (sk->level < lvl) sk->upgrade();
@@ -469,7 +489,7 @@ SaveData* SaveManager::load_save() {
                 }
             }
             if (parts.size() < 4) {
-                LOG_WARN("[BUF] 读档跳过坏条目: %s", tok.c_str());
+                LOG_WARN("[BUF] 读档跳过坏条�? %s", tok.c_str());
                 skipped++; continue;
             }
             std::string id  = parts[0];
@@ -480,7 +500,7 @@ SaveData* SaveManager::load_save() {
             bi.remaining = (float)atof(parts[2].c_str());
             bi.tick_timer= (float)atof(parts[3].c_str());
             if (bi.stacks <= 0 || bi.remaining <= 0) {
-                // 过期或无效 buff：跳过
+                // 过期或无�?buff：跳�?
                 skipped++; continue;
             }
             p->active_buffs.push_back(bi);
@@ -514,16 +534,8 @@ SaveData* SaveManager::load_save() {
         }
     }
 
-    // ── G2.5: Parse unlocked endings ──
-    std::string ends = getS("end");
-    if (!ends.empty()) {
-        for (size_t pos = 0; pos < ends.size(); ) {
-            size_t semi = ends.find(';', pos);
-            std::string tok = ends.substr(pos, (semi != std::string::npos ? semi - pos : std::string::npos));
-            pos = (semi != std::string::npos ? semi + 1 : ends.size());
-            if (!tok.empty()) d->unlocked_endings.push_back(atoi(tok.c_str()));
-        }
-    }
+    // G10.9-B2: end: 行解析移�?�?endings 迁移 meta_save.json (load_game 不再返回)
+    // 老档 end: 行仍可能存在, 直接忽略 (数据已在 meta 侧由 unlock_ending 接管)
 
     // ── G10.1: Element Core ──
     {
@@ -553,6 +565,7 @@ SaveData* SaveManager::load_save() {
     }
 
     d->attack_evo_level = getV("atl", 1);
+    d->play_time = (float)getV("time", 0);   // G10.9-B2: v<5 老档无此�?�?0
 
     // ── M4e: 跨对局镜像记忆恢复 ──
     _parse_float_list(getS("mra"), d->mirror_prior_alpha);
@@ -575,19 +588,88 @@ SaveData* SaveManager::load_save() {
 
     d->player = std::move(p);
 
-    LOG_INFO("读档: 第%d层 Lv%d HP:%d/%d %zu技能 %zu物品 %zuBuff",
-        floor, lv, chp, mhp,
+    LOG_INFO("读档(slot %d v%d): �?d�?Lv%d HP:%d/%d %zu技�?%zu物品 %zuBuff",
+        slot_id, save_version, floor, lv, chp, mhp,
         d->player->skills.active_skills.size(), d->player->inventory.items.size(),
         d->player->active_buffs.size());
     return d;
 }
 
-void SaveManager::delete_save() {
-    remove(_save_path().c_str());
-    LOG_INFO("存档已删除");
+// G10.9-B2: 旧接�?�?活跃槽转�?
+SaveData* SaveManager::load_save() { return load_game(active_slot()); }
+
+void SaveManager::delete_save(int slot_id) {
+    remove(_slot_path(slot_id).c_str());
+    LOG_INFO("存档已删�?(slot %d)", slot_id);
 }
 
-// B8: spr 序列化 — vector<bool> → "1,0,1"
+// G10.9-B2: 轻量槽位摘要 �?�?fopen 扫几�? 不构�?Player/不依�?Registry
+SlotSummary SaveManager::get_slot_summary(int slot_id) {
+    SlotSummary s;
+    s.slot_id = slot_id;
+    if (!slot_exists(slot_id)) return s;
+    FILE* f = fopen(_slot_path(slot_id).c_str(), "rb");
+    if (!f) return s;
+    s.exists = true;
+    char buf[256];
+    while (fgets(buf, sizeof(buf), f)) {
+        if (strncmp(buf, "floor:", 6) == 0)      s.floor = atoi(buf + 6);
+        else if (strncmp(buf, "maxf:", 5) == 0)  s.max_floor = atoi(buf + 5);
+        else if (strncmp(buf, "lv:", 3) == 0)   s.level = atoi(buf + 3);
+        else if (strncmp(buf, "time:", 5) == 0) s.play_time = (float)atof(buf + 5);
+        else if (strncmp(buf, "elem:", 5) == 0) s.element_type = atoi(buf + 5);
+    }
+    fclose(f);
+    return s;
+}
+
+std::vector<SlotSummary> SaveManager::get_all_slots() {
+    std::vector<SlotSummary> v;
+    v.reserve(SAVE_SLOT_COUNT);
+    for (int i = 1; i <= SAVE_SLOT_COUNT; i++) v.push_back(get_slot_summary(i));
+    return v;
+}
+
+// �?G10.9-B3: 旧档安全迁移 �?save.json �?slot_1.json �?
+// 条件: 旧档存在 && slot_1 �?(不覆盖任何已有槽!)
+// 流程: 复制旧档 �?验证新档可读 �?旧档改名 .bak (不删�? 迁移失败可手工恢�?
+bool SaveManager::migrate_legacy_save() {
+    FILE* legacy = fopen(_legacy_save_path().c_str(), "rb");
+    if (!legacy) { fclose(legacy); return false; }          // 无旧�? 无事可做
+    // 读完旧档内容到内�?(旧档单文�?< 10KB)
+    std::string content;
+    char buf[4096];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), legacy)) > 0) content.append(buf, n);
+    fclose(legacy);
+
+    if (content.empty()) return false;
+    if (slot_exists(1)) {
+        LOG_INFO("[迁移] slot_1 已存�? 旧档保留不动");
+        return false;                                       // 安全第一: 不覆�?
+    }
+    // 写入 slot_1
+    mkdir_impl(_save_dir().c_str());
+    FILE* out = fopen(_slot_path(1).c_str(), "wb");
+    if (!out) { LOG_ERROR("[迁移] slot_1 写入失败"); return false; }
+    fwrite(content.c_str(), 1, content.size(), out);
+    fclose(out);
+    // 验证: 新档存在且非�?
+    FILE* verify = fopen(_slot_path(1).c_str(), "rb");
+    if (!verify) { LOG_ERROR("[迁移] slot_1 验证失败(不可�?"); return false; }
+    fseek(verify, 0, SEEK_END);
+    bool ok = ftell(verify) == (long)content.size();
+    fclose(verify);
+    if (!ok) { remove(_slot_path(1).c_str()); LOG_ERROR("[迁移] slot_1 验证失败(大小不符)"); return false; }
+    // 验证通过 �?旧档改名备份 (rename 同目录原子性足�? 失败也不丢数�?
+    std::string bak = _legacy_save_path() + ".bak";
+    if (rename(_legacy_save_path().c_str(), bak.c_str()) != 0)
+        LOG_WARN("[迁移] 旧档改名失败 (数据已复制到 slot_1, 手动处理 save.json)");
+    LOG_INFO("[迁移] 旧档 save.json �?slot_1.json 完成 (备份: save.json.bak)");
+    return true;
+}
+
+// B8: spr 序列�?�?vector<bool> �?"1,0,1"
 std::string SaveManager::_encode_spr(const std::vector<bool>& v) {
     std::string out;
     for (size_t i = 0; i < v.size(); i++) {
@@ -597,21 +679,21 @@ std::string SaveManager::_encode_spr(const std::vector<bool>& v) {
     return out;
 }
 
-// B8: spr 反序列化 — "1,0,1" → vector<bool>
+// B8: spr 反序列化 �?"1,0,1" �?vector<bool>
 std::vector<bool> SaveManager::_decode_spr(const std::string& s) {
     std::vector<bool> out;
     if (s.empty()) return out;
     for (size_t pos = 0; pos < s.size(); ) {
         size_t comma = s.find(',', pos);
         std::string tok = s.substr(pos, (comma == std::string::npos) ? std::string::npos : (comma - pos));
-        out.push_back(tok == "1");  // 宽容: 非"1"一律当 false
+        out.push_back(tok == "1");  // 宽容: �?1"一律当 false
         if (comma == std::string::npos) break;
         pos = comma + 1;
     }
     return out;
 }
 
-// M4e: "1.0,2.0,..." → vector<float> (空串忽略)
+// M4e: "1.0,2.0,..." �?vector<float> (空串忽略)
 static void _parse_float_list(const std::string& s, std::vector<float>& out) {
     out.clear();
     if (s.empty()) return;

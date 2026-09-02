@@ -94,11 +94,12 @@ void GameSceneInput::handle_input(const InputMap& input) {
                 }
                 std::vector<float> mirror_alpha, mirror_beta;
                 _s._boss.export_mirror_memory(mirror_alpha, mirror_beta);
-                SaveManager::save_game(_s.player.get(), _s.current_floor,
+                // G10.9-B2: 槽位化 + play_time; endings 不再入档 (Meta 落盘)
+                SaveManager::save_game(SaveManager::active_slot(),
+                    _s.player.get(), _s.current_floor,
                     _s.max_unlocked_floor, _s._dungeon_seed, spr, spd, rcm,
                     _s._gameplay.quest_mgr.export_states(),
-                    _s._gameplay.ending_dir.unlocked(),
-                    mirror_alpha, mirror_beta);
+                    mirror_alpha, mirror_beta, (float)_s.game_time);
                 LOG_INFO("Save→第%d层", _s.current_floor);
             }
         }

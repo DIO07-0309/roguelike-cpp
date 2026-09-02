@@ -42,13 +42,14 @@ public:
 
     // ── 生命周期 ──
     void new_game();    // NEW_GAME → reset → enter_floor(1)
+    // G10.9-B2: unlocked_endings → Meta; 新增 play_time
     void load_saved_game(int floor, int max_f, std::unique_ptr<Player> p,
                          uint32_t seed,
                          const std::vector<bool>& special_triggered,
                          const std::vector<bool>& special_discovered,
                          const std::unordered_map<std::string, int>& rule_counters = {},
                          const std::unordered_map<int, int>& quest_states = {},
-                         const std::vector<int>& unlocked_endings = {});
+                         float play_time = 0.0f);
 
     // ── 状态转换 ──
     void on_boss_intro_confirm();   // BOSS_INTRO → spawn boss → BOSS_FIGHT

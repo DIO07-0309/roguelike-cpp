@@ -23,12 +23,18 @@ bool TitleScene::_activate(const std::string& action) {
     if (action == "new") {
         auto gs = std::make_shared<GameScene>();
         gs->name = "GameScene";
+        // G10.9-B2: 新游戏 → 第一个空档 (G10.9-C 覆盖为显式选档 UI; 满档处理也在 C)
+        int free_slot = 0;
+        for (auto& s : SaveManager::get_all_slots())
+            if (!s.exists) { free_slot = s.slot_id; break; }
+        if (free_slot) SaveManager::set_active_slot(free_slot);
         gs->new_game();
         tree->change_scene(gs);
-        LOG_INFO("开始新游戏");
+        LOG_INFO("开始新游戏 (slot %d)", SaveManager::active_slot());
         return true;
     }
     if (action == "continue" && has_save) {
+        // G10.9-B2: 槽位化 — 读活跃槽 (G10.9-C 加选档 UI 后由那里 set_active_slot)
         auto* data = SaveManager::load_save();
         if (data) {
             auto gs = std::make_shared<GameScene>();
@@ -39,14 +45,14 @@ bool TitleScene::_activate(const std::string& action) {
                 gs->load_saved_game(floor, maxf, std::move(data->player),
                                     data->dungeon_seed, data->special_triggered,
                                     data->special_discovered, data->rule_counters,
-                                    data->quest_states, data->unlocked_endings);
+                                    data->quest_states, data->play_time);
             } else {
                 auto p = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
                     PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
                 gs->load_saved_game(floor, maxf, std::move(p),
                                     data->dungeon_seed, data->special_triggered,
                                     data->special_discovered, data->rule_counters,
-                                    data->quest_states, data->unlocked_endings);
+                                    data->quest_states, data->play_time);
             }
             gs->set_mirror_memory(data->mirror_prior_alpha,
                                   data->mirror_prior_beta);
@@ -85,11 +91,14 @@ bool TitleScene::_activate(const std::string& action) {
 
 void TitleScene::_enter_tree() {
     // 每次进入标题画面时重新检测存档状态
-    has_save = SaveManager::save_exists();
-    if (has_save) {
-        auto* data = SaveManager::load_save();
-        max_floor = data ? data->max_unlocked_floor : 1;
-        delete data;
+    // G10.9-B2: 任一槽有档即算 (选关用各槽自身 maxf; 此处 max_floor = 全槽最大)
+    has_save = false;
+    max_floor = 1;
+    for (auto& s : SaveManager::get_all_slots()) {
+        if (s.exists) {
+            has_save = true;
+            if (s.max_floor > max_floor) max_floor = s.max_floor;
+        }
     }
     LOG_INFO("标题画面: has_save=%d max_floor=%d", has_save, max_floor);
 }

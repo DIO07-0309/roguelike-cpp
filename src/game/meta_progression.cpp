@@ -128,6 +128,14 @@ bool MetaSystem::save() const {
         fprintf(f, "%d%s", _save.node_levels[i], (i < _node_count-1) ? "," : "");
     }
     fprintf(f, "],\n");
+    // G10.9-B2: 账号历史最高层
+    fprintf(f, "  \"best_floor\":%d,\n", _save.best_floor);
+    // G10.9-B2: 账号级结局收集
+    fprintf(f, "  \"endings\":[");
+    for (size_t i = 0; i < _save.unlocked_endings.size(); i++)
+        fprintf(f, "%d%s", _save.unlocked_endings[i],
+                (i + 1 < _save.unlocked_endings.size()) ? "," : "");
+    fprintf(f, "],\n");
     // G10.8-B3: 首次提示标记
     fprintf(f, "  \"hints\":[");
     bool first = true;
@@ -158,6 +166,20 @@ bool MetaSystem::load() {
     _save.currency.soul_fragments = parse_int("\"soul\"", 0);
     _save.currency.knowledge      = parse_int("\"know\"", 0);
     _save.currency.ancient_memory = parse_int("\"memory\"", 0);
+    _save.best_floor  = parse_int("\"best_floor\"", 1);
+    // G10.9-B2: 解析 endings 数组 ("endings":[1,2])
+    _save.unlocked_endings.clear();
+    if (const char* ep = strstr(buf, "\"endings\"")) {
+        if ((ep = strstr(ep, "[")) != nullptr) {
+            ep++;
+            while (*ep && *ep != ']') {
+                if (*ep >= '0' && *ep <= '9')
+                    _save.unlocked_endings.push_back(atoi(ep));
+                while (*ep && *ep != ',' && *ep != ']') ep++;
+                if (*ep == ',') ep++;
+            }
+        }
+    }
     // 解析 nodes 数组
     const char* np = strstr(buf, "\"nodes\"");
     if (np) { np = strstr(np, "["); if (np) { np++;
@@ -212,6 +234,34 @@ void MetaSystem::mark_hint_shown(const std::string& hint_id) {
     if (g_readonly) return;
     g_meta._save.first_hints_shown[hint_id] = true;
     g_meta.save();
+}
+
+// ═══ G10.9-B2: 账号级结局收集 + 历史最高层 ═══
+void MetaSystem::unlock_ending(int ending_type) {
+    if (g_readonly) return;
+    for (int t : g_meta._save.unlocked_endings)
+        if (t == ending_type) return;          // 幂等
+    g_meta._save.unlocked_endings.push_back(ending_type);
+    g_meta.save();                              // 解锁即落盘 — 修审计 bug#2
+}
+
+bool MetaSystem::ending_unlocked(int ending_type) {
+    for (int t : g_meta.data().unlocked_endings)
+        if (t == ending_type) return true;
+    return false;
+}
+
+void MetaSystem::record_floor_reached(int floor) {
+    if (floor > g_meta._save.best_floor) {
+        g_meta._save.best_floor = floor;
+        g_meta.save();
+    }
+}
+
+// G10.9-B4: 测试清理钩子
+void MetaSystem::debug_reset_collection() {
+    g_meta._save.unlocked_endings.clear();
+    g_meta._save.best_floor = 1;
 }
 
 // 计算本局奖励

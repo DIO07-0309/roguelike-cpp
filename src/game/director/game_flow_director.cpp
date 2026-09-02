@@ -40,11 +40,12 @@ void GameFlowDirector::load_saved_game(int floor, int max_f, std::unique_ptr<Pla
                                         const std::vector<bool>& special_discovered,
                                         const std::unordered_map<std::string, int>& rule_counters,
                                         const std::unordered_map<int, int>& quest_states,
-                                        const std::vector<int>& unlocked_endings) {
+                                        float play_time) {
     if (!_scene) return;
     current_state = GameFlowState::ENTER_FLOOR;
+    // G10.9-B2: unlocked_endings 参数移除 (Meta 账号级恢复)
     _scene->load_saved_game(floor, max_f, std::move(p), seed, special_triggered,
-                            special_discovered, rule_counters, quest_states, unlocked_endings);
+                            special_discovered, rule_counters, quest_states, play_time);
     current_state = GameFlowState::PLAYING;
 }
 
@@ -77,11 +78,10 @@ void GameFlowDirector::on_game_clear() {
     current_state = GameFlowState::GAME_CLEAR;
     // Q3.16: 通关 BGM 由 VictoryScene::get_bgm_name() 声明, change_scene 管线自动切换
 
-    // ── 计算结局 ──
+    // G10.9-B1: 结局判定/奖励发放已由 GameScene 调 _gameplay.on_game_clear() 完成
+    // (旧代码这里再 begin() + add_currency → 结局双判定/奖励双发), 此处只读结果建场景
     auto* gs = _scene;
     auto& ending = gs->_gameplay.ending_dir;
-    ending.begin(gs->_gameplay.world_state, gs->_boss.battle_report.rank,
-                 g_relic_archive.collection_pct(), gs->_gameplay.rels, gs->_gameplay.quest_mgr);
 
     // ── VictoryScene ──
     auto vs = std::make_shared<VictoryScene>();
@@ -121,12 +121,8 @@ void GameFlowDirector::on_game_clear() {
     vs->run_combo     = gs->_gameplay.run_stats.combo_max;
     vs->run_playtime  = gs->_gameplay.run_stats.play_time;
 
-    // 发放 Meta 奖励
-    MetaCurrency mc;
-    mc.soul_fragments = vs->meta_soul;
-    mc.knowledge = vs->meta_knowledge;
-    mc.ancient_memory = 2;
-    g_meta.add_currency(mc);
+    // G10.9-B1: Meta 奖励已在 _gameplay.on_game_clear → reward_from_ending 内发放
+    // (此处旧代码再 add_currency → 双发), 这里只保证 meta 落盘一次
     g_meta.save();
 
     gs->get_tree()->change_scene(vs);

@@ -3,6 +3,7 @@
 #include "quest_manager.h"
 #include "data/ending_defs.h"    // G2.5
 #include "core/event_bus.h"      // G2.5: ENDING_REACHED
+#include "meta_progression.h"    // G10.9-B1: unlock_ending 账号级落盘
 
 void EndingDirector::begin(const WorldState& ws, BossRank rank, float coll_pct,
                             const RelationshipSystem& rels,
@@ -46,6 +47,8 @@ void EndingDirector::begin(const WorldState& ws, BossRank rank, float coll_pct,
         bool found = false;
         for (int v : _unlocked) if (v == et) { found = true; break; }
         if (!found) _unlocked.push_back(et);
+        // G10.9-B1: 账号级落盘 — 解锁即写 meta (修审计 bug#2: 此前从不持久化)
+        MetaSystem::unlock_ending(et);
         // EventBus emit (保持与 Quest/Attack/Skill Evolution 一致的风格)
         EventBus::inst().emit(GameEventType::ENDING_REACHED, nullptr, et);
     }
