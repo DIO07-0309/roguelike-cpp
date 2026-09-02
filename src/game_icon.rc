@@ -21,8 +21,8 @@ BEGIN
             VALUE "InternalName", "roguelike_cpp"
             VALUE "OriginalFilename", "roguelike_cpp.exe"
             VALUE "ProductName", "Abyssal Echo (回响深渊)"
-            VALUE "FileVersion", "1.3.2"
-            VALUE "ProductVersion", "1.3.2"
+            VALUE "FileVersion", "1.4.0"
+            VALUE "ProductVersion", "1.4.0"
         END
     END
     BLOCK "VarFileInfo"
