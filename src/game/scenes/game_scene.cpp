@@ -371,6 +371,10 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     // M4f: biome palette → 地图 (程序化像素纹理基色)
     const BiomeDef* biome = get_biome_for_floor(floor);
     game_map->set_palette(biome ? &biome->palette : nullptr);
+    // G11.2: 氛围层 — 本群系 ambient 粒子配置 (监狱尘埃/火山余烬/深渊幽光)
+    _ambient.set_biome(biome);
+    _ambient.set_mood(0.0f, 0.0f);          // 入层重置情绪
+    _kill_streak_timer = 0;
 
     // Door sprites — load once, reuse across floors
     if (!DoorRenderer::inst().is_loaded())
@@ -1194,7 +1198,23 @@ void GameScene::_process(double delta) {
             _last_player_tile_x = tx;
             _last_player_tile_y = ty;
             game_map->update_fov(tx, ty, _fov_radius);
+            // G11.2: 探索足迹 — 跨 tile 即踩下一枚脚印 (纯渲染)
+            if (game_map->is_walkable(tx, ty))
+                game_map->mark_footstep(tx, ty);
+            // G11.2: 情绪 vignette — 探索进度 (地板总数近似)
+            int floor_tiles = game_map->width * game_map->height;
+            _ambient.set_mood(
+                (float)game_map->explored_tile_count() / (float)floor_tiles * 3.0f,
+                _kill_streak_timer > 0 ? 1.0f : 0.0f);
         }
+    }
+
+    // G11.2: 氛围层 tick — 粒子飘动 + 足迹渐隐 + 击杀势头衰减
+    if (game_map) {
+        _ambient.update(dt, game_map->pixel_width, game_map->pixel_height,
+                        _cam_x, _cam_y, 0, 0);
+        game_map->tick_footsteps(dt);
+        if (_kill_streak_timer > 0) _kill_streak_timer -= dt;
     }
 
     // Boss 位置 + FOV — 始终追踪
@@ -1869,7 +1889,10 @@ void GameScene::_setup_boss_arena_terrain(const DungeonGenerator& gen, int floor
 
 void GameScene::_cleanup_dead_monsters() {
     _boss.on_core_maybe_erased();   // F10.2-fix: UAF guard — DOT 击杀核心先解除引用
+    // G11.2: 击杀势头 — 有怪刚死则触发暖色 vignette 脉动 (3s 衰减)
+    size_t alive_before = monsters.size();
     _combat.cleanup_dead_monsters();
+    if (monsters.size() < alive_before) _kill_streak_timer = 3.0f;
 }
 void GameScene::_check_floor_clear() {
     if (FloorManager::is_floor_cleared(monsters) && !stairs_active) _activate_stairs();
@@ -2109,6 +2132,8 @@ void GameScene::_render() {
     _draw_ground_items();
     _draw_entities();
     _renderer.draw_effects(active_effects, _cam_x, _cam_y);
+    // G11.2: 氛围粒子层 — 实体之上, HUD 之下 (世界空间)
+    if (game_map) _ambient.draw(_cam_x, _cam_y, sw, sh);
     // Batch 3I: Challenge portal VFX (entry in DUNGEON, return in CHALLENGE_ARENA)
     if (_challenge.phase() == ChallengePhase::PORTAL_ACTIVE && game_map) {
         for (auto& sr : game_map->special_rooms) {
@@ -2298,6 +2323,8 @@ void GameScene::_render() {
     }
 
     // HUD (委托给 GameRenderer)
+    // G11.2: AI 情绪 vignette — 地图之上, HUD 之下 (探索冷色/战斗暖色渐晕)
+    _ambient.draw_vignette(sw, sh);
     int ch_wave = (_challenge.phase() == ChallengePhase::COMBAT ||
                    _challenge.phase() == ChallengePhase::WAVE_SPAWNING)
                   ? _challenge.current_wave() + 1 : -1;

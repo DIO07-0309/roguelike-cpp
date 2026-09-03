@@ -55,6 +55,7 @@ class BTAgent;
 #include "scene/game_scene_input.h"
 #include "scene/game_scene_combat.h"
 #include "scene/game_scene_interaction.h"
+#include "world/ambient_layer.h"   // G11.2: 氛围层 (粒子+情绪 vignette)
 
 // ── G4.5: Replay ──
 #include "core/replay/recorder.h"
@@ -249,6 +250,9 @@ private:
     GameFlowDirector _flow;
     // D6 Step7: PlayerController (玩家输入/攻击/技能/移动/交互)
     PlayerController _player_ctrl;
+    // G11.2: AmbientLayer — 群系氛围粒子 + AI 情绪 vignette (组合)
+    AmbientLayer _ambient;
+    float _kill_streak_timer = 0.0f;   // 击杀势头衰减计时
 
     // 楼层 (委托给 FloorManager)
     void _activate_stairs();

@@ -114,10 +114,25 @@ public:
 
     void draw(float cam_x, float cam_y, int screen_w, int screen_h) const;
 
+    // G11.2: 探索足迹 — 玩家踏过地板留下渐隐脚印 (纯渲染, 不影响逻辑)
+    void mark_footstep(int tx, int ty);
+    int  explored_tile_count() const;      // 情绪 vignette 数据源
+    void tick_footsteps(float dt);        // 足迹生命周期 (每帧调用)
+
 private:
     std::vector<std::vector<Tile>> _tiles;
     bool _in_bounds(int tx, int ty) const;
     void _init_walls();
     TilePalette _palette;      // M4f: 当前 biome 调色板
     bool _has_palette = false;
+
+    // G11.2: 足迹槽 (环形缓冲, 固定 32 个不逐 tile 存储)
+    struct Footstep {
+        int tx, ty;            // tile 坐标
+        float life;            // 剩余秒数 (2.5s 渐隐)
+    };
+    static constexpr int FOOTSTEP_MAX = 32;
+    Footstep _footsteps[FOOTSTEP_MAX] = {};
+    int _footstep_head = 0;
+    int _explored_count = 0;    // is_explored=true 的 tile 数 (set 时累加)
 };

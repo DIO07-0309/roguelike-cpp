@@ -12,10 +12,10 @@ crash.log
 game.log
 saves/save.json
 saves/meta_save.json
-saves/rl_qtable.json
-saves/rl_mirror_q_*.json
+saves/slot_*.json
 saves/*.user_backup
 saves/*.bak.user_backup
+# 注: rl_qtable / rl_mirror_q_* (神经网络训练成果) 刻意入库 — 演示资产
 reports/
 build_mingw/
 build_test/

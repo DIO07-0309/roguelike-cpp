@@ -25,6 +25,23 @@ static TilePalette _parse_palette(const json& obj) {
     return p;
 }
 
+// G11.2: ambient 段解析 (字段全可选, 缺省=无粒子)
+static AmbientDef _parse_ambient(const json& obj) {
+    AmbientDef a{};
+    if (!obj.contains("ambient")) return a;
+    const json& amb = obj["ambient"];
+    a.count = amb.value("count", 0);
+    if (amb.contains("color"))
+        a.color = _parse_color(amb["color"]);
+    a.size_min = amb.value("size_min", 1.0f);
+    a.size_max = amb.value("size_max", 2.5f);
+    a.speed = amb.value("speed", 12.0f);
+    a.rise = amb.value("rise", true);
+    a.life_min = amb.value("life_min", 2.5f);
+    a.life_max = amb.value("life_max", 6.0f);
+    return a;
+}
+
 bool load_biome_defs(const char* json_path) {
     try {
         std::ifstream f(json_path);
@@ -40,6 +57,7 @@ bool load_biome_defs(const char* json_path) {
             auto& fr = obj["floor_range"];
             b.floor_start = fr[0].get<int>(); b.floor_end = fr[1].get<int>();
             b.palette = _parse_palette(obj["tile_palette"]);
+            b.ambient = _parse_ambient(obj);   // G11.2: ambient 段
             if (obj.contains("enemy_pool")) {
                 for (auto& e : obj["enemy_pool"]) b.enemy_pool.push_back(e.get<std::string>());
                 for (auto& w : obj["enemy_weights"]) b.enemy_weights.push_back(w.get<float>());

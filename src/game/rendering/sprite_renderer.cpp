@@ -37,6 +37,13 @@ static Color _dim(Color c, float f) {
             (unsigned char)(c.b * f), 255};
 }
 
+// 亮度提升 (墙顶高光/呼吸帧/发带用)
+static Color _brighten(Color c, int amt) {
+    return {(unsigned char)std::min(255, (int)c.r + amt),
+            (unsigned char)std::min(255, (int)c.g + amt),
+            (unsigned char)std::min(255, (int)c.b + amt), c.a};
+}
+
 static void _draw_wall_details(Image* img, Color base) {
     Color joint = _dim(base, 0.5f);
     for (int y = 0; y < 32; y += 8)
@@ -56,6 +63,37 @@ static void _draw_wall_details(Image* img, Color base) {
             ImageDrawPixel(img, x, y, joint);
 }
 
+// G11.1-A: 伪3D墙贴图 — 上 1/3 亮色"墙顶", 下 2/3 暗色"墙面"
+// 砖缝只画在墙面段, 墙顶段横向拉丝营造石面质感
+static void _draw_wall_3d(Image* img, Color base) {
+    Color top_face = _brighten(base, 42);
+    Color top_edge = _brighten(base, 72);
+    // 上段: 墙顶 (受光面)
+    ImageDrawRectangle(img, 0, 0, 32, 11, top_face);
+    for (int x = 0; x < 32; x++)                       // 顶缘高光
+        for (int y = 0; y < 2; y++)
+            ImageDrawPixel(img, x, y, top_edge);
+    // 顶-面交界阴影线
+    Color joint = _dim(base, 0.42f);
+    for (int x = 0; x < 32; x++)
+        ImageDrawPixel(img, x, 11, joint);
+    // 下段: 墙面 (背光) + 错缝砖
+    ImageDrawRectangle(img, 0, 12, 32, 20, base);
+    Color brick_joint = _dim(base, 0.5f);
+    for (int by = 12; by < 32; by += 6) {
+        for (int x = 0; x < 32; x++)
+            ImageDrawPixel(img, x, by, brick_joint);
+        int offset = ((by - 12) / 6) % 2 == 0 ? 4 : 20;   // 错缝
+        for (int y = by; y < std::min(by + 6, 32); y++)
+            ImageDrawPixel(img, offset, y, brick_joint);
+    }
+    // 底缘踢脚阴影
+    Color foot = _dim(base, 0.36f);
+    for (int x = 0; x < 32; x++)
+        for (int y = 30; y < 32; y++)
+            ImageDrawPixel(img, x, y, foot);
+}
+
 static void _draw_floor_details(Image* img, Color base) {
     Color joint = _dim(base, 0.6f);
     for (int x = 0; x < 32; x++) {
@@ -67,10 +105,11 @@ static void _draw_floor_details(Image* img, Color base) {
 }
 
 // 程序化像素纹理: 基色 + 确定性噪点 + 砖缝/接缝
+// G11.1-A: wall=true 使用伪3D贴图 (墙顶亮面 + 墙面错缝砖)
 Texture2D SpriteRenderer::gen_pixel_tile(Color base, bool wall) {
     Image img = GenImageColor(32, 32, base);
     _add_noise(&img, base);
-    if (wall) _draw_wall_details(&img, base);
+    if (wall) _draw_wall_3d(&img, base);
     else      _draw_floor_details(&img, base);
     Texture2D tex = LoadTextureFromImage(img);
     UnloadImage(img);
@@ -85,13 +124,6 @@ static void _draw_body_shadow(Image* img, int ox, int oy, int w, int h) {
     for (int y = oy + h; y < oy + h + 3; y++)
         for (int x = ox; x < ox + w; x++)
             ImageDrawPixel(img, x, y, {0, 0, 0, 70});
-}
-
-// 亮度提升 (呼吸帧/发带用)
-static Color _brighten(Color c, int amt) {
-    return {(unsigned char)std::min(255, (int)c.r + amt),
-            (unsigned char)std::min(255, (int)c.g + amt),
-            (unsigned char)std::min(255, (int)c.b + amt), c.a};
 }
 
 void SpriteRenderer::_draw_person_body(Image* img, Color body, bool big) {
