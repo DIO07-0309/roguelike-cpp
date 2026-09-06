@@ -1,8 +1,9 @@
 #include "sim_ai.h"
 #include "player.h"
 #include "monster.h"
-#include "boss.h"           // Q3.2: BossAI windup 状态读取 (躲招判定)
+#include "boss.h"           // Q3.2: BossAI windup 状态读取 (蓄力判断)
 #include "game_map.h"
+#include "item.h"           // P1-A3: ConsumableItem 药水判定
 #include "combat_system.h"  // rng
 #include "build_score.h"    // BuildType, calculate_build
 #include "core/logger.h"
@@ -273,6 +274,11 @@ bool DecisionAgent::_needs_recovery(const Player* p) const {
     for (auto& s : p->skills.active_skills)
         if (dynamic_cast<SelfHealSkill*>(s.get()) && s->can_use(_game_time))
             return false;
+    // P1-A3: 背包有治疗药水也不算危急 (AI 已有 use_potion 决策路径)
+    for (const auto& it : p->inventory.items) {
+        const auto* c = dynamic_cast<const ConsumableItem*>(it.get());
+        if (c && c->effect_type == "heal") return false;
+    }
     return true;
 }
 
@@ -315,6 +321,60 @@ int DecisionAgent::_bfs_toward_room(const Player* p, const GameMap* map) const {
         }
     }
     return -1;
+}
+
+// P1-A2: BFS 至最近地面物品 (注入的 _ground 快照), 返回第一步方向 (0-3, -1=无/不可达)
+// 骨架复用 _bfs_toward_room: is_target = 注入物品格; 剩血时药水格优先由调用方排序
+int DecisionAgent::_bfs_toward_loot(const Player* p, const GameMap* map) const {
+    if (!map || !p || _ground.empty()) return -1;
+    int w = map->width, h = map->height;
+    auto [sx, sy] = map->pixel_to_tile(
+        p->entity.rect.x + p->entity.rect.width/2,
+        p->entity.rect.y + p->entity.rect.height/2);
+    if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
+    if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
+    const int N = w * h;
+    std::vector<char> is_target((size_t)N, 0);
+    size_t pending = 0;
+    for (auto& g : _ground) {
+        if (g.tile_x < 0 || g.tile_x >= w || g.tile_y < 0 || g.tile_y >= h) continue;
+        is_target[g.tile_y * w + g.tile_x] = 1;
+        pending++;
+    }
+    if (pending == 0) return -1;
+    std::vector<int> first((size_t)N, -2);
+    std::queue<int> q;
+    first[sy * w + sx] = -1;
+    q.push(sy * w + sx);
+    while (!q.empty()) {
+        int cur = q.front(); q.pop();
+        int cx = cur % w, cy = cur / w;
+        if (is_target[cur]) return (first[cur] >= 0) ? first[cur] : -1;
+        for (int d = 0; d < 4; d++) {
+            int nx = cx + kBfsDx[d], ny = cy + kBfsDy[d];
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+            int ni = ny * w + nx;
+            if (first[ni] != -2 || !_tile_rect_walkable(map, nx, ny)) continue;
+            first[ni] = (cur == sy * w + sx) ? d : first[cur];
+            q.push(ni);
+        }
+    }
+    return -1;
+}
+
+// P1-A2: 站位附近 (2.5 格拾取半径内) 最近地面物品距离 (px), -1=无
+float DecisionAgent::_near_loot_dist(const Player* p) const {
+    if (!p || _ground.empty()) return -1.0f;
+    float px = p->entity.rect.x + p->entity.rect.width / 2;
+    float py = p->entity.rect.y + p->entity.rect.height / 2;
+    float best = -1.0f;
+    for (auto& g : _ground) {
+        float lx = g.tile_x * 32.0f + 16.0f;
+        float ly = g.tile_y * 32.0f + 16.0f;
+        float d = hypotf(lx - px, ly - py);
+        if (best < 0 || d < best) best = d;
+    }
+    return best;
 }
 
 // Q3.2: BFS 寻路 — 从玩家所在格出发, 找最近可达的存活怪物, 返回第一步方向 (0-3, -1=不可达)
@@ -464,6 +524,27 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
     // Q3.2: 站在毒池里 → 任何安全方向优先逃离 (1.2 > 攻击上限 1.0)
     if (map && _is_hazard_near(px, py, map)) return 1.2f;
 
+    // P1-A3: 危急回血 — 残血(<50%)且无自愈无药水时, 找泉水/祭坛优先于战斗 (1.3 > 攻击 1.0)
+    // P1-A3-fix: 无未触发房 (room_step<0) 时必须穿透到战斗逻辑 — 原实现 return 0
+    // 导致四方向全 0 → 站桩转圈 → stuck_rot 300+/局 (20 局复现回归)
+    if (map && _needs_recovery(p) && t && !t->is_boss) {
+        int room_step = _bfs_toward_room(p, map);
+        if (room_step >= 0) return (dir == room_step) ? 1.3f : 0.0f;
+        // 无房可去 → 残血拉扯: 与怪拉开 (bfs_away 已有), 打不过至少少挨刀
+        int away = _bfs_away(p, t, map, true);
+        if (away >= 0) return (dir == away) ? 0.9f : 0.0f;
+    }
+
+    // P1-A2: 战斗间隙捡地面物品 — 比特殊房更近的直接资源, 优先级更高 (0.7 > 0.6)
+    if (d > 160.0f && map && !_ground.empty()) {
+        float loot_d = _near_loot_dist(p);
+        // 只对 5 格内的近物品直奔; 更远的留给房间搜刮 (避免长途回头捡破烂)
+        if (loot_d >= 0 && loot_d < 5.0f * 32.0f) {
+            int loot_step = _bfs_toward_loot(p, map);
+            if (loot_step >= 0) return (dir == loot_step) ? 0.7f : 0.0f;
+        }
+    }
+
     // Q3.2: 战斗间隙搜刮 — 最近怪 >5 格(160px)时走向最近未触发特殊房 (圣物/装备/泉水)
     // 交战圈内(≤ideal)先打; rect级BFS保证路径真实可达, 不会卡墙
     if (d > 160.0f && map) {
@@ -510,6 +591,16 @@ float DecisionAgent::_evaluate_pickup(const Player* p, const GameMap* map,
         float md = hypotf(m->entity.rect.x + m->entity.rect.width/2 - (p->entity.rect.x + p->entity.rect.width/2),
                           m->entity.rect.y + m->entity.rect.height/2 - (p->entity.rect.y + p->entity.rect.height/2));
         threat = std::max(threat, 1.0f - md / (6.0f * 32.0f));
+    }
+    // P1-A2: 地面物品拾取判定 (原 AI 对 ground_items 全盲 → picks=0 → 无药无武器)
+    // 拾取半径与 InteractionHandler::pickup_item 对齐 (PICKUP_RANGE=2.0 * TILE_SIZE)
+    float loot_d = _near_loot_dist(p);
+    if (loot_d >= 0 && loot_d < 2.0f * 32.0f) {
+        // P1-A2-fix: 被围殴 (threat>0.55, 怪 <2 格) 时拾取消分 → 还手保命
+        // 冒烟复现: 残血 hp=0.03 仍 pickup 站桩 → 史莱姆围殴磨死 + 卡死传送
+        float loot_w = (threat > 0.55f) ? 0.0f : 1.6f;
+        if (loot_w > 0 && _hp_ratio(p) < 0.5f) loot_w *= 1.8f;  // 残血药水加权
+        if (loot_w > 0) return loot_w * (1.0f - 0.6f * threat);
     }
     for (auto& sr : map->special_rooms) {
         if (sr.triggered) continue; // Q3.2: 已拾取房间不再给分 — 否则 loot 完站桩等死

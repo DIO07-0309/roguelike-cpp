@@ -21,6 +21,14 @@ struct ActionScore {
 
 class DecisionAgent {
 public:
+    // ── P1-A2: 地面物品感知 (GameScene 每帧只读注入, 归属不变) ──
+    // SimAI 决策输入瓶颈: ground_items 原不在 AI 视野 → picks=0 → 无药/无武器
+    struct GroundSpot {
+        int tile_x, tile_y;
+        bool is_potion;               // 药水类 (heal 效果) — 残血时权重加倍
+    };
+    void set_ground_items(std::vector<GroundSpot> spots) { _ground = std::move(spots); }
+
     DecisionAgent();
 
     void start(const Player* player);
@@ -105,12 +113,18 @@ private:
     mutable int _escape_dir = -1;
     // Q3.3: 药水决策冷却 — 防止残血时逐帧连喝清空背包
     mutable double _last_potion_time = -999.0;
+    // P1-A2: 地面物品快照 (每帧 set_ground_items 注入)
+    std::vector<GroundSpot> _ground;
     // Q3.2: 危险视野 — 活性毒池/尖刺圈内判定 (半径 1.5 格)
     bool _is_hazard_near(float px, float py, const GameMap* map) const;
     // Q3.2: 残血且无可用自愈 → 需去找泉水/祭坛回血
     bool _needs_recovery(const Player* p) const;
     // Q3.2: BFS 至最近未触发特殊房 (回血/增益资源), -1=不可达
     int _bfs_toward_room(const Player* p, const GameMap* map) const;
+    // P1-A2: BFS 至最近地面物品 (注入的 _ground), -1=不可达
+    int _bfs_toward_loot(const Player* p, const GameMap* map) const;
+    // P1-A2: 站位 1 格内最近地面物品距离 (px), -1=无
+    float _near_loot_dist(const Player* p) const;
 
 public:
     // ── G8.3: MCTS integration ──

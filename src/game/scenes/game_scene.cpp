@@ -572,6 +572,19 @@ void GameScene::_process(double delta) {
     if (_sim_ai) _sim_ai->set_time(game_time); // Q3.2: AI 技能冷却判定需要当前时间
     if (_sim_bt) _sim_bt->set_time(game_time); // Q3.15: BT agent 同样需要真实时间 (P0-2 fix)
 
+    // P1-A2: 地面物品只读注入 — SimAI 感知掉落物 (归属仍在本场景, AI 不修改)
+    if (_sim_ai) {
+        std::vector<DecisionAgent::GroundSpot> spots;
+        spots.reserve(ground_items.size());
+        for (auto& d : ground_items) {
+            bool is_potion = false;
+            auto* c = dynamic_cast<ConsumableItem*>(d.item.get());
+            if (c && c->effect_type == "heal") is_potion = true;
+            spots.push_back({d.tile_x, d.tile_y, is_potion});
+        }
+        _sim_ai->set_ground_items(std::move(spots));
+    }
+
     // Q3.2: sim 真实伤害统计 — 玩家 HP 下降累计 (含毒池等环境伤害)
     if (_sim_mode && player) {
         int hp = player->combat.current_hp;
