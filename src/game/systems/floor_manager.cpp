@@ -1,4 +1,5 @@
 #include "floor_manager.h"
+#include <cmath>          // P1-A4: hypotf 出生房距离判定
 #include "player.h"
 #include "monster.h"
 #include "ai.h"
@@ -50,13 +51,21 @@ void FloorManager::spawn_floor_monsters(int floor_number, GameMap* map,
     float atk_m = gc.monster_atk;
     int count = cfg->monster_count;
 
+    // P1-A4-fix: 出生房(rooms[0] = 玩家落点)永不刷怪 — 安全屋惯例.
+    // 原缺陷: ri % rooms.size() 取模环绕后落回 rooms[0], 怪刷在玩家落点,
+    // 开局即被围殴 (20局冒烟: 19局出生房围杀零输出, M4 基线 DEATH_MONSTER 62% 直接死因)
+    const int room_count = (int)rooms.size();
+    if (room_count < 2) return;   // 只有出生房 → 不刷 (理论不该发生, 防御)
     int ri = 1;
     while ((int)out_monsters.size() < count && ri < 500) {
-        auto [tx, ty] = rooms[ri % rooms.size()];
+        auto [tx, ty] = rooms[1 + (ri % (room_count - 1))];   // 轮询 rooms[1..N-1]
         int off_x = (int)(rng() % 5) - 2;
         int off_y = (int)(rng() % 5) - 2;
         int stx = tx + off_x, sty = ty + off_y;
-        if (map->is_walkable(stx, sty)) {
+        // 双保险: 距出生房中心 3 格内不落怪 (偏移可能蹭进出生房边缘)
+        float d0 = hypotf((float)(stx - rooms[0].first),
+                          (float)(sty - rooms[0].second));
+        if (map->is_walkable(stx, sty) && d0 > 3.0f) {
             auto [px, py] = map->tile_to_pixel(stx, sty);
             const char* type = _pick_monster_type(*cfg);
             auto* m = spawn_monster(px, py, type);

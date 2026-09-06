@@ -120,7 +120,9 @@ private:
     // Q3.2: 残血且无可用自愈 → 需去找泉水/祭坛回血
     bool _needs_recovery(const Player* p) const;
     // Q3.2: BFS 至最近未触发特殊房 (回血/增益资源), -1=不可达
-    int _bfs_toward_room(const Player* p, const GameMap* map) const;
+    // P1-A3: heal_only — 危急模式只找回血房 (FOUNTAIN/ALTAR/SHRINE)
+    int _bfs_toward_room(const Player* p, const GameMap* map,
+                          bool heal_only = false) const;
     // P1-A2: BFS 至最近地面物品 (注入的 _ground), -1=不可达
     int _bfs_toward_loot(const Player* p, const GameMap* map) const;
     // P1-A2: 站位 1 格内最近地面物品距离 (px), -1=无

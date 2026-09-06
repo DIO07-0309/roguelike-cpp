@@ -1,4 +1,5 @@
 #include "game_scene_input.h"
+#include "core/logger.h"      // A4-probe
 #include "game_scene.h"
 #include "title_scene.h"
 #include "config.h"
@@ -172,6 +173,22 @@ void GameSceneInput::handle_event_input(const InputMap& input) {
     auto& ui = _s._event_ui;
     if (!ui.active) return;
 
+    // P1-A4-fix: sim 模式事件 UI 自动推进 — AI 决策集无 confirm/cancel 词汇,
+    // 真实卡死链: AI 按 E 触发事件 → DESC/CHOICE 无限等待 → 攻击消费链断 → 围殴致死.
+    // sim 的目的是战斗/平衡测试, 叙事 UI 直接选第一项通过 (确定性: 选项0).
+    if (_s._sim_mode) {
+        if (ui.phase == EventPhase::DESC) {
+            ui.phase = (ui.option_count > 0) ? EventPhase::CHOICE : EventPhase::ANIM;
+            if (ui.phase == EventPhase::ANIM) ui.timer = 0.8f;
+            else ui.selected = 0;
+        } else if (ui.phase == EventPhase::CHOICE) {
+            ui.selected = 0;
+            ui.phase = EventPhase::ANIM;
+            ui.timer = 0.8f;
+        }
+        return;   // ANIM/RESULT 由 _update 的 timer 自行推进, 无需输入
+    }
+
     if (_s._is_action_just_pressed(input,"cancel")) {
         if (ui.phase == EventPhase::DESC || ui.phase == EventPhase::CHOICE) {
             ui.active = false;
@@ -212,6 +229,18 @@ void GameSceneInput::handle_event_input(const InputMap& input) {
 void GameSceneInput::handle_dialogue_input(const InputMap& input) {
     auto& d = _s._dialogue;
     if (!d.active) return;
+
+    // P1-A4-fix: sim 模式对话自动翻页 — AI 无 confirm 词汇, 对话无限等待同样锁死攻击链.
+    if (_s._sim_mode) {
+        d.page++;
+        d.timer = 0.0f;
+        // 翻到底的收尾逻辑与真实按键路径一致 (走 confirm 分支的简化: 每次进一格)
+        if (d.page >= (int)d.pages.size()) {
+            _s._dialogue.active = false;   // 直接关闭, NPC 状态由真实路径维护
+            return;
+        }
+        return;
+    }
 
     if (_s._is_action_just_pressed(input,"confirm")) {
         d.page++;

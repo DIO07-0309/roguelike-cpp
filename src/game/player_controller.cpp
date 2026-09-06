@@ -1,4 +1,5 @@
 #include "player_controller.h"
+#include "core/logger.h"      // A4-probe
 #include "scenes/game_scene.h"
 #include "player.h"
 #include "monster.h"
@@ -442,8 +443,10 @@ void PlayerController::handle_input(const InputMap& input) {
                     }
                 }
             }
-            SpecialRoom* room = gs.game_map->get_special_room_at(ptx, pty);
-            if (room && room->type == SpecialRoomType::GAMBLER) {
+        SpecialRoom* room = gs.game_map->get_special_room_at(ptx, pty);
+        // P1-A4-fix: sim 模式禁入赌局面板 — AI 无"关闭面板"决策, 进即永久卡死
+        // (v9 探针实锤: gmb=1 后 AI 被面板锁死, 怪在外面磨死 = M4 基线 DEATH_MONSTER 62% 根因)
+        if (room && room->type == SpecialRoomType::GAMBLER && !gs._sim_mode) {
                 if (!gs.gamble_open) {
                     gs.gamble_open = true;
                     gs.gamble_cursor = 0;

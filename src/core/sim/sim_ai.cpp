@@ -283,7 +283,10 @@ bool DecisionAgent::_needs_recovery(const Player* p) const {
 }
 
 // Q3.2: BFS 至最近未触发的特殊房 — 战斗间隙搜刮资源 (圣物/装备/泉水)
-int DecisionAgent::_bfs_toward_room(const Player* p, const GameMap* map) const {
+// P1-A3-fix2: heal_only 模式 — 危急回血时只找回血房 (FOUNTAIN/ALTAR/SHRINE),
+// 放弃宝箱/商店等 — 血线告急时多进一个房 = 多一分被围死的风险
+int DecisionAgent::_bfs_toward_room(const Player* p, const GameMap* map,
+                                    bool heal_only) const {
     if (!map || !p) return -1;
     int w = map->width, h = map->height;
     auto [sx, sy] = map->pixel_to_tile(
@@ -299,6 +302,12 @@ int DecisionAgent::_bfs_toward_room(const Player* p, const GameMap* map) const {
         if (sr.triggered) continue;
         // Q3.13: 房间坐标越界保护 (数据驱动异常时不得写堆)
         if (sr.cx < 0 || sr.cx >= w || sr.cy < 0 || sr.cy >= h) continue;
+        if (heal_only) {
+            bool heals = sr.type == SpecialRoomType::FOUNTAIN
+                      || sr.type == SpecialRoomType::ALTAR
+                      || sr.type == SpecialRoomType::SHRINE;
+            if (!heals) continue;
+        }
         is_target[sr.cy * w + sr.cx] = 1;
         pending++;
     }
@@ -525,14 +534,17 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
     if (map && _is_hazard_near(px, py, map)) return 1.2f;
 
     // P1-A3: 危急回血 — 残血(<50%)且无自愈无药水时, 找泉水/祭坛优先于战斗 (1.3 > 攻击 1.0)
-    // P1-A3-fix: 无未触发房 (room_step<0) 时必须穿透到战斗逻辑 — 原实现 return 0
-    // 导致四方向全 0 → 站桩转圈 → stuck_rot 300+/局 (20 局复现回归)
+    // P1-A3-fix1: 无未触发房 (room_step<0) 时不得永续撤退 — 原实现 bfs_away 0.9 分
+    // 持续压过攻击 → "只逃不打"死循环 (v3 冒烟: 19/20 局零输出, 怪追到墙角磨死).
+    // 撤退是止损不是战术: 只在怪贴脸 (<2格) 时短暂拉开, 否则回战场正常输出.
     if (map && _needs_recovery(p) && t && !t->is_boss) {
-        int room_step = _bfs_toward_room(p, map);
+        int room_step = _bfs_toward_room(p, map, true);   // P1-A3-fix2: 只找回血房
         if (room_step >= 0) return (dir == room_step) ? 1.3f : 0.0f;
-        // 无房可去 → 残血拉扯: 与怪拉开 (bfs_away 已有), 打不过至少少挨刀
-        int away = _bfs_away(p, t, map, true);
-        if (away >= 0) return (dir == away) ? 0.9f : 0.0f;
+        // 无房可去 → 仅贴脸时拉开 (条件撤退, 血线安全或距离拉开即恢复战斗)
+        if (d < 2.0f * 32.0f) {
+            int away = _bfs_away(p, t, map, true);
+            if (away >= 0) return (dir == away) ? 0.9f : 0.0f;
+        }
     }
 
     // P1-A2: 战斗间隙捡地面物品 — 比特殊房更近的直接资源, 优先级更高 (0.7 > 0.6)
@@ -561,7 +573,18 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
     // 远程 build 死区宽达 ~90px。曾尝试激活"拉开距离"分支消除死区, 实测 200 局
     // 胜率 10.0%→3.5%(风筝震荡破坏 Q3.12 数值平衡), 故回退保留站桩行为。
     // 后续若重调此段必须同步重跑 500 局平衡回归。
-    if (d <= ideal_dist * 32.0f) return 0;
+    // P1-A4-fix: 48px 判定线 = 攻击半径极限边缘 — AI 停在这里时怪挪 1px 即出圈,
+    // attack 分归零 → 决策抖动 → 出手率暴跌 (探针: 60 冷却拦截 vs 3 命中).
+    // 修复: 圈内不返回 0, 改为"贴脸步进" — 距离 >1 格时向最近怪靠近仍得 0.4 分,
+    // 压过 0 分的站桩, 让 AI 站进 d≤32px 的稳定出手区. 只在近战时启用 (远程风筝已验证有害).
+    if (d <= ideal_dist * 32.0f) {
+        bool is_melee = (p->weapon.weapon_type() == WeaponType::FIST);
+        if (is_melee && t && d > 32.0f) {
+            int step = _bfs_toward(p, monsters, map, false);
+            if (step >= 0) return (dir == step) ? 0.4f : 0.0f;
+        }
+        return 0;
+    }
 
     // Q3.2: 太远 → BFS 寻路接近 (绕墙+绕毒, 无路时轴贪心兜底)
     int step = _bfs_toward(p, monsters, map, true);
@@ -815,22 +838,6 @@ std::string DecisionAgent::best_action(const Player* player,
     if (best.empty()) {
         const char* rand_dirs[] = {"move_up","move_down","move_left","move_right"};
         best = rand_dirs[rng() % 4];
-    }
-    // P0-M1 诊断: 每 2s 采样一次最终决策 + 上下文 (仅 sim)
-    {
-        static float s_next = 0.0f;
-        if (_game_time >= s_next) {
-            s_next = _game_time + 2.0f;
-            auto* nt = _find_nearest(player, monsters);
-            float nd = nt ? hypotf(nt->entity.rect.x + 14 - (player->entity.rect.x + player->entity.rect.width/2),
-                                    nt->entity.rect.y + 14 - (player->entity.rect.y + player->entity.rect.height/2)) : -1;
-            printf("[P0DIAG2] t=%.0f best='%s' atk=%.2f hp=%.2f near=%.0f pt=(%.0f,%.0f) nt=(%.0f,%.0f) m0..3=(%.2f,%.2f,%.2f,%.2f) stairs=%d\n",
-                _game_time, best.c_str(), atk_score, _hp_ratio(player), nd,
-                player->entity.rect.x, player->entity.rect.y,
-                nt ? nt->entity.rect.x : -1, nt ? nt->entity.rect.y : -1,
-                move_scores[0], move_scores[1], move_scores[2], move_scores[3],
-                (int)stairs_active);
-        }
     }
     return best;
 }
