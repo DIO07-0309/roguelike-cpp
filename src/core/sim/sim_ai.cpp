@@ -154,6 +154,24 @@ void DecisionAgent::tick() {
 //  G7.4: Action evaluators
 // ═══════════════════════════════════════════════════════════
 
+// P1-C2: 玩家当前中毒层数 (0=无) — 毒 DOT 是基线最大单一死因 (33.6%),
+// AI 必须感知毒状态: 中毒时提前喝药 + 优先击杀毒源
+static int _player_poison_stacks(const Player* p) {
+    if (!p) return 0;
+    for (auto& b : p->active_buffs)
+        if (b.id == "poison") return b.stacks;
+    return 0;
+}
+
+// P1-C2: 怪物命中是否会上毒 (orc/elite_orc/poison_wyrm 等) — 击杀毒源
+// 是切断再上毒的最直接手段 (数据来自 enemies.json on_hit, 只读不复制)
+static bool _monster_applies_poison(const Monster* m) {
+    if (!m) return false;
+    for (auto& trig : m->on_hit_triggers)
+        if (trig.buff_id == "poison") return true;
+    return false;
+}
+
 float DecisionAgent::_evaluate_attack(const Player* p,
     const std::vector<Monster*>& monsters) const {
     auto* t = _find_nearest(p, monsters);
@@ -163,7 +181,11 @@ float DecisionAgent::_evaluate_attack(const Player* p,
     if (d > 1.5f * 32.0f) return 0; // out of range — no score
     // Melee builds score higher for attacking
     float base = 1.0f - _prefer_range; // range=0 → score 1.0
-    return base * (1.0f - d / (3.0f * 32.0f)); // closer = better
+    float score = base * (1.0f - d / (3.0f * 32.0f)); // closer = better
+    // P1-C2: 自身中毒时毒源怪 +0.25 — 斩断再上毒源头 (兽人族 25%/击 上毒)
+    if (_player_poison_stacks(p) > 0 && _monster_applies_poison(t))
+        score += 0.25f;
+    return score;
 }
 
 float DecisionAgent::_evaluate_skill(int slot, const Player* p,
@@ -786,9 +808,12 @@ std::string DecisionAgent::best_action(const Player* player,
     // Q3.3: 药水 — 残血且本帧无可发自愈技能 → 喝治疗药水 (1s CD 防连灌)
     // M4.4: Boss战阈值 0.35→0.55 (冻结 1.5s 后血量会被秒杀, 必须提前喝)
     // M4.4: Boss蓄力瞬间不喝 — 优先 _evaluate_move 的躲招 (1.4 分 > 药水收益)
+    // P1-C2: 中毒时阈值 0.35→0.55 — 毒 tick 3-6/0.5s, 35% 线才喝必然被追上
+    // (基线 33.6% DOT 死亡: 喝 30HP 的同时毒继续吃血, 提前 20% 喝才有净回血)
     float potion_line = _prefer_heal;
     auto* boss = _find_nearest(player, monsters);
     if (boss && boss->is_boss) potion_line = 0.55f;
+    else if (_player_poison_stacks(player) > 0) potion_line = 0.55f;
     if ((best.empty() || best[0] != 's') && _hp_ratio(player) < potion_line &&
         _game_time - _last_potion_time > 1.0f &&
         !(boss && boss->is_boss && _boss_winding_up(boss))) {
