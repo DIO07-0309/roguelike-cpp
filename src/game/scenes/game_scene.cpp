@@ -167,11 +167,11 @@ void GameScene::new_game() {
     player = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
         PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
 
-    // Q3.10: 初始携带 2 瓶治疗药水 — 无自愈系开局遇毒/环境伤害无解 (F1 掉血死)
-    player->inventory.items.push_back(
-        std::make_shared<ConsumableItem>("治疗药水", Rarity::COMMON, "heal", 30));
-    player->inventory.items.push_back(
-        std::make_shared<ConsumableItem>("治疗药水", Rarity::COMMON, "heal", 30));
+    // Q3.10: 初始携带治疗药水 — 无自愈系开局遇毒/环境伤害无解 (F1 掉血死)
+    // P1-C1: 2瓶→3瓶 — P1-B 基线毒路死亡35%: 毒DOT单次24HP, 2瓶60HP不够对冲2-3次中毒
+    for (int potion_i = 0; potion_i < 3; potion_i++)
+        player->inventory.items.push_back(
+            std::make_shared<ConsumableItem>("治疗药水", Rarity::COMMON, "heal", 30));
 
     // G10.1: Element select on first-ever game
     if (!player->element.initialized) {
