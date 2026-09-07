@@ -1,3 +1,31 @@
+# v1.4.1 — P1-B 500 局基线 + NPC 对话越界崩溃修复 (2026-09-07)
+
+> P1-A4 三死锁修复后的正式 500 局基线采集；跑批过程发现并修复一处真玩家可触发的越界崩溃。
+
+## P1-B-fix — NPC 二次对话越界崩溃（4/5 种子跑批必现）
+
+- **表象**：`--sim 100 --sim-seed 3` 在 run 4 楼层切换后 SIGSEGV（exit 0xC0000005），4/5 种子在前几局崩溃
+- **诊断**：gdb 栈 `strlen ← GameSceneInteraction::start_dialogue ← GameScene::_input`
+- **根因**：`start_dialogue` 用 `i<5` 统一遍历对话池，但 `repeat_dialogue` 只有 2 槽且全满（无 nullptr 终止）→ NPC 重谈（`met=true`）越界读 3 个野指针
+- **暴露链**：P1-A4 让 sim 能自动推进对话 → `met=true` 残留 → 下局重谈走 repeat 池 → 越界。**真玩家任何 NPC 二次交谈同样触发**（与 sim 无关）
+- **修复 A**：`std::size` 按池真实容量遍历
+- **修复 B**：`spawn_floor_npcs` 落位写错槽（`_npc_count-1` 是"最后创建"槽而非本 NPC 槽）→ 按 npc_id 定位
+- **修复 C**：`new_game()` 不清 NPC 状态（`_npc_state/_npc_count/_dialogue` 跨局残留）→ 统一重置
+- **修复 D**：BalanceReport `avg_*` 均值 int 截断（"1 局 2046 伤害 + 99 局 0" 算出 avg=0）+ `avg_heal` 漏序列化 → 改 float
+
+## P1-B — 500 局正式基线（5 seeds × 100，`reports/p1b/`）
+
+- 5×100 全 exit=0；同 seed 双跑 MD5 一致；60/60 ctest；Validator 0 错
+- **胜率 0%**，96.6% 死于 F1：DEATH_MONSTER 61.4% / DEATH_DOT 35.6% / TIMEOUT_WALL 2.6%
+- **攻击消费链复活但极窄**：picks 0→0.49/局，深层局（≥F3）0→16/500（3.2%），最深 F11（1 局双 Boss 击杀，55 杀 5383 伤害）
+- 拿到武器的 15 局全部进入 F3+（fist_basic avg_floor=1.0 vs 真武器 2.5-8.0）——"活得久→捡到武器→活更久"正循环被 F1 数值掐断
+- **结论**：M4 时 0% 是"AI 坏了"；P1-B 后 0% 是"F1 平衡数值问题"——16 个深层局证明链路走通后 AI 能推进。详见 `docs/P1B_BASELINE_DATA_REVIEW.md`
+- **v1.5.0 Release Gate 依据**：崩溃修复必须发版；F1 数值带下调（P1-C1）建议在 Release 前完成
+
+---
+
+
+
 # v1.3.2 — G10 视觉链闭环 + P0 sim 死锁修复 + F15 平衡 (2026-09-01)
 
 > G10.3→G10.7 视觉垂直切片全线贯通：游戏内空间可信度 + 游戏身份层。
