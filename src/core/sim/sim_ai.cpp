@@ -172,6 +172,11 @@ static bool _monster_applies_poison(const Monster* m) {
     return false;
 }
 
+// P1-C4 探针: 攻击评分命中时的最近怪距离分布 — 实体定义在 sim_runner.cpp
+// (test 二进制链接 sim_runner 但不链接 sim_ai, 引用方 extern 即可)
+extern int g_p1c4_probe_frame;
+extern int g_p1c4_d_bucket[8];
+
 float DecisionAgent::_evaluate_attack(const Player* p,
     const std::vector<Monster*>& monsters) const {
     auto* t = _find_nearest(p, monsters);
@@ -185,6 +190,13 @@ float DecisionAgent::_evaluate_attack(const Player* p,
     // P1-C2: 自身中毒时毒源怪 +0.25 — 斩断再上毒源头 (兽人族 25%/击 上毒)
     if (_player_poison_stacks(p) > 0 && _monster_applies_poison(t))
         score += 0.25f;
+    // P1-C4 探针: 近距未出手采样 — 每 180 帧 (3s) 记录最近怪距离,
+    // 用于量化 48px 攻击圈外"看得见打不着"的站桩时长
+    if (++g_p1c4_probe_frame % 180 == 0) {
+        int b = (int)(d / 32.0f);
+        if (b > 7) b = 7;
+        g_p1c4_d_bucket[b]++;
+    }
     return score;
 }
 
@@ -592,14 +604,16 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
     // P1-A3: 危急回血 — 残血(<50%)且无自愈无药水时, 找泉水/祭坛优先于战斗 (1.3 > 攻击 1.0)
     // P1-A3-fix1: 无未触发房 (room_step<0) 时不得永续撤退 — 原实现 bfs_away 0.9 分
     // 持续压过攻击 → "只逃不打"死循环 (v3 冒烟: 19/20 局零输出, 怪追到墙角磨死).
-    // 撤退是止损不是战术: 只在怪贴脸 (<2格) 时短暂拉开, 否则回战场正常输出.
+    // P1-C4: 贴脸拉开分 0.9→0.6 — 0.9 曾压过攻击(0.67)使围殴局零输出全程逃命
+    // (P1-C3 数据: 270 局 F1 围殴死 100% 零杀, avg 118s 仅 1.65dps 被追着咬).
+    // 0.6 保留撤离意图但让贴脸攻击(d0≈0.67)反超 → "逃一步打一下" 轮换
     if (map && _needs_recovery(p) && t && !t->is_boss) {
         int room_step = _bfs_toward_room(p, map, true);   // P1-A3-fix2: 只找回血房
         if (room_step >= 0) return (dir == room_step) ? 1.3f : 0.0f;
         // 无房可去 → 仅贴脸时拉开 (条件撤退, 血线安全或距离拉开即恢复战斗)
         if (d < 2.0f * 32.0f) {
             int away = _bfs_away(p, t, map, true);
-            if (away >= 0) return (dir == away) ? 0.9f : 0.0f;
+            if (away >= 0) return (dir == away) ? 0.6f : 0.0f;
         }
     }
 

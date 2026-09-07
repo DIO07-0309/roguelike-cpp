@@ -110,11 +110,27 @@ uint32_t SimRunner::next_seed() const {
     return _cfg.seed_start + (uint32_t)_current_run * 1234567u;
 }
 
+// P1-C4 探针实体: 攻击评分命中距离分布 (sim_ai.cpp extern 引用)
+int g_p1c4_probe_frame = 0;
+int g_p1c4_d_bucket[8] = {0};
+
 void SimRunner::finalize() {
     _active = false;
     auto& r = _report;
     int N = r.total_runs;
     printf("\n═══ BALANCE REPORT: %d runs ═══\n", N);
+    // P1-C4 探针: 攻击圈命中距离分布 (0-7+格) — F1 零输出死因定位
+    // (定义在此: sim_ai.cpp 的引用方只需 extern, test 二进制可链接)
+    {
+        int tot = 0;
+        for (int i = 0; i < 8; i++) tot += g_p1c4_d_bucket[i];
+        if (tot > 0) {
+            printf("  [C4PROBE] attack-eval hit dist (tiles): ");
+            for (int i = 0; i < 8; i++)
+                printf("d%d=%.1f%% ", i, g_p1c4_d_bucket[i]*100.0/tot);
+            printf("(n=%d)\n", tot);
+        }
+    }
     printf("  Win rate:     %.1f%% (%d/%d)\n", r.win_rate*100, r.total_wins, N);
     printf("  Avg floor:    %.2f\n", r.avg_floor);
     printf("  Avg turns:    %.1f\n", r.avg_turns);

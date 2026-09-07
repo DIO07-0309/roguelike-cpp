@@ -1,3 +1,44 @@
+# v1.4.5 — P1-C4 时停 UAF 根治 + 模拟器确定性恢复 (2026-09-08)
+
+> 本批核心产出：发现并修复 P1-C3 全部历史 500 局数据的**地基缺陷**——同 seed 双结局。
+
+## 改动
+
+### UAF 根治 (game_scene.h / game_scene_combat.cpp / player_controller.cpp / combat_coordinator.*)
+
+- **根因**：`pending_damage` 存裸 `Monster*`。时停期间目标怪被 cleanup/kill 路径
+  erase 释放 → 结算时悬空。堆地址被新怪复用会**欺骗 valid 检查把伤害打错怪**；
+  常规失效则**伤害凭空丢失**（84 点挂起伤害消失 → 兽人不死 → 世界线分裂）。
+  是否触发取决于进程堆布局（Windows ASLR）——纯运行期运气
+- **修复**：`pending_damage` 改存 `instance_id`，结算按 id 在 monsters 中查找，
+  id 失效诚实跳过。删除零调用者的死代码 `CombatCoordinator::apply_pending_damage`
+- **验证**：同 seed 8 连跑 MD5 全一致（修复前 ~50% 概率分岔成两种结局）
+
+### SimAI 贴脸拉开分 0.9→0.6 (sim_ai.cpp)
+
+P1-C3 数据：270 局 F1 围殴死 100% 零杀（0.9 分撤退持续压过贴脸攻击 0.67，
+全程逃命被咬死）。0.6 让贴脸攻击反超 → "逃一步打一下"轮换。
+
+### C4PROBE 常驻探针 (sim_ai.cpp / sim_runner.cpp)
+
+攻击评分命中距离分布：**d1（32-48px 边缘圈）占 82.2%**，d0 稳定出手区仅 17.8%
+——F1 围殴死亡真因定位为"攻击圈边缘站桩"，是 P1-C5 贴脸步进泛化的直接依据。
+
+## 定位过程（五层探针收网，详见 `docs/P1C4_UAF_DETERMINISM_DATA_REVIEW.md`）
+
+传送指纹 → 帧级 FPDIAG → KILLDIAG → 时停/挂起计数 → PENDDIAG（DANGLING 实锤）。
+每层一个可证伪假设。**教训：MD5 双跑验证对间歇性缺陷是假阳性，
+N≥4 次重复才可信。**
+
+## 500 局对比（P1-C3 → P1-C4）
+
+- 胜利 0 → **1/500**（s19 首胜 ⭐）；F1 死亡 90.2%→91.0%、TWall 7.8%→7.0% 持平
+- 判读：本批是**地基修复批**非调优批——数值持平符合预期；
+  F1 围殴 91% 仍是最大瓶颈，C4PROBE 已精确到"边缘圈站桩"
+- 验证：60/60 ctest · Validator 0 错 · 8 连跑 MD5 一致（s3）+ 4 连跑（s7）
+
+---
+
 # v1.4.4 — P1-C3 楼梯导航 + 层级搜刮预算 (2026-09-07)
 
 > C3DIAG 探针定位"清层不下楼"死锁：AI 返回 descend 但从不导航去楼梯格，站原地按 E 600s。

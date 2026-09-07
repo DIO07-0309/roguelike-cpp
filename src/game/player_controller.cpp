@@ -554,7 +554,8 @@ void PlayerController::player_attack() {
     gs._boss.dmg_done += dmg;
 
     if (gs.time_stop_remaining > 0) {
-        gs.pending_damage.emplace_back(target, dmg);
+        // P1-C4-fix(UAF): instance_id 代替裸指针 — 时停中目标可被释放
+        gs.pending_damage.emplace_back(target->instance_id, dmg);
     } else {
         CombatCoordinator::apply_attack_damage(target, dmg,
             gs.active_effects, gs.get_tree()->get_audio());
@@ -584,7 +585,8 @@ void PlayerController::_process_weapon_result(GameScene& gs, Player& p,
     const WeaponAttackResult& r)
 {
     if (gs.time_stop_remaining > 0) {
-        gs.pending_damage.emplace_back(r.target, r.damage);
+        // P1-C4-fix(UAF): instance_id 代替裸指针 — 时停中目标可被释放
+        gs.pending_damage.emplace_back(r.target->instance_id, r.damage);
         return;
     }
     // P0-B: _resolve_one 已施加 take_damage，此处不再重复

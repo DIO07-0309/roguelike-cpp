@@ -141,7 +141,11 @@ public:
 
     // 时停
     float time_stop_remaining = 0.0f;
-    std::vector<std::pair<Monster*, int>> pending_damage;
+    // P1-C4-fix(UAF): 时停挂起伤害原存裸 Monster* — 时停中目标怪可被
+    // cleanup/kill 路径 erase 释放, 结算时悬空指针 valid 检查被堆地址复用
+    // 欺骗或直接丢伤害 (同 seed 双结局根因). 改存 instance_id, 结算时按 id
+    // 在 monsters 中查找 — 天然防 UAF, 跨进程确定.
+    std::vector<std::pair<uint64_t, int>> pending_damage;
 
     // M4.2: 镜像专属真冻结 — 玩家禁移动/攻击 (Echo 可行动, 计时在 Director::tick 递减)
     bool player_frozen_by_mirror() const { return _boss.mirror_freeze_active(); }

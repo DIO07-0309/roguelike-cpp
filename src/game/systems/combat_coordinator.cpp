@@ -39,7 +39,7 @@ std::string CombatCoordinator::use_skill(int index, Player* player,
                                           GameMap* map, std::vector<Effect>& effects,
                                           AudioServer* audio, double game_time,
                                           float& time_stop_remaining,
-                                          std::vector<std::pair<Monster*, int>>& pending_damage,
+                                          std::vector<std::pair<uint64_t, int>>& pending_damage,
                                           bool is_heavy) {
     if (!player || index >= (int)player->skills.active_skills.size()) return "";
     auto& sk = player->skills.active_skills[index];
@@ -76,7 +76,8 @@ std::string CombatCoordinator::use_skill(int index, Player* player,
         for (auto& m : monsters) {
             int delta = pre_hp[m.get()] - m->combat.current_hp;
             if (delta > 0) {
-                pending_damage.emplace_back(m.get(), delta);
+                // P1-C4-fix(UAF): instance_id 代替裸指针 — 时停中目标可被释放
+                pending_damage.emplace_back(m->instance_id, delta);
                 m->combat.current_hp = pre_hp[m.get()];
                 m->combat.is_alive = true;
             }
@@ -200,19 +201,6 @@ void CombatCoordinator::cleanup_dead_monsters(
     }
 }
 
-void CombatCoordinator::apply_pending_damage(
-    std::vector<std::pair<Monster*, int>>& pending,
-    std::vector<std::unique_ptr<Monster>>& monsters,
-    Player* player, std::vector<DroppedItem>& ground_items, AudioServer* audio) {
-    for (auto& [m, dmg] : pending) {
-        if (m && m->combat.is_alive) m->combat.take_damage(dmg);
-    }
-    auto it = monsters.begin();
-    while (it != monsters.end()) {
-        if (!(*it)->combat.is_alive) {
-            on_monster_killed(it->get(), player, monsters, ground_items, audio);
-            it = monsters.erase(it);
-        } else ++it;
-    }
-    pending.clear();
-}
+// P1-C4-fix: apply_pending_damage 已删除 — 零调用者的死路径, 且其裸指针
+// 语义正是 UAF 根因 (真实结算走 GameSceneCombat::apply_pending_damage,
+// 已改为 instance_id 查找).

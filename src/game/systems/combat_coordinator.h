@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <utility>
 
+#include <cstdint>
+
 class Player;
 class Monster;
 class GameMap;
@@ -28,12 +30,13 @@ public:
                                      std::vector<Effect>& effects, AudioServer* audio);
 
     // 技能释放 (含时停special-case + 伤害队列 + SFX + VFX + D2 heavy强化)
+    // P1-C4-fix(UAF): pending_damage 存 instance_id (原裸指针见 game_scene.h)
     static std::string use_skill(int index, Player* player,
                                   std::vector<std::unique_ptr<Monster>>& monsters,
                                   GameMap* map, std::vector<Effect>& effects,
                                   AudioServer* audio, double game_time,
                                   float& time_stop_remaining,
-                                  std::vector<std::pair<Monster*, int>>& pending_damage,
+                                  std::vector<std::pair<uint64_t, int>>& pending_damage,
                                   bool is_heavy = false);
 
     // D2 Step2: 技能命中后的 heavy 增强 VFX
@@ -51,11 +54,4 @@ public:
                                        Player* player,
                                        std::vector<DroppedItem>& ground_items,
                                        AudioServer* audio);
-
-    // 应用时停暂存伤害
-    static void apply_pending_damage(std::vector<std::pair<Monster*, int>>& pending,
-                                      std::vector<std::unique_ptr<Monster>>& monsters,
-                                      Player* player,
-                                      std::vector<DroppedItem>& ground_items,
-                                      AudioServer* audio);
 };
