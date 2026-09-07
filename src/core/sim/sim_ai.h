@@ -29,6 +29,19 @@ public:
     };
     void set_ground_items(std::vector<GroundSpot> spots) { _ground = std::move(spots); }
 
+    // ── P1-C3: 楼梯感知 (GameScene 每帧只读注入) ──
+    // 病理: stairs_active 后 AI 返回 "descend" 但人不走向楼梯格 →
+    // _check_floor_transition 只认"站在楼梯上按 E" → 站原地按 E 600s 兜底
+    // (P1-C3 探针: 9/20 局 stairs=1 monsters=0 卡死于此)
+    // 楼层切换检测: 楼梯坐标变化 → 重置搜刮状态 (新层重新允许搜刮)
+    void set_stairs_pos(int tx, int ty) {
+        if (tx != _stairs_tx || ty != _stairs_ty) {
+            _loot_abandoned = false;
+            _stairs_since = -1.0;    // P1-C3-fix: 新层搜刮预算重开
+        }
+        _stairs_tx = tx; _stairs_ty = ty;
+    }
+
     DecisionAgent();
 
     void start(const Player* player);
@@ -110,11 +123,22 @@ private:
     mutable float _last_hp_sum = -1.0f, _last_mon_sum = -1.0f;  // 换血检测
     mutable int _loot_last_tx = -999, _loot_last_ty = -999;     // 搜刮卡死看门狗
     mutable float _loot_stuck_since = -1.0f;
+    // P1-C3: 本层搜刮放弃标记 — 看门狗触发后置位, 直奔楼梯 (原直接 "descend"
+    // 但人不在楼梯格按 E 无效 → 搜刮→卡2s→descend→搜刮 循环 600s)
+    mutable bool _loot_abandoned = false;
+    // P1-C3-fix: 层级搜刮预算 — stairs 激活起计时, 15s 内没完成搜刮就下楼.
+    // 病理: 楼梯修复后节奏 x7 快, 但"每层全搜刮"让 deep 局资源不足被围殴
+    // (P1-C3 vs P1-C2 500局: TWall 29→4 但 deep 22→5, s3) — 搜刮要限时限层
+    mutable float _stairs_since = -1.0f;
     mutable int _escape_dir = -1;
     // Q3.3: 药水决策冷却 — 防止残血时逐帧连喝清空背包
     mutable double _last_potion_time = -999.0;
     // P1-A2: 地面物品快照 (每帧 set_ground_items 注入)
     std::vector<GroundSpot> _ground;
+    // P1-C3: 楼梯目标 tile (-1=未注入) — set_stairs_pos 每帧注入
+    int _stairs_tx = -1, _stairs_ty = -1;
+    // P1-C3: BFS 至楼梯, 返回第一步方向 (0-3, -1=不可达/已在格)
+    int _bfs_to_stairs(const Player* p, const GameMap* map) const;
     // Q3.2: 危险视野 — 活性毒池/尖刺圈内判定 (半径 1.5 格)
     bool _is_hazard_near(float px, float py, const GameMap* map) const;
     // Q3.2: 残血且无可用自愈 → 需去找泉水/祭坛回血

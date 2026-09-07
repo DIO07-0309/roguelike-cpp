@@ -408,6 +408,40 @@ float DecisionAgent::_near_loot_dist(const Player* p) const {
     return best;
 }
 
+// P1-C3: BFS 至楼梯格 — stairs_active 后人必须站上楼梯才能按 E 下楼,
+// 原 best_action 只返回 "descend" 不导航 → 站原地按 E 600s (探针 9/20 局)
+int DecisionAgent::_bfs_to_stairs(const Player* p, const GameMap* map) const {
+    if (!map || !p || _stairs_tx < 0) return -1;
+    int w = map->width, h = map->height;
+    if (_stairs_tx >= w || _stairs_ty >= h) return -1;
+    auto [sx, sy] = map->pixel_to_tile(
+        p->entity.rect.x + p->entity.rect.width/2,
+        p->entity.rect.y + p->entity.rect.height/2);
+    if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
+    if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
+    if (sx == _stairs_tx && sy == _stairs_ty) return -1;   // 已在格 → 调用方直接 descend
+    const int N = w * h;
+    std::vector<int> first((size_t)N, -2);
+    std::queue<int> q;
+    first[sy * w + sx] = -1;
+    q.push(sy * w + sx);
+    while (!q.empty()) {
+        int cur = q.front(); q.pop();
+        int cx = cur % w, cy = cur / w;
+        if (cx == _stairs_tx && cy == _stairs_ty)
+            return (first[cur] >= 0) ? first[cur] : -1;
+        for (int d = 0; d < 4; d++) {
+            int nx = cx + kBfsDx[d], ny = cy + kBfsDy[d];
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+            int ni = ny * w + nx;
+            if (first[ni] != -2 || !_tile_rect_walkable(map, nx, ny)) continue;
+            first[ni] = (cur == sy * w + sx) ? d : first[cur];
+            q.push(ni);
+        }
+    }
+    return -1;
+}
+
 // Q3.2: BFS 寻路 — 从玩家所在格出发, 找最近可达的存活怪物, 返回第一步方向 (0-3, -1=不可达)
 int DecisionAgent::_bfs_toward(const Player* p,
     const std::vector<Monster*>& monsters, const GameMap* map, bool avoid_hazard) const {
@@ -675,9 +709,14 @@ std::string DecisionAgent::best_action(const Player* player,
     if (boss_intro_active) return "confirm";
     if (stairs_active) {
         // Q3.2: 清层后先搜刮未触发特殊房 (原逻辑直接下楼 → 整层资源全丢)
+        // P1-C3-fix: 层级搜刮预算 15s — 超时放弃本层余下搜刮直奔楼梯.
+        // 全量数据: 无限搜刮 → TWall 16.8% 爬不完; 15s 预算 → TWall 7.8%.
+        // (25s 实验更差: 混沌重排下不单调 — 以结构指标定参: 死锁根除+节奏资源平衡)
+        if (_stairs_since < 0) _stairs_since = (float)_game_time;
+        bool budget_ok = (float)_game_time - _stairs_since < 15.0f;
         bool can_move = false;
         std::string move_act;
-        if (map) {
+        if (map && !_loot_abandoned && budget_ok) {
             for (auto& sr : map->special_rooms) {
                 if (sr.triggered) continue;
                 float ddx = player->entity.rect.x + player->entity.rect.width/2 - (sr.cx * 32 + 16);
@@ -697,7 +736,7 @@ std::string DecisionAgent::best_action(const Player* player,
             }
         }
         if (can_move) {
-            // Q3.2-fix: 搜刮被半格偏移卡死 → 原地 ≥2s 放弃搜刮直接下楼
+            // Q3.2-fix: 搜刮被半格偏移卡死 → 原地 ≥2s 放弃搜刮直奔楼梯
             int ct0 = (int)(player->entity.rect.x + player->entity.rect.width / 2) / 32;
             int ct1 = (int)(player->entity.rect.y + player->entity.rect.height / 2) / 32;
             if (abs(ct0 - _loot_last_tx) + abs(ct1 - _loot_last_ty) >= 2) {
@@ -706,9 +745,19 @@ std::string DecisionAgent::best_action(const Player* player,
                 _loot_stuck_since = (float)_game_time;
             } else if ((float)_game_time - _loot_stuck_since > 2.0f) {
                 sim_stuck_loot_wd++;   // M2-C: 搜刮看门狗强制下楼计数
-                return "descend";
+                _loot_abandoned = true;  // P1-C3: 锁定放弃, 走楼梯不再回头
             }
-            return move_act;
+            if (!_loot_abandoned) return move_act;
+        }
+        // P1-C3: 搜刮完毕/放弃 → 人必须先走到楼梯格 (原直接 "descend" 但
+        // _check_floor_transition 只认"站在楼梯上按 E" → 站原地按 E 600s)
+        // 在格 → descend; 有路 → 迈向楼梯的第一步; 无路 → descend 碰运气
+        {
+            int sstep = _bfs_to_stairs(player, map);
+            if (sstep >= 0) {
+                const char* dl[] = {"move_up","move_down","move_left","move_right"};
+                return dl[sstep];
+            }
         }
         return "descend";
     }

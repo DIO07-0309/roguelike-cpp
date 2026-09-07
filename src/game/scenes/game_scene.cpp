@@ -544,6 +544,32 @@ void GameScene::_process(double delta) {
     // M2-E: GetTime()(真实墙钟, 慢机改变结果) → 帧计数 (600s×60fps=36000帧, 确定性)
     if (_sim_mode && ++_sim_wall_frames > 36000) {
         LOG_INFO("[SIM] 帧数兜底超时(36000f) 第%d层 — 强制结算", current_floor);
+        // P1-C3 探针: 兜底结算现场快照 — 定位游走困死的末帧状态
+        // (与 900s P0DIAG 同构: 玩家/怪/楼梯/门, headless 一次性打印)
+        {
+            float px = player->entity.rect.x + player->entity.rect.width/2;
+            float py = player->entity.rect.y + player->entity.rect.height/2;
+            LOG_INFO("[C3DIAG] stairs_active=%d monsters=%zu picks=%d gold=%d",
+                     (int)stairs_active, monsters.size(), _sim_items_picked, player->gold);
+            for (auto& m : monsters) {
+                if (!m || !m->combat.is_alive) continue;
+                float d = hypotf(m->entity.rect.x + m->entity.rect.width/2 - px,
+                                 m->entity.rect.y + m->entity.rect.height/2 - py);
+                LOG_INFO("[C3DIAG] mon '%s' hp=%d/%d dist=%.0f pos=(%.0f,%.0f) room=%d",
+                         m->name.c_str(), m->combat.current_hp, m->combat.max_hp,
+                         d, m->entity.rect.x, m->entity.rect.y,
+                         _room_mgr.room_at(
+                             (int)(m->entity.rect.x / TILE_SIZE),
+                             (int)(m->entity.rect.y / TILE_SIZE)));
+            }
+            if (game_map) {
+                auto [stx, sty] = game_map->pixel_to_tile(px, py);
+                LOG_INFO("[C3DIAG] player tile=(%d,%d) walkable=%d stairs_pos=(%d,%d) on_stairs=%d",
+                         stx, sty, (int)game_map->is_walkable(stx, sty),
+                         stairs_pos.first, stairs_pos.second,
+                         (std::make_pair(stx, sty) == stairs_pos) ? 1 : 0);
+            }
+        }
         _sim_wall_timeout = true;
         _collect_sim_stats();
         return;
@@ -590,6 +616,10 @@ void GameScene::_process(double delta) {
             spots.push_back({d.tile_x, d.tile_y, is_potion});
         }
         _sim_ai->set_ground_items(std::move(spots));
+        // P1-C3: 楼梯位置注入 — AI 需导航到楼梯格才能按 E 下楼
+        // (原只传 bool stairs_active, AI 返回 descend 但不走路 → 600s 站桩)
+        _sim_ai->set_stairs_pos(stairs_active ? stairs_pos.first : -1,
+                                stairs_active ? stairs_pos.second : -1);
     }
 
     // Q3.2: sim 真实伤害统计 — 玩家 HP 下降累计 (含毒池等环境伤害)
