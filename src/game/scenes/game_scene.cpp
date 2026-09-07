@@ -157,6 +157,13 @@ void GameScene::new_game() {
     // (旧代码 g_behavior 从不清: 上一局的死亡记录混入本局镜像分析)
     g_behavior.clear();
 
+    // P1-B-fix(C): NPC 状态跨局清零 — new_game 从不重置, 上一局 met/finished/
+    // tile 残留进本局 (sim 100 局共享一个 GameScene 实例, 逐局累积错位)
+    for (int i = 0; i < _npc_count; i++) _npc_state[i] = NPCState{};
+    _npc_count = 0;
+    _current_npc_index = -1;
+    _dialogue = DialogueState{};
+
     player = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
         PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
 

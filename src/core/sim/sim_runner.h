@@ -128,13 +128,15 @@ struct BalanceReport {
     int total_runs = 0;
     int total_wins = 0;
     float win_rate = 0;
-    int avg_floor = 0;
-    int avg_turns = 0;
-    int avg_damage_dealt = 0;
-    int avg_damage_taken = 0;
-    int avg_heal = 0;
-    int avg_relics = 0;
-    int avg_equipment = 0;   // Q3.2: 平均每局自动装备数
+    // P1-B-fix(D): 均值改 float — 原int增量均值在"少数局有大量/多数局为0"分布下
+    // 每步截断归零 (s7: 1局2046伤害99局0 → avg 应20.46, int算出0), avg_heal 也被截丢
+    float avg_floor = 0;
+    float avg_turns = 0;
+    float avg_damage_dealt = 0;
+    float avg_damage_taken = 0;
+    float avg_heal = 0;
+    float avg_relics = 0;
+    float avg_equipment = 0;   // Q3.2: 平均每局自动装备数
     int boss_kill_count[3] = {0};          // F5, F10, F15 counts
     int death_floor_dist[16] = {0};        // floor 1-15
     int build_count[13] = {0};             // 12 BuildType counts (index 0 unused)

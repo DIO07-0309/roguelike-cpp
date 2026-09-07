@@ -88,7 +88,7 @@ void SimRunner::record_run(const RunResult& s) {
     int pct = (_current_run * 100) / _cfg.runs;
     int prev_pct = ((_current_run - 1) * 100) / _cfg.runs;
     if (pct != prev_pct)
-        printf("[SIM] %3d%%  %d/%d  (wins:%d, avg_floor:%d)\n",
+        printf("[SIM] %3d%%  %d/%d  (wins:%d, avg_floor:%.2f)\n",
                pct, _current_run, _cfg.runs, _report.total_wins, _report.avg_floor);
 }
 
@@ -116,12 +116,12 @@ void SimRunner::finalize() {
     int N = r.total_runs;
     printf("\n═══ BALANCE REPORT: %d runs ═══\n", N);
     printf("  Win rate:     %.1f%% (%d/%d)\n", r.win_rate*100, r.total_wins, N);
-    printf("  Avg floor:    %d\n", r.avg_floor);
-    printf("  Avg turns:    %d\n", r.avg_turns);
-    printf("  Avg damage:   dealt=%d  taken=%d  heal=%d\n",
+    printf("  Avg floor:    %.2f\n", r.avg_floor);
+    printf("  Avg turns:    %.1f\n", r.avg_turns);
+    printf("  Avg damage:   dealt=%.1f  taken=%.1f  heal=%.1f\n",
         r.avg_damage_dealt, r.avg_damage_taken, r.avg_heal);
-    printf("  Avg relics:   %d\n", r.avg_relics);
-    printf("  Avg equips:   %d\n", r.avg_equipment);
+    printf("  Avg relics:   %.2f\n", r.avg_relics);
+    printf("  Avg equips:   %.2f\n", r.avg_equipment);
     printf("  Boss kills:   F5=%.1f%%  F10=%.1f%%  F15=%.1f%%\n",
         r.boss_kill_count[0]*100.0/N, r.boss_kill_count[1]*100.0/N, r.boss_kill_count[2]*100.0/N);
 
@@ -187,6 +187,7 @@ std::string BalanceReport::to_json() const {
     j["summary"]["avg_turns"]   = avg_turns;
     j["summary"]["avg_damage_dealt"] = avg_damage_dealt;
     j["summary"]["avg_damage_taken"] = avg_damage_taken;
+    j["summary"]["avg_heal"]   = avg_heal;   // P1-B-fix(D): 原漏序列化, JSON 一直缺失
     j["summary"]["avg_relics"]  = avg_relics;
     j["summary"]["avg_equipment"] = avg_equipment;
     json bk = json::array(); for (int i=0;i<3;i++) bk.push_back(boss_kill_count[i]);

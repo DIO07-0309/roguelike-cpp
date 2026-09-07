@@ -13,8 +13,9 @@ extern bool g_font_loaded;
 #include "gameplay_system_director.h"
 #include "presentation_system_director.h"
 #include "resource_manager.h"                 // G9.4: 对话头像
-#include "game/rendering/sprite_renderer.h"   // G9.4
+#include "game/rendering/sprite_renderer.h"  // G9.4
 #include <cstdio>
+#include <iterator>   // P1-B-fix(A): std::size 推导对话池容量
 
 // ============================================================
 // Event UI
@@ -182,12 +183,21 @@ void GameSceneInteraction::spawn_floor_npcs(int floor, const std::vector<std::pa
         const NPCData* cfg = get_npc_config(floor, slot);
         if (!cfg) continue;
         int npc_id = floor * 10 + slot;
+        const int npc_index_before = _s._npc_count;
         NPCState* st = _s._find_or_create_npc_state(npc_id);
         if (!st || st->finished) continue;
+        // P1-B-fix(B): 写"本 NPC 自己"的槽 — 原写 _npc_count-1 恰是"最后创建"的槽,
+        // 已存在的 NPC (met 跨局残留) 会把位置写到别人槽上 → 落位错乱/越界触发对话
+        int npc_index = (npc_index_before < _s._npc_count) ? _s._npc_count - 1 : -1;
+        if (npc_index < 0) {
+            for (int i = 0; i < _s._npc_count; i++)
+                if (_s._npc_state[i].id == npc_id) { npc_index = i; break; }
+        }
+        if (npc_index < 0) continue;
         int r_idx = 2 + slot; if (r_idx >= (int)rooms.size() - 1) r_idx = (int)rooms.size()/2;
         auto [rx, ry] = rooms[r_idx];
-        _s._npc_tile_x[_s._npc_count - 1] = rx;
-        _s._npc_tile_y[_s._npc_count - 1] = ry;
+        _s._npc_tile_x[npc_index] = rx;
+        _s._npc_tile_y[npc_index] = ry;
     }
 }
 
@@ -203,8 +213,13 @@ void GameSceneInteraction::start_dialogue(int npc_index) {
     _s._dialogue.pages.clear();
     _s._dialogue.target_npc = st;
 
+    // P1-B-fix(A): 按池真实容量遍历 — first_dialogue[5] / repeat_dialogue[2] 尺寸不同,
+    // 原 i<5 统一遍历对 repeat 池越界读 3 个野指针 → dp.text=pool[i] → strlen SIGSEGV
+    // (gdb 实锤: seed 3 run 4, 二次对话必崩, 真玩家同样潜伏)
     const char* const* pool = st->met ? cfg->repeat_dialogue : cfg->first_dialogue;
-    for (int i = 0; i < 5; i++) {
+    const size_t pool_size = st->met ? std::size(cfg->repeat_dialogue)
+                                      : std::size(cfg->first_dialogue);
+    for (size_t i = 0; i < pool_size; i++) {
         if (!pool[i]) break;
         DialoguePage dp;
         dp.speaker = cfg->name;
