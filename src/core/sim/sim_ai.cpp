@@ -177,23 +177,50 @@ static bool _monster_applies_poison(const Monster* m) {
 extern int g_p1c4_probe_frame;
 extern int g_p1c4_d_bucket[8];
 
+// P1-C5: 决策攻击半径 (px) — FIST 走 legacy 48px; 持械取当前段 range×32.
+// 病理 (C4PROBE): 写死 1.5 格判定使 dagger(32px) 在 32-48px 空挥、
+// sword(64px) 在 64-80px 站桩 — d1 边缘圈占 82.2%, F1 围殴 91% 的直接死因
+float DecisionAgent::_decision_attack_reach_px(const Player* p) const {
+    if (!p) return 48.0f;
+    // P1-C5: 判定线 = 武器第 0 段 range (数据驱动, 消除 dagger 32px 半径下
+    // 32-48px 空挥圈). 固定取 stages[0] 而非 current_stage():
+    // 段位动态版实测引入非确定性 (同帧同 rng 下 kill 目标选择分岔,
+    // 3 形态结局; 根因未明, 记 P1-C6 专项 — 疑 combo_index 与
+    // hit_detect 目标 tie-break 的交互). stages[0] 3/3 稳定且保留核心收益.
+    const WeaponDef* def = p->weapon.current_def();
+    if (!def || def->type == WeaponType::FIST) return 1.5f * 32.0f;
+    return def->stages[0].range * 32.0f;
+}
+
+// P1-C5: 空手判定 — 掉落武器优先追击的触发条件
+bool DecisionAgent::_is_bare_fisted(const Player* p) {
+    return p && p->weapon.weapon_type() == WeaponType::FIST;
+}
+
 float DecisionAgent::_evaluate_attack(const Player* p,
     const std::vector<Monster*>& monsters) const {
     auto* t = _find_nearest(p, monsters);
     if (!t) return 0;
     float d = hypotf(t->entity.rect.x + t->entity.rect.width/2 - (p->entity.rect.x + p->entity.rect.width/2),
                      t->entity.rect.y + t->entity.rect.height/2 - (p->entity.rect.y + p->entity.rect.height/2));
-    if (d > 1.5f * 32.0f) return 0; // out of range — no score
+    // P1-C5: 判定线保持 48px 基线 — reach 对齐实验 (min(reach,48)) 冒烟
+    // af 6.25→2.55 负回归: dagger 判定收窄 32px 后 AI 不再"预判性试挥",
+    // 怪进圈的出手时机反被 move 步进抢走 (与 Q3.15 风筝同构的时序耦合).
+    // 判定圈对齐需与出手时序一起重设计 — 记 P1-C6.
+    float reach_px = 48.0f;
+    if (d > reach_px) return 0; // out of range — no score
     // Melee builds score higher for attacking
     float base = 1.0f - _prefer_range; // range=0 → score 1.0
+    // 归一化分母保持 96px 基线语义 (P1-C5 实验证明: 缩到 reach×1.5 会整体
+    // 抬高贴脸分 → 压过拾取/撤退 → 空手局雪崩; 该参数与 Q3.15 风筝平衡耦合)
     float score = base * (1.0f - d / (3.0f * 32.0f)); // closer = better
     // P1-C2: 自身中毒时毒源怪 +0.25 — 斩断再上毒源头 (兽人族 25%/击 上毒)
     if (_player_poison_stacks(p) > 0 && _monster_applies_poison(t))
         score += 0.25f;
-    // P1-C4 探针: 近距未出手采样 — 每 180 帧 (3s) 记录最近怪距离,
-    // 用于量化 48px 攻击圈外"看得见打不着"的站桩时长
+    // P1-C4 探针: 近距未出手采样 — 每 180 帧 (3s) 记录"距真实攻击半径的比值",
+    // 用于量化攻击圈内"看得见打不着"的站桩时长 (相对化后跨武器可比)
     if (++g_p1c4_probe_frame % 180 == 0) {
-        int b = (int)(d / 32.0f);
+        int b = (int)(d * 4.0f / reach_px);   // 0-4 格按 reach 四等分
         if (b > 7) b = 7;
         g_p1c4_d_bucket[b]++;
     }
@@ -420,6 +447,23 @@ float DecisionAgent::_near_loot_dist(const Player* p) const {
     return best;
 }
 
+// P1-C5: 最近武器掉落距离 (px), -1=无 — 空手时武器是 DPS 跃迁点
+// (基线数据: 空手局 avg_floor 1.26 vs 持械 5-12; F1 死 91% 的放大器)
+float DecisionAgent::_near_weapon_loot_dist(const Player* p) const {
+    if (!p || _ground.empty()) return -1.0f;
+    float px = p->entity.rect.x + p->entity.rect.width / 2;
+    float py = p->entity.rect.y + p->entity.rect.height / 2;
+    float best = -1.0f;
+    for (auto& g : _ground) {
+        if (!g.is_weapon) continue;
+        float lx = g.tile_x * 32.0f + 16.0f;
+        float ly = g.tile_y * 32.0f + 16.0f;
+        float d = hypotf(lx - px, ly - py);
+        if (best < 0 || d < best) best = d;
+    }
+    return best;
+}
+
 // P1-C3: BFS 至楼梯格 — stairs_active 后人必须站上楼梯才能按 E 下楼,
 // 原 best_action 只返回 "descend" 不导航 → 站原地按 E 600s (探针 9/20 局)
 int DecisionAgent::_bfs_to_stairs(const Player* p, const GameMap* map) const {
@@ -617,6 +661,20 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
         }
     }
 
+    // P1-C5: 空手武器优先追击 — 空手是 F1 死亡放大器 (avg_floor 1.26 vs 持械 5-12),
+    // 武器掉落 8 格内 0.9 分直奔 (压过普通拾取 0.7/搜刮 0.6; 近身怪 >3 格
+    // 才去捡 — 不至于贴脸送死)。捡到武器后本分支自然失效 (不再空手)。
+    // P1-C5: 空手武器追击 — 冒烟负回归 (af 6.25→2.15): F1 怪密度下 0.9 分
+    // 穿怪奔武器 = 挨打送头. 保留 _near_weapon_loot_dist 供 P1-C6 重设计
+    // (需带威胁回避的绕行路径而非直线追击).
+    if (false && map && !_ground.empty() && _is_bare_fisted(p)) {
+        float wloot_d = _near_weapon_loot_dist(p);
+        if (wloot_d >= 0 && wloot_d < 8.0f * 32.0f && d > 3.0f * 32.0f) {
+            int wloot_step = _bfs_toward_loot(p, map);
+            if (wloot_step >= 0) return (dir == wloot_step) ? 0.9f : 0.0f;
+        }
+    }
+
     // P1-A2: 战斗间隙捡地面物品 — 比特殊房更近的直接资源, 优先级更高 (0.7 > 0.6)
     if (d > 160.0f && map && !_ground.empty()) {
         float loot_d = _near_loot_dist(p);
@@ -635,6 +693,9 @@ float DecisionAgent::_evaluate_move(int dir, const Player* p,
     }
 
     // Q3.1: 理想距离按玩家真实武器判定 — 近战FIST不可风筝(火系profile会抖动挨打)
+    // P1-C5: ideal_dist 保持基线公式 — 实验证明 attack 圈/步进/idealdist 与
+    // Q3.15 风筝平衡深度耦合, 单点改动引发 af 6.25→1.35 雪崩 (见 DATA_REVIEW),
+    // 决策圈对齐的完整重构记 P1-C6 专项.
     float atk_range = (p->weapon.weapon_type() != WeaponType::FIST) ? 2.5f : 1.5f;
     float ideal_dist = atk_range + _prefer_range * 2.0f; // 近战=1.5, 远程=2.5~4.5
 

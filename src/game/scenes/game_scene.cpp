@@ -611,9 +611,13 @@ void GameScene::_process(double delta) {
         spots.reserve(ground_items.size());
         for (auto& d : ground_items) {
             bool is_potion = false;
+            bool is_weapon = false;
             auto* c = dynamic_cast<ConsumableItem*>(d.item.get());
             if (c && c->effect_type == "heal") is_potion = true;
-            spots.push_back({d.tile_x, d.tile_y, is_potion});
+            // P1-C5: 武器掉落标记 — 空手 AI 优先追击 (EquipmentItem weapon 槽)
+            auto* eq = dynamic_cast<EquipmentItem*>(d.item.get());
+            if (eq && eq->slot == "weapon") is_weapon = true;
+            spots.push_back({d.tile_x, d.tile_y, is_potion, is_weapon});
         }
         _sim_ai->set_ground_items(std::move(spots));
         // P1-C3: 楼梯位置注入 — AI 需导航到楼梯格才能按 E 下楼

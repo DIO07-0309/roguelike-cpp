@@ -26,6 +26,7 @@ public:
     struct GroundSpot {
         int tile_x, tile_y;
         bool is_potion;               // 药水类 (heal 效果) — 残血时权重加倍
+        bool is_weapon = false;       // P1-C5: 武器掉落 — 空手时优先追击
     };
     void set_ground_items(std::vector<GroundSpot> spots) { _ground = std::move(spots); }
 
@@ -106,6 +107,11 @@ private:
     void _pick_direction(const Player* player,
                          const std::vector<Monster*>& monsters);
     void _resolve_profile(const Player* player);
+    // P1-C5: 决策攻击半径 (px) — FIST=48px legacy; 武器=当前段 range×32.
+    // _evaluate_attack/_evaluate_move 消费同一份, 与 WeaponExecutor 判定对齐
+    float _decision_attack_reach_px(const Player* p) const;
+    // P1-C5: 空手 (FIST) 判定 — 影响武器掉落追击权重
+    static bool _is_bare_fisted(const Player* p);
     // Q3.2: BFS 寻路辅助 — 返回第一步方向 (0-3, -1=不可达)
     int _bfs_toward(const Player* p, const std::vector<Monster*>& monsters,
                     const GameMap* map, bool avoid_hazard) const;
@@ -151,6 +157,8 @@ private:
     int _bfs_toward_loot(const Player* p, const GameMap* map) const;
     // P1-A2: 站位 1 格内最近地面物品距离 (px), -1=无
     float _near_loot_dist(const Player* p) const;
+    // P1-C5: 最近武器掉落距离 (px), -1=无 — 空手优先追击目标
+    float _near_weapon_loot_dist(const Player* p) const;
 
 public:
     // ── G8.3: MCTS integration ──
