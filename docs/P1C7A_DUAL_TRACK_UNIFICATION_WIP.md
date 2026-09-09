@@ -1,10 +1,56 @@
 # P1-C7-A · 双轨判定统一 — 进行中交接 (Work In Progress)
 
-> 日期: 2026-09-08 (第 2 次会话更新) · 状态: **实验中途, 已回退到干净基线**
+> 日期: 2026-09-09 (第 3 次会话: P1-C7-B 泄漏排查完结) · 状态: **实验中途, 已回退到干净基线**
 > (e542af0 行为等价: af=6.25/dmg=1746.2 精确复现)
 > 方案: 空手 (fist_basic) 从 legacy `Player::can_attack` (0.5s) 轨迁移到
 > WeaponExecutor/WeaponComponent 轨 (数据驱动), fist stage 调至 range=1.5
 > (48px 手感保持) + recovery=0.35 (≈0.5s 出手间隔)。
+
+## 🔴 第 3 次会话结论 (P1-C7-B 泄漏排查 — 假说全灭, 真因定位)
+
+**"跨局状态泄漏"假说被系统证伪。真因 = 迁移的出手节奏变化触发了
+"战斗-搜刮时序再平衡"，在串行批的混沌流中演化为更差结局。**
+
+### 排查记录 (每项一探针, 全部已验证)
+
+| # | 假说 | 探针 | 判决 |
+|---|---|---|---|
+| 1 | 镜像冻结跨局/跨层残留 (Q3.9 reset_run 放进 reset() 但全仓零调用) | new_game/enter_floor 补调 reset/clear_mirror_freeze + 行为对比 | **证伪** — 修复后 30 局日志与修前仅差时间戳 (逐字节) |
+| 2 | UI 状态跨局残留 (event/dialogue/quest/challenge/inventory) | enter_floor 全 UI 标志快照 | **证伪** — 全部层进入时 0 |
+| 3 | GameState 非 PLAYING 跨局残留 | handle_input 入口 state 采样 (660 帧) | **证伪** — 99% PLAYING + 4 次 Boss 入场 (正常) |
+| 4 | AI 意图 attack 但输入门吞 (frozen/UI/is_action 缓存) | 350 行查询失败 + AI 意图对照探针 | **证伪** — 零失败样本 |
+| 5 | executor can_attack 门异常 (recovery/special/fatigue) | 拦截原因分类计数 | **证伪** — recovery 拦 68% 属正常 0.35s 节奏; special=203 是 spear 局尾累计 |
+
+### 真因 (C7BFINAL 终点决策探针, run2 全程剖面)
+
+run2 的 AI 最终决策序列: 攻击有效 (nhp 30→15→3→0, 伤害链健康) →
+**t=14.6 起再无 attack — AI 在怪 15 血未清时切换目标/启动搜刮, nd 增大
+远离怪 → 被 15 血怪追杀 → 毒磨死**。
+
+**机制**: v2 出手 0.35s/击 (基线 0.5s) → 杀怪更快 → 目标切换更早 →
+出圈窗口更长 → `_evaluate_move` 搜刮分支 (0.6) 在追击空隙赢得决策 →
+战斗-搜刮震荡形态。**与 P1-C6 的教训同构**: 出手时序与 Q3.15 风筝/
+搜刮平衡深度耦合, 单点改节奏必然翻车。
+
+**同批附带发现 (仍有效, 值得单独修)**:
+- `BossSystemDirector::reset()` 设计注释"新楼层开始时调用"但**全仓零调用**
+  — replay_mem/evolution/arena 等 boss 状态跨层跨局全残留。本批曾在
+  new_game/enter_floor 补调 (已回退, 因 replay_mem 语义需拆分: 局内跨层
+  须持久 vs 跨局须清)。**建议 P1-C7-C: reset 语义拆分 + 补调用点**
+- `C7BGATE` 探针的 special=203 提醒: WeaponSpecialState 激活中局结束
+  (spear 10 连击 tick 中死亡) 的跨局残留无法从 Player 重建角度发生
+  (新 Player runtime 干净) — 已排除, 但 spear 局尾的 special 拦截期
+  (放行停止) 值得在 P1-C7-A 复审时用 per-run 探针盯一次
+
+### P1-C7-A 下一步 (第 4 会话入口)
+
+1. **放弃"泄漏修复后迁移自然通过"的路线** — 泄漏不存在。
+   迁移要落地必须解决"战斗-搜刮再平衡": 候选 = 搜刮分支加"近距有
+   未死怪时压制" (15 血怪在 3 格内时 approach 压过搜刮 0.6), 或接受
+   v2 形态跑 5 种子×100 聚合看总体 (单 s3 串行批不可判读 — 已两次证明)
+2. 迁移 + 再平衡一起冒烟 (20 局 s3) + 5 种子×100 聚合双验证
+3. 落地后: MCTS build_sim_state 感知统一 (一行版已验证) + 删
+   Player::can_attack 死代码
 
 ## ⭕ 第 2 次会话关键增量 (2026-09-08 下午, 判决性证据)
 
