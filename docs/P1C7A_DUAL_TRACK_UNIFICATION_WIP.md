@@ -1,9 +1,68 @@
 # P1-C7-A · 双轨判定统一 — 进行中交接 (Work In Progress)
 
-> 日期: 2026-09-08 · 状态: **实验中途, 已回退到干净基线** (e542af0 行为等价)
+> 日期: 2026-09-08 (第 2 次会话更新) · 状态: **实验中途, 已回退到干净基线**
+> (e542af0 行为等价: af=6.25/dmg=1746.2 精确复现)
 > 方案: 空手 (fist_basic) 从 legacy `Player::can_attack` (0.5s) 轨迁移到
 > WeaponExecutor/WeaponComponent 轨 (数据驱动), fist stage 调至 range=1.5
 > (48px 手感保持) + recovery=0.35 (≈0.5s 出手间隔)。
+
+## ⭕ 第 2 次会话关键增量 (2026-09-08 下午, 判决性证据)
+
+### A. 单局批次对照 — 迁移本身无害, 是"串行批内局间泄漏"放大了它
+
+`--sim 1` (每批只有 run0, 无跨局传播) × 5 种子, 基线 vs v2 迁移版:
+
+| seed | 基线单局 | v2 单局 |
+|---|---|---|
+| 101 | F10 / 2360 dmg | F5 / 761 |
+| 102 | F6 / 1149 | **F10 / 3859** |
+| 103 | F8 / 1947 | F6 / 1568 |
+| 104 | F6 / 1150 | **F12 / 5931** |
+| 105 | F5 / 272 | F3 / 399 |
+
+**无 F1 全灭形态** (最差 F3), af 均值 7.2 vs 7.0 — 单局层面持平偏好,
+两局大幅更好。**迁移的 executor 链路完全健康** (探针: run0 fist_calls=306
+fired=27 hits=27 — 出手节奏 0.35s/击, 命中率 100%)。
+
+### B. 串行批次 — run2 起空手局零出手 (跨局泄漏实锤)
+
+30 局 s3: run0/1 正常 (捡 crossbow/spear 起飞), **run2-29 空手局
+`_weapon_attack` 零调用** (per-run 探针, 挂在 `_collect_sim_stats` 输出)。
+同 exe 两批 6 局日志逐字节一致 → **确定性批内局间泄漏, 非进程随机**。
+6 局批次同样形态: run0-1 af=10/10.5, run2 起崩到 4-5。
+
+### C. 已排除项 (二分/探针累计)
+
+- weapons.json 单独改 (fist 48px/0.35s): **零行为差** (legacy 不消费它)
+- `_weapon_attack` 空手跳过 `p.combo.hit`: 零行为差 (D2 combo 在 executor
+  路径只影响镜像观察/技能 heavy, 不影响伤害 — executor 用 stage mult)
+- executor 命中判定/伤害计算/统计口径: §二遗留项全部复核无恙
+- 旧 C4PROBE 盲区已补: 原探针只采样圈内 (d≤48px), 基线 72% 时间最近怪
+  在 144px 外 (d7) — 圈外站桩/游走是基线空手 AI 的**常态**, 非异常
+
+### D. 泄漏嫌疑清单 (下次会话第一入口, 按优先级)
+
+跨局存活且 new_game 清不到的状态:
+1. **EventBus 单例 listener** (SkillEvolution/RuleChain/AttackEvo 注册于
+   `_ready`, 100 局共享一个 GameScene — listener 内部静态计数跨局累计?)
+2. **`SkillEvolutionManager` uses 计数** (日志见 uses=20 进化 — 跨局残留
+   会让 run2 起技能直接处于进化态? 需查 new_game 是否清)
+3. `CombatFeelSystem`/`_presentation` 静态? (last_combo_announced 等)
+4. `SaveManager`/`g_meta` readonly 模式下的读路径副作用
+5. DungeonGenerator `_local_rng` (若 seed 未每局重置 — 但 seed_rng 每局跑)
+
+**定位法建议**: run2 开局首帧打 "agent 首次决策快照" (best_action +
+各 evaluator 分值), 对比 run0 开局同点 — 分岔点应该在**第一个决策帧**就有
+差异, 顺着差异的 evaluator 定位泄漏的状态变量。
+
+### E. 会话 2 已完成步骤 (可跳过)
+
+1. weapons.json fist 48px/0.35s — 改过, 回退 (验证零行为差)
+2. player_controller legacy 删除迁移 — 改过, 回退 (单局批次验证通过)
+3. sim_ai `_evaluate_attack` 圈外探针 (d4-d7 采样) — 改过, 回退
+   (**建议下次保留此探针** — 它补了 C4PROBE 最大盲区)
+4. game_scene `_collect_sim_stats` per-run 探针 — 改过, 回退 (模板见
+   git stash 历史/本文件描述: 全局计数器 + run 结束打印清零)
 
 ## 一、双轨现状 (问题定义, 已验证)
 
@@ -55,23 +114,25 @@
    设计上 fist 有意快节奏, 但 recovery 0.35 是新加的硬门, 两者交互
    未按 fist 语义审过
 
-## 四、下场行动清单
+## 四、下场行动清单 (会话 2 修订 — 泄漏优先于迁移)
 
-1. `conda run python tools/p1c5_weapon_ranges.py` 确认 fist 参数现状
-   (本批已回退, 应为 range=1/recovery=0.15 原始值)
-2. 重做迁移 (本文件 §二的实现 diff 在 git 历史/会话记录可抄), 但
-   **验证改为 5 种子×100 局聚合** (s3/s7/s11/s19/s23, 基线数据
-   reports/p1c4/*.json 可直接对比), 不再用 20 局单种子判定
-3. 若聚合仍 F1 空手全灭: 上 per-run fist 命中/出手探针 (本批 probe 模板
-   在 player_controller.cpp 会话记录, 24 次采样式), 区分"站桩"vs"出手未中"
-4. 备选: 若聚合显示 F1 只是方差、整体 af/dmg 持平或更好 → 直接落地,
-   F1 空手死亡属已接受基线病理 (91% F1 死亡率本就是 P1 系列主攻目标)
-5. 迁移落地后顺手统一 MCTS 感知 (build_sim_state 读 weapon.can_attack,
-   本批已写好一行版) + 删 `Player::can_attack`/`ATTACK_COOLDOWN` 死代码
+> **顺序调整**: 单局批次已证迁移无害 (§A), 串行批次已证泄漏存在 (§B)。
+> 泄漏不修, 一切串行批数据不可判读 — **先修泄漏 (P1-C7-B), 再落地迁移**。
+
+1. **[P1-C7-B 立项] 定位批内局间泄漏** (§D 嫌疑清单 ×5 + §D 定位法):
+   run2 开局首帧 agent 决策快照 vs run0 同点, 顺 evaluator 分差异追状态变量。
+   **泄漏是基线与 v2 共有的** (基线 run2+ 也受影响, 只是形态池不同) —
+   修好它对 500 局基线数据可信度也是地基级修复 (P1-C4 UAF 同级别)
+2. 泄漏修复后重做迁移 (§二的 diff + §E 保留项), 验证跑串行 6 局 ×2 批 +
+   单局 ×5 种子双维度 (任何一维负回归都拦下)
+3. `python tools/p1c5_weapon_ranges.py` 确认 fist 参数现状
+   (已回退, 应为 range=1/recovery=0.15 原始值)
+4. 迁移落地后顺手统一 MCTS 感知 (build_sim_state 读 weapon.can_attack,
+   已验证一行版) + 删 `Player::can_attack`/`ATTACK_COOLDOWN` 死代码
 
 ## 五、相关文件
 
 - 本批 review: docs/P1C6_COOLDOWN_AWARENESS_NEGATIVE_RESULTS_REVIEW.md (§四.1 提出双轨问题)
 - 基线数据: reports/p1c4/p1c4_s{3,7,11,19,23}.json (5 种子×100 局)
 - 教程先例: tutorial_scene.cpp:312 (G10.8-B1 空手已走 executor, 实机验证过)
-- 探针输出样例: [P1C7PROBE] fist#1..24 (会话记录 2026-09-08)
+- 探针输出样例: [P1C7PROBE] (会话记录 2026-09-08 ×2 会话, .out 在 reports/p1c6/ 未入库)
