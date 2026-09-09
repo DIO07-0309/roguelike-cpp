@@ -506,78 +506,13 @@ void PlayerController::player_attack() {
     attack_zone.height += 2.0f * PLAYER_ATTACK_RANGE;
     gs._try_trigger_barrel_near(attack_zone);
 
-    // ── G9: Weapon-driven attack via WeaponExecutor ──
-    if (p.weapon.current_def() && p.weapon.current_def()->type != WeaponType::FIST) {
+    // ── G9/P1-C7-A: Weapon-driven attack via WeaponExecutor (空手/持械统一轨) ──
+    // P1-C7-A B方案: fist recovery=0.5 与 legacy ATTACK_COOLDOWN 完全等值,
+    // range=1.5 tile = 48px 与 PLAYER_ATTACK_RANGE 数学等价 — 节奏保持迁移
+    if (p.weapon.current_def()) {
         _weapon_attack(gs, p);
         return;
     }
-
-    // ── Legacy fallback: fist / no weapon (keeps existing behavior) ──
-    if (!p.can_attack(gs.game_time)) return;
-
-    auto* target = find_attack_target(p.entity.rect,
-        reinterpret_cast<const std::vector<Monster*>&>(gs.monsters), PLAYER_ATTACK_RANGE);
-    if (!target) return;
-
-    gs._gameplay.flow.mark_combat();
-    gs._boss.behavior.memory.record_attack();
-    gs._boss.replay_mem.melee_hits++;
-
-    p.combo.hit(gs.game_time);
-    float combo_mul = p.combo.multiplier();
-    bool is_heavy = p.combo.is_heavy();
-
-    int base_dmg = calculate_damage(get_effective_attack(gs.player.get()),
-        target->combat.get_effective_defense(p.attack_type));
-    int dmg = (int)(base_dmg * combo_mul);
-
-    bool is_crit = false;
-    if (gs._presentation.combat_juice_on) {
-        if ((rng() % 1000) / 1000.0f < CombatFeelSystem::crit_chance(p.combo.count)) {
-            dmg *= CombatFeelSystem::crit_multiplier();
-            is_crit = true;
-        }
-    }
-    const char* cb_msg = CombatFeelSystem::combo_message(p.combo.count);
-    if (cb_msg && p.combo.count > gs._presentation.last_combo_announced) {
-        gs._presentation.room_msg = cb_msg;
-        gs._presentation.room_msg_timer = 1.0f;
-        gs._presentation.last_combo_announced = p.combo.count;
-        gs._presentation.trigger_shake(CombatFeelSystem::SHAKE_COMBO);
-        gs._presentation.trigger_freeze(CombatFeelSystem::LIGHT_HIT);
-        if (p.combo.count > gs._gameplay.run_stats.combo_max)
-            gs._gameplay.run_stats.combo_max = p.combo.count;
-    }
-
-    p._last_attack_time = gs.game_time;
-    gs.get_tree()->get_audio()->play_sfx("melee");
-    gs._boss.dmg_done += dmg;
-
-    if (gs.time_stop_remaining > 0) {
-        // P1-C4-fix(UAF): instance_id 代替裸指针 — 时停中目标可被释放
-        gs.pending_damage.emplace_back(target->instance_id, dmg);
-    } else {
-        CombatCoordinator::apply_attack_damage(target, dmg,
-            gs.active_effects, gs.get_tree()->get_audio());
-        Color dc = is_crit ? Color{255, 220, 30, 255}
-                 : is_heavy ? Color{255, 220, 30, 255}
-                 : dmg_color_for(dmg, false, false);
-        gs._presentation.damage_floats.push_back({
-            target->entity.rect.x + target->entity.rect.width/2,
-            target->entity.rect.y,
-            (is_crit || is_heavy) ? 0.85f : 0.6f,
-            (is_crit || is_heavy) ? 0.85f : 0.6f, dmg, dc
-        });
-        _apply_attack_feedback(gs, p, target, is_crit, is_heavy);
-        if (!target->combat.is_alive) _kill_target(gs, target);
-    }
-
-    VFXServer vfx;
-    float range = is_heavy ? PLAYER_ATTACK_RANGE * 1.5f : PLAYER_ATTACK_RANGE;
-    vfx.player_attack(p.entity.rect.x + p.entity.rect.width/2,
-                      p.entity.rect.y + p.entity.rect.height/2, range * TILE_SIZE,
-                      p.attack_evo);
-    for (auto& e : vfx.effects) gs.active_effects.push_back(e);
 }
 
 // ── G9: process one attack result (damage float + feedback + kill) ──
