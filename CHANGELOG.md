@@ -1,3 +1,30 @@
+# v1.4.12 — P1-C7-A 结项: 双轨判定统一落地 + Boss reset 语义修复 (2026-09-10)
+
+> 大更新批（四任务一天完成）：空手攻击正式迁入 WeaponExecutor 数据驱动轨。
+>
+> ## 玩法/系统改动
+> - **空手/持械统一判定轨**（T1 B方案）: fist 走 weapons.json 数据驱动
+>   (range 1.5=48px/recovery 0.5s 与 legacy 数学等值), 删 player_controller
+>   legacy 分支 ~70 行。三败后的成功配方: **节奏保持, 只换实现**。
+>   聚合验证 5 种子×100: af 1.60→1.66, dmg 196→201 (小幅偏好, CIRCLE 判定
+>   圈内群杀 + executor 暴击梯度贡献)
+> - **MCTS 感知统一**（T2）: build_sim_state 改读 weapon.can_attack —
+>   空手/持械 AI 感知不再错轨; Player::can_attack/ATTACK_COOLDOWN 死代码删除
+> - **Boss reset 语义拆分**（T3/P1-C7-C）: reset()→reset_floor()/reset_run(),
+>   enter_floor/new_game 显式调用点补全。WIP "零调用"前提修正 — FLOOR_ENTER
+>   EventBus 路径原本就在跑, 修复为零行为差 (逐字节实证)。replay_mem 语义
+>   审计: init_on_spawn 每战重建, 无跨层持久项; mirror 跨局记忆走独立通道
+> - **spear 局尾 special 残留嫌疑划掉**（T4）: 30 局探针 0 残留
+>
+> ## 过程插曲
+> - T2 双跑分岔假阳性: bisect 排查 + 6 连跑 1 哈希证伪 — P1-C4
+>   "间歇判定 N≥4" 手册教训再验证
+>
+> 验证: 基线复现/T1 冒烟+聚合/T2 6连跑+60测试/T3 逐字节+60测试/T4 探针 全过。
+> 结项报告: docs/P1C7A_FINAL_REPORT.md
+
+---
+
 # v1.4.11 — P1-C7-A 会话4: 聚合判决, 迁移三连败坐实 (2026-09-09)
 
 > 判决批：v3 迁移 (fist 48px/0.35s + 删 legacy 分支) 跑满 5 种子×100 局聚合 —
