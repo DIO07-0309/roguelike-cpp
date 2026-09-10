@@ -22,7 +22,7 @@
 // D6 Step3: BossSystemDirector — 组合所有Boss子系统
 // ============================================================
 
-void BossSystemDirector::reset() {
+void BossSystemDirector::reset_floor() {
     evolution = BossEvolutionData{};
     behavior = BossBehaviorState{};
     skill_queue = BossSkillQueue{};
@@ -589,7 +589,7 @@ void BossSystemDirector::init_events() {
     EventBus::inst().subscribe(GameEventType::BOSS_DEAD,
         [this](const GameEvent& ev) { notify_death_ev(ev); }, "BossSys", this);
     EventBus::inst().subscribe(GameEventType::FLOOR_ENTER,
-        [this](const GameEvent&) { reset(); }, "BossSys", this);
+        [this](const GameEvent&) { reset_floor(); }, "BossSys", this);
 }
 
 void BossSystemDirector::unregister_events() {

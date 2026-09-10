@@ -164,6 +164,11 @@ void GameScene::new_game() {
     _current_npc_index = -1;
     _dialogue = DialogueState{};
 
+    // P1-C7-C: Boss 子系统跨局重置 — 原 reset() 全仓零调用, boss 状态跨局
+    // 全残留 (evolution/encounter/battle_report 等)。mirror 跨局记忆走
+    // export/inject 独立通道, reset_run 不清 (语义正确)
+    _boss.reset_run();
+
     player = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
         PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
 
@@ -332,7 +337,10 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     }
     _presentation.boss_intro_text.clear();
     _presentation.boss_modifier_text.clear();
-    _boss.arena.clear();  // D5 Step4: 新楼层清除Arena
+    // P1-C7-C: 补 Boss 子系统跨层重置 — 原单一 reset() 设计意图"新楼层开始时
+    // 调用"但全仓零调用, evolution/encounter/cinematic/timeline/domain 等
+    // 状态跨层残留 (仅 arena 在此单独清过)
+    _boss.reset_floor();
 
     // B8: seed=0 → 新楼层随机生成; seed!=0 → 读档恢复
     // 换层清空脱卡状态 — Monster* 键在换层后地址可复用, 残留键污染新怪 (进程间不确定)

@@ -81,7 +81,15 @@ public:
     int  dmg_done = 0, dmg_taken = 0;
 
     // ── 生命周期 Hooks (GameScene 调用) ──
-    void reset();   // 新楼层开始时调用
+    // P1-C7-C: reset 语义拆分 — 原单一 reset() 设计注释"新楼层开始时调用"
+    // 但全仓零调用, boss 子系统状态跨层跨局全残留。拆分后:
+    //   reset_floor() — enter_floor 调用: 清跨层运行态 (evolution/behavior/
+    //     encounter/cinematic/timeline/domain/arena 等; replay_mem 由
+    //     init_on_spawn 每战重建, 此处一并清属双保险)
+    //   reset_run() — new_game 调用: = reset_floor(); boss 子系统无"局内
+    //     跨层须持久"字段 (mirror 跨局记忆走 export/inject 独立通道, 不清)
+    void reset_floor();
+    void reset_run() { reset_floor(); }
     void init_on_spawn(Monster* boss, int floor, const WorldState& ws, BuildType bt,
                        const RelationshipSystem& rels, GameMap* map,
                        const class Player* player = nullptr);
