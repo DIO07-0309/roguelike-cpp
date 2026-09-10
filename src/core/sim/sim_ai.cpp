@@ -41,8 +41,8 @@ mcts::SimulationState DecisionAgent::build_sim_state(
     // Cooldowns: real remaining time (Q3.15 A6 fix — was faked to constant
     // 0.5s/0s, which permanently disabled ATTACK at the MCTS root since
     // get_possible_actions requires attack_cooldown <= 0)
-    p.attack_cooldown = std::max(0.0f,
-        player->_last_attack_time + Player::ATTACK_COOLDOWN - (float)game_time);
+    // P1-C7-A: 空手已迁 executor 轨 — 感知源统一为 WeaponComponent::can_attack
+    p.attack_cooldown = player->weapon.can_attack(game_time) ? 0.0f : 0.5f;
     for (int i = 0; i < 4; i++) {
         if (i < (int)player->skills.active_skills.size() && player->skills.active_skills[i])
             p.skill_cooldowns[i] = std::max(0.0f,

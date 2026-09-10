@@ -58,8 +58,8 @@ public:
     // Used by floor-scaled interactions (e.g. Gamble Room cost).
     int current_floor = 1;
 
-    static constexpr float ATTACK_COOLDOWN = 0.5f;
-    float _last_attack_time = -999.0f;
+    // P1-C7-A: legacy 攻击冷却已删 — 空手统一走 WeaponComponent 轨 (weapons.json fist recovery=0.5)
+    float _last_attack_time = -999.0f;   // 镜像 Boss 观察用 (executor 路径写入)
     float _last_skill_time = -999.0f;   // M4e: 最近技能施放时刻 (镜像观察)
     float _swing_start = -1.0f;         // G9.4: 武器挥砍动画起始时刻
 
@@ -67,7 +67,6 @@ public:
     Player(float x, float y, float spd, int hp, int atk, int pdef, int mdef);
 
     void reset_attack_timers();
-    bool can_attack(double game_time) const;
     int attack_target(Player* target, double game_time);
 
     // 移动

@@ -67,9 +67,7 @@ void Player::reset_attack_timers() {
     }
 }
 
-bool Player::can_attack(double game_time) const {
-    return (game_time - _last_attack_time) >= ATTACK_COOLDOWN;
-}
+// P1-C7-A: Player::can_attack 已删 — 空手/持械统一走 WeaponComponent::can_attack
 
 Vector2 Player::handle_input(const InputMap& input) {
     Vector2 move = input.get_movement_axis();
