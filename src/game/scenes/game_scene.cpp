@@ -386,6 +386,7 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
     // M4f: biome palette → 地图 (程序化像素纹理基色)
     const BiomeDef* biome = get_biome_for_floor(floor);
     game_map->set_palette(biome ? &biome->palette : nullptr);
+    game_map->set_biome_id(biome ? biome->id.c_str() : "");   // M5-A: 群系贴图选择
     // G11.2: 氛围层 — 本群系 ambient 粒子配置 (监狱尘埃/火山余烬/深渊幽光)
     _ambient.set_biome(biome);
     _ambient.set_mood(0.0f, 0.0f);          // 入层重置情绪

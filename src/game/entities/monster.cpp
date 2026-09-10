@@ -24,6 +24,7 @@ static int _sprite_variant_for(bool is_boss, MonsterType type,
 
 // M4f.4: MonsterType/名字 → 素材精灵 key; 空 = 程序化占位
 // G10.3-B1: 名字规则扩展 — 骨系→mon_skeleton, 萨满→mon_shaman
+// M5-B: 兜底怪专属图 — 潜行者/火魔/精英兽人/刺客 (原先全落 mon_orc)
 static const char* _monster_sprite_key(MonsterType type,
                                        const std::string& name, bool is_boss) {
     if (is_boss) return nullptr;
@@ -39,6 +40,13 @@ static const char* _monster_sprite_key(MonsterType type,
     if (name.find("骨") != std::string::npos)     return "mon_skeleton";
     if (name.find("骷髅") != std::string::npos)   return "mon_skeleton";
     if (name.find("萨满") != std::string::npos)   return "mon_shaman";
+    if (name.find("法师") != std::string::npos)   return "mon_shaman";
+    if (name.find("潜行者") != std::string::npos) return "mon_shadow_stalker";
+    if (name.find("刺客") != std::string::npos)   return "mon_shadow_assassin";
+    if (name.find("火魔") != std::string::npos)   return "mon_fire_imp";
+    if (name.find("守卫") != std::string::npos)   return "mon_tank";
+    if (name.find("兽人") != std::string::npos)
+        return (name.find("精英") != std::string::npos) ? "mon_elite_orc" : "mon_orc";
     return "mon_orc";
 }
 

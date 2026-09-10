@@ -243,6 +243,19 @@ void GameMap::set_palette(const TilePalette* palette) {
     if (_has_palette) _palette = *palette;
 }
 
+// M5-A: 群系贴图 key — biomes.json id (prison/volcano/abyss) →
+// "wall_<id>"/"floor_<id>"; sprite_by_key 未命中返回空纹理 (id<=0),
+// draw() 内现有 fallback 链 (通用贴图 → 程序化) 保持兜底
+static const char* _biome_tile_key(const char* biome_id,
+                                   const char* kind /* "wall"|"floor" */) {
+    static char key[48];
+    if (biome_id && biome_id[0]) {
+        snprintf(key, sizeof(key), "%s_%s", kind, biome_id);
+        return key;
+    }
+    return kind;
+}
+
 // Phase 1: 颜色变暗 (已探索但不在视野内时使用)
 static Color _dim(Color c, float brightness) {
     return {
@@ -321,6 +334,7 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
     int er = std::min(height, (int)((cam_y + sh) / tile_size) + 1);
 
     // M4f.4: 数据驱动素材 (wall/floor) 优先, 未配置回退程序化像素
+    // M5-A: 群系专属贴图优先 (wall_prison/volcano/abyss), 未命中回退通用再回退程序化
     Color wall_c  = _has_palette ? _palette.wall_face : Color{60, 60, 80, 255};
     Color floor_c = _has_palette ? _palette.floor_base : Color{25, 25, 35, 255};
     char wall_key[40], floor_key[40];
@@ -330,12 +344,16 @@ void GameMap::draw(float cam_x, float cam_y, int sw, int sh) const {
         floor_c.r, floor_c.g, floor_c.b);
     auto& rm = ResourceManager::inst();
     SpriteDef wall_def, floor_def;
-    Texture2D wall_data = rm.sprite_by_key("wall", wall_def);
-    Texture2D floor_data = rm.sprite_by_key("floor", floor_def);
+    Texture2D wall_data = rm.sprite_by_key(
+        _biome_tile_key(_biome_id.c_str(), "wall"), wall_def);
+    Texture2D floor_data = rm.sprite_by_key(
+        _biome_tile_key(_biome_id.c_str(), "floor"), floor_def);
+    if (wall_data.id <= 0) { wall_def = SpriteDef{}; wall_data = rm.sprite_by_key("wall", wall_def); }
+    if (floor_data.id <= 0) { floor_def = SpriteDef{}; floor_data = rm.sprite_by_key("floor", floor_def); }
     Texture2D wall_tex = wall_data.id > 0 ? wall_data
                        : rm.procedural_tile(wall_key, wall_c, true);
     Texture2D floor_tex = floor_data.id > 0 ? floor_data
-                        : rm.procedural_tile(floor_key, floor_c, false);
+                         : rm.procedural_tile(floor_key, floor_c, false);
     SpriteDef sd; sd.frame_w = tile_size; sd.frame_h = tile_size;
 
     for (int y = sr; y < er; y++) {

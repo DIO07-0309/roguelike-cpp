@@ -1,5 +1,5 @@
 #include "game/rendering/sprite_renderer.h"
-#include "combat_system.h"   // rng()
+#include "combat_system.h"   // visual_rng (RNG-001)
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -19,11 +19,13 @@ void SpriteRenderer::draw_sprite(Texture2D tex, const SpriteDef& def,
 }
 
 // ── 程序化像素纹理辅助 (≤40 行/函数) ──
+// M5-fix(RNG-001): 噪声吃独立 visual_rng — 原用 gameplay rng() 使纹理
+// 生成/缓存时序变化 (如素材命中与否) 污染 gameplay 随机流 → 同 seed 分岔
 static void _add_noise(Image* img, Color base) {
     for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++) {
-            if (rng() % 100 < 8) {
-                int d = (rng() % 36) - 18;
+            if (visual_rng() % 100 < 8) {
+                int d = (int)(visual_rng() % 36) - 18;
                 ImageDrawPixel(img, x, y,
                     {(unsigned char)std::clamp((int)base.r + d, 0, 255),
                      (unsigned char)std::clamp((int)base.g + d, 0, 255),

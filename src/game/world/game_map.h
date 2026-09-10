@@ -89,6 +89,11 @@ public:
     const TilePalette& palette() const { return _palette; }
     bool has_palette() const { return _has_palette; }
 
+    // M5-A: 群系 id (prison/volcano/abyss) — set_palette 时由 GameScene 一并注入,
+    // draw() 据此选择 wall_<id>/floor_<id> 群系贴图
+    void set_biome_id(const char* id) { _biome_id = id ? id : ""; }
+    const char* biome_id() const { return _biome_id.c_str(); }
+
     // Phase 1: FOV 可见性
     bool isVisible(int x, int y) const;
     bool isExplored(int x, int y) const;
@@ -125,6 +130,7 @@ private:
     void _init_walls();
     TilePalette _palette;      // M4f: 当前 biome 调色板
     bool _has_palette = false;
+    std::string _biome_id;     // M5-A: 群系 id (空=通用贴图)
 
     // G11.2: 足迹槽 (环形缓冲, 固定 32 个不逐 tile 存储)
     struct Footstep {
