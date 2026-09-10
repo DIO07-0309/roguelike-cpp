@@ -415,6 +415,7 @@ void GameScene::enter_floor(int floor, uint32_t seed) {
         boss_intro_lore = bdef->lore.c_str();
         boss_intro_skills = get_boss_skills_text(bdef);
         boss_intro_color = get_boss_visual_color(bdef->visual_id);
+        boss_intro_visual = bdef->visual_id;   // M5-C: 立绘 key 派生用
         state = GameState::BOSS_INTRO;
 
         // D4 Step5.5: BossNarrative覆盖intro对话
@@ -2154,7 +2155,8 @@ void GameScene::_render() {
             _draw_mirror_analysis_panel(sw, sh);
         } else {
             _renderer.draw_boss_intro(sw, sh, boss_intro_title, boss_intro_lore,
-                                       boss_intro_skills, boss_intro_color, boss_floor);
+                                       boss_intro_skills, boss_intro_color, boss_floor,
+                                       boss_intro_visual);
         }
         // D4 Step5.5: BossNarrative覆盖对话 (显示在面板下方)
         if (!_presentation.boss_intro_text.empty() && g_font_loaded) {

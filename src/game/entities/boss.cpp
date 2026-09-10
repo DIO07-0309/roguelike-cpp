@@ -7,6 +7,7 @@
 #include "vfx_server.h"
 #include "config.h"
 #include "growth_curve.h"
+#include "resources/resource_manager.h"   // M5-C: visual_id 精灵探测
 #include "core/logger.h"
 #include "data/boss_defs.h"      // G1 Step6
 #include <cmath>
@@ -1146,9 +1147,18 @@ Monster* boss_factory_create(BossType type, int tile_x, int tile_y, int floor,
     boss->entity.size = {48, 48};
     boss->entity.rect = {boss->entity.position.x, boss->entity.position.y, 48, 48};
 
-    // ── M4f.5: Boss 素材精灵按层指定 (F5/F10 专属图, F15 玩家形象) ──
-    boss->sprite_override = floor <= 5 ? "boss_f5"
-                          : floor <= 10 ? "boss_f10" : "boss_self";
+    // ── M5-C: Boss 素材精灵数据驱动 (visual_id → boss_<id>, 缺失回退旧按层链) ──
+    // 旧链保留兜底: F15 镜像有意用玩家形象 boss_self; F5/F10 未注册新图时落回旧 key
+    {
+        std::string vkey = "boss_" + def->visual_id;
+        SpriteDef probe;
+        if (ResourceManager::inst().sprite_by_key(vkey.c_str(), probe).id > 0) {
+            boss->sprite_override = vkey;
+        } else {
+            boss->sprite_override = floor <= 5 ? "boss_f5"
+                                  : floor <= 10 ? "boss_f10" : "boss_self";
+        }
+    }
 
     // ── G1 Step6: Phase2 参数 (替代硬编码) ──
     ai->_phase2_hp_threshold = def->phase2_hp_threshold;

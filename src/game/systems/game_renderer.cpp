@@ -214,17 +214,25 @@ void GameRenderer::draw_boss_cinematic_overlay(int sw, int sh) {
 void GameRenderer::draw_boss_intro(int sw, int sh, const std::string& title,
                                     const std::string& lore,
                                     const std::string& skills_text, Color color,
-                                    int boss_floor) {
+                                    int boss_floor, const std::string& visual_id) {
     ClearBackground(BLACK);
     float pw = 500, ph = 380;
     Rectangle pr = {sw / 2.0f - pw / 2, sh / 2.0f - ph / 2, pw, ph};
     draw_panel(pr, "! Boss 遭遇 !");
 
-    // M3: Boss 立绘 (按层数取 sprite, 48px 置于标题右上; 立绘随 Boss 类型变化)
+    // M5-C: Boss 立绘数据驱动 (visual_id 优先, 未注册时回退按层链)
     {
         auto& rm = ResourceManager::inst();
-        const char* key = (boss_floor >= 15) ? "boss_self"
-                       : (boss_floor >= 10) ? "boss_f10" : "boss_f5";
+        const char* key = nullptr;
+        SpriteDef probe;
+        std::string vkey = "boss_" + visual_id;
+        if (!visual_id.empty()
+            && rm.sprite_by_key(vkey.c_str(), probe).id > 0) {
+            key = vkey.c_str();
+        } else {
+            key = (boss_floor >= 15) ? "boss_self"
+                 : (boss_floor >= 10) ? "boss_f10" : "boss_f5";
+        }
         SpriteDef sd; sd.frame_w = 16; sd.frame_h = 16;
         Texture2D tex = rm.sprite_by_key(key, sd);
         if (tex.id > 0) {

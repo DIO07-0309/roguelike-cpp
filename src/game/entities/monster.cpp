@@ -41,6 +41,7 @@ static const char* _monster_sprite_key(MonsterType type,
     if (name.find("骷髅") != std::string::npos)   return "mon_skeleton";
     if (name.find("萨满") != std::string::npos)   return "mon_shaman";
     if (name.find("法师") != std::string::npos)   return "mon_shaman";
+    if (name.find("潜伏") != std::string::npos) return "mon_shadow_stalker";
     if (name.find("潜行者") != std::string::npos) return "mon_shadow_stalker";
     if (name.find("刺客") != std::string::npos)   return "mon_shadow_assassin";
     if (name.find("火魔") != std::string::npos)   return "mon_fire_imp";
@@ -316,6 +317,7 @@ static AIArchetype _str_to_archetype(const std::string& s) {
 }
 
 // visual_id → Color (表现层映射, 未来替换为 texture/animation)
+// M5-D: 新专属怪配色 (与 mon_<visual_id> 专属图同色系)
 static Color _visual_to_color(const std::string& vid) {
     if (vid == "slime")       return {100, 180, 100, 255};
     if (vid == "orc")         return {200,  80,  80, 255};
@@ -327,6 +329,27 @@ static Color _visual_to_color(const std::string& vid) {
     if (vid == "elite_orc")   return {240,  60,  60, 255};
     if (vid == "charger")     return {200, 140,  60, 255};
     if (vid == "summoner")    return {180, 120, 220, 255};
+    // M5-D 专属怪 (visual_id 已回归自身 id)
+    if (vid == "shadow_stalker")  return { 58,  48,  92, 255};
+    if (vid == "fire_imp")        return {232,  96,  40, 255};
+    if (vid == "shadow_assassin") return { 72,  60, 110, 255};
+    if (vid == "dark_mage")       return { 70,  50, 110, 255};
+    if (vid == "void_walker")     return { 60,  40,  90, 255};
+    if (vid == "night_stalker")   return { 90,  70,  60, 255};
+    if (vid == "ice_warden")      return {140, 200, 230, 255};
+    if (vid == "blood_leech")     return {170,  40,  60, 255};
+    if (vid == "bone_soldier")    return {220, 215, 190, 255};
+    if (vid == "skeleton_archer") return {210, 205, 185, 255};
+    if (vid == "goblin_hunter")   return {110, 150,  70, 255};
+    if (vid == "frost_slime")     return {150, 210, 240, 255};
+    if (vid == "lightning_orb")   return {250, 230, 110, 255};
+    if (vid == "poison_wyrm")     return {130, 170,  70, 255};
+    if (vid == "golem")           return {140, 130, 120, 255};
+    if (vid == "necromancer")    return {100, 130,  85, 255};
+    if (vid == "storm_elemental") return {120, 170, 230, 255};
+    if (vid == "blood_priest")    return {190,  40,  80, 255};
+    if (vid == "stone_guardian")  return {150, 140, 125, 255};
+    if (vid == "iron_sentinel")   return {170, 175, 185, 255};
     return {100, 180, 100, 255}; // fallback: slime green
 }
 
@@ -366,6 +389,15 @@ Monster* spawn_monster(float px, float py, const std::string& type) {
     m->attack_type     = _str_to_attack_type(def->attack_type_str);
     m->attack_cooldown = def->attack_cooldown;
     m->is_elite        = def->is_elite;
+
+    // M5-D: visual_id 派生精灵 (mon_<visual_id>), 未注册时留空走名字规则链
+    // — 消灭"名字规则不命中→共用 orc"整类 bug (如 潜伏者死规则)
+    {
+        std::string vkey = "mon_" + def->visual_id;
+        SpriteDef probe;
+        if (ResourceManager::inst().sprite_by_key(vkey.c_str(), probe).id > 0)
+            m->sprite_override = vkey;
+    }
 
     // G5.3: AI Archetype (行为原型, 与 MonsterType 外观解耦)
     if (ai) ai->archetype = _str_to_archetype(def->ai_archetype);

@@ -152,6 +152,7 @@ public:
 
     // Boss
     std::string boss_intro_title, boss_intro_lore, boss_intro_skills;
+    std::string boss_intro_visual;   // M5-C: BossDef visual_id → 立绘数据驱动
     Color boss_intro_color{200, 40, 40, 255};
     float boss_cinematic_timer = 0.0f;
     int boss_floor = 0;

@@ -68,7 +68,8 @@ public:
     void draw_mirror_freeze_overlay(int sw, int sh, float freeze_remaining);
     void draw_boss_cinematic_overlay(int sw, int sh);
     void draw_boss_intro(int sw, int sh, const std::string& title, const std::string& lore,
-                         const std::string& skills_text, Color color, int boss_floor);
+                         const std::string& skills_text, Color color, int boss_floor,
+                         const std::string& visual_id = "");
     void draw_room_message(int sw, int sh, const std::string& msg, float timer);
 
     // ---- F15.5.1: 角色面板 (可复用的玩家/Echo面板) ----
