@@ -107,7 +107,7 @@ F15 镜像 Boss 读你的行为画像（攻防倾向/走位偏好/技能习惯�
 - **手感** — 实时动作（攻击间隔 0.5s），无翻滚/无锁定；打击感三件套就位但数值以研究平衡为主（胜率区间 6-10%）
 - **平台** — Windows 实机验证；macOS/Linux 构建规范见 `docs/G4_PLATFORM_BIBLE.md`，未实机验证
 - **输入** — 键盘 only
-- **确定性已知项** — sim 批量模拟存在小概率间歇分岔（P1-C8 跟踪中），玩家实机不可感知
+- **确定性已知项** — sim 批量间歇分岔已于 v1.4.15 修复（P1-C8/RNG-002：VFX 视觉掷骰误吃 gameplay rng 流，32 批并行验证零分岔）；`combat_coordinator.cpp` 时停 pre_hp 裸指针快照列清理候选
 - **截图/GIF** — README 截图位为占位，录制清单已备（`docs/RELEASE_CHECKLIST.md` 附录 A）
 
 ## License

@@ -4,6 +4,7 @@
 #include "core/scene_tree.h"
 #include "audio/audio_server.h"
 #include "director/presentation_system_director.h"
+#include "combat_system.h"             // RNG-002: visual_rng (视觉掷骰独立流)
 #include <cmath>
 #include <algorithm>
 
@@ -35,7 +36,8 @@ void VFXServer::lightning(float sx, float sy, float tx, float ty, int branches, 
     effects.push_back({"bolt", sx, sy, 0, c, dur, 0, Direction::DOWN, tx, ty, 1});
     // Jagged offset lines for electricity effect
     for (int j = 0; j < branches; j++) {
-        float off = (float)((int)rng() % 12 - 6);
+        // RNG-002: 视觉掷骰走 visual_rng 独立流, 不吃 gameplay rng
+        float off = (float)((int)visual_rng() % 12 - 6);
         Color dim = {c.r, c.g, c.b, (unsigned char)(c.a / 2)};
         effects.push_back({"bolt", sx + off, sy + off, 0, dim, dur * 0.6f, 0, Direction::DOWN, tx + off, ty + off});
     }
@@ -44,10 +46,11 @@ void VFXServer::lightning(float sx, float sy, float tx, float ty, int branches, 
 void VFXServer::explosion(float cx, float cy, float radius, Color c, int count, float dur) {
     ring(cx, cy, radius * 0.6f, c, 2, dur);
     for (int i = 0; i < count; i++) {
-        float a = (float)(rng() % 360) * DEG2RAD;
-        float d = radius * (0.3f + (float)(rng() % 70) / 100.0f);
+        // RNG-002: 视觉掷骰走 visual_rng 独立流, 不吃 gameplay rng
+        float a = (float)(visual_rng() % 360) * DEG2RAD;
+        float d = radius * (0.3f + (float)(visual_rng() % 70) / 100.0f);
         effects.push_back(_ef("spark", cx + cosf(a) * d, cy + sinf(a) * d,
-                              2.0f + (float)(rng() % 4), c, dur * 0.8f));
+                              2.0f + (float)(visual_rng() % 4), c, dur * 0.8f));
     }
 }
 
@@ -63,16 +66,18 @@ void VFXServer::slash_arc(float cx, float cy, Direction dir, float radius, Color
 
 void VFXServer::smoke_puff(float cx, float cy, float radius, Color c, int count, float dur) {
     for (int i = 0; i < count; i++)
-        effects.push_back(_ef("smoke", cx + (float)(rng()%24 - 12), cy + (float)(rng()%24 - 12),
-                              radius * (0.5f + (float)(rng()%50)/100.0f), c, dur));
+        // RNG-002: 视觉掷骰走 visual_rng 独立流, 不吃 gameplay rng
+        effects.push_back(_ef("smoke", cx + (float)(visual_rng()%24 - 12), cy + (float)(visual_rng()%24 - 12),
+                              radius * (0.5f + (float)(visual_rng()%50)/100.0f), c, dur));
 }
 
 void VFXServer::spark_burst(float cx, float cy, int count, Color c, float dur) {
     for (int i = 0; i < count; i++) {
-        float a = (float)(rng() % 360) * DEG2RAD;
-        float d = 5.0f + (float)(rng() % 28);
+        // RNG-002: 视觉掷骰走 visual_rng 独立流, 不吃 gameplay rng
+        float a = (float)(visual_rng() % 360) * DEG2RAD;
+        float d = 5.0f + (float)(visual_rng() % 28);
         effects.push_back(_ef("spark", cx + cosf(a) * d, cy + sinf(a) * d,
-                              1.5f + (float)(rng() % 4), c, dur));
+                              1.5f + (float)(visual_rng() % 4), c, dur));
     }
 }
 
@@ -256,12 +261,13 @@ void VFXServer::shadow_strike(float fx, float fy, float tx, float ty, int level)
 void VFXServer::blood_frenzy(float cx, float cy, float radius, int hit_count) {
     ring(cx, cy, radius, {200,30,40,180}, 1, 0.40f);
     for (int i = 0; i < 15 + hit_count * 3; i++) {
-        float a = (float)(rng() % 360) * DEG2RAD;
-        float d = radius * (float)(rng() % 100) / 100.0f;
+        // RNG-002: 视觉掷骰走 visual_rng 独立流, 不吃 gameplay rng
+        float a = (float)(visual_rng() % 360) * DEG2RAD;
+        float d = radius * (float)(visual_rng() % 100) / 100.0f;
         effects.push_back(_ef("spark", cx + cosf(a) * d, cy + sinf(a) * d, 2.5f, {220,30,50,220}, 0.35f));
     }
     for (int i = 0; i < hit_count; i++)
-        effects.push_back(_ef("spark", cx - 20 + (float)(rng()%40), cy - 30, 4.0f, {100,255,100,220}, 0.45f));
+        effects.push_back(_ef("spark", cx - 20 + (float)(visual_rng()%40), cy - 30, 4.0f, {100,255,100,220}, 0.45f));
 }
 
 void VFXServer::summon_spirit(float cx, float cy, int count) {

@@ -1,3 +1,30 @@
+# v1.4.15 — P1-C8 结案: RNG-002 视觉掷骰流污染修复 (2026-09-11)
+
+> v1.4.14 记录的 sim 间歇非确定性 (同 exe 同 seed 12~50% 批次分岔) 根因锁定并修复。
+>
+> ## 根因 (RNG-002)
+> - `vfx_server.cpp` 5 个 VFX 函数 (lightning/explosion/smoke_puff/spark_burst/
+>   blood_frenzy) 用 gameplay `rng()` 生成纯视觉粒子参数 — RNG-001 (_add_noise
+>   偷吃主 rng 流) 的同族漏网。一次攻击特效 = 50~150 draws, 同帧事件路径差异
+>   经此放大成 RNG 流永久错位 → 怪池/id/进层全雪崩
+> - 证据链 (RNGSPIKE/RNGSITE 探针 + ASLR slide call 边界唯一确定法):
+>   分岔 tick B 独有 117-draw spike, 调用点全解析为 VFX 内联掷骰 + 击杀链;
+>   帧末状态哈希仍一致 (纯掷骰差, 无 gameplay 差异) → 流错位后雪崩
+>
+> ## 修复 (方案 A)
+> - vfx_server.cpp 11 处 `rng()` → `visual_rng()` (RNG-001 同法, 独立视觉流)
+> - 全部 P1-C8 探针移除 (game_scene.cpp FP/POS/SPD/RNGSPIKE/RNGSITE +
+>   combat_system.h CountingRng 返回地址环形缓冲)
+>
+> ## 验证
+> - 60/60 ctest + world_validator 全绿
+> - **16 对并行 (32 进程批) --sim 12 --sim-seed 3 零分岔**, 同哈希
+>   061A2BE6... (修复前同协议每批 1~4 对分岔)
+> - 新基线: avg_floor=7.00 dmg_dealt=1987.2 (旧基线被 RNG-002 污染, 轻微
+>   移动属预期; 后续对照以新基线为准)
+> - 遗留: combat_coordinator.cpp:72 pre_hp 裸指针快照 (已证非本例根因, 清理候选);
+>   "第一信号"上游机理未深挖 (32 批零分岔下未再现, 若复发按 WIP §9.1 方法论重启)
+
 # v1.4.14 — M5 尾批: 共用图清零 — visual_id 数据驱动全量接线 + 潜伏者死规则修复 (2026-09-10)
 
 > V1_4 审计缺口①③清零 (17/30 共用 orc + 3 个 F5 Boss 共用一图)。
