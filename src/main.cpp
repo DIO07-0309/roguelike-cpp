@@ -7,6 +7,7 @@
 #include "core/scene_tree.h"
 #include "core/win_center.h"     // G10.7-B1: gui_sanitize_stdio
 #include "game/audio/audio_server.h"   // Q3.1: --sim 静音
+#include "game/rendering3d/hd2d_renderer.h"  // M6-HD2D: --hd2d
 #include "core/logger.h"
 #include "scenes/game_scene.h"
 #include "scenes/title_scene.h"
@@ -155,6 +156,9 @@ int main(int argc, char** argv) {
             GameScene::g_rl_train_episodes = atoi(__argv[++i]);
         } else if (arg == "--rl-mirror" && i + 1 < __argc) {
             GameScene::g_rl_mirror_episodes = atoi(__argv[++i]);
+        } else if (arg == "--hd2d") {
+            // M6-HD2D: 3D 表现层切片开关 (逻辑层不变; 默认 2D)
+            g_hd2d_mode = true;
         }
     }
 #endif

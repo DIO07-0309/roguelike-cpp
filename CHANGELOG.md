@@ -1,3 +1,22 @@
+# v1.4.16 — M6-HD2D 切片: 3D 表现层骨架 (--hd2d 可切换) (2026-09-11)
+
+> 大更新第一步: HD-2D 渲染切片落地。逻辑层零改动, 默认仍是 2D。
+>
+> ## 新增
+> - `src/game/rendering3d/` 模块: HD2DRenderer (Camera3D 45° 俯视 + 分层绘制 +
+>   后处理占位) + HD2DSceneBuilder (GameScene 只读状态 → 绘制列表纯翻译层)
+> - `--hd2d` 启动参数: 3D 世界层 + 2D HUD 桥; 初始化失败自动回退 2D
+> - 墙体盒子伪光照 / 地板分色 / 实体 billboard (精灵与 2D 同源) / 特效脉冲片
+> - 设计文档: docs/M6_HD2D_RENDERING.md (含 v2 路线与一致性验证协议)
+>
+> ## 红线遵守
+> - rendering3d 只读 GameScene, 无 gameplay 副作用
+> - 视觉随机只吃 visual_rng (RNG-001/002)
+> - sim 无头模式不进 3D (--hd2d 与 --sim 并存验证通过)
+>
+> 验证: 60/60 ctest + world_validator + sim 12×2 与 RNG-002 基线
+> **剔除启动时间戳后逐行一致** (哈希对比教训: 时间戳行必假阳性)。
+
 # v1.4.15 — P1-C8 结案: RNG-002 视觉掷骰流污染修复 (2026-09-11)
 
 > v1.4.14 记录的 sim 间歇非确定性 (同 exe 同 seed 12~50% 批次分岔) 根因锁定并修复。

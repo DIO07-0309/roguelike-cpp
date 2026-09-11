@@ -44,6 +44,7 @@
 #include "resource_manager.h"                 // M4f: NPC 精灵加载
 #include "game/rendering/sprite_renderer.h"   // M4f: NPC 精灵绘制
 #include "game/rendering/door_renderer.h"     // Door sprites + anim
+#include "game/rendering3d/hd2d_renderer.h"   // M6-HD2D: 3D 表现层切片
 
 // 字体指针 (在 main.cpp 中初始化)
 extern Font g_font;
@@ -2192,6 +2193,24 @@ void GameScene::_render() {
                                              _presentation.shake_timer);
     float saved_cx = _cam_x, saved_cy = _cam_y;
     _cam_x += shake_ox; _cam_y += shake_oy;
+
+    // M6-HD2D: 3D 表现层分支 (--hd2d) — 世界层走 3D 渲染器, HUD 走 2D 桥。
+    // 逻辑层零改动; 初始化失败自动回退 2D。切片阶段: 面板/小地图等不进 3D 分支
+    if (g_hd2d_mode) {
+        auto& hd2d = HD2DRenderer::inst();
+        if (hd2d.ensure_init(sw, sh)) {
+            hd2d.render_frame(*this);
+            _cam_x = saved_cx; _cam_y = saved_cy;   // 恢复无震动的相机 (HUD 用)
+            _ambient.draw_vignette(sw, sh);
+            _renderer.draw_hud(player.get(), current_floor, game_time,
+                               _get_boss(), _show_relic_panel,
+                               inventory_open, inventory_cursor,
+                               _presentation.room_msg, _presentation.room_msg_timer,
+                               sw, sh, nullptr, -1, 0);
+            return;
+        }
+        g_hd2d_mode = false;  // 初始化失败: 本次会话回退 2D
+    }
 
     _draw_map();
     _draw_ground_items();
