@@ -30,13 +30,77 @@ src/game/rendering3d/
 - 特效 = 脉冲发光片; 后处理占位 = 夜色分级 + 地平雾 (v2 换 shader)
 - 视野裁剪: 玩家 ±16x±12 tile
 
-## v2 路线 (按优先级)
+## v2a 已实现 (2026-09-12, 全量完成)
 
-1. **bloom + 景深 shader** (rlGLSL; raylib 5.0 无 rlights 需自带 shader 文件)
-2. 真阴影 (深度纹理 or blob shadow 贴图)
-3. 墙/地板 tile 贴图接入 (procedural_tile 拉伸采样, 需换 shader 平面)
-4. 特效 additive 混合 + 粒子 billboard 化
-5. 完整面板/小地图/传送门 3D 化 (v1 切片仅 HUD)
+- **地形贴图**: 地板 = rlGL 原语贴地 quad (法线朝上, UV 归一化采样);
+  墙体 = 四侧面 rlGL quad + 顶面亮 10% 伪受光。贴图回退链与 2D 同源:
+  `wall_<biome>` → `wall` → `procedural_tile` (builder `_resolve_tile_tex`)
+- **billboard 帧动画**: `((int)(GetTime()*4))&1` 呼吸 2 帧 (与 2D 实体同款,
+  非随机不触 RNG 红线); `flip_x` 负宽源矩形生效
+- **地面物品/NPC billboard**: item_icon_key / npc_sprite_key 同源图标,
+  可见性判定与 2D 一致 (缺素材跳过, 2D 有几何回退 3D 无)
+- **挑战传送门**: PORTAL_RING 竖立脉冲双环 (DrawCircle3D) — 入口蓝/返回绿,
+  脉冲频率 3.0 与 2D 同源; builder `_build_portals` 条件与 2D 分支逐条对齐
+- **UI 尾段共用**: `_render_ui_tail(sw,sh)` — 2D 分支 370 行 UI
+  (红屏/黑屏/HUD/小地图/面板/对话/事件/冻结/演出) 单一真相源, 3D 桥同调
+- **HUD 参数补齐**: echo 面板 + 挑战波次 (2D 降级参数 nullptr/-1/0 修复;
+  `_build_echo_panel_data()` 共用方法)
+- **3D 世界标签**: `world_to_screen()` 投影 → 怪名条 + E 对话/拾取气泡
+  (屏幕空间绘制, 样式与 2D 同款)
+
+## v2b 已实现 (2026-09-12, 战斗表现层全量)
+
+- **投射物**: PROJECTILE_BODY 发光弹体 (穿透金/元素色/归属色三态) +
+  WARNING 相贴地预警环 (AOE) / 轨迹预警线 (点弹, 撞墙截止与 2D 同算法)
+- **伤害飘字**: `_render_damage_text` 共用样式, 3D 走 `world_to_screen` 投影
+  (暴击 1.6x 字号 / 元素标签 缓冻毒暴 全对齐)
+- **射程指示环**: NUNCHAKU 双环带 / SPEAR+CROSSBOW 单环 (暖金, 2D 同源)
+- **Boss 技能预警** (只读 BossAI): 弹幕弹道 + 蓄力扇形 (CONE_FAN rlGL
+  三角扇, 实时朝向玩家) + 扇形斩 / 瞬移落点紫圈 / 旋风范围圈
+- **Boss 战场危险区**: 岩浆/影墙/虚空 贴地危险圈 (warn/active 双态)
+- **弱点光环 + Tank 守护连线**: WARNING_RING / ENTITY_LINK
+- **空心环原语**: `_draw_flat_ring` (rlGL RL_LINES) — 预警环/射程环底座
+- v2a 修复: 传送门环朝向 (竖立朝相机, 原为平躺)
+
+## v2c 已实现 (2026-09-12, shader 档全量)
+
+- **平滑距离雾**: `hd2d_fog.fs` + `hd2d_world.vs` — 克隆 rlgl 默认采样管线
+  + viewPos→片元距离 smoothstep 雾色混合; 替代逐 tile 40% 阶跃压暗
+  (FOV 探索语义仍由 builder tint 保留; fogStart=520/fogEnd=900 常量起步)
+- **Blob shadow**: `GenImageGradientRadial` 64x64 程序纹理贴地椭圆 quad
+  替换黑扁片 cube (失败回退原实现)
+- **岩浆动画材质**: `hd2d_lava.fs` — 世界坐标 value-noise (暗壳/亮流/热核
+  三层分段) + 双向 UV 流动 + emissive 呼吸 (频率 4.0 与 2D 同源);
+  LAVA tile 由 builder 打 `is_lava` 标记分流, 探索压暗编码进 tint 灰度
+- **Bloom**: 亮部提取 (1/4 RT) → 9-tap 高斯乒乓 (水平/垂直) →
+  additive 全屏叠加; 三 GLSL (`hd2d_bloom_extract/blur/composite.fs`,
+  composite 降级为 overlay 叠加未用 shader)
+- **性能**: 地形两遍分区 (lava 单批 + 其余单批), 每帧仅 2 次 shader 切换
+- **嵌套 RT 恢复** (raylib 5.0 坑): `EndTextureMode` 盲绑 FBO 0 并重置
+  投影 → `HD2DPostFX::process` 尾部手动恢复 FBO + viewport + 960x640
+  ortho 投影; `SceneTree::main_target()` 新增只读 getter
+- 新模块: `hd2d_shader_bank` (GLSL 懒加载/缓存/回退标记) +
+  `hd2d_post_fx` (bloom 链); GLSL 放 `assets/shaders/` (随 POST_BUILD 拷贝)
+
+## v2d 已实现 (2026-09-12, 战斗反馈打磨)
+
+- **投射物拖尾**: 反速度 3 段渐隐线 (0.03/0.06/0.09s, 递减 50/33/17%,
+  BLEND_ADDITIVE) — 2D 穿透弹 back 线 (0.03s) 的 3D 加强版; `trail_dir`
+  = p.vel 直接传入 (纯视觉无状态, 不加弹实例 id)
+- **名条遮挡裁剪**: `GameMap::has_line_of_sight` (Bresenham tile 步进,
+  只读; 越界按挡视线保守处理) — **2D/3D 名条同条件**加玩家→怪视线判定,
+  墙后名条不再穿透显示 (怪本体绘制不受影响; 仅 isVisible 层为原语义)
+
+## v2 剩余路线 (v2e 候选)
+
+Shadow map (硬阴影, 深度 RT 双 pass)、DOF、HD2D 描边
+
+## 已知限制 (v2d 后)
+
+- 雾对 LAVA tile 不生效 (岩浆自发光, 不入雾; 视觉可接受)
+- blob shadow 为程序渐变, 非角色形状阴影 (shadow map 见 v2e)
+- bloom 阈值/强度为全局常量, 未按场景亮度自适应
+- 拖尾为直线渐隐 (高速弹转向时无弧度; 弹道本身直线, 语义一致)
 
 ## 一致性验证协议 (每次改 rendering3d 必跑)
 
@@ -45,10 +109,3 @@ src/game/rendering3d/
    (教训: 哈希对比必须排除 "启动" 行, 否则必假阳性)
 3. 对照基线: RNG-002 修复后 `reports/p1c8/fix/fix_1_a.out` (061A2BE6)
 4. `--sim 2 --sim-seed 3 --hd2d` 冒烟: sim 无头不进 3D, 输出应正常
-
-## 已知限制 (v1)
-
-- 帧动画未接 (billboard 固定 frame 0)
-- flip_x 未生效 (DrawBillboardRec 需负宽源矩形, 待 v2)
-- 门/楼梯/物品/投射物/传送门未进 3D 分支 (2D 面板在 3D 模式下不画)
-- 后处理是叠加矩形近似, 非 shader

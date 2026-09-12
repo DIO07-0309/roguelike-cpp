@@ -1,3 +1,146 @@
+# v1.4.22 — M6-v2d 完成: 战斗反馈打磨 (拖尾 + 名条遮挡) (2026-09-12)
+
+> v2d 小步打磨。3D 投射物拖尾 + 2D/3D 同条件名条视线裁剪。
+>
+> ## 渲染 (rendering3d) + 世界 (world)
+> - **投射物拖尾**: _draw_projectile_trail — 反速度 3 段渐隐线
+>   (0.03/0.06/0.09s, 递减 50/33/17%, BLEND_ADDITIVE); 语义对齐 2D
+>   穿透弹 back 线 (0.03s) 并加强; trail_dir=p.vel 直接传递, 零状态
+>   (不加弹实例 id, 不触碰逻辑层)
+> - **名条遮挡裁剪**: GameMap::has_line_of_sight 新增 (Bresenham
+>   tile 步进, 只读, 端点不检查, 越界保守挡视线); 2D 名条与 3D 投影
+>   名条同条件判定 — 墙后名条不再穿透 (怪本体绘制不变)
+>
+> 验证: 60/60 ctest + validator 0 err + sim 12×2 双跑零分岔 +
+> --hd2d 实机 (键链自动进游戏) shader 全加载 + 优雅退出 exit 0。
+
+# v1.4.21 — M6-v2c 完成: 3D 表现层 C 档 shader 全量 (2026-09-12)
+
+> v2c shader 档收官。距离雾/blob 阴影/岩浆动画材质/bloom 四项落地,
+> 全部带失败回退 (shader 编译失败自动降级默认管线, 不崩溃不黑屏)。
+>
+> ## 渲染 (rendering3d)
+> - **平滑距离雾**: hd2d_fog.fs + hd2d_world.vs — 克隆 rlgl 默认采样管线
+>   + viewPos→片元距离 smoothstep 雾色混合; 替代逐 tile 40% 阶跃压暗
+>   (FOV 探索语义仍由 builder tint 保留)
+> - **Blob shadow**: GenImageGradientRadial 64x64 程序纹理贴地椭圆
+>   替换黑扁片 cube (_draw_blob_shadow 提取, 失败回退原实现)
+> - **岩浆动画材质**: hd2d_lava.fs — 世界坐标 value-noise 三层分段
+>   (暗壳/亮流/热核, 对齐 2D LAVA 深底/裂纹/热核) + 双向流动 +
+>   emissive 呼吸 (频率 4.0 同源); builder is_lava 标记分流,
+>   探索压暗编码进 tint 灰度
+> - **Bloom 后处理链**: 亮部提取 (1/4 RT, Rec.709 亮度阈值+平方衰减) →
+>   9-tap 高斯乒乓 (水平/垂直) → additive 全屏叠加 (BLEND_ADDITIVE)
+> - **性能**: 地形两遍分区 (lava 单批 + 其余单批), 每帧仅 2 次 shader
+>   切换, 避免逐 tile 切换的数百次 batch flush
+> - **raylib 5.0 嵌套 RT 坑**: EndTextureMode 盲绑 FBO 0 并重置投影 →
+>   HD2DPostFX::process 尾部手动恢复 FBO+viewport+960x640 ortho;
+>   SceneTree::main_target() 新增只读 getter
+> - 新模块: hd2d_shader_bank (GLSL 懒加载/缓存/回退标记) +
+>   hd2d_post_fx (bloom 链); GLSL 6 文件放 assets/shaders/
+>   (随 POST_BUILD assets 拷贝, 桌面镜像自动覆盖)
+>
+> 已知限制: 雾不作用于岩浆 (自发光); blob shadow 非形状阴影
+> (shadow map 列 v2d); bloom 参数为全局常量未自适应。
+>
+> 验证: 60/60 ctest + world_validator 0 err + sim 12×2 双跑零分岔
+> (剔时间戳) + --sim 2 --hd2d 冒烟 exit=0 无 WARN/ERROR/FATAL。
+
+# v1.4.20 — M6-v2b 完成: 3D 战斗表现层 B 档全量 (2026-09-12)
+
+> v2b 切片收官。战斗反馈全链 3D 化: 投射物/预警/飘字/技能几何/危险区,
+> 3D 模式下战斗信息不再缺席。逐项对齐 2D 配色与触发条件 (只读翻译)。
+>
+> ## 渲染 (rendering3d)
+> - **投射物三态**: PROJECTILE_BODY 发光双球 (穿透金/敌元素火红冰蓝/玩家
+>   土金); WARNING 相 AOE→贴地空心预警环 (红/橙/黄三级 + 脉冲),
+>   点弹→TRAJECTORY_LINE 轨迹线 (撞墙截止算法与 2D _preview 同源) + 落点圈
+> - **伤害飘字**: _render_damage_text 提取共用样式 (暴击1.6x/元素标签),
+>   2D 相机偏移 / 3D world_to_screen 投影两路分发
+> - **射程指示环**: WARNING_RING 复用 — NUNCHAKU 双环带 (内环+外环+淡带),
+>   SPEAR/CROSSBOW 单环; 暖金色与 2D 同源
+> - **Boss 技能预警** (只读 BossAI): 弹幕在飞弹道线 + 蓄力扇形预警
+>   (CONE_FAN rlGL 三角扇, 朝玩家实时角度); 扇形斩蓄力面 (橙红);
+>   瞬移落点紫圈; 旋风蓄力白环/旋转紫圈
+> - **Boss 战场危险区**: 岩浆/影墙/虚空 贴地危险圈 (warn橙黄/active红,
+>   boss_ctrl() 只读访问器)
+> - **弱点光环 + Tank 守护连线**: WARNING_RING 橙脉冲环 + ENTITY_LINK 3D线
+> - **空心环原语**: _draw_flat_ring (rlGL RL_LINES 圆周线段) —
+>   DrawCircle3D 实心无法挖空心, 预警环全部走原语
+> - **v2a 修复**: 传送门环朝向修正 ({0,1,0}/45° 朝相机竖立, 原 {1,0,0}/90°
+>   是平躺贴片 — Code Review 抓获)
+>
+> 验证: 60/60 ctest + world_validator 0 err + sim 12×2 双跑零分岔 +
+> --hd2d 与基线一致 (剔时间戳/HD2D行) + 冒烟 20s 无崩溃。
+
+# v1.4.19 — M6-v2a 完成: 3D 表现层 A 档纯接线全量 (2026-09-12)
+
+> v2a 收尾 (方案一: 3D 世界 + 2D 屏幕空间 UI)。7 项 A 档缺失全部接通,
+> 3D 模式功能对齐 2D 的可玩闭环。
+>
+> ## 渲染 (rendering3d + game_scene 3D 桥)
+> - **地面物品 billboard**: item_icon_key 图标 3D 化, 可见性同 2D (缺素材跳过)
+> - **NPC billboard**: npc_sprite_key 楼层映射 (npc_views() 只读快照)
+> - **挑战传送门**: PORTAL_RING 竖立脉冲双环 (DrawCircle3D, 入口蓝/返回绿,
+>   颜色/脉冲频率与 2D 同源) + 地面基准圈
+> - **HUD 参数补齐**: echo 面板 (F15 Ending Echo 镜像数据) + 挑战波次全量传入
+>   — _build_echo_panel_data() 提取为 2D/3D 共用方法 (buff 腐化名表重构为
+>   数据驱动 MAP, _fill_echo_buffs)
+> - **UI 尾段共用**: _render() 的 370 行 UI (红屏/黑屏/挑战选择/小地图/背包/
+>   赌博/对话/事件/冻结/时停/Boss 演出) 提取为 _render_ui_tail(sw,sh),
+>   2D/3D 分支同 UI — 单一真相源, 消除双份维护
+> - **3D 世界标签**: world_to_screen() 投影 (GetWorldToScreen);
+>   怪名条 (Boss红/精英金/普通灰) + E 对话/拾取气泡, 样式与 2D 同款
+>
+> ## 结构
+> - GameScene 新增只读访问器 (3D 红线): npc_views() / dropped_items() /
+>   in_challenge_arena() — rendering3d 无 friend, 无可变访问
+> - _render_hd2d_ui_bridge / _render_hd2d_world_labels (≤40行, 拆分合规)
+>
+> 验证: 60/60 ctest + world_validator 0 err + sim 12×2 双跑零分岔 (剔时间戳)
+> + --hd2d 冒烟 20s 浸泡无崩溃 (每项增量验证 + 收尾全协议)。
+
+# v1.4.18 — M6-v2a 第一刀: 3D 地形贴图 + billboard 帧动画 (2026-09-12)
+
+> v2a 切片 (方案一: 3D 世界 + 2D 屏幕空间 UI) 开工。本刀: 地形/墙体接群系贴图,
+> 实体接呼吸帧动画 + flip_x, 全部复用 2D 同源素材回退链, 零 shader 依赖。
+>
+> ## 渲染 (rendering3d)
+> - 地板: rlGL 原语贴地 quad 采样 tile 贴图 (v1 的顶视 billboard 近似退役),
+>   无贴图回退 DrawPlane 纯色
+> - 墙体: 四侧面 rlGL quad 贴图 + 顶面亮 10% 伪受光; 无贴图回退 v1 纯色盒子
+> - 贴图解析: 群系 wall_<biome>/floor_<biome> → 通用 → 程序化 (与 2D
+>   GameMap::draw 同链, hd2d_scene_builder._resolve_tile_tex)
+> - billboard 帧动画: `((int)(GetTime()*4))&1` 呼吸 2 帧轮换 (与 2D 实体同款,
+>   GetTime 非随机, 不触 RNG 红线); flip_x 负宽源矩形接线生效
+>
+> ## 红线遵守
+> - 视觉随机零新增 (帧驱动只用 GetTime); rendering3d 仍只读 GameScene
+>
+> 验证: 60/60 ctest + world_validator 0 err + sim 12×2 双跑零分岔 (剔时间戳)
+> + --hd2d sim 与基线一致 + --hd2d 冒烟 20s 浸泡无崩溃 (HD2D 激活日志确认)。
+
+# v1.4.17 — P1-C9: 3D包输入失灵调查结案 + --input-diag 诊断开关 (2026-09-11)
+
+> 用户报告 3D 包 exe "进层后键盘失灵"。系统化排查后结案: f6019ee 无罪, 环境瞬态。
+> 3D 模式入口补齐: HD2D 激活日志 + 桌面包 "3D模式" 快捷方式。
+>
+> ## 调查结论
+> - 代码审查: f6019ee 输入链零改动, `--hd2d` 无参数时为死分支
+> - PostMessage 全流程探针 (标题→选档→进层→Esc存档) 原包 exe 全通, 输入链完好
+> - 用户复测诊断版: keys=1 到达 GLFW, focus=1 全程, 正常玩到第2层
+> - 环境线索: 当日系统日志 VMware hcmon USB 驱动风暴 (3.4万条, 键盘=USB HID),
+>   17:08/18:29 失灵会话为驱动层瞬态干扰, 与游戏代码无关
+>
+> ## 新增
+> - `--input-diag` 启动参数: 主循环每 2 秒记录 [INPUT-DIAG] 键盘队列/焦点/
+>   鼠标三态到 game.log — 键盘失灵复发时一跑即定位 (失焦/消息不达/状态卡死)
+> - SceneTree::set_input_diag(); 默认关, 零日志噪声
+> - HD2DRenderer::ensure_init 激活日志 (区分 2D/3D 路径, 排障可辨)
+> - 桌面 3D 包根目录新增 "3D模式" 快捷方式 (roguelike_cpp.exe --hd2d)
+>
+> 验证: 60/60 ctest; --hd2d 启动 3D 激活日志确认; 无参启动 0 条 DIAG。
+
 # v1.4.16 — M6-HD2D 切片: 3D 表现层骨架 (--hd2d 可切换) (2026-09-11)
 
 > 大更新第一步: HD-2D 渲染切片落地。逻辑层零改动, 默认仍是 2D。
