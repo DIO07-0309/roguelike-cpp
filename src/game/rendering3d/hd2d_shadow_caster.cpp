@@ -1,7 +1,9 @@
-// M6-v2e: 光空间深度 RT 实现 — rlgl 原语 depth-only fbo + 墙几何深度 pass
+// M6-v2e/v2f: 光空间深度 RT — rlgl 原语 depth-only fbo + 墙/billboard 深度 pass
 // 深度纹理走 GL_DEPTH_ATTACHMENT (无色彩附件; GPU depth-only 可用)
+// v2f: 实体剪影进深度 pass (hd2d_depth.fs alpha-discard, 透明像素不写深度)
 #include "hd2d_shadow_caster.h"
 #include "hd2d_renderer.h"          // HD2DDrawItem
+#include "hd2d_shader_bank.h"       // v2f: depth shader 加载
 #include "core/logger.h"
 #include "rlgl.h"
 #include "config.h"                 // TILE_SIZE
@@ -15,8 +17,12 @@ HD2DShadowCaster& HD2DShadowCaster::inst() {
 bool HD2DShadowCaster::ensure_init(int scene_w, int scene_h) {
     if (_ready) return true;
     _ready = _create_depth_target(scene_w / 2, scene_h / 2);
-    if (_ready) LOG_INFO("HD2D shadow: 深度 RT 就绪 (%dx%d)", _map_w, _map_h);
-    else LOG_WARN("HD2D shadow: 深度 RT 不支持, 回退 blob shadow");
+    if (_ready) {
+        _load_depth_shader();                  // v2f: 剪影 shader (失败可降级)
+        LOG_INFO("HD2D shadow: 深度 RT 就绪 (%dx%d)", _map_w, _map_h);
+    } else {
+        LOG_WARN("HD2D shadow: 深度 RT 不支持, 回退 blob shadow");
+    }
     return _ready;
 }
 
@@ -48,9 +54,21 @@ void HD2DShadowCaster::shutdown() {
     _ready = false;
 }
 
+// ── v2f: alpha-discard 剪影 shader (hd2d_depth.fs + 共享 hd2d_world.vs) ──
+bool HD2DShadowCaster::_load_depth_shader() {
+    auto& bank = HD2DShaderBank::inst();
+    _depth_shader = bank.load("hd2d_depth", "hd2d_world");
+    _depth_shader_ok = bank.is_valid("hd2d_depth");
+    if (!_depth_shader_ok)
+        LOG_WARN("HD2D shadow: depth shader 缺失, billboard 不投影 (墙照常)");
+    return _depth_shader_ok;
+}
+
 // ── 光空间相机: 45° 方向光正交投影, 罩住视野半径 ~16 tile ──
 // (与 renderer._light_dir 同源的固定方向; 光随相机焦点平移)
-void HD2DShadowCaster::update_light_camera(Vector3 cam_focus) {
+void HD2DShadowCaster::update_light_camera(Vector3 cam_focus,
+                                           const Camera3D* view_camera) {
+    _view_camera_override = view_camera;       // v2f: billboard 朝向源
     float world_radius = TILE_SIZE * 17.0f;   // 覆盖 ±16 tile 视野 + 1 缓冲
     _texel_world_size = (world_radius * 2.0f) / (float)_map_w;
 
@@ -72,11 +90,10 @@ void HD2DShadowCaster::update_light_camera(Vector3 cam_focus) {
     _light_proj = MatrixOrtho(-r, r, -r, r, 0.0, world_radius * 4.0);
 }
 
-// ── 深度 pass: 只画墙 (billboard 实体走 blob 回退, 见头注释) ──
+// ── 深度 pass: 墙 + billboard 实体 (v2f) ──
 void HD2DShadowCaster::render_depth(
         const GameScene& gs, const std::vector<HD2DDrawItem>& items,
         unsigned int outer_fbo) {
-    (void)gs;
     if (!_ready) return;
     // 备份主相机矩阵 (rlSetMatrix* 直接替换内部状态, 需手动还原)
     Matrix saved_proj = rlGetMatrixProjection();
@@ -89,6 +106,25 @@ void HD2DShadowCaster::render_depth(
     rlClearScreenBuffers();                     // depth-only fbo: 清深度
     rlEnableDepthTest();
 
+    // v2f: billboard 剪影 (alpha-discard; 需主相机朝向参数保持几何一致)
+    Camera3D view_camera = {};
+    const Camera3D* cam_ptr = _view_camera_override;
+    if (!cam_ptr) {
+        view_camera.position = {0, 640, 320};
+        view_camera.target = {0, 0, 0};
+        view_camera.up = {0, 1, 0};
+        view_camera.fovy = 50.0f;
+        view_camera.projection = CAMERA_PERSPECTIVE;
+        cam_ptr = &view_camera;
+    }
+    if (_depth_shader_ok) {
+        BeginShaderMode(_depth_shader);
+        for (const auto& item : items)
+            if (item.kind == HD2DDrawItem::Kind::ENTITY_BILLBOARD
+                && item.texture.id > 0)
+                _draw_billboard_depth(item, *cam_ptr);
+        EndShaderMode();
+    }
     for (const auto& item : items)
         if (item.kind == HD2DDrawItem::Kind::WALL_BLOCK) _draw_wall_depth(item);
 
@@ -98,6 +134,22 @@ void HD2DShadowCaster::render_depth(
     rlSetMatrixProjection(saved_proj);
     rlSetMatrixModelview(saved_modelview);
     rlViewport(0, 0, _map_w * 2, _map_h * 2);   // = scene_w/h (map 为其一半)
+}
+
+// ── v2f: billboard 深度几何 — 复用 DrawBillboardRec 顶点公式 ──
+// 相机参数只参与朝向数学 (面朝相机方向), 顶点是世界坐标 → 被当前
+// rlSetMatrix 的光空间矩阵变换; 与主 pass _draw_billboard 几何同源
+// (含 flip_x 负宽源矩形处理), 剪影像素 = 主 pass 可见像素
+void HD2DShadowCaster::_draw_billboard_depth(const HD2DDrawItem& item,
+                                             const Camera3D& view_camera) {
+    Vector3 pos = item.world_pos;
+    float w = item.size;
+    float h = item.size * 1.5f;
+    Rectangle src = item.tex_src.width > 0 ? item.tex_src
+        : Rectangle{0, 0, (float)item.texture.width, (float)item.texture.height};
+    if (item.flip_x) src.width = -src.width;
+    DrawBillboardRec(view_camera, item.texture, src,
+                     {pos.x, h * 0.5f, pos.z}, {w, h}, WHITE);
 }
 
 // ── 单墙深度 quad ×4 面 + 顶面 (复用 renderer._wall_quad 顶点公式) ──

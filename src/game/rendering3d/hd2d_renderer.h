@@ -115,7 +115,7 @@ private:
     void _upload_fog_uniforms();    // v2c: 视点+雾色 → 地形 shader
     void _upload_shadow_uniforms(); // v2e: 光矩阵/深度纹理/参数 → 地形 shader
     void _upload_point_lights();    // v2e: LAVA tile+玩家暖光 → uniform
-    void _draw_scene(GameScene& gs);
+    void _draw_scene();              // (相机已由 render_frame 定位)
     void _draw_terrain_pass();      // v2c: 地形批 (雾 shader 包裹/岩浆分流)
     void _draw_floor_tile(const HD2DDrawItem& item);
     void _draw_wall_block(const HD2DDrawItem& item);

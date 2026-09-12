@@ -184,23 +184,8 @@ void HD2DRenderer::render_frame(GameScene& gs) {
     _camera_focus.x += _shake_offset.x;
     _camera_focus.z += _shake_offset.z;
     _shake_offset = {0, 0, 0};
-    // M6-v2e: 光空间深度 pass (墙投影; 失败时主 pass 走 blob 回退)
-    // outer_fbo = scene_tree 主 RT (EndTextureMode 盲绑 FBO 0 的同源坑:
-    // 深度 pass 后必须恢复主 RT 绑定, 否则主场景画到屏幕 FBO 上丢失)
-    {
-        auto& shadow = HD2DShadowCaster::inst();
-        auto* tree = gs.get_tree();
-        if (shadow.ensure_init(_target_w, _target_h) && tree) {
-            shadow.update_light_camera(_camera_focus);
-            shadow.render_depth(gs, _draw_items, tree->main_target().id);
-        }
-    }
-    _draw_scene(gs);
-    _apply_post_processing(gs);
-}
-
-// ── 场景绘制: 相机定位 + 分 kind 绘制 (地形 → 实体 → 特效) ──
-void HD2DRenderer::_draw_scene(GameScene& gs) {
+    // 3. 相机定位 (v2f: 提前到深度 pass 前 — billboard 深度几何朝向
+    // 需当帧相机, 不吃上一帧残值; _draw_scene 内复用不再重算)
     float cam_dist = 640.0f;
     _camera.position = {
         _camera_focus.x,
@@ -208,7 +193,23 @@ void HD2DRenderer::_draw_scene(GameScene& gs) {
         _camera_focus.z + cam_dist * 0.7071f
     };
     _camera.target = _camera_focus;
+    // M6-v2e/v2f: 光空间深度 pass (墙 + billboard 剪影; 失败时主 pass 走 blob 回退)
+    // outer_fbo = scene_tree 主 RT (EndTextureMode 盲绑 FBO 0 的同源坑:
+    // 深度 pass 后必须恢复主 RT 绑定, 否则主场景画到屏幕 FBO 上丢失)
+    {
+        auto& shadow = HD2DShadowCaster::inst();
+        auto* tree = gs.get_tree();
+        if (shadow.ensure_init(_target_w, _target_h) && tree) {
+            shadow.update_light_camera(_camera_focus, &_camera);
+            shadow.render_depth(gs, _draw_items, tree->main_target().id);
+        }
+    }
+    _draw_scene();
+    _apply_post_processing(gs);
+}
 
+// ── 场景绘制: 分 kind 绘制 (地形 → 实体 → 特效; 相机已在 render_frame 定位) ──
+void HD2DRenderer::_draw_scene() {
     BeginMode3D(_camera);
     ClearBackground({12, 14, 24, 255});
 
@@ -404,7 +405,7 @@ void HD2DRenderer::_draw_billboard(const HD2DDrawItem& item) {
 }
 
 // ── M6-v2c: blob shadow — 径向渐变纹理贴地 quad (失败回退黑扁片) ──
-// v2e: shadow map 激活时 alpha 减半 (墙投影已在, blob 只补接地感)
+// v2f: 实体剪影已进深度 pass; blob 只补接地感 (alpha 再降)
 void HD2DRenderer::_draw_blob_shadow(Vector3 pos, float w) {
     if (_blob_shadow_tex.id <= 0) {
         DrawCube({pos.x, 0.05f, pos.z}, w * 0.55f, 0.08f, w * 0.35f,
@@ -412,8 +413,11 @@ void HD2DRenderer::_draw_blob_shadow(Vector3 pos, float w) {
         return;
     }
     float half_x = w * 0.31f, half_z = w * 0.21f;   // 椭圆约 0.62w x 0.42w
-    bool terrain_shadow = HD2DShadowCaster::inst().is_ready();
-    unsigned char alpha = terrain_shadow ? 60 : 120;
+    auto& shadow = HD2DShadowCaster::inst();
+    bool entity_cast = shadow.entity_shadow_ready();   // v2f: 剪影生效?
+    unsigned char alpha = entity_cast ? 40
+                        : shadow.is_ready() ? 60      // v2e: 仅墙投影
+                        : 120;                          // 全回退: blob 主角
     rlSetTexture(_blob_shadow_tex.id);
     rlBegin(RL_QUADS);
     rlColor4ub(255, 255, 255, alpha);

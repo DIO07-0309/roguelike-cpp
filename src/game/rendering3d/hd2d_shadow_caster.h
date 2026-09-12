@@ -18,13 +18,16 @@ public:
     // scene_w/h: 场景 RT 尺寸; depth map 尺寸 = scene/2 (性能/质量折中)
     bool ensure_init(int scene_w, int scene_h);
     bool is_ready() const { return _ready; }
+    // v2f: 剪影投影完整可用 (RT + depth shader)? blob 降级判定用
+    bool entity_shadow_ready() const { return _ready && _depth_shader_ok; }
     void shutdown();
 
     // 每帧渲染前: 光空间正交相机跟随玩家 (focus 为相机焦点世界坐标)
-    void update_light_camera(Vector3 cam_focus);
+    // v2f: 同步注入主相机 (billboard 深度几何朝向与主 pass 一致)
+    void update_light_camera(Vector3 cam_focus, const Camera3D* view_camera);
 
-    // 深度 pass: 把墙盒几何画进深度 fbo (caller 传墙列表; 实体阴影
-    // 走 blob 回退 — billboard alpha 几何会全投影, 不进 depth pass)
+    // 深度 pass: 墙盒几何 + billboard 实体 (v2f: alpha-discard shader 剪影)
+    // 画进深度 fbo; 无贴图实体跳过 (罕见降级路径, blob shadow 兜底)
     // outer_fbo: 深度 pass 完成后必须恢复绑定的外层渲染目标
     // (raylib 5.0 无查询当前 FBO API; 由 caller 注入 — 通常为主 RT fbo)
     void render_depth(const class GameScene& gs,
@@ -51,12 +54,19 @@ private:
     int _map_h = 0;
     float _texel_world_size = 0.0f;   // 世界单位/深度像素 (bias 用)
 
+    Shader _depth_shader = {};       // v2f: alpha-discard 剪影
+    bool _depth_shader_ok = false;
+    const Camera3D* _view_camera_override = nullptr;  // v2f: 主相机朝向源
+
     Matrix _light_view = MatrixIdentity();
     Matrix _light_proj = MatrixIdentity();
     Camera3D _light_camera = {};
 
     bool _create_depth_target(int scene_w, int scene_h);
+    bool _load_depth_shader();        // v2f: alpha-discard 剪影 shader
     void _draw_wall_depth(const struct HD2DDrawItem& item);
+    void _draw_billboard_depth(const struct HD2DDrawItem& item,
+                               const Camera3D& view_camera);
 
     HD2DShadowCaster(const HD2DShadowCaster&) = delete;
     HD2DShadowCaster& operator=(const HD2DShadowCaster&) = delete;

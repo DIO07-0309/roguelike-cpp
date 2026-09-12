@@ -1,3 +1,23 @@
+# v1.4.24 — M6-v2f 完成: 实体剪影进 shadow map (2026-09-13)
+
+> v2e 只投影墙, billboard 实体走 blob 回退 ("墙有影怪没影") — 本切片
+> 补齐实体投影。alpha-discard 深度 shader + 深度几何与主 pass 同源。
+>
+> ## 渲染 (rendering3d)
+> - **Billboard 深度剪影**: hd2d_depth.fs (alpha<0.5 discard, 透明像素
+>   不写深度) + hd2d_world.vs 共享顶点; shader_bank 回退机制复用
+>   (编译失败仅墙投影, 不崩溃)
+> - **几何同源**: _draw_billboard_depth 复用 DrawBillboardRec 顶点公式
+>   (含 flip_x), 相机只参与朝向数学 — 深度剪影像素 = 主 pass 可见像素
+> - **当帧相机**: update_light_camera 注入主相机; render_frame 相机
+>   定位提前 (深度 pass 不吃上帧残值)
+> - **blob 三态降级**: 剪影生效=40 / 仅墙投影=60 / 全回退=120
+> - 实机键链验证 (PostMessage 注入 N→ENTER→SPACE→移动): hd2d_depth
+>   编译成功 + 深度 RT 480x320 就绪 + 全 shader 链零 WARN
+>
+> 验证: 60/60 ctest + validator 0 err + sim 12×2 双跑零分岔
+> (剔时间戳, 与 RNG-002 基线一致) + --sim 2 --hd2d 冒烟 exit 0。
+
 # v1.4.23 — M6-v2e 完成: Shadow map + 点光源 + 打磨 (2026-09-12)
 
 > v2e 合体方案落地。HD2D 风格核心拼图: 方向光阴影 + 岩浆/火把点光。

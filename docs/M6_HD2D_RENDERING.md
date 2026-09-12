@@ -109,15 +109,32 @@ src/game/rendering3d/
   丢弃 (全屏 (2,2,5) 近黑); 根因 = raylib 5.0 无当前 FBO 查询 API,
   恢复目标需 caller 注入 (render_frame 传 main_target().id)
 
+## v2f 已实现 (2026-09-13, 实体剪影投影)
+
+- **Billboard 进深度 pass**: alpha-discard 深度 shader `hd2d_depth.fs`
+  (纹理 alpha*顶点色*diffuse < 0.5 → discard, 像素画硬边缘剪影; 与
+  hd2d_world.vs 配对, mvp 由 rlgl 绘制时自动写入 = 光空间矩阵);
+  shader_bank 懒加载/回退标记复用 — 编译失败仅墙投影, blob 兜底
+- **深度几何同源**: `_draw_billboard_depth` 复用 `DrawBillboardRec`
+  顶点公式 (含 flip_x 负宽源矩形); 相机参数只参与朝向数学,
+  顶点世界坐标被光空间矩阵变换 — 与主 pass 几何一致
+- **当帧相机注入**: `update_light_camera(focus, view_camera)` 存主相机;
+  render_frame 相机定位提前到深度 pass 前 (不吃上帧残值)
+- **blob shadow 三态降级**: 剪影投影生效=40 / 仅墙=60 / 全回退=120
+- **无贴图实体跳过深度 pass**: DrawCube 回退几何 (罕见路径) 不投影,
+  blob 兜底; `_draw_scene()` 签名简化 (无参)
+- 实机键链验证 (PostMessage 注入): hd2d_depth 编译链接成功 + 深度
+  pass 稳定运行, 全 shader 链零 WARN (N→ENTER→SPACE→移动进局)
+
 ## v2 剩余路线
 
-(评估中 — v2f 候选: shadow map 实体投影 / 岩浆点光密度提升 /
-HD2D 描边重评估)
+(评估中 — v2g 候选: 岩浆点光密度提升 / HD2D 描边重评估 /
+bloom 参数场景自适应)
 
-## 已知限制 (v2d 后)
+## 已知限制 (v2f 后)
 
 - 雾对 LAVA tile 不生效 (岩浆自发光, 不入雾; 视觉可接受)
-- blob shadow 为程序渐变, 非角色形状阴影 (shadow map 见 v2e)
+- 实体本身不接收阴影 (billboard 走默认管线; v2e 起即如此, 非回归)
 - bloom 阈值/强度为全局常量, 未按场景亮度自适应
 - 拖尾为直线渐隐 (高速弹转向时无弧度; 弹道本身直线, 语义一致)
 
