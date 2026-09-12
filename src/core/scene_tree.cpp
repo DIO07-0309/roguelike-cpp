@@ -118,6 +118,10 @@ void SceneTree::_handle_input() {
 
 void SceneTree::run() {
     double last = GetTime();
+    // P1-C9 诊断: 输入心跳 (每2秒) — GLFW 原始按键队列/焦点/鼠标三态
+    // 定位 "进层后键盘失灵": 区分 (a)窗口失焦 (b)键盘消息不达 (c)状态卡死
+    double input_diag_timer = 0.0;
+    long input_diag_frames = 0;
     while (_running && !WindowShouldClose()) {
         double now = GetTime();
         double dt = now - last;
@@ -125,6 +129,22 @@ void SceneTree::run() {
         if (dt > 0.1) dt = 0.1;
         _handle_input();
         process_frame(dt);
+
+        // ── P1-C9: 输入心跳诊断 (--input-diag 时每2秒; 区分失焦/消息不达/状态卡死) ──
+        if (_input_diag) {
+            input_diag_frames++;
+            input_diag_timer += dt;
+            if (input_diag_timer >= 2.0) {
+                int drained = 0;
+                while (GetKeyPressed() != 0) drained++;   // 排空 GLFW 按键队列
+                int mx = GetMouseX(), my = GetMouseY();
+                LOG_INFO("[INPUT-DIAG] f=%lld keys=%d focus=%d cursor=%d mouse=(%d,%d)",
+                         (long long)input_diag_frames, drained,
+                         (int)IsWindowFocused(), (int)IsCursorOnScreen(), mx, my);
+                input_diag_timer = 0.0;
+                input_diag_frames = 0;
+            }
+        }
 
         // Batch 3H + G10.9: 渲染到 960×640 逻辑缓冲, blit 到客户区
         // letterbox 保持 3:2 (消除任意拉伸变形), BILINEAR 平滑放大

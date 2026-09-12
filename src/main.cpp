@@ -125,6 +125,7 @@ int main(int argc, char** argv) {
 
     // ── G4.5/G7.3: CLI replay/record/sim flags ──
     bool replay_mode = false, record_mode = false, sim_mode = false;
+    bool input_diag_requested = false;  // P1-C9: --input-diag
     std::string replay_path, record_path;
     int sim_runs = 100;
     uint32_t sim_seed_start = 0;
@@ -159,6 +160,9 @@ int main(int argc, char** argv) {
         } else if (arg == "--hd2d") {
             // M6-HD2D: 3D 表现层切片开关 (逻辑层不变; 默认 2D)
             g_hd2d_mode = true;
+        } else if (arg == "--input-diag") {
+            // P1-C9: 输入心跳诊断 (键盘失灵复发时定位用; 默认关)
+            input_diag_requested = true;
         }
     }
 #endif
@@ -191,6 +195,7 @@ int main(int argc, char** argv) {
     }
 
     SceneTree tree(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);  // G10.7-B1: 统一 config.h 常量
+    if (input_diag_requested) tree.set_input_diag(true);  // P1-C9
     ServiceLocator::provide(&tree);  // Q4.4: 事件回调访问音频
     LOG_INFO("窗口创建");
 
