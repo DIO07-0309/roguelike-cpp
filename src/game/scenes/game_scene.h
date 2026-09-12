@@ -170,6 +170,16 @@ public:
     Object::Signal<> on_floor_cleared;
     Object::Signal<int> on_player_leveled;
 
+    // ── M6-HD2D: 3D 表现层只读访问器 (rendering3d 只读红线; 不暴露可变引用) ──
+    struct NpcView {                       // NPC 快照 (坐标 tile + 是否完成对话)
+        int tile_x = 0, tile_y = 0;
+        bool finished = false;
+    };
+    std::vector<NpcView> npc_views() const;          // 未完成对话的在图 NPC
+    const std::vector<DroppedItem>& dropped_items() const { return ground_items; }
+    bool in_challenge_arena() const { return _world_mode == WorldMode::CHALLENGE_ARENA; }
+    const BossSystemDirector& boss_ctrl() const { return _boss; }  // M6-v2b: 危险区只读
+
     // 生命周期
     void _ready() override;
     void _process(double delta) override;
@@ -356,6 +366,27 @@ private:
     void _draw_arena_map();
     void _draw_arena_entities();
     void _cleanup_dead_arena_monsters();
+
+    // F15.5.1/M6-v2a: Echo 面板数据构建 (2D/3D 分支共用, 防 60 行复制)
+    void _build_echo_panel_data(CharacterPanelData& out) const;
+    void _fill_echo_buffs(CharacterPanelData& out) const;
+
+    // M6-v2a: _render UI 尾段共用 (红屏/HUD/小地图/对话/冻结/演出; 2D/3D 同 UI)
+    void _render_ui_tail(int sw, int sh);
+
+    // M6-v2a: 3D 分支 UI 桥 (vignette + 完整 HUD 参数 + ui_tail)
+    void _render_hd2d_ui_bridge(int sw, int sh);
+
+    // M6-v2a: 3D 世界标签 (怪名/NPC名/E 气泡 → 屏幕空间投影)
+    void _render_hd2d_world_labels();
+    void _render_hd2d_monster_labels();
+    void _render_hd2d_interact_hints();
+
+    // C1/M6-v2b: 伤害飘字 (样式共用; 2D 相机偏移 / 3D 投影)
+    void _render_damage_text(const PresentationSystemDirector::DamageFloat& df,
+                             float sx, float sy);
+    void _render_damage_floats_2d();
+    void _render_damage_floats_3d();
 
     float _cam_x = 0, _cam_y = 0;
 

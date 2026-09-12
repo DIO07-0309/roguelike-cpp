@@ -22,6 +22,10 @@ public:
     InputMap& get_input() { return _input; }
     AudioServer* get_audio() { return _audio.get(); }
 
+    // P1-C9: 输入诊断开关 (--input-diag 启动参数; 默认关, 零日志噪声)
+    void set_input_diag(bool on) { _input_diag = on; }
+    bool is_input_diag() const { return _input_diag; }
+
     // 逻辑分辨率 (始终 960×640，全屏/缩放时由 RenderTexture blit 保持比例)
     int width()  const { return WINDOW_WIDTH; }
     int height() const { return WINDOW_HEIGHT; }
@@ -34,6 +38,10 @@ public:
     void process_frame(double delta);
     bool is_running() const { return _running; }  // Q3.1: headless sim 循环
     void process_input() { _handle_input(); }    // Q3.1: headless sim 输入分发
+
+    // M6-v2c: 主渲染 RT 只读访问 (HD2D 后处理链嵌套 FBO 恢复用;
+    // raylib 5.0 EndTextureMode 会盲绑 FBO 0, 嵌套 pass 后需手动恢复)
+    const RenderTexture2D& main_target() const { return _target; }
 
 private:
     void _handle_input();
@@ -55,4 +63,5 @@ private:
     std::shared_ptr<Node> _pending_scene;
     bool _scene_changed = false;
     int  _skip_input = 0;  // 场景切换后跳过N帧输入(防Esc穿透)
+    bool _input_diag = false;  // P1-C9: --input-diag 输入心跳诊断
 };

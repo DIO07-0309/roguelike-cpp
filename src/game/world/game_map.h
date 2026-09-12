@@ -103,6 +103,10 @@ public:
     void update_boss_fov(int center_x, int center_y, int radius);
     void reset_visibility();
 
+    // M6-v2d: 两 tile 间视线 (Bresenham 步进, 端点不检查) — 名条遮挡裁剪用
+    // 只读查询, 无副作用; 越界 tile 按挡视线处理 (保守)
+    bool has_line_of_sight(int x0, int y0, int x1, int y1) const;
+
     // Batch 1: Door 状态 API (仅对 DOOR tile 生效)
     DoorState door_state_at(int tx, int ty) const;   // 非 DOOR tile 返回 NONE
     bool set_door_state(int tx, int ty, DoorState s); // 非 DOOR tile 返回 false; OPEN/CLOSED 切换 is_walkable

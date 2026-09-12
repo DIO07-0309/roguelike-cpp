@@ -95,6 +95,23 @@ bool GameMap::blocks_sight(int x, int y) const {
     return false;
 }
 
+// ── M6-v2d: 两 tile 间视线 (Bresenham; 中途挡视 tile 即断) ──
+// 只读查询 (名条遮挡裁剪); 端点自身不检查 (玩家/怪所站 tile 通常可见)
+bool GameMap::has_line_of_sight(int x0, int y0, int x1, int y1) const {
+    int dx = abs(x1 - x0), dy = -abs(y1 - y0);
+    int sx = (x0 < x1) ? 1 : -1, sy = (y0 < y1) ? 1 : -1;
+    int err = dx + dy;
+    int cx = x0, cy = y0;
+    while (cx != x1 || cy != y1) {
+        int e2 = 2 * err;
+        if (e2 >= dy) { err += dy; cx += sx; }
+        if (e2 <= dx) { err += dx; cy += sy; }
+        if (cx == x1 && cy == y1) break;      // 端点不检查
+        if (blocks_sight(cx, cy)) return false;
+    }
+    return true;
+}
+
 // ── Batch 1: Door 状态 API ─────────────────────────────────
 
 DoorState GameMap::door_state_at(int tx, int ty) const {

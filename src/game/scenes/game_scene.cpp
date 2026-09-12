@@ -1,4 +1,4 @@
-﻿#include "game_scene.h"
+#include "game_scene.h"
 #include "title_scene.h"
 #include "death_scene.h"
 #include "victory_scene.h"
@@ -1618,8 +1618,7 @@ void GameScene::_tick_replay_hash() {
 }
 
 // _input / debug / event / dialogue — delegated to GameSceneInput
-void GameScene::_input(const InputMap& input) {
-    // G10.1: Element select input
+void GameScene::_input(const InputMap& input) {    // G10.1: Element select input
     if (element_select_active) {
         if (input.is_action_just_pressed("move_left"))
             element_select_cursor = (element_select_cursor + 2) % 3;
@@ -2194,24 +2193,17 @@ void GameScene::_render() {
     float saved_cx = _cam_x, saved_cy = _cam_y;
     _cam_x += shake_ox; _cam_y += shake_oy;
 
-    // M6-HD2D: 3D 表现层分支 (--hd2d) — 世界层走 3D 渲染器, HUD 走 2D 桥。
-    // 逻辑层零改动; 初始化失败自动回退 2D。切片阶段: 面板/小地图等不进 3D 分支
+    // M6-HD2D: 3D 表现层分支 (--hd2d) — 世界层走 3D 渲染器, HUD/overlay 走 2D 桥
+    // (方案一: 3D 世界 + 屏幕空间 UI)。逻辑层零改动; 初始化失败自动回退 2D
     if (g_hd2d_mode) {
         auto& hd2d = HD2DRenderer::inst();
         if (hd2d.ensure_init(sw, sh)) {
             hd2d.render_frame(*this);
-            _cam_x = saved_cx; _cam_y = saved_cy;   // 恢复无震动的相机 (HUD 用)
-            _ambient.draw_vignette(sw, sh);
-            _renderer.draw_hud(player.get(), current_floor, game_time,
-                               _get_boss(), _show_relic_panel,
-                               inventory_open, inventory_cursor,
-                               _presentation.room_msg, _presentation.room_msg_timer,
-                               sw, sh, nullptr, -1, 0);
+            _render_hd2d_ui_bridge(sw, sh);   // M6-v2a: HUD + 全 overlay 桥
             return;
         }
         g_hd2d_mode = false;  // 初始化失败: 本次会话回退 2D
     }
-
     _draw_map();
     _draw_ground_items();
     _draw_entities();
@@ -2318,27 +2310,18 @@ void GameScene::_render() {
         }
     }
 
-    // C1: 伤害数字 (世界坐标→屏幕)
-    for (auto& df : _presentation.damage_floats) {
-        // G10.4-B Fix2: alpha 按自身 max_lifetime 计算 (修复暴击 0.85s 溢出隐形 bug)
-        float life_ratio = df.max_lifetime > 0.0f ? df.lifetime / df.max_lifetime : 0.0f;
-        if (life_ratio < 0.0f) life_ratio = 0.0f;
-        float sx = df.x - _cam_x, sy = df.y - _cam_y - (df.max_lifetime - df.lifetime) * 30;
-        unsigned char a = (unsigned char)(df.color.a * life_ratio);
-        Color c = df.color; c.a = a;
-        if (df.label) {
-            // G10: element effect label (缓/冻/毒/暴)
-            GameRenderer::draw_glow_text(df.label, sx, sy, 18, c, true);
-        } else {
-            char buf[16]; snprintf(buf, sizeof(buf), "%d", df.value);
-            // G10.4-B Fix2: 暴击/重击数字 1.6x 字号 (接线 DMG_FLOAT_SCALE_CRIT)
-            float size = (16 + df.value / 10) * (df.max_lifetime > 0.7f
-                ? CombatFeelSystem::DMG_FLOAT_SCALE_CRIT : 1.0f);
-            GameRenderer::draw_glow_text(buf, sx, sy, size, c, true);
-        }
-    }
+    // C1: 伤害数字 (世界坐标→屏幕; M6-v2b 提取共用)
+    _render_damage_floats_2d();
 
     _cam_x = saved_cx; _cam_y = saved_cy;  // 恢复
+
+    // M6-v2a: UI tail extracted to shared method (2D/3D common)
+    _render_ui_tail(sw, sh);
+}
+
+
+// M6-v2a: _render UI tail (2D/3D common) - hitflash/fade/panels/HUD/minimap/dialogue/event/freeze/cinematic
+void GameScene::_render_ui_tail(int sw, int sh) {
 
     // Q4.7: 玩家受击红屏 — 全屏叠加主题 hit_flash_tint (alpha 随计时衰减)
     if (_presentation.hit_flash_timer > 0 && g_font_loaded) {
@@ -2354,57 +2337,9 @@ void GameScene::_render() {
         _renderer.draw_challenge_choice(sw, sh, challenge_choice_cursor);
     }
 
-    // F15.5.1: Build echo mirror panel data
+    // F15.5.1: Build echo mirror panel data (M6-v2a: 提取为共用方法)
     CharacterPanelData echo_panel_data;
-    bool is_echo = (boss_floor == 15 && _boss._behavior_type == "mirror");
-    if (is_echo) {
-        auto* boss = _get_boss();
-        if (boss) {
-            echo_panel_data.name = "ENDING ECHO";
-            echo_panel_data.hp = boss->combat.current_hp;
-            echo_panel_data.max_hp = boss->combat.max_hp;
-            echo_panel_data.atk = boss->combat.get_effective_attack();
-            echo_panel_data.pdef = boss->combat.get_effective_defense(AttackType::PHYSICAL);
-            echo_panel_data.mdef = boss->combat.get_effective_defense(AttackType::MAGICAL);
-            echo_panel_data.mirror_mode = true;
-            // Mirror player skills
-            for (auto& sk : player->skills.active_skills) {
-                SkillDisplay sd;
-                sd.name = sk->name;
-                sd.cooldown_ratio = sk->remaining_cooldown(game_time) / sk->cooldown;
-                sd.ready = sk->can_use(game_time);
-                echo_panel_data.skills.push_back(sd);
-            }
-            // Mirror player buffs with corrupted names
-            for (auto& b : player->active_buffs) {
-                BuffDisplay bd;
-                bd.icon = "?";  // will use _buff_icon mapping
-                if (b.id == "attack_up") { bd.icon = "攻"; bd.label = "Echo Atk"; }
-                else if (b.id == "defense_up") { bd.icon = "防"; bd.label = "腐化防御"; }
-                else if (b.id == "poison" || b.id == "poison2s") { bd.icon = "毒"; bd.label = "腐败毒"; }
-                else if (b.id == "slow") { bd.icon = "缓"; bd.label = "暗影缓"; }
-                else if (b.id == "freeze") { bd.icon = "冻"; bd.label = "黑冰"; }
-                else if (b.id == "bleed") { bd.icon = "血"; bd.label = "暗血"; }
-                else if (b.id == "burn") { bd.icon = "燃"; bd.label = "黑焰"; }
-                else if (b.id == "electrified") { bd.icon = "雷"; bd.label = "暗雷"; }
-                else { bd.icon = "?"; bd.label = b.id; }
-                echo_panel_data.buffs.push_back(bd);
-            }
-            // Phase from MirrorAgent
-            if (_boss._mirror_agent) {
-                echo_panel_data.mirror_phase = _boss._mirror_agent->current_phase();
-                echo_panel_data.sub_label = _boss._mirror_agent->phase_name();
-                // M4e: 在线学习 HUD 数据
-                echo_panel_data.mirror_last_action =
-                    _boss._mirror_agent->last_action();
-                int mb = _boss._mirror_agent->last_bucket();
-                if (mb < 0) mb = 0;   // 观察期未决策 → 展示桶0
-                for (int i = 0; i < 4; i++)
-                    echo_panel_data.mirror_arm_rates[i] =
-                        _boss._mirror_agent->arm_win_rate(mb, i);
-            }
-        }
-    }
+    _build_echo_panel_data(echo_panel_data);
 
     // HUD (委托给 GameRenderer)
     // G11.2: AI 情绪 vignette — 地图之上, HUD 之下 (探索冷色/战斗暖色渐晕)
@@ -2416,7 +2351,7 @@ void GameScene::_render() {
                         _get_boss(), _show_relic_panel,
                         inventory_open, inventory_cursor,
                         _presentation.room_msg, _presentation.room_msg_timer, sw, sh,
-                        is_echo ? &echo_panel_data : nullptr,
+                        echo_panel_data.mirror_mode ? &echo_panel_data : nullptr,
                         ch_wave, _challenge.total_waves());
 
     // Phase 3: Minimap — 右下角常驻面板 (M 键开关)
@@ -2758,7 +2693,6 @@ void GameScene::_render() {
         }
     }
 }
-
 void GameScene::_draw_map() {
     if (game_map) game_map->draw(_cam_x, _cam_y, get_tree()->get_width(), get_tree()->get_height());
 }
@@ -2785,11 +2719,14 @@ void GameScene::_draw_entities() {
     int ptx = ppl.first, pty = ppl.second;
     for (auto& m : monsters) {
         // Phase 1: 实体中心 tile 不可见 → 跳过渲染
+        bool label_visible = true;
         if (game_map) {
             auto [mtx, mty] = game_map->pixel_to_tile(
                 m->entity.rect.x + m->entity.rect.width / 2,
                 m->entity.rect.y + m->entity.rect.height / 2);
             if (!game_map->isVisible(mtx, mty)) continue;
+            // M6-v2d: 墙后名条裁剪 — 玩家→怪无视线则隐藏名条 (本体仍画)
+            label_visible = game_map->has_line_of_sight(ptx, pty, mtx, mty);
         }
         m->draw(_cam_x, _cam_y);
         // F10.2: Weak point glow
@@ -2807,7 +2744,7 @@ void GameScene::_draw_entities() {
         Color nc = m->is_boss ? Color{255,80,40,200}
                  : m->is_elite ? Color{255,180,60,180}
                  : Color{200,200,200,140};
-        if (g_font_loaded && !m->name.empty()) {
+        if (g_font_loaded && !m->name.empty() && label_visible) {
             float tw = MeasureTextEx(g_font_small, m->name.c_str(), 10, 1).x;
             DrawTextEx(g_font_small, m->name.c_str(),
                 {mx - tw/2, my - 4}, 10, 1, nc);
@@ -2888,6 +2825,194 @@ void GameScene::_draw_entities() {
             _draw_interact_hint("E 调查", evx, evy - 30);
         }
     }
+}
+
+// ── C1/M6-v2b: 伤害飘字核心样式 (2D/3D 共用; 坐标由调用方算) ──
+void GameScene::_render_damage_text(
+        const PresentationSystemDirector::DamageFloat& df, float sx, float sy) {
+    float life_ratio = df.max_lifetime > 0.0f ? df.lifetime / df.max_lifetime : 0.0f;
+    if (life_ratio < 0.0f) life_ratio = 0.0f;
+    unsigned char a = (unsigned char)(df.color.a * life_ratio);
+    Color c = df.color; c.a = a;
+    if (df.label) {
+        // G10: element effect label (缓/冻/毒/暴)
+        GameRenderer::draw_glow_text(df.label, sx, sy, 18, c, true);
+    } else {
+        char buf[16]; snprintf(buf, sizeof(buf), "%d", df.value);
+        // G10.4-B Fix2: 暴击/重击数字 1.6x 字号 (接线 DMG_FLOAT_SCALE_CRIT)
+        float size = (16 + df.value / 10) * (df.max_lifetime > 0.7f
+            ? CombatFeelSystem::DMG_FLOAT_SCALE_CRIT : 1.0f);
+        GameRenderer::draw_glow_text(buf, sx, sy, size, c, true);
+    }
+}
+
+// 2D 路径: 世界坐标 - 相机偏移 (含上浮)
+void GameScene::_render_damage_floats_2d() {
+    for (auto& df : _presentation.damage_floats) {
+        float sx = df.x - _cam_x, sy = df.y - _cam_y
+                 - (df.max_lifetime - df.lifetime) * 30;
+        _render_damage_text(df, sx, sy);
+    }
+}
+
+// 3D 路径 (M6-v2b): 世界坐标 → 3D 投影 (含上浮)
+void GameScene::_render_damage_floats_3d() {
+    auto& hd2d = HD2DRenderer::inst();
+    if (!hd2d.is_ready()) return;
+    for (auto& df : _presentation.damage_floats) {
+        float rise = (df.max_lifetime - df.lifetime) * 30;
+        Vector2 s = hd2d.world_to_screen({df.x, 0, df.y}, 30.0f - rise);
+        if (s.x < 0) continue;
+        _render_damage_text(df, s.x, s.y);
+    }
+}
+
+// ── M6-v2a: 3D 分支 UI 桥 — HUD 完整参数 + 全 overlay (方案一: 屏幕空间 UI) ──
+// 对应 2D 分支 _render_ui_tail; 世界坐标类 overlay (伤害飘字/E提示) 在 v2b 投影
+void GameScene::_render_hd2d_ui_bridge(int sw, int sh) {
+    _ambient.draw_vignette(sw, sh);
+    _render_hd2d_world_labels();             // M6-v2a: 怪名条/NPC名/E 气泡 (投影)
+    _render_damage_floats_3d();               // M6-v2b: 伤害飘字 (投影)
+    CharacterPanelData echo_panel_data;
+    _build_echo_panel_data(echo_panel_data);
+    int ch_wave = (_challenge.phase() == ChallengePhase::COMBAT ||
+                   _challenge.phase() == ChallengePhase::WAVE_SPAWNING)
+                  ? _challenge.current_wave() + 1 : -1;
+    _renderer.draw_hud(player.get(), current_floor, game_time,
+                       _get_boss(), _show_relic_panel,
+                       inventory_open, inventory_cursor,
+                       _presentation.room_msg, _presentation.room_msg_timer,
+                       sw, sh,
+                       echo_panel_data.mirror_mode ? &echo_panel_data : nullptr,
+                       ch_wave, _challenge.total_waves());
+    _render_ui_tail(sw, sh);   // 红屏/黑屏/面板/小地图/对话/事件/冻结/演出 全套
+}
+
+// ── M6-v2a: 3D 世界标签 — 怪名/NPC名/E 气泡 (投影到屏幕空间, 2D 同款样式) ──
+// 红线: 只读状态; 投影失败(相机未就绪)静默跳过
+void GameScene::_render_hd2d_world_labels() {
+    _render_hd2d_monster_labels();
+    _render_hd2d_interact_hints();
+}
+
+// 怪物名条 (2D 同款: Boss红/精英金/普通灰)
+void GameScene::_render_hd2d_monster_labels() {
+    auto& hd2d = HD2DRenderer::inst();
+    if (!hd2d.is_ready() || !g_font_loaded) return;
+    for (auto& m : monsters) {
+        if (!m || !m->combat.is_alive || m->name.empty()) continue;
+        int ptx = -99, pty = -99;
+        if (player && game_map) {
+            auto ppl = game_map->pixel_to_tile(
+                player->entity.rect.x + player->entity.rect.width/2,
+                player->entity.rect.y + player->entity.rect.height/2);
+            ptx = ppl.first; pty = ppl.second;
+        }
+        if (game_map) {
+            auto [mtx, mty] = game_map->pixel_to_tile(
+                m->entity.rect.x + m->entity.rect.width / 2,
+                m->entity.rect.y + m->entity.rect.height / 2);
+            if (!game_map->isVisible(mtx, mty)) continue;
+            // M6-v2d: 墙后名条裁剪 (与 2D 名条同条件 — has_line_of_sight)
+            if (!game_map->has_line_of_sight(ptx, pty, mtx, mty)) continue;
+        }
+        Vector3 wpos = {m->entity.rect.x + m->entity.rect.width * 0.5f, 0,
+                        m->entity.rect.y + m->entity.rect.height * 0.5f};
+        Vector2 s = hd2d.world_to_screen(wpos, 58.0f);   // 头顶高度
+        if (s.x < 0) continue;
+        Color nc = m->is_boss ? Color{255,80,40,200}
+                 : m->is_elite ? Color{255,180,60,180}
+                 : Color{200,200,200,140};
+        float tw = MeasureTextEx(g_font_small, m->name.c_str(), 10, 1).x;
+        DrawTextEx(g_font_small, m->name.c_str(), {s.x - tw/2, s.y - 4}, 10, 1, nc);
+    }
+}
+
+// E 交互气泡 (NPC 对话 / 地面物品拾取; 玩家相邻时显示)
+void GameScene::_render_hd2d_interact_hints() {
+    auto& hd2d = HD2DRenderer::inst();
+    if (!hd2d.is_ready() || !g_font_loaded) return;
+    int ptx = -99, pty = -99;
+    if (player && game_map) {
+        auto ppl = game_map->pixel_to_tile(
+            player->entity.rect.x + player->entity.rect.width/2,
+            player->entity.rect.y + player->entity.rect.height/2);
+        ptx = ppl.first; pty = ppl.second;
+    }
+    for (auto& npc : npc_views()) {
+        if (game_map && !game_map->isVisible(npc.tile_x, npc.tile_y)) continue;
+        if (abs(npc.tile_x - ptx) > 1 || abs(npc.tile_y - pty) > 1) continue;
+        Vector2 s = hd2d.world_to_screen(
+            {(float)npc.tile_x * TILE_SIZE + TILE_SIZE * 0.5f, 0,
+             (float)npc.tile_y * TILE_SIZE + TILE_SIZE * 0.5f}, 56.0f);
+        if (s.x >= 0) _draw_interact_hint("E 对话", s.x, s.y - 16);
+    }
+    for (auto& d : ground_items) {
+        if (abs(d.tile_x - ptx) > 1 || abs(d.tile_y - pty) > 1) continue;
+        Vector2 s = hd2d.world_to_screen(
+            {(float)d.tile_x * TILE_SIZE + TILE_SIZE * 0.5f, 0,
+             (float)d.tile_y * TILE_SIZE + TILE_SIZE * 0.5f}, 20.0f);
+        if (s.x >= 0) _draw_interact_hint("E 拾取", s.x, s.y - 4);
+    }
+}
+
+// ── F15.5.1/M6-v2a: Echo 面板数据构建 (2D/3D 共用; 从 _render 提取防复制) ──
+void GameScene::_build_echo_panel_data(CharacterPanelData& echo) const {
+    bool is_echo = (boss_floor == 15 && _boss._behavior_type == "mirror");
+    if (!is_echo) return;
+    auto* boss = _get_boss();
+    if (!boss) return;
+    echo.name = "ENDING ECHO";
+    echo.hp = boss->combat.current_hp;
+    echo.max_hp = boss->combat.max_hp;
+    echo.atk = boss->combat.get_effective_attack();
+    echo.pdef = boss->combat.get_effective_defense(AttackType::PHYSICAL);
+    echo.mdef = boss->combat.get_effective_defense(AttackType::MAGICAL);
+    echo.mirror_mode = true;
+    for (auto& sk : player->skills.active_skills) {
+        SkillDisplay sd;
+        sd.name = sk->name;
+        sd.cooldown_ratio = sk->remaining_cooldown(game_time) / sk->cooldown;
+        sd.ready = sk->can_use(game_time);
+        echo.skills.push_back(sd);
+    }
+    _fill_echo_buffs(echo);
+    if (!_boss._mirror_agent) return;
+    echo.mirror_phase = _boss._mirror_agent->current_phase();
+    echo.sub_label = _boss._mirror_agent->phase_name();
+    echo.mirror_last_action = _boss._mirror_agent->last_action();
+    int mb = _boss._mirror_agent->last_bucket();
+    if (mb < 0) mb = 0;   // 观察期未决策 → 展示桶0
+    for (int i = 0; i < 4; i++)
+        echo.mirror_arm_rates[i] = _boss._mirror_agent->arm_win_rate(mb, i);
+}
+
+// Echo 面板 buff 腐化名映射 (攻/防/毒/缓/冻/血/燃/雷 → 黑化前缀)
+void GameScene::_fill_echo_buffs(CharacterPanelData& echo) const {
+    static const struct { const char* id, *icon, *label; } MAP[] = {
+        {"attack_up", "攻", "Echo Atk"}, {"defense_up", "防", "腐化防御"},
+        {"poison", "毒", "腐败毒"}, {"poison2s", "毒", "腐败毒"},
+        {"slow", "缓", "暗影缓"}, {"freeze", "冻", "黑冰"},
+        {"bleed", "血", "暗血"}, {"burn", "燃", "黑焰"},
+        {"electrified", "雷", "暗雷"},
+    };
+    for (auto& b : player->active_buffs) {
+        BuffDisplay bd;
+        bd.icon = "?"; bd.label = b.id;
+        for (auto& m : MAP)
+            if (b.id == m.id) { bd.icon = m.icon; bd.label = m.label; break; }
+        echo.buffs.push_back(bd);
+    }
+}
+
+// ── M6-HD2D: 3D 表现层只读快照 (rendering3d 只读红线, 不给可变访问) ──
+std::vector<GameScene::NpcView> GameScene::npc_views() const {
+    std::vector<NpcView> out;
+    for (int i = 0; i < _npc_count; i++) {
+        if (_npc_state[i].finished) continue;
+        out.push_back({_npc_tile_x[i], _npc_tile_y[i], false});
+    }
+    return out;
 }
 
 void GameScene::_draw_ground_items() {

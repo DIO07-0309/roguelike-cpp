@@ -17,18 +17,31 @@ struct HD2DDrawItem;
 
 // 一帧的 3D 绘制项 (由 HD2DSceneBuilder 从 GameScene 状态提取)
 struct HD2DDrawItem {
-    enum class Kind { FLOOR_TILE, WALL_BLOCK, ENTITY_BILLBOARD, FX_QUAD };
+    enum class Kind { FLOOR_TILE, WALL_BLOCK, ENTITY_BILLBOARD, FX_QUAD,
+                     PORTAL_RING,                    // M6-v2a: 挑战传送门竖立光环
+                     PROJECTILE_BODY, WARNING_RING, TRAJECTORY_LINE,  // M6-v2b
+                     CONE_FAN, ENTITY_LINK };          // M6-v2b: 扇形/实体连线
     Kind kind = Kind::FLOOR_TILE;
     int tile_x = 0;                 // 世界 tile 坐标 (32px/格)
     int tile_y = 0;
     Vector3 world_pos = {0, 0, 0};  // 3D 位置 (世界坐标直转, y=高度)
-    float size = 32.0f;            // billboard 宽 / tile 边长
-    float height = 32.0f;          // 墙高
+    float size = 32.0f;            // billboard 宽 / tile 边长 / ring 半径
+    float height = 32.0f;          // 墙高 / 门环半径 / line 终点偏移
     Color tint = WHITE;
     Texture2D texture = {};        // billboard/地板贴图 (0 = 纯色)
     Rectangle tex_src = {};        // 贴图源矩形 (帧动画)
     bool flip_x = false;
     float sort_y = 0.0f;           // billboard 深度排序键 (世界 y)
+    bool portal_entry = true;      // PORTAL_RING: 入口(蓝)/返回(绿)
+    // ── M6-v2b: 投射物/预警/轨迹 附加数据 ──
+    Vector3 end_pos = {0, 0, 0};   // TRAJECTORY_LINE 终点
+    bool piercing = false;         // PROJECTILE_BODY: 穿透弹(金光/拖尾加长)
+    int element = 0;               // PROJECTILE_BODY: 元素色 (0无/1火/2冰)
+    // ── M6-v2b: Boss 扇形预警 (CONE_FAN) ──
+    float fan_angle = 0.0f;        // 朝向 (弧度; x/z 平面)
+    float fan_half_deg = 45.0f;    // 半角 (度)
+    bool is_lava = false;          // M6-v2c: FLOOR_TILE 为 LAVA → 岩浆 shader
+    Vector2 trail_dir = {0, 0};   // M6-v2d: PROJECTILE_BODY 速度向量 px/s (拖尾)
 };
 
 // 单房间切片: 960x640 目标 → 3D 透视相机 + 地形 + billboard
@@ -44,6 +57,10 @@ public:
     // 主入口: 用 GameScene 状态构建绘制列表并渲染一帧
     // (内部: clear → 相机 → 场景构建 → 绘制 → 后处理回 2D target)
     void render_frame(GameScene& gs);
+
+    // M6-v2a: 世界坐标 → 屏幕坐标投影 (名字标签/E 气泡等屏幕空间 UI 用;
+    // 相机每帧 render_frame 后有效; 投影失败返回 {-1,-1})
+    Vector2 world_to_screen(Vector3 world_pos, float y_offset = 0.0f) const;
 
 private:
     HD2DRenderer() = default;
@@ -61,12 +78,37 @@ private:
     // 切片内简单光照 (无 shader 依赖版: 环境光 + 方向光)
     Vector3 _light_dir = {0.35f, -1.0f, 0.25f};
 
+    // ── M6-v2c: 地形 shader (距离雾/岩浆) + blob shadow 纹理 ──
+    Shader _fog_shader = {};        // 地形距离雾 (失败→回退默认管线)
+    Shader _lava_shader = {};       // 岩浆动画 (失败→回退纯色 tile)
+    bool _fog_ok = false;
+    bool _lava_ok = false;
+    Texture2D _blob_shadow_tex = {};// 径向渐变阴影贴图 (billboard 脚下)
+    int _lava_time_loc = -1;        // 岩浆 uTime uniform 位置缓存
+    int _fog_viewpos_loc = -1;      // 雾 viewPos uniform 位置缓存
+    int _fog_color_loc = -1;
+    int _fog_start_loc = -1;
+    int _fog_end_loc = -1;
+
     void _setup_camera();
+    void _load_terrain_shaders();   // v2c: 雾/岩浆 shader 懒加载+缓存 loc
+    void _make_blob_shadow_tex();   // v2c: 径向渐变程序纹理
     void _draw_scene(GameScene& gs);
+    void _draw_terrain_pass();      // v2c: 地形批 (雾 shader 包裹/岩浆分流)
     void _draw_floor_tile(const HD2DDrawItem& item);
     void _draw_wall_block(const HD2DDrawItem& item);
+    void _wall_quad(float u0, float u1, float v0, float v1,
+                    Vector3 pos, float e, float h);   // M6-v2a: 墙体贴图侧面
     void _draw_billboard(const HD2DDrawItem& item);
+    void _draw_blob_shadow(Vector3 pos, float w);   // M6-v2c: 接地阴影
     void _draw_fx_quad(const HD2DDrawItem& item);
+    void _draw_portal_ring(const HD2DDrawItem& item);   // M6-v2a: 挑战传送门
+    void _draw_projectile_body(const HD2DDrawItem& item);  // M6-v2b
+    void _draw_projectile_trail(const HD2DDrawItem& item, Color c);  // M6-v2d
+    void _draw_warning_ring(const HD2DDrawItem& item);     // M6-v2b: 贴地预警/射程环
+    void _draw_trajectory_line(const HD2DDrawItem& item);  // M6-v2b
+    void _draw_cone_fan(const HD2DDrawItem& item);          // M6-v2b: Boss 扇形预警
+    void _draw_entity_link(const HD2DDrawItem& item);       // M6-v2b: 实体连线
     void _apply_post_processing(GameScene& gs);
 
     HD2DRenderer(const HD2DRenderer&) = delete;
