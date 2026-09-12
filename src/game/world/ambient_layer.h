@@ -38,6 +38,9 @@ public:
     void draw(float cam_x, float cam_y, int sw, int sh) const;
     // vignette 独立绘制 (地图之上, HUD 之下)
     void draw_vignette(int sw, int sh) const;
+    // M6-v2e: 粒子只读视图 (3D 渲染层直接画小 billboard; 无副本)
+    const std::vector<AmbientParticle>& particles() const { return _particles; }
+    const AmbientCfg& config() const { return _cfg; }
 
 private:
     void _spawn_one(AmbientParticle& p, int map_w, int map_h) const;

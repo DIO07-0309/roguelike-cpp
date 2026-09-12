@@ -2198,6 +2198,7 @@ void GameScene::_render() {
     if (g_hd2d_mode) {
         auto& hd2d = HD2DRenderer::inst();
         if (hd2d.ensure_init(sw, sh)) {
+            hd2d.set_camera_shake(shake_ox, shake_oy);  // M6-v2e: 3D shake
             hd2d.render_frame(*this);
             _render_hd2d_ui_bridge(sw, sh);   // M6-v2a: HUD + 全 overlay 桥
             return;

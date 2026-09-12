@@ -112,6 +112,9 @@ public:
     // G10.8-B4: 首次提示转发 (first_hint.h 使用; 简单转给 show_message)
     void show_hint(const char* msg, float duration = 4.5f);
 
+    // M6-v2e: 氛围层只读视图 (3D 渲染层画粒子 billboard 用)
+    const AmbientLayer& ambient_layer() const { return _ambient; }
+
     // 核心数据
     std::unique_ptr<Player> player;
     std::shared_ptr<GameMap> game_map;

@@ -91,9 +91,28 @@ src/game/rendering3d/
   只读; 越界按挡视线保守处理) — **2D/3D 名条同条件**加玩家→怪视线判定,
   墙后名条不再穿透显示 (怪本体绘制不受影响; 仅 isVisible 层为原语义)
 
-## v2 剩余路线 (v2e 候选)
+## v2e 已实现 (2026-09-12, shadow map + 点光源 + 打磨)
 
-Shadow map (硬阴影, 深度 RT 双 pass)、DOF、HD2D 描边
+- **Shadow map**: `hd2d_shadow_caster` 新模块 — rlgl 原语 depth-only fbo
+  (480x320, rlLoadFramebuffer+rlLoadTextureDepth+rlFramebufferAttach);
+  45° 方向光正交投影 (跟相机焦点), 只画墙 (billboard 实体走 blob 回退,
+  alpha 几何全投影不进深度 pass); 地形 shader `sample_shadow` PCF 3x3
+  软化 + 环境光 45% 保底; shadow map 成功时 blob alpha 减半
+- **点光源**: 地形 shader uniform 数组 (上限 8) — LAVA tile 自发光暖橙
+  (半径 3 tile, 上限 7) + 玩家随身火把感暖光; 只读 _draw_items 收集
+- **3D 相机 shake**: 2D shake_offset 同源值 → camera focus 偏移
+  (set_camera_shake 注入, render_frame 消费后清零)
+- **氛围粒子 3D 化**: AMBIENT_MOTE — AmbientLayer::particles() 只读视图
+  → additive 微光球 (life 渐隐; 火山余烬/深渊幽光/监狱尘埃的 3D 对应)
+- **修复 (systematic-debugging 结案)**: render_depth 曾恢复绑定到
+  FBO 0 (屏幕) 而非 scene_tree 主 RT → 主场景画到屏幕 FBO 被 blit
+  丢弃 (全屏 (2,2,5) 近黑); 根因 = raylib 5.0 无当前 FBO 查询 API,
+  恢复目标需 caller 注入 (render_frame 传 main_target().id)
+
+## v2 剩余路线
+
+(评估中 — v2f 候选: shadow map 实体投影 / 岩浆点光密度提升 /
+HD2D 描边重评估)
 
 ## 已知限制 (v2d 后)
 

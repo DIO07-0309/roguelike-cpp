@@ -20,7 +20,8 @@ struct HD2DDrawItem {
     enum class Kind { FLOOR_TILE, WALL_BLOCK, ENTITY_BILLBOARD, FX_QUAD,
                      PORTAL_RING,                    // M6-v2a: 挑战传送门竖立光环
                      PROJECTILE_BODY, WARNING_RING, TRAJECTORY_LINE,  // M6-v2b
-                     CONE_FAN, ENTITY_LINK };          // M6-v2b: 扇形/实体连线
+                     CONE_FAN, ENTITY_LINK,          // M6-v2b: 扇形/实体连线
+                     AMBIENT_MOTE };                 // M6-v2e: 氛围粒子微光点
     Kind kind = Kind::FLOOR_TILE;
     int tile_x = 0;                 // 世界 tile 坐标 (32px/格)
     int tile_y = 0;
@@ -62,6 +63,12 @@ public:
     // 相机每帧 render_frame 后有效; 投影失败返回 {-1,-1})
     Vector2 world_to_screen(Vector3 world_pos, float y_offset = 0.0f) const;
 
+    // M6-v2e: 3D 相机 shake (2D shake_offset 同源值; x/y 世界偏移,
+    // render_frame 消费后自动清零)
+    void set_camera_shake(float offset_x, float offset_y) {
+        _shake_offset = {offset_x, 0.0f, offset_y};
+    }
+
 private:
     HD2DRenderer() = default;
     bool _ready = false;
@@ -70,6 +77,7 @@ private:
 
     Camera3D _camera = {};
     Vector3 _camera_focus = {0, 0, 0};
+    Vector3 _shake_offset = {0, 0, 0};  // M6-v2e: 3D 相机 shake (帧内消费)
     float _camera_yaw = 0.0f;       // 观察朝向 (切片固定 45° 俯角)
 
     // 场景数据缓存
@@ -79,20 +87,34 @@ private:
     Vector3 _light_dir = {0.35f, -1.0f, 0.25f};
 
     // ── M6-v2c: 地形 shader (距离雾/岩浆) + blob shadow 纹理 ──
-    Shader _fog_shader = {};        // 地形距离雾 (失败→回退默认管线)
+    Shader _fog_shader = {};        // 地形 shader (雾+阴影+点光; 失败→回退默认)
     Shader _lava_shader = {};       // 岩浆动画 (失败→回退纯色 tile)
     bool _fog_ok = false;
     bool _lava_ok = false;
     Texture2D _blob_shadow_tex = {};// 径向渐变阴影贴图 (billboard 脚下)
     int _lava_time_loc = -1;        // 岩浆 uTime uniform 位置缓存
-    int _fog_viewpos_loc = -1;      // 雾 viewPos uniform 位置缓存
+    int _fog_viewpos_loc = -1;      // 雾 uniforms 位置缓存
     int _fog_color_loc = -1;
     int _fog_start_loc = -1;
     int _fog_end_loc = -1;
+    // ── M6-v2e: 阴影/点光 uniforms (地形 shader) ──
+    int _shadow_map_loc = -1;        // shadowMap sampler
+    int _shadow_mvp_loc = -1;        // lightViewProj
+    int _shadow_on_loc = -1;         // shadowEnabled
+    int _shadow_texel_loc = -1;      // shadowTexel (PCF 步长)
+    int _shadow_bias_loc = -1;       // shadowBias
+    int _pl_count_loc = -1;          // 点光源 count
+    int _pl_pos_loc = -1;            // 点光源 pos[8]
+    int _pl_color_loc = -1;           // 点光源 color[8]
+    int _pl_range_loc = -1;          // 点光源 range[8]
 
     void _setup_camera();
     void _load_terrain_shaders();   // v2c: 雾/岩浆 shader 懒加载+缓存 loc
+    void _cache_v2e_uniform_locs(); // v2e: 阴影/点光 uniform 位置
     void _make_blob_shadow_tex();   // v2c: 径向渐变程序纹理
+    void _upload_fog_uniforms();    // v2c: 视点+雾色 → 地形 shader
+    void _upload_shadow_uniforms(); // v2e: 光矩阵/深度纹理/参数 → 地形 shader
+    void _upload_point_lights();    // v2e: LAVA tile+玩家暖光 → uniform
     void _draw_scene(GameScene& gs);
     void _draw_terrain_pass();      // v2c: 地形批 (雾 shader 包裹/岩浆分流)
     void _draw_floor_tile(const HD2DDrawItem& item);
@@ -109,6 +131,7 @@ private:
     void _draw_trajectory_line(const HD2DDrawItem& item);  // M6-v2b
     void _draw_cone_fan(const HD2DDrawItem& item);          // M6-v2b: Boss 扇形预警
     void _draw_entity_link(const HD2DDrawItem& item);       // M6-v2b: 实体连线
+    void _draw_ambient_mote(const HD2DDrawItem& item);     // M6-v2e: 氛围粒子
     void _apply_post_processing(GameScene& gs);
 
     HD2DRenderer(const HD2DRenderer&) = delete;

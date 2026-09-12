@@ -465,6 +465,26 @@ static void _build_monster_overlays(GameScene& gs, std::vector<HD2DDrawItem>& ou
     }
 }
 
+// ── M6-v2e: 氛围粒子 → 微光点 (2D _ambient.draw 同源; 只读翻译) ──
+// 粒子 y 语义: 世界像素 y 直接映射 3D z; 高度 = 粒子 y 的 3D 浮动
+// (rise 粒子上飘 = 视觉高度渐变; 用 life 比例近似)
+static void _build_ambient(GameScene& gs, std::vector<HD2DDrawItem>& out) {
+    const auto& ambient = gs.ambient_layer();
+    const auto& cfg = ambient.config();
+    for (const auto& p : ambient.particles()) {
+        if (p.life <= 0.0f) continue;
+        HD2DDrawItem item;
+        item.kind = HD2DDrawItem::Kind::AMBIENT_MOTE;
+        item.world_pos = {p.x, 8.0f + 40.0f * (1.0f - p.life / p.max_life),
+                          p.y};
+        item.size = p.size * 2.0f;               // 半径→直径感
+        item.tint = cfg.color;
+        item.tint.a = p.alpha;
+        item.height = p.life / p.max_life;       // 渐隐比例
+        out.push_back(item);
+    }
+}
+
 void build_scene(GameScene& gs, std::vector<HD2DDrawItem>& out_items) {
     _build_terrain(gs, out_items);
     _build_entities(gs, out_items);
@@ -477,6 +497,7 @@ void build_scene(GameScene& gs, std::vector<HD2DDrawItem>& out_items) {
     _build_boss_skill_warnings(gs, out_items);  // M6-v2b
     _build_danger_zones(gs, out_items);         // M6-v2b
     _build_monster_overlays(gs, out_items);     // M6-v2b
+    _build_ambient(gs, out_items);              // M6-v2e
 }
 
 } // namespace hd2d

@@ -4,6 +4,7 @@
 #include "hd2d_scene_builder.h"
 #include "hd2d_shader_bank.h"               // M6-v2c: GLSL 加载
 #include "hd2d_post_fx.h"                   // M6-v2c: bloom 链
+#include "hd2d_shadow_caster.h"             // M6-v2e: 光空间深度 RT
 #include "core/logger.h"                    // P1-C9: 3D 激活日志
 #include "rlgl.h"                           // M6-v2a: rl 原语 (贴图地板/墙)
 #include "core/scene_tree.h"                // M6-v2c: main_target (bloom 源)
@@ -56,11 +57,96 @@ void HD2DRenderer::_load_terrain_shaders() {
                        SHADER_UNIFORM_FLOAT);
         SetShaderValue(_fog_shader, _fog_end_loc, &fog_end,
                        SHADER_UNIFORM_FLOAT);
+        _cache_v2e_uniform_locs();
     }
     _lava_shader = bank.load("hd2d_lava", "hd2d_world");
     _lava_ok = _lava_shader.id > 0;
     if (_lava_ok)
         _lava_time_loc = GetShaderLocation(_lava_shader, "uTime");
+}
+
+// ── M6-v2e: 阴影/点光 uniform 位置缓存 (地形 shader 一次) ──
+void HD2DRenderer::_cache_v2e_uniform_locs() {
+    _shadow_map_loc = GetShaderLocation(_fog_shader, "shadowMap");
+    _shadow_mvp_loc = GetShaderLocation(_fog_shader, "lightViewProj");
+    _shadow_on_loc = GetShaderLocation(_fog_shader, "shadowEnabled");
+    _shadow_texel_loc = GetShaderLocation(_fog_shader, "shadowTexel");
+    _shadow_bias_loc = GetShaderLocation(_fog_shader, "shadowBias");
+    _pl_count_loc = GetShaderLocation(_fog_shader, "pointLightCount");
+    _pl_pos_loc = GetShaderLocation(_fog_shader, "pointLightPos");
+    _pl_color_loc = GetShaderLocation(_fog_shader, "pointLightColor");
+    _pl_range_loc = GetShaderLocation(_fog_shader, "pointLightRange");
+}
+
+// ── M6-v2c: 雾 uniforms 上传 (视点距离 smoothstep + 常量雾色) ──
+void HD2DRenderer::_upload_fog_uniforms() {
+    Vector3 view_pos = _camera.position;
+    SetShaderValue(_fog_shader, _fog_viewpos_loc, &view_pos,
+                   SHADER_UNIFORM_VEC3);
+    Vector4 fog_color = {12.0f / 255.0f, 14.0f / 255.0f, 24.0f / 255.0f, 1.0f};
+    SetShaderValue(_fog_shader, _fog_color_loc, &fog_color,
+                   SHADER_UNIFORM_VEC4);
+    _upload_shadow_uniforms();                     // v2e: 阴影
+    _upload_point_lights();                         // v2e: 点光源 (LAVA+玩家)
+}
+
+// ── M6-v2e: 阴影 uniforms 上传 (每帧; 深度纹理包装 Texture2D 走标准 API) ──
+void HD2DRenderer::_upload_shadow_uniforms() {
+    auto& shadow = HD2DShadowCaster::inst();
+    bool active = shadow.is_ready() && _shadow_map_loc >= 0;
+    float enabled = active ? 1.0f : 0.0f;
+    SetShaderValue(_fog_shader, _shadow_on_loc, &enabled,
+                   SHADER_UNIFORM_FLOAT);
+    if (!active) return;
+    // raylib 5.0: proj*view = lightViewProj (raymath row-major, shader 内
+    // mat4 列主序 — SetShaderValueMatrix 内部已做转置适配)
+    Matrix light_vp = MatrixMultiply(shadow.light_proj(), shadow.light_view());
+    SetShaderValueMatrix(_fog_shader, _shadow_mvp_loc, light_vp);
+    float texel = shadow.depth_texel();             // 1/depth 尺寸 (PCF 步长)
+    SetShaderValue(_fog_shader, _shadow_texel_loc, &texel,
+                   SHADER_UNIFORM_FLOAT);
+    float bias = shadow.texel_world_size() * 1.5f;  // 世界 texel → 深度补偿
+    SetShaderValue(_fog_shader, _shadow_bias_loc, &bias,
+                   SHADER_UNIFORM_FLOAT);
+    // 深度纹理 (rlgl 裸 id) 包装 Texture2D POD → SetShaderValueTexture
+    Texture2D depth_tex_pod = {};
+    depth_tex_pod.id = shadow.depth_tex_id();
+    depth_tex_pod.width = shadow.map_width();
+    depth_tex_pod.height = shadow.map_height();
+    depth_tex_pod.mipmaps = 1;
+    SetShaderValueTexture(_fog_shader, _shadow_map_loc, depth_tex_pod);
+}
+
+// ── M6-v2e: 点光源收集上传 (LAVA tile + 玩家暖光; 只读 _draw_items) ──
+void HD2DRenderer::_upload_point_lights() {
+    if (_pl_count_loc < 0) return;
+    Vector3 positions[8];
+    Vector3 colors[8];
+    float ranges[8];
+    int count = 0;
+    // LAVA tile: 自发光暖橙 (半径 3 tile; 每帧最多 7 个, 留 1 给玩家)
+    for (const auto& item : _draw_items) {
+        if (count >= 7) break;
+        if (item.kind == HD2DDrawItem::Kind::FLOOR_TILE && item.is_lava
+            && item.texture.id == 0) {
+            positions[count] = {item.world_pos.x, 6.0f, item.world_pos.z};
+            colors[count] = {0.55f, 0.22f, 0.06f};
+            ranges[count] = TILE_SIZE * 3.0f;
+            count++;
+        }
+    }
+    // 玩家随身暖光 (火把感; _camera_focus 即玩家世界 x/z)
+    positions[count] = {_camera_focus.x, 14.0f, _camera_focus.z};
+    colors[count] = {0.16f, 0.12f, 0.07f};
+    ranges[count] = TILE_SIZE * 2.5f;
+    count++;
+    SetShaderValue(_fog_shader, _pl_count_loc, &count, SHADER_UNIFORM_INT);
+    SetShaderValueV(_fog_shader, _pl_pos_loc, positions,
+                    SHADER_UNIFORM_VEC3, count);
+    SetShaderValueV(_fog_shader, _pl_color_loc, colors,
+                    SHADER_UNIFORM_VEC3, count);
+    SetShaderValueV(_fog_shader, _pl_range_loc, ranges,
+                    SHADER_UNIFORM_FLOAT, count);
 }
 
 // ── M6-v2c: blob shadow 程序纹理 — 64x64 径向渐变 (中心黑→边透明) ──
@@ -89,11 +175,25 @@ void HD2DRenderer::render_frame(GameScene& gs) {
     _draw_items.clear();
     hd2d::build_scene(gs, _draw_items);
 
-    // 2. 相机聚焦玩家世界坐标
+    // 2. 相机聚焦玩家世界坐标 (+ M6-v2e: shake 偏移, 帧内消费)
     _camera_focus = {0, 0, 0};
     if (gs.player) {
         _camera_focus.x = gs.player->entity.rect.x;
         _camera_focus.z = gs.player->entity.rect.y;
+    }
+    _camera_focus.x += _shake_offset.x;
+    _camera_focus.z += _shake_offset.z;
+    _shake_offset = {0, 0, 0};
+    // M6-v2e: 光空间深度 pass (墙投影; 失败时主 pass 走 blob 回退)
+    // outer_fbo = scene_tree 主 RT (EndTextureMode 盲绑 FBO 0 的同源坑:
+    // 深度 pass 后必须恢复主 RT 绑定, 否则主场景画到屏幕 FBO 上丢失)
+    {
+        auto& shadow = HD2DShadowCaster::inst();
+        auto* tree = gs.get_tree();
+        if (shadow.ensure_init(_target_w, _target_h) && tree) {
+            shadow.update_light_camera(_camera_focus);
+            shadow.render_depth(gs, _draw_items, tree->main_target().id);
+        }
     }
     _draw_scene(gs);
     _apply_post_processing(gs);
@@ -131,7 +231,19 @@ void HD2DRenderer::_draw_scene(GameScene& gs) {
         if (item.kind == HD2DDrawItem::Kind::PROJECTILE_BODY) _draw_projectile_body(item);
     for (const auto& item : _draw_items)
         if (item.kind == HD2DDrawItem::Kind::FX_QUAD) _draw_fx_quad(item);
+    for (const auto& item : _draw_items)
+        if (item.kind == HD2DDrawItem::Kind::AMBIENT_MOTE)
+            _draw_ambient_mote(item);                 // M6-v2e
     EndMode3D();
+}
+
+// ── M6-v2e: 氛围粒子微光点 — additive 小球 (2D 灰尘/余烬/幽光的 3D 对应) ──
+void HD2DRenderer::_draw_ambient_mote(const HD2DDrawItem& item) {
+    Color c = item.tint;
+    c.a = (unsigned char)(c.a * item.height);      // life 渐隐
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawSphere(item.world_pos, item.size * 0.5f, c);
+    EndBlendMode();
 }
 
 // ── M6-v2c: 地形批 — 两遍分区 (lava 一遍 / 其余一遍), 每帧仅 2 次 shader 切换 ──
@@ -160,12 +272,7 @@ void HD2DRenderer::_draw_terrain_pass() {
     }
     // Pass 2: 其余地形 (雾管线或默认)
     if (_fog_ok) {
-        Vector3 view_pos = _camera.position;
-        SetShaderValue(_fog_shader, _fog_viewpos_loc, &view_pos,
-                       SHADER_UNIFORM_VEC3);
-        Vector4 fog_color = {12.0f / 255.0f, 14.0f / 255.0f, 24.0f / 255.0f, 1.0f};
-        SetShaderValue(_fog_shader, _fog_color_loc, &fog_color,
-                       SHADER_UNIFORM_VEC4);
+        _upload_fog_uniforms();
         BeginShaderMode(_fog_shader);
     }
     for (const auto& item : _draw_items) {
@@ -297,6 +404,7 @@ void HD2DRenderer::_draw_billboard(const HD2DDrawItem& item) {
 }
 
 // ── M6-v2c: blob shadow — 径向渐变纹理贴地 quad (失败回退黑扁片) ──
+// v2e: shadow map 激活时 alpha 减半 (墙投影已在, blob 只补接地感)
 void HD2DRenderer::_draw_blob_shadow(Vector3 pos, float w) {
     if (_blob_shadow_tex.id <= 0) {
         DrawCube({pos.x, 0.05f, pos.z}, w * 0.55f, 0.08f, w * 0.35f,
@@ -304,9 +412,11 @@ void HD2DRenderer::_draw_blob_shadow(Vector3 pos, float w) {
         return;
     }
     float half_x = w * 0.31f, half_z = w * 0.21f;   // 椭圆约 0.62w x 0.42w
+    bool terrain_shadow = HD2DShadowCaster::inst().is_ready();
+    unsigned char alpha = terrain_shadow ? 60 : 120;
     rlSetTexture(_blob_shadow_tex.id);
     rlBegin(RL_QUADS);
-    rlColor4ub(255, 255, 255, 120);
+    rlColor4ub(255, 255, 255, alpha);
     rlNormal3f(0, 1, 0);
     rlTexCoord2f(0, 0); rlVertex3f(pos.x - half_x, 0.06f, pos.z - half_z);
     rlTexCoord2f(1, 0); rlVertex3f(pos.x + half_x, 0.06f, pos.z - half_z);

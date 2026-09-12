@@ -1,3 +1,27 @@
+# v1.4.23 — M6-v2e 完成: Shadow map + 点光源 + 打磨 (2026-09-12)
+
+> v2e 合体方案落地。HD2D 风格核心拼图: 方向光阴影 + 岩浆/火把点光。
+> 附带 3D 相机 shake 接线 + 氛围粒子 3D 化。修复深度 pass FBO 恢复 bug。
+>
+> ## 渲染 (rendering3d)
+> - **Shadow map**: hd2d_shadow_caster 新模块 — rlgl 原语 depth-only
+>   fbo (480x320); 45° 方向光正交投影跟相机; 墙几何深度 pass;
+>   地形 shader PCF 3x3 软化 + 环境光 45% 保底; blob shadow 在
+>   shadow map 激活时 alpha 减半 (接地感保留)
+> - **点光源**: LAVA tile 暖橙自发光 (半径 3 tile × 7) + 玩家火把暖光;
+>   距离平方衰减; shader uniform 数组只读收集, 逻辑层零改动
+> - **3D 相机 shake**: set_camera_shake 注入 (2D shake_offset 同源,
+>   RNG 红线语义保留 — 独立视觉流)
+> - **氛围粒子 3D 化**: AMBIENT_MOTE additive 微光球 (AmbientLayer
+>   particles() 只读视图; 火山余烬/深渊幽光 3D 对应)
+> - **修复**: render_depth FBO 恢复 bug — 曾绑回 FBO 0 (屏幕) 而非
+>   scene_tree 主 RT, 主场景被 blit 丢弃 (截图全屏近黑;
+>   DEBUG 常量色 shader 分层隔离定位, caller 注入 outer_fbo 结案)
+>
+> 验证: 60/60 ctest + validator 0 err + sim 12×2 零分岔 + --hd2d
+> 实机键链 (shader/shadow RT 全加载) + 像素分布回归正常
+> (avg 57,62,75 / 纯黑 0.2%, 修复前全屏 (2,2,5))。
+
 # v1.4.22 — M6-v2d 完成: 战斗反馈打磨 (拖尾 + 名条遮挡) (2026-09-12)
 
 > v2d 小步打磨。3D 投射物拖尾 + 2D/3D 同条件名条视线裁剪。
