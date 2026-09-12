@@ -14,7 +14,7 @@ Prerequisites:
 
 Steps (MSVC):
   1. Open "Developer Command Prompt for VS 2022"
-  2. cd C:\Users\HP\Desktop\Roguelike-CPP版
+  2. cd C:\Users\HP\Desktop\Roguelike-CPP-3D版
   3. cmake -B build -G "Visual Studio 17 2022"
   4. cmake --build build --config Release
   5. copy build\Release\roguelike_cpp.exe .

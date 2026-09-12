@@ -16,4 +16,4 @@
 
 - 构建: `cmake --build build --config Release`；测试: `ctest --test-dir build -C Release`（当前 53 用例）
 - 提交习惯: Conventional Commits（feat/fix/docs），CHANGELOG 按版本记录
-- 同步: 提交后 push `origin/master`，并同步桌面版 `C:\Users\HP\Desktop\Roguelike-CPP版`
+- 同步: 提交后 push `origin/master`，并同步桌面开发测试包 `C:\Users\HP\Desktop\Roguelike-CPP-3D版`（初代版已冻结，禁止改动）
