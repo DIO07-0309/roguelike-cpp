@@ -220,10 +220,33 @@ Texture2D ResourceManager::load_texture(const char* path) {
 }
 
 Texture2D ResourceManager::procedural_tile(const char* key, Color base,
-                                           bool wall) {
+                                            bool wall) {
     auto it = _texture_cache.find(key);
     if (it != _texture_cache.end()) return it->second;
     Texture2D tex = SpriteRenderer::gen_pixel_tile(base, wall);
+    _texture_cache[key] = tex;
+    return tex;
+}
+
+// M6-i: 群系风格化程序材质 (风格分歧在 SpriteRenderer; 这里只做缓存)
+Texture2D ResourceManager::procedural_biome_tile(const char* key, Color base,
+                                                 Color accent, int style,
+                                                 bool wall) {
+    auto it = _texture_cache.find(key);
+    if (it != _texture_cache.end()) return it->second;
+    auto s = (SpriteRenderer::BiomeStyle)style;
+    Texture2D tex = SpriteRenderer::gen_biome_tile(base, accent, base, s, wall);
+    _texture_cache[key] = tex;
+    return tex;
+}
+
+// M6-j: 地板装饰片缓存
+Texture2D ResourceManager::procedural_floor_decal(const char* key, int kind,
+                                                  Color primary,
+                                                  Color secondary) {
+    auto it = _texture_cache.find(key);
+    if (it != _texture_cache.end()) return it->second;
+    Texture2D tex = SpriteRenderer::gen_floor_decal(kind, primary, secondary);
     _texture_cache[key] = tex;
     return tex;
 }

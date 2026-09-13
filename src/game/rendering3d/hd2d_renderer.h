@@ -22,7 +22,8 @@ struct HD2DDrawItem {
                      PROJECTILE_BODY, WARNING_RING, TRAJECTORY_LINE,  // M6-v2b
                      CONE_FAN, ENTITY_LINK,          // M6-v2b: 扇形/实体连线
                      AMBIENT_MOTE,                   // M6-v2e: 氛围粒子微光点
-                     DOOR_PANEL, ROOM_ICON };        // M6-v2h: 门/特殊房间图标
+                     DOOR_PANEL, ROOM_ICON,         // M6-v2h: 门/特殊房间图标
+                     FLOOR_DECAL };                  // M6-j: 地板装饰贴片
     Kind kind = Kind::FLOOR_TILE;
     int tile_x = 0;                 // 世界 tile 坐标 (32px/格)
     int tile_y = 0;
@@ -130,6 +131,7 @@ private:
     void _draw_door_panel(const HD2DDrawItem& item);    // M6-v2h: 门 (四态)
     void _draw_lock_badge(Vector3 pos, float door_h);  // M6-v2h: 锁徽记
     void _draw_room_icon(const HD2DDrawItem& item);     // M6-v2h: 房间图标
+    void _draw_floor_decal(const HD2DDrawItem& item);   // M6-j: 地板装饰
     void _draw_projectile_body(const HD2DDrawItem& item);  // M6-v2b
     void _draw_projectile_trail(const HD2DDrawItem& item, Color c);  // M6-v2d
     void _draw_warning_ring(const HD2DDrawItem& item);     // M6-v2b: 贴地预警/射程环

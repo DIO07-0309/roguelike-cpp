@@ -118,6 +118,147 @@ Texture2D SpriteRenderer::gen_pixel_tile(Color base, bool wall) {
     return tex;
 }
 
+// ═══════════════ M6-i: 群系风格化程序材质 (per-biome 画法分歧) ═══════════════
+
+// 监狱: 湿石砖 — 大块石板缝 + 底部水渍 + 零星苔斑 (accent=青苔色)
+static void _biome_prison(Image* img, Color base, Color accent, bool wall) {
+    Color joint = _dim(base, 0.45f);
+    if (wall) {
+        _draw_wall_3d(img, base);                    // 伪3D 亮顶/暗面骨架
+        for (int x = 0; x < 32; x++)                 // 面上不规则石板缝
+            for (int y = 13; y < 31; y++)
+                if ((x + y * 3) % 13 == 0)
+                    ImageDrawPixel(img, x, y, joint);
+    } else {
+        _draw_floor_details(img, base);             // 基础接缝
+        for (int i = 0; i < 5; i++)                  // 湿渍块 (半透明深斑)
+            ImageDrawRectangle(img, 2 + i * 6, 20 + (i % 3) * 4, 4, 3,
+                                _dim(base, 0.72f));
+    }
+    // 零星苔斑 (accent; 视觉确定性循环覆盖, 不吃 RNG)
+    for (int i = 0; i < 4; i++) {
+        int mx = (i * 9 + 3) % 28, my = (i * 7 + 6) % 26;
+        ImageDrawPixel(img, mx, my, accent);
+        ImageDrawPixel(img, mx + 1, my, _dim(accent, 0.8f));
+    }
+}
+
+// 火山: 玄武岩 — 不规则岩块分割 + 熔岩裂纹亮线 (accent=岩浆橙)
+static void _biome_volcano(Image* img, Color base, Color accent, bool wall) {
+    Color dark = _dim(base, 0.5f);
+    if (wall) {
+        _draw_wall_3d(img, base);
+        for (int i = 0; i < 6; i++) {                // 岩块碎裂暗斑
+            int bx = (i * 11 + 5) % 24, by = 13 + (i * 5) % 16;
+            ImageDrawRectangle(img, bx, by, 4, 3, dark);
+        }
+    } else {
+        _draw_floor_details(img, base);
+        for (int i = 0; i < 4; i++)                  // 灰烬浅斑 (提亮)
+            ImageDrawRectangle(img, (i * 8 + 2) % 26, (i * 6 + 4) % 24, 3, 2,
+                                _brighten(base, 26));
+    }
+    // 熔岩裂纹 (accent 亮线, 之字形; 墙面+地板都画)
+    int cy = wall ? 20 : 16;
+    for (int x = 2; x < 30; x++) {
+        int y = cy + ((x / 7) % 2 == 0 ? 0 : 2);
+        ImageDrawPixel(img, x, y, accent);
+        if (x % 9 == 4) ImageDrawPixel(img, x, y + 1, _dim(accent, 0.7f));
+    }
+}
+
+// 深渊: 晶簇 — 竖晶柱亮棱 + 发光符文刻痕 (accent=幽紫光)
+static void _biome_abyss(Image* img, Color base, Color accent, bool wall) {
+    Color bright = _brighten(base, 36);
+    if (wall) {
+        _draw_wall_3d(img, base);
+        for (int i = 0; i < 3; i++) {                // 竖晶柱棱 (高光)
+            int cx = 5 + i * 10;
+            for (int y = 13; y < 31; y++) {
+                ImageDrawPixel(img, cx, y, bright);
+                if (y % 5 == 0) ImageDrawPixel(img, cx + 1, y, _dim(bright, 0.8f));
+            }
+        }
+    } else {
+        _draw_floor_details(img, base);
+        for (int i = 0; i < 3; i++)                  // 地面晶片碎斑
+            ImageDrawRectangle(img, (i * 12 + 4) % 26, (i * 9 + 8) % 24, 2, 3,
+                                bright);
+    }
+    // 发光符文刻痕 (accent; 两道折线符号)
+    for (int i = 0; i < 2; i++) {
+        int rx = 8 + i * 12, ry = wall ? 18 : 12;
+        ImageDrawPixel(img, rx, ry, accent);
+        ImageDrawPixel(img, rx + 1, ry + 2, accent);
+        ImageDrawPixel(img, rx, ry + 4, _dim(accent, 0.75f));
+        ImageDrawPixel(img, rx - 1, ry + 2, _dim(accent, 0.75f));
+    }
+}
+
+Texture2D SpriteRenderer::gen_biome_tile(Color base, Color accent, Color joint_c,
+                                         BiomeStyle style, bool wall) {
+    // 通用回退 = 原画法 (保证既有视觉不回归)
+    if (style == BiomeStyle::GENERIC)
+        return gen_pixel_tile(base, wall);
+    Image img = GenImageColor(32, 32, base);
+    _add_noise(&img, base);
+    switch (style) {
+        case BiomeStyle::PRISON:  _biome_prison(&img, base, accent, wall);  break;
+        case BiomeStyle::VOLCANO: _biome_volcano(&img, base, accent, wall); break;
+        case BiomeStyle::ABYSS:   _biome_abyss(&img, base, accent, wall);   break;
+        default: break;
+    }
+    (void)joint_c;                                  // 预留: 深缝色 (当前用 _dim)
+    Texture2D tex = LoadTextureFromImage(img);
+    UnloadImage(img);
+    return tex;
+}
+
+// ═══════════════ M6-j: 程序化地板装饰片 (确定性 decal) ═══════════════
+
+Texture2D SpriteRenderer::gen_floor_decal(int kind, Color primary,
+                                         Color secondary) {
+    Image img = GenImageColor(32, 32, BLANK);
+    Image* p = &img;
+    switch (kind) {
+        case 0:                                     // 裂缝: 三段折线 (墙缝深色)
+            for (int s = 0; s < 3; s++) {
+                int x0 = 6 + s * 9, y0 = 8 + s * 4;
+                for (int d = 0; d < 9; d++)
+                    ImageDrawPixel(p, x0 + d, y0 + (d % 3) - 1, primary);
+            }
+            ImageDrawPixel(p, 15, 16, secondary);
+            ImageDrawPixel(p, 26, 20, secondary);
+            break;
+        case 1:                                     // 苔藓斑: 3+2+1 团簇
+            ImageDrawCircle(p, 10, 22, 3, primary);
+            ImageDrawCircle(p, 13, 24, 2, primary);
+            ImageDrawCircle(p, 22, 12, 2, primary);
+            ImageDrawPixel(p, 15, 20, secondary);
+            ImageDrawPixel(p, 24, 15, secondary);
+            break;
+        case 2:                                     // 符文: 折线符文 + 中心点
+            for (int s = 0; s < 2; s++) {
+                int x0 = 8 + s * 12, y0 = 8;
+                for (int d = 0; d < 8; d++)
+                    ImageDrawPixel(p, x0 + (d % 3), y0 + d, primary);
+                for (int d = 0; d < 8; d++)
+                    ImageDrawPixel(p, x0 + 3 - (d % 3), y0 + d, primary);
+            }
+            ImageDrawCircle(p, 16, 17, 2, secondary);
+            break;
+        default:                                    // 污渍: 不规则暗斑
+            for (int i = 0; i < 5; i++)
+                ImageDrawRectangle(p, 6 + i * 5, 10 + (i % 4) * 4, 4, 3,
+                                    primary);
+            ImageDrawPixel(p, 20, 20, secondary);
+            break;
+    }
+    Texture2D tex = LoadTextureFromImage(img);
+    UnloadImage(img);
+    return tex;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // M4f.2: 程序化角色占位精灵
 // ═══════════════════════════════════════════════════════════════

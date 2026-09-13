@@ -39,15 +39,25 @@ static Color _tile_color(TileType t, bool visible_now) {
     return base;
 }
 
+// ── M6-i: biome_id → 材质风格映射 (biomes.json 三群系; 未知=通用) ──
+static int _biome_material_style(const GameMap& map) {
+    const char* id = map.biome_id();
+    if (strcmp(id, "forgotten_prison") == 0) return (int)SpriteRenderer::BiomeStyle::PRISON;
+    if (strcmp(id, "ash_volcano") == 0)      return (int)SpriteRenderer::BiomeStyle::VOLCANO;
+    if (strcmp(id, "void_abyss") == 0)       return (int)SpriteRenderer::BiomeStyle::ABYSS;
+    return (int)SpriteRenderer::BiomeStyle::GENERIC;
+}
+
 // ── M6-v2a: 群系 tile 贴图解析 — 复用 2D 同源回退链 ──
 // (群系 wall_<biome> → 通用 wall → 程序化 procedural_tile, 与 GameMap::draw 一致)
+// M6-i: 程序化末端升级为群系风格化材质 (监狱/火山/深渊 各自画法)
 struct TileTexPair {
     Texture2D tex = {};
     SpriteDef def;
 };
 
 static TileTexPair _resolve_tile_tex(const GameMap& map, const char* kind,
-                                     const Color& fallback_color, bool wall) {
+                                      const Color& fallback_color, bool wall) {
     TileTexPair out;
     auto& res = ResourceManager::inst();
     char biome_key[48];
@@ -57,11 +67,24 @@ static TileTexPair _resolve_tile_tex(const GameMap& map, const char* kind,
     out.def = SpriteDef{};
     Texture2D generic = res.sprite_by_key(kind, out.def);
     if (generic.id > 0) { out.tex = generic; return out; }
-    char proc_key[40];
-    snprintf(proc_key, sizeof(proc_key), "%s_%02x%02x%02x",
-             kind, fallback_color.r, fallback_color.g, fallback_color.b);
-    out.tex = res.procedural_tile(proc_key, fallback_color, wall);
-    out.def = SpriteDef{};  // procedural_tile = 整图单帧
+    // M6-i: 群系风格化程序材质 (accent = palette 苔藓/特征色; 未配置回退通用)
+    char proc_key[56];
+    int style = _biome_material_style(map);
+    const auto& pal = map.palette();
+    bool has_pal = map.has_palette();
+    Color accent = has_pal ? pal.wall_moss : fallback_color;
+    if (style != (int)SpriteRenderer::BiomeStyle::GENERIC) {
+        snprintf(proc_key, sizeof(proc_key), "bio%d_%s_%02x%02x%02x",
+                 style, kind, fallback_color.r, fallback_color.g,
+                 fallback_color.b);
+        out.tex = res.procedural_biome_tile(proc_key, fallback_color, accent,
+                                            style, wall);
+    } else {
+        snprintf(proc_key, sizeof(proc_key), "%s_%02x%02x%02x",
+                 kind, fallback_color.r, fallback_color.g, fallback_color.b);
+        out.tex = res.procedural_tile(proc_key, fallback_color, wall);
+    }
+    out.def = SpriteDef{};  // procedural = 整图单帧
     return out;
 }
 
@@ -102,6 +125,40 @@ static const char* _special_room_icon_key(SpecialRoomType type) {
         case SpecialRoomType::SECRET:     return "room_secret";
         default:                          return nullptr;
     }
+}
+
+// ── M6-j: 地板装饰 — 坐标确定性哈希 (2D game_map.draw 同款, 零 RNG) ──
+// tint 变体 (污渍 6% / 石块 4%) + decal 贴片 (7%: 裂缝/苔藓/符文 按群系配色)
+static void _apply_floor_decoration(const GameMap& map, int tx, int ty,
+                                    bool has_pal, const TilePalette& pal,
+                                    Texture2D floor_tex, HD2DDrawItem& item,
+                                    std::vector<HD2DDrawItem>& out) {
+    if (!has_pal || floor_tex.id <= 0) return;      // 程序化地板自带风格化
+    unsigned int h = (unsigned int)tx * 73856093u
+                   ^ (unsigned int)ty * 19349663u;
+    unsigned int variant = (h ^ (h >> 13)) % 100u;
+    if (variant < 6u)        item.tint = pal.floor_dirt;   // 污渍
+    else if (variant < 10u)  item.tint = pal.floor_b;      // 石块变体
+    unsigned int decal_roll = (h ^ (h >> 7)) % 100u;
+    if (decal_roll >= 7u) return;                          // 93% 无装饰
+    // decal 类型 + 群系配色 (2D dh 段同源: 裂缝/苔藓/符文)
+    int kind = (decal_roll < 3u) ? 2 : (decal_roll < 5u) ? 0 : 1;
+    Color primary = pal.floor_joint, secondary = pal.wall_highlight;
+    const char* biome = map.biome_id();
+    if (strcmp(biome, "ash_volcano") == 0)       primary = pal.wall_highlight;
+    else if (strcmp(biome, "void_abyss") == 0)    primary = pal.floor_b;
+    char dkey[56];
+    snprintf(dkey, sizeof(dkey), "decal%d_%02x%02x%02x", kind,
+             primary.r, primary.g, primary.b);
+    HD2DDrawItem decal;
+    decal.kind = HD2DDrawItem::Kind::FLOOR_DECAL;
+    decal.world_pos = {(float)tx * TILE_SIZE + TILE_SIZE * 0.5f, 0,
+                       (float)ty * TILE_SIZE + TILE_SIZE * 0.5f};
+    decal.size = (float)TILE_SIZE;
+    decal.texture = ResourceManager::inst().procedural_floor_decal(
+        dkey, kind, primary, secondary);
+    if (decal.texture.id <= 0) return;
+    out.push_back(decal);
 }
 
 // ── 地形: 玩家周围可见 tile → 地板/墙 item (M6-v2a: 群系贴图接线) ──
@@ -191,6 +248,11 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                     && !map->get_special_room_at(tx, ty))
                     item.tint = map->isVisible(tx, ty)
                         ? Color{150, 120, 70, 255} : Color{90, 72, 42, 255};
+                // M6-j: 地板装饰 (2D 同款坐标哈希; 只在普通可见地板)
+                if (t == TileType::FLOOR && map->isVisible(tx, ty)
+                    && !map->get_special_room_at(tx, ty))
+                    _apply_floor_decoration(*map, tx, ty, has_pal, pal,
+                                            floor_tex.tex, item, out);
             }
             out.push_back(item);
         }

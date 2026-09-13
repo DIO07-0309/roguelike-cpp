@@ -31,6 +31,17 @@ public:
     // 返回纹理由调用方持有 (ResourceManager 缓存), 失败返回 {0}
     static Texture2D gen_pixel_tile(Color base, bool wall);
 
+    // M6-i: 群系风格化程序材质 — 同一管线按 BiomeStyle 分歧画法
+    // (监狱湿石砖+苔斑 / 火山岩块+熔岩裂纹 / 深渊晶柱+符文 / 通用回退)
+    // base/accent/joint 来自 biomes.json tile_palette 三主色
+    enum class BiomeStyle { GENERIC = 0, PRISON = 1, VOLCANO = 2, ABYSS = 3 };
+    static Texture2D gen_biome_tile(Color base, Color accent, Color joint,
+                                    BiomeStyle style, bool wall);
+
+    // M6-j: 程序化地板装饰片 32×32 (确定性贴地 decal, 走坐标哈希)
+    // kind: 0=裂缝 1=苔藓斑 2=符文 3=污渍 (配色取 palette 同源色)
+    static Texture2D gen_floor_decal(int kind, Color primary, Color secondary);
+
     // M4f.2: 程序化角色/怪物占位精灵 32×32
     // variant: 0=人形 1=圆形(史莱姆) 2=大体型(Boss) 3=箭形(Charger)
     //          4=方甲(Tank) 5=炸弹(Bomber) 6=尖帽(Summoner/Shaman)

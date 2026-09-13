@@ -46,6 +46,13 @@ public:
     Texture2D load_texture(const char* path);
     // 程序化像素纹理缓存 (key 唯一, 如 "wall_1a2a2e"); 同 key 复用
     Texture2D procedural_tile(const char* key, Color base, bool wall);
+    // M6-i: 群系风格化程序材质缓存 (key 如 "biome_prison_wall_1a2a2e")
+    // style 见 SpriteRenderer::BiomeStyle; accent = 群系特征色
+    Texture2D procedural_biome_tile(const char* key, Color base, Color accent,
+                                    int style, bool wall);
+    // M6-j: 程序化地板装饰片缓存 (kind 0-3; 坐标哈希消费)
+    Texture2D procedural_floor_decal(const char* key, int kind,
+                                     Color primary, Color secondary);
     // M4f.2: 程序化角色/怪物占位精灵缓存
     Texture2D procedural_sprite(const char* key, Color body, Color accent,
                                 int variant, int eye_dir = 0);

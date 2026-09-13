@@ -226,6 +226,8 @@ void HD2DRenderer::_draw_scene() {
     ClearBackground({12, 14, 24, 255});
 
     _draw_terrain_pass();                    // M6-v2c: 雾 shader 包裹地形批
+    for (const auto& item : _draw_items)
+        if (item.kind == HD2DDrawItem::Kind::FLOOR_DECAL) _draw_floor_decal(item);
     // M6-v2b: 贴地层 (预警圈/射程环/扇形/危险区) — 地形之上, 实体之下
     for (const auto& item : _draw_items) {
         if (item.kind == HD2DDrawItem::Kind::WARNING_RING) _draw_warning_ring(item);
@@ -475,6 +477,23 @@ void HD2DRenderer::_draw_portal_ring(const HD2DDrawItem& item) {
     // 地面基准圈 (定位感, 防悬空) — 贴地平躺
     DrawCircle3D({pos.x, 0.1f, pos.z}, radius * 0.5f, {1, 0, 0}, 90.0f,
                   Color{outer.r, outer.g, outer.b, 120});
+}
+
+// ── M6-j: 地板装饰 — 贴地 decal quad (裂缝/苔藓/符文; 32px 平铺) ──
+// 与地板同平面 (y=0.09 略高避免 z-fight), 半透融入
+void HD2DRenderer::_draw_floor_decal(const HD2DDrawItem& item) {
+    Vector3 pos = item.world_pos;
+    float e = item.size * 0.5f;
+    rlSetTexture(item.texture.id);
+    rlBegin(RL_QUADS);
+    rlColor4ub(255, 255, 255, 190);                 // 融入度 (透 25%)
+    rlNormal3f(0, 1, 0);
+    rlTexCoord2f(0, 0); rlVertex3f(pos.x - e, 0.09f, pos.z - e);
+    rlTexCoord2f(1, 0); rlVertex3f(pos.x + e, 0.09f, pos.z - e);
+    rlTexCoord2f(1, 1); rlVertex3f(pos.x + e, 0.09f, pos.z + e);
+    rlTexCoord2f(0, 1); rlVertex3f(pos.x - e, 0.09f, pos.z + e);
+    rlEnd();
+    rlSetTexture(0);
 }
 
 // ── M6-v2h: 门 — 竖立贴图面板 (四态纹理; 锁=红罩 / 封=紫脉冲十字) ──

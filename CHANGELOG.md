@@ -1,3 +1,22 @@
+# v1.4.27 — M6-i+j 完成: 群系材质风格化 + 地面细节哈希装饰 (2026-09-13)
+
+> 用户拍板 M6 后半段路线: 技术特效边际收益下降, 转向资产密度。
+> 本切片: 群系"长出自己的皮肤"(材质分歧) + 地面打破单调(确定性装饰)。
+>
+> ## 渲染 (rendering/sprite_renderer + rendering3d)
+> - **M6-i 群系材质**: gen_biome_tile per-biome 画法 — 监狱湿石砖+
+>   苔斑 / 火山玄武岩+熔岩裂纹 / 深渊晶柱+发光符文; 回退链末端按
+>   biome_id 选风格, 贴图资产到位自动让位 (GENERIC=原画法零回归)
+> - **M6-j 地面细节**: 坐标哈希 (2D 同款公式, 零 RNG 流 — Sim
+>   确定性红线保持) — tint 变体 (污渍 6%/石块 4%) + 7% decal
+>   贴片 (裂缝/苔藓/符文 per-biome 配色); gen_floor_decal 程序生成,
+>   FLOOR_DECAL 贴地 quad 防 z-fight
+> - ResourceManager 新增 procedural_biome_tile / procedural_floor_decal
+>   缓存 (key 编码风格+色值)
+>
+> 验证: 60/60 ctest + 0 警告 + validator 0 err + sim 12 与基线零分岔
+> + --hd2d 冒烟 exit 0 + 实机键链稳定 (像素分布同族)。
+
 # v1.4.26 — M6-v2h 完成: 地图可读性三件套 (门/楼梯/特殊房间) (2026-09-13)
 
 > 3D 模式覆盖度补齐: 玩家导航依赖的三大地标 (门/楼梯/特殊房间)
