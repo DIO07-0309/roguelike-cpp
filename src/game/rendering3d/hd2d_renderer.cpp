@@ -13,6 +13,7 @@
 #include "entities/player.h"
 #include "entities/monster.h"
 #include <algorithm>
+#include <cstring>                          // M6-v2g: strcmp (biome 预设)
 
 bool g_hd2d_mode = false;
 
@@ -117,23 +118,34 @@ void HD2DRenderer::_upload_shadow_uniforms() {
     SetShaderValueTexture(_fog_shader, _shadow_map_loc, depth_tex_pod);
 }
 
-// ── M6-v2e: 点光源收集上传 (LAVA tile + 玩家暖光; 只读 _draw_items) ──
+// ── M6-v2e/v2g: 点光源收集上传 (LAVA tile 聚类 + 玩家暖光; 只读) ──
+// v2g: 网格聚类 — LAVA tile 按 4-tile 网格分桶, 每桶 1 个代表光
+// (火山层岩浆 tile 数量不设限, 光源数恒 ≤7; 桶内首 tile 即锚点)
 void HD2DRenderer::_upload_point_lights() {
     if (_pl_count_loc < 0) return;
     Vector3 positions[8];
     Vector3 colors[8];
     float ranges[8];
     int count = 0;
-    // LAVA tile: 自发光暖橙 (半径 3 tile; 每帧最多 7 个, 留 1 给玩家)
+    long seen_buckets[7] = {-1, -1, -1, -1, -1, -1, -1};   // 已亮桶指纹
+    const float bucket_span = TILE_SIZE * 4.0f;            // 聚类网格宽
     for (const auto& item : _draw_items) {
         if (count >= 7) break;
-        if (item.kind == HD2DDrawItem::Kind::FLOOR_TILE && item.is_lava
-            && item.texture.id == 0) {
-            positions[count] = {item.world_pos.x, 6.0f, item.world_pos.z};
-            colors[count] = {0.55f, 0.22f, 0.06f};
-            ranges[count] = TILE_SIZE * 3.0f;
-            count++;
-        }
+        if (item.kind != HD2DDrawItem::Kind::FLOOR_TILE || !item.is_lava
+            || item.texture.id != 0)
+            continue;
+        long bx = (long)(item.world_pos.x / bucket_span);
+        long bz = (long)(item.world_pos.z / bucket_span);
+        long key = bx * 100003L + bz;
+        bool dup = false;
+        for (int i = 0; i < count; i++)
+            if (seen_buckets[i] == key) { dup = true; break; }
+        if (dup) continue;                                 // 桶已亮, 跳过
+        seen_buckets[count] = key;
+        positions[count] = {item.world_pos.x, 6.0f, item.world_pos.z};
+        colors[count] = {0.55f, 0.22f, 0.06f};
+        ranges[count] = TILE_SIZE * 3.5f;                  // v2g: 4→3.5 tile
+        count++;
     }
     // 玩家随身暖光 (火把感; _camera_focus 即玩家世界 x/z)
     positions[count] = {_camera_focus.x, 14.0f, _camera_focus.z};
@@ -629,16 +641,28 @@ Vector2 HD2DRenderer::world_to_screen(Vector3 world_pos, float y_offset) const {
     return s;
 }
 
+// ── M6-v2g: bloom 按 biome 自适应 — 夜暗层低阈值提亮 / 火山压强度 ──
+static void _apply_bloom_biome_preset(const GameMap* map) {
+    auto& fx = HD2DPostFX::inst();
+    const char* biome = map ? map->biome_id() : "";
+    if (strcmp(biome, "ash_volcano") == 0)
+        fx.set_params(0.80f, 0.15f, 0.42f);   // 火山: 高阈值 + 压强度防全屏泛红
+    else if (strcmp(biome, "void_abyss") == 0)
+        fx.set_params(0.68f, 0.22f, 0.50f);   // 深渊: 幽紫光晕提感
+    else
+        fx.set_params(0.60f, 0.25f, 0.58f);   // 监狱(默认): 冷暗层低阈值补亮
+}
+
 // ── M6-v2c: 后处理 — bloom 链 + 夜色分级 + 地平雾带 (shader 版) ──
 // bloom: 场景 RT → 亮部提取/模糊 (PostFX 内部嵌套 RT, 已自恢复 FBO);
 //   之后 additive 叠加回本层 (当前绘制目标 = scene_tree 主 RT)
 // 夜色/雾带: 2D 叠加保留 (与 bloom 不冲突; 雾带在 bloom 之下画)
 void HD2DRenderer::_apply_post_processing(GameScene& gs) {
-    (void)gs;
     // 1. bloom 链 (需要场景已画完; 当前在 scene_tree 主 RT 绘制流内)
     auto& fx = HD2DPostFX::inst();
     auto* tree = gs.get_tree();
     if (tree && fx.ensure_init(_target_w, _target_h)) {
+        _apply_bloom_biome_preset(gs.game_map.get());     // M6-v2g
         fx.process(tree->main_target());
         // 夜色分级 + 地平雾带 (bloom 之下)
         DrawRectangle(0, 0, _target_w, _target_h, {20, 18, 46, 28});
