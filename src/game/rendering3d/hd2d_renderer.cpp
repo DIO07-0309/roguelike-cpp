@@ -241,6 +241,10 @@ void HD2DRenderer::_draw_scene() {
     for (const auto& item : _draw_items)
         if (item.kind == HD2DDrawItem::Kind::ENTITY_BILLBOARD) _draw_billboard(item);
     for (const auto& item : _draw_items)
+        if (item.kind == HD2DDrawItem::Kind::DOOR_PANEL) _draw_door_panel(item);
+    for (const auto& item : _draw_items)
+        if (item.kind == HD2DDrawItem::Kind::ROOM_ICON) _draw_room_icon(item);
+    for (const auto& item : _draw_items)
         if (item.kind == HD2DDrawItem::Kind::PROJECTILE_BODY) _draw_projectile_body(item);
     for (const auto& item : _draw_items)
         if (item.kind == HD2DDrawItem::Kind::FX_QUAD) _draw_fx_quad(item);
@@ -470,7 +474,74 @@ void HD2DRenderer::_draw_portal_ring(const HD2DDrawItem& item) {
                  {0, 1, 0}, 45.0f, inner);
     // 地面基准圈 (定位感, 防悬空) — 贴地平躺
     DrawCircle3D({pos.x, 0.1f, pos.z}, radius * 0.5f, {1, 0, 0}, 90.0f,
-                 Color{outer.r, outer.g, outer.b, 120});
+                  Color{outer.r, outer.g, outer.b, 120});
+}
+
+// ── M6-v2h: 门 — 竖立贴图面板 (四态纹理; 锁=红罩 / 封=紫脉冲十字) ──
+// 面板面向相机 (billboard 语义; 探索压暗由 builder tint 编码)
+void HD2DRenderer::_draw_door_panel(const HD2DDrawItem& item) {
+    Vector3 pos = item.world_pos;
+    if (item.texture.id > 0) {
+        float h = item.height;
+        Rectangle src = {0, 0, (float)item.texture.width,
+                         (float)item.texture.height};
+        DrawBillboardRec(_camera, item.texture, src,
+                         {pos.x, h * 0.5f, pos.z}, {item.size, h}, item.tint);
+    } else {
+        // 无贴图回退: 棕色立板 (2D DOOR 色 130,90,50)
+        DrawCube({pos.x, item.height * 0.5f, pos.z}, item.size * 0.9f,
+                 item.height, 6.0f, Color{130, 90, 50, 255});
+    }
+    // LOCKED: 红色半罩 + 小锁徽记 (2D DoorRenderer overlay 语义)
+    if ((DoorState)item.door_state == DoorState::LOCKED) {
+        DrawCube({pos.x, item.height * 0.5f, pos.z}, item.size * 0.92f,
+                 item.height * 0.98f, 2.5f, Color{180, 40, 40, 90});
+        _draw_lock_badge(pos, item.height);
+    }
+    // SEALED: 紫脉冲十字
+    if ((DoorState)item.door_state == DoorState::SEALED) {
+        float pulse = 0.7f + 0.3f * sinf((float)GetTime() * 3.0f);
+        Color seal = {(unsigned char)(160 * pulse), 50,
+                      (unsigned char)(220 * pulse), 200};
+        Vector3 c = {pos.x, item.height * 0.55f, pos.z};
+        DrawCube(c, 2.0f, 12.0f, 2.0f, seal);
+        DrawCube(c, 12.0f, 2.0f, 2.0f, seal);
+    }
+}
+
+// ── M6-v2h: 锁徽记 — 门板中央小锁 (2D _draw_lock_icon 3D 对应) ──
+void HD2DRenderer::_draw_lock_badge(Vector3 pos, float door_h) {
+    Vector3 c = {pos.x, door_h * 0.55f, pos.z};
+    DrawCube(c, 8.0f, 6.0f, 3.0f, Color{200, 50, 50, 220});   // 锁体
+    DrawCube({c.x, c.y + 5.0f, c.z}, 6.0f, 4.0f, 3.0f,
+             Color{230, 190, 60, 220});                        // 锁环
+}
+
+// ── M6-v2h: 特殊房间图标 — 贴地菱形底 + 上方 billboard 图标 ──
+// (2D 中心 75% 尺寸图标 + 菱形嵌纹的 3D 对应; 未触发才画)
+void HD2DRenderer::_draw_room_icon(const HD2DDrawItem& item) {
+    Vector3 pos = item.world_pos;
+    // 贴地菱形底板 (房间主色提亮; 半透明)
+    Color base = item.tint;
+    base.a = 120;
+    rlSetTexture(0);
+    rlBegin(RL_TRIANGLES);
+    rlColor4ub(base.r, base.g, base.b, base.a);
+    float m = item.size * 0.6f;
+    rlVertex3f(pos.x, 0.12f, pos.z - m); rlVertex3f(pos.x + m, 0.12f, pos.z);
+    rlVertex3f(pos.x, 0.12f, pos.z + m);
+    rlVertex3f(pos.x, 0.12f, pos.z - m); rlVertex3f(pos.x, 0.12f, pos.z + m);
+    rlVertex3f(pos.x - m, 0.12f, pos.z);
+    rlEnd();
+    // 图标本体: 略浮空 billboard (与地面物品同款式样)
+    if (item.texture.id > 0) {
+        Rectangle src = item.tex_src.width > 0 ? item.tex_src
+            : Rectangle{0, 0, (float)item.texture.width,
+                        (float)item.texture.height};
+        DrawBillboardRec(_camera, item.texture, src,
+                         {pos.x, item.size * 0.55f, pos.z},
+                         {item.size, item.size}, WHITE);
+    }
 }
 
 // ── M6-v2b: 投射物弹体 — 发光球 + 拖尾 (2D 三态配色同源) ──

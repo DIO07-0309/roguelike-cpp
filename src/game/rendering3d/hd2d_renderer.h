@@ -21,7 +21,8 @@ struct HD2DDrawItem {
                      PORTAL_RING,                    // M6-v2a: 挑战传送门竖立光环
                      PROJECTILE_BODY, WARNING_RING, TRAJECTORY_LINE,  // M6-v2b
                      CONE_FAN, ENTITY_LINK,          // M6-v2b: 扇形/实体连线
-                     AMBIENT_MOTE };                 // M6-v2e: 氛围粒子微光点
+                     AMBIENT_MOTE,                   // M6-v2e: 氛围粒子微光点
+                     DOOR_PANEL, ROOM_ICON };        // M6-v2h: 门/特殊房间图标
     Kind kind = Kind::FLOOR_TILE;
     int tile_x = 0;                 // 世界 tile 坐标 (32px/格)
     int tile_y = 0;
@@ -43,6 +44,7 @@ struct HD2DDrawItem {
     float fan_half_deg = 45.0f;    // 半角 (度)
     bool is_lava = false;          // M6-v2c: FLOOR_TILE 为 LAVA → 岩浆 shader
     Vector2 trail_dir = {0, 0};   // M6-v2d: PROJECTILE_BODY 速度向量 px/s (拖尾)
+    int door_state = 0;           // M6-v2h: DOOR_PANEL 四态 (DoorState 枚举值)
 };
 
 // 单房间切片: 960x640 目标 → 3D 透视相机 + 地形 + billboard
@@ -125,6 +127,9 @@ private:
     void _draw_blob_shadow(Vector3 pos, float w);   // M6-v2c: 接地阴影
     void _draw_fx_quad(const HD2DDrawItem& item);
     void _draw_portal_ring(const HD2DDrawItem& item);   // M6-v2a: 挑战传送门
+    void _draw_door_panel(const HD2DDrawItem& item);    // M6-v2h: 门 (四态)
+    void _draw_lock_badge(Vector3 pos, float door_h);  // M6-v2h: 锁徽记
+    void _draw_room_icon(const HD2DDrawItem& item);     // M6-v2h: 房间图标
     void _draw_projectile_body(const HD2DDrawItem& item);  // M6-v2b
     void _draw_projectile_trail(const HD2DDrawItem& item, Color c);  // M6-v2d
     void _draw_warning_ring(const HD2DDrawItem& item);     // M6-v2b: 贴地预警/射程环

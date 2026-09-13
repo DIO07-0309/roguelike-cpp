@@ -5,6 +5,7 @@
 #include "scenes/game_scene.h"
 #include "world/game_map.h"
 #include "world/challenge_room.h"              // M6-v2a: ChallengePhase
+#include "world/special_room.h"                // M6-v2h: SpecialRoom 图标 key
 #include "entities/player.h"
 #include "entities/monster.h"
 #include "entities/item.h"                    // M6-v2a: item_icon_key
@@ -64,6 +65,45 @@ static TileTexPair _resolve_tile_tex(const GameMap& map, const char* kind,
     return out;
 }
 
+// ── M6-v2h: 特殊房间地板 tint (2D game_map.draw 九色同源) ──
+static Color _special_room_tint(const SpecialRoom* sr) {
+    Color base;
+    switch (sr->type) {
+        case SpecialRoomType::ALTAR:      base = {60, 44, 22, 255}; break;
+        case SpecialRoomType::TREASURE:   base = {34, 46, 76, 255}; break;
+        case SpecialRoomType::FOUNTAIN:   base = {28, 56, 34, 255}; break;
+        case SpecialRoomType::SHOP:       base = {62, 56, 24, 255}; break;
+        case SpecialRoomType::BLACKSMITH: base = {68, 40, 28, 255}; break;
+        case SpecialRoomType::LIBRARY:    base = {22, 38, 68, 255}; break;
+        case SpecialRoomType::GAMBLER:    base = {56, 22, 60, 255}; break;
+        case SpecialRoomType::SHRINE:     base = {52, 52, 16, 255}; break;
+        case SpecialRoomType::SECRET:     base = {62, 16, 16, 255}; break;
+        default:                          base = {25, 25, 35, 255}; break;
+    }
+    if (sr->triggered) {
+        base.r = (unsigned char)(base.r * 0.55f);
+        base.g = (unsigned char)(base.g * 0.55f);
+        base.b = (unsigned char)(base.b * 0.55f);
+    }
+    return base;
+}
+
+// ── M6-v2h: 特殊房间中心图标 key (2D room_* 素材同源) ──
+static const char* _special_room_icon_key(SpecialRoomType type) {
+    switch (type) {
+        case SpecialRoomType::ALTAR:      return "room_altar";
+        case SpecialRoomType::TREASURE:   return "room_chest";
+        case SpecialRoomType::FOUNTAIN:   return "room_spring";
+        case SpecialRoomType::SHOP:       return "room_shop";
+        case SpecialRoomType::BLACKSMITH: return "room_blacksmith";
+        case SpecialRoomType::LIBRARY:    return "room_library";
+        case SpecialRoomType::GAMBLER:    return "room_gambler";
+        case SpecialRoomType::SHRINE:     return "room_shrine";
+        case SpecialRoomType::SECRET:     return "room_secret";
+        default:                          return nullptr;
+    }
+}
+
 // ── 地形: 玩家周围可见 tile → 地板/墙 item (M6-v2a: 群系贴图接线) ──
 static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
     const GameMap* map = gs.game_map.get();
@@ -78,6 +118,7 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
     int y0 = std::max(0, cy - 12), y1 = std::min(map->height - 1, cy + 12);
 
     // v2a: 与 2D 同源的贴图回退链 (群系 → 通用 → 程序化)
+    auto& res = ResourceManager::inst();
     const auto& pal = map->palette();
     bool has_pal = map->has_palette();
     Color wall_c  = has_pal ? pal.wall_face : Color{60, 60, 80, 255};
@@ -101,6 +142,22 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                 item.texture = wall_tex.tex;
                 item.tex_src = wall_tex.def.frame_w > 0
                     ? SpriteRenderer::frame_rect(wall_tex.def, 0) : Rectangle{};
+            } else if (t == TileType::DOOR) {
+                // M6-v2h: 门 → 竖立贴图面板 (四态纹理走 door.* manifest)
+                item.kind = HD2DDrawItem::Kind::DOOR_PANEL;
+                item.height = TILE_SIZE * 1.05f;
+                item.door_state = (int)map->door_state_at(tx, ty);
+                SpriteDef ddef;
+                const char* door_id = "door.closed";
+                switch ((DoorState)item.door_state) {
+                    case DoorState::OPEN:   door_id = "door.open";   break;
+                    case DoorState::LOCKED: door_id = "door.locked"; break;
+                    case DoorState::SEALED: door_id = "door.sealed"; break;
+                    default: break;
+                }
+                item.texture = res.tex_by_id(door_id);
+                item.tint = map->isVisible(tx, ty) ? WHITE
+                                                      : Color{153, 153, 153, 255};
             } else {
                 item.kind = HD2DDrawItem::Kind::FLOOR_TILE;
                 item.texture = floor_tex.tex;
@@ -117,6 +174,23 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                     item.tint = map->isVisible(tx, ty) ? WHITE
                                                        : Color{153, 153, 153, 255};
                 }
+                // M6-v2h: 特殊房间地板 tint (2D 九色同源; triggered 压暗 55%)
+                if (t == TileType::FLOOR || t == TileType::STAIRS_DOWN) {
+                    const SpecialRoom* sr = map->get_special_room_at(tx, ty);
+                    if (sr) {
+                        item.tint = _special_room_tint(sr);
+                        if (!map->isVisible(tx, ty))
+                            item.tint = Color{
+                                (unsigned char)(item.tint.r * 6 / 10),
+                                (unsigned char)(item.tint.g * 6 / 10),
+                                (unsigned char)(item.tint.b * 6 / 10), 255};
+                    }
+                }
+                // M6-v2h: 楼梯 tint 换棕金阶调 (2D 60/48/26 系)
+                if (t == TileType::STAIRS_DOWN && item.texture.id > 0
+                    && !map->get_special_room_at(tx, ty))
+                    item.tint = map->isVisible(tx, ty)
+                        ? Color{150, 120, 70, 255} : Color{90, 72, 42, 255};
             }
             out.push_back(item);
         }
@@ -214,6 +288,32 @@ static void _build_npcs(GameScene& gs, std::vector<HD2DDrawItem>& out) {
         SpriteDef def;
         item.texture = res.sprite_by_key(skey, def);
         if (item.texture.id <= 0) continue;     // 缺素材回退: 2D 有绿点, 3D 跳过
+        item.tex_src = SpriteRenderer::frame_rect(def, 0);
+        item.tint = WHITE;
+        out.push_back(item);
+    }
+}
+
+// ── M6-v2h: 特殊房间中心图标 → 贴地小 billboard (2D room_* 素材同源) ──
+// triggered 后不画 (2D 同条件); 缺素材跳过
+static void _build_special_rooms(GameScene& gs, std::vector<HD2DDrawItem>& out) {
+    const GameMap* map = gs.game_map.get();
+    if (!map) return;
+    auto& res = ResourceManager::inst();
+    for (const auto& sr : map->special_rooms) {
+        if (sr.type == SpecialRoomType::CHALLENGE) continue;   // 传送门另有绘制
+        if (sr.triggered) continue;
+        const char* ikey = _special_room_icon_key(sr.type);
+        if (!ikey) continue;
+        HD2DDrawItem item;
+        item.kind = HD2DDrawItem::Kind::ROOM_ICON;
+        item.world_pos = {(float)sr.cx * TILE_SIZE + TILE_SIZE * 0.5f, 0,
+                          (float)sr.cy * TILE_SIZE + TILE_SIZE * 0.5f};
+        item.size = TILE_SIZE * 0.75f;
+        item.sort_y = (float)sr.cy * TILE_SIZE;
+        SpriteDef def;
+        item.texture = res.sprite_by_key(ikey, def);
+        if (item.texture.id <= 0) continue;
         item.tex_src = SpriteRenderer::frame_rect(def, 0);
         item.tint = WHITE;
         out.push_back(item);
@@ -490,6 +590,7 @@ void build_scene(GameScene& gs, std::vector<HD2DDrawItem>& out_items) {
     _build_entities(gs, out_items);
     _build_effects(gs, out_items);
     _build_ground_items(gs, out_items);   // M6-v2a
+    _build_special_rooms(gs, out_items);   // M6-v2h
     _build_npcs(gs, out_items);           // M6-v2a
     _build_portals(gs, out_items);        // M6-v2a
     _build_projectiles(gs, out_items);    // M6-v2b

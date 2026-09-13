@@ -136,17 +136,31 @@ src/game/rendering3d/
   0.68/0.22/0.50 (幽紫光晕) / 火山 0.80/0.15/0.42 (高阈值压强度,
   防全屏泛红); 每帧 `_apply_post_processing` 按 `biome_id()` 选档
 
+## v2h 已实现 (2026-09-13, 地图可读性三件套)
+
+- **门 (DOOR_PANEL)**: 竖立贴图面板 — 四态纹理与 2D 同 manifest
+  (door.open/closed/locked/sealed); LOCKED 红罩+小锁徽记 /
+  SEALED 紫脉冲十字 (2D DoorRenderer overlay 语义); 无贴图回退棕色立板
+- **楼梯**: STAIRS_DOWN tint 换棕金阶调 (2D 60/48/26 系同源),
+  与普通地板明确区分
+- **特殊房间**: 九色地板 tint (2D game_map.draw 同色表; triggered
+  压暗 55%) + 中心 ROOM_ICON (贴地菱形底 + 浮空 billboard 图标,
+  room_* 素材同源, triggered 不画)
+- 已知限制: 门贴在墙面上但面向相机 (billboard 语义, 非 wall-aligned);
+  Arena 物件 (爆炸桶/图腾) 与 Boss FOV 红雾未做 (下批候选)
+
 ## v2 剩余路线
 
-(评估中 — v2h 候选: HD2D 描边重评估 [工作量大效果不可控, 建议
-先 spike 验证] / 实体接收阴影 [billboard 走默认管线, 见已知限制])
+(评估中 — v2i 候选: Arena 物件 3D 化 / Boss FOV 红雾 / 地板装饰
+变体 (哈希污渍/符文) / HD2D 描边 spike / 群系贴图资产批量接入)
 
-## 已知限制 (v2g 后)
+## 已知限制 (v2h 后)
 
 - 雾对 LAVA tile 不生效 (岩浆自发光, 不入雾; 视觉可接受)
 - 实体本身不接收阴影 (billboard 走默认管线; v2e 起即如此, 非回归)
 - 拖尾为直线渐隐 (高速弹转向时无弧度; 弹道本身直线, 语义一致)
 - bloom 三档为手调常量, 未做逐帧亮度反馈 (需人眼验收后微调)
+- 地板装饰变体缺失 (2D 有 6% 污渍/4% 石块/符文/裂缝/苔藓哈希装饰)
 
 ## 一致性验证协议 (每次改 rendering3d 必跑)
 
