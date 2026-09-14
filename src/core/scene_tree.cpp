@@ -176,8 +176,9 @@ void SceneTree::run() {
             Image shot = LoadImageFromTexture(_target.texture);
             ExportImage(shot, "saves/screenshot.png");
             UnloadImage(shot);
-            LOG_INFO("[autoshot] 主 RT 已导出 -> saves/screenshot.png (%dx%d)",
-                     _target.texture.width, _target.texture.height);
+            // M6-n: 取证帧同时记录 FPS (性能回归基线; --autoshot 专用)
+            LOG_INFO("[autoshot] 主 RT 已导出 -> saves/screenshot.png (%dx%d) FPS=%d",
+                     _target.texture.width, _target.texture.height, GetFPS());
         }
         EndDrawing();
     }

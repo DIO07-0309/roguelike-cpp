@@ -421,6 +421,21 @@ void HD2DRenderer::_draw_billboard(const HD2DDrawItem& item) {
             : Rectangle{0, 0, (float)item.texture.width, (float)item.texture.height};
         // flip_x: 负宽源矩形 (raylib DrawTexturePro 惯例; billboard 同理取负 w)
         if (item.flip_x) src.width = -src.width;
+        // M6-n: 实体描边 — 4 向偏移深色底稿 (2D 描边法移植; 分离主体与背景)
+        // 中性深色: 不给群系加色偏 (暖棕会稀释深渊紫, 实测 F11 中心 -4.5→+1.3)
+        if (item.outline) {
+            Color edge{24, 24, 27, 220};
+            float off = item.size * 0.02f;
+            for (int i = 0; i < 4; i++) {
+                Vector3 shift = pos;
+                if (i == 0) shift.x -= off;
+                else if (i == 1) shift.x += off;
+                else if (i == 2) shift.z -= off;
+                else shift.z += off;
+                DrawBillboardRec(_camera, item.texture, src,
+                                 {shift.x, h * 0.5f, shift.z}, {w, h}, edge);
+            }
+        }
         DrawBillboardRec(_camera, item.texture, src,
                          {pos.x, h * 0.5f, pos.z}, {w, h}, item.tint);
     } else {
@@ -511,34 +526,70 @@ void HD2DRenderer::_draw_floor_decal(const HD2DDrawItem& item) {
 }
 
 // ── M6-v2h: 门 — 竖立贴图面板 (四态纹理; 锁=红罩 / 封=紫脉冲十字) ──
-// 面板面向相机 (billboard 语义; 探索压暗由 builder tint 编码)
+// M6-n: billboard → wall-aligned (door_axis 探测两侧墙走向; 面板贴墙不飘)
 void HD2DRenderer::_draw_door_panel(const HD2DDrawItem& item) {
     Vector3 pos = item.world_pos;
-    if (item.texture.id > 0) {
-        float h = item.height;
-        Rectangle src = {0, 0, (float)item.texture.width,
-                         (float)item.texture.height};
-        DrawBillboardRec(_camera, item.texture, src,
-                         {pos.x, h * 0.5f, pos.z}, {item.size, h}, item.tint);
+    float h = item.height;
+    float half = item.size * 0.5f;
+    if (item.texture.id > 0 && item.door_axis == 0) {
+        // 贴东西走向墙: 面板沿 X 展开, 法线 ±Z (面朝相机侧)
+        float facing = (_camera.position.z >= pos.z) ? 1.0f : -1.0f;
+        rlSetTexture(item.texture.id);
+        rlBegin(RL_QUADS);
+        rlColor4ub(item.tint.r, item.tint.g, item.tint.b, item.tint.a);
+        rlNormal3f(0, 0, facing);
+        rlTexCoord2f(0, 1); rlVertex3f(pos.x - half, 0, pos.z);
+        rlTexCoord2f(1, 1); rlVertex3f(pos.x + half, 0, pos.z);
+        rlTexCoord2f(1, 0); rlVertex3f(pos.x + half, h, pos.z);
+        rlTexCoord2f(0, 0); rlVertex3f(pos.x - half, h, pos.z);
+        rlEnd();
+        rlSetTexture(0);
+    } else if (item.texture.id > 0) {
+        // 贴南北走向墙: 面板沿 Z 展开, 法线 ±X
+        float facing = (_camera.position.x >= pos.x) ? 1.0f : -1.0f;
+        rlSetTexture(item.texture.id);
+        rlBegin(RL_QUADS);
+        rlColor4ub(item.tint.r, item.tint.g, item.tint.b, item.tint.a);
+        rlNormal3f(facing, 0, 0);
+        rlTexCoord2f(0, 1); rlVertex3f(pos.x, 0, pos.z - half);
+        rlTexCoord2f(1, 1); rlVertex3f(pos.x, 0, pos.z + half);
+        rlTexCoord2f(1, 0); rlVertex3f(pos.x, h, pos.z + half);
+        rlTexCoord2f(0, 0); rlVertex3f(pos.x, h, pos.z - half);
+        rlEnd();
+        rlSetTexture(0);
     } else {
-        // 无贴图回退: 棕色立板 (2D DOOR 色 130,90,50)
-        DrawCube({pos.x, item.height * 0.5f, pos.z}, item.size * 0.9f,
-                 item.height, 6.0f, Color{130, 90, 50, 255});
+        // 无贴图回退: 棕色立板 (2D DOOR 色 130,90,50), 按 axis 取向
+        float depth = 6.0f, width = item.size * 0.9f;
+        if (item.door_axis == 1) { float t = depth; depth = width; width = t; }
+        DrawCube({pos.x, item.height * 0.5f, pos.z}, width,
+                 item.height, depth, Color{130, 90, 50, 255});
     }
-    // LOCKED: 红色半罩 + 小锁徽记 (2D DoorRenderer overlay 语义)
+    // 门楣横梁 (提高辨识; 按 axis 取向)
+    DrawCube({pos.x, h + 1.0f, pos.z},
+             item.door_axis == 0 ? item.size + 2.0f : 1.5f, 2.0f,
+             item.door_axis == 0 ? 1.5f : item.size + 2.0f,
+             Color{70, 45, 25, 255});
+    // LOCKED: 红色半罩 + 小锁徽记 (2D DoorRenderer overlay 语义; 按 axis 取向)
     if ((DoorState)item.door_state == DoorState::LOCKED) {
-        DrawCube({pos.x, item.height * 0.5f, pos.z}, item.size * 0.92f,
-                 item.height * 0.98f, 2.5f, Color{180, 40, 40, 90});
+        float w = item.door_axis == 0 ? item.size * 0.92f : 2.5f;
+        float d = item.door_axis == 0 ? 2.5f : item.size * 0.92f;
+        DrawCube({pos.x, item.height * 0.5f, pos.z}, w,
+                 item.height * 0.98f, d, Color{180, 40, 40, 90});
         _draw_lock_badge(pos, item.height);
     }
-    // SEALED: 紫脉冲十字
+    // SEALED: 紫脉冲十字 (贴门面; 按 axis 取向)
     if ((DoorState)item.door_state == DoorState::SEALED) {
         float pulse = 0.7f + 0.3f * sinf((float)GetTime() * 3.0f);
         Color seal = {(unsigned char)(160 * pulse), 50,
                       (unsigned char)(220 * pulse), 200};
         Vector3 c = {pos.x, item.height * 0.55f, pos.z};
-        DrawCube(c, 2.0f, 12.0f, 2.0f, seal);
-        DrawCube(c, 12.0f, 2.0f, 2.0f, seal);
+        if (item.door_axis == 0) {
+            DrawCube(c, 2.0f, 12.0f, 2.0f, seal);
+            DrawCube(c, 12.0f, 2.0f, 2.0f, seal);
+        } else {
+            DrawCube(c, 2.0f, 12.0f, 2.0f, seal);
+            DrawCube(c, 2.0f, 2.0f, 12.0f, seal);
+        }
     }
 }
 

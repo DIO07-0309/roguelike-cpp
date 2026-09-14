@@ -268,6 +268,11 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                 item.texture = res.tex_by_id(door_id);
                 item.tint = map->isVisible(tx, ty) ? WHITE
                                                       : Color{153, 153, 153, 255};
+                // M6-n: 探测门两侧墙走向 → 面板贴墙 (billboard 改 wall-aligned)
+                // 左右是墙 = 门嵌在东西走向墙里 → 面板法线沿 Z (axis 0)
+                bool wall_lr = map->tile_at(tx - 1, ty) == TileType::WALL ||
+                               map->tile_at(tx + 1, ty) == TileType::WALL;
+                item.door_axis = wall_lr ? 0 : 1;
             } else {
                 item.kind = HD2DDrawItem::Kind::FLOOR_TILE;
                 item.texture = floor_tex.tex;
@@ -366,6 +371,7 @@ static void _build_entities(GameScene& gs, std::vector<HD2DDrawItem>& out) {
         item.world_pos = {r.x + r.width * 0.5f, 0, r.y + r.height * 0.5f};
         item.size = 36.0f;
         item.sort_y = r.y;
+        item.outline = true;                   // M6-n: 玩家描边
         SpriteDef def;
         item.texture = res.sprite_by_key("player_default", def);
         if (item.texture.id > 0)
@@ -382,6 +388,7 @@ static void _build_entities(GameScene& gs, std::vector<HD2DDrawItem>& out) {
         item.world_pos = {r.x + r.width * 0.5f, 0, r.y + r.height * 0.5f};
         item.size = 34.0f;
         item.sort_y = r.y;
+        item.outline = true;                   // M6-n: 怪物描边
         SpriteDef def;
         // M6-m: 使用 sprite_override 或按类型/名称映射
         const char* skey = !m->sprite_override.empty() ? m->sprite_override.c_str()

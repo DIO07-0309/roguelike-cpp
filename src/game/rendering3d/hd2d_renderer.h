@@ -46,6 +46,8 @@ struct HD2DDrawItem {
     bool is_lava = false;          // M6-v2c: FLOOR_TILE 为 LAVA → 岩浆 shader
     Vector2 trail_dir = {0, 0};   // M6-v2d: PROJECTILE_BODY 速度向量 px/s (拖尾)
     int door_state = 0;           // M6-v2h: DOOR_PANEL 四态 (DoorState 枚举值)
+    int door_axis = 0;            // M6-n: 门朝向 0=贴东西墙(面板朝±Z) 1=贴南北墙(朝±X)
+    bool outline = false;         // M6-n: 实体描边 (玩家/怪; 4向偏移深色底)
 };
 
 // 单房间切片: 960x640 目标 → 3D 透视相机 + 地形 + billboard
