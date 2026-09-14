@@ -111,6 +111,11 @@ static void _fix_working_dir(const char* argv0) {
 }
 #endif
 
+// M6-i.1: --hidwin 把窗口移到屏幕外 (取证静默; HWND 仍有效, PostMessage 可用)
+extern bool g_window_hidden;
+extern bool g_autocontinue;
+extern int  g_goto_floor;
+
 int main(int argc, char** argv) {
     Logger::inst().init();
 #ifdef _WIN32
@@ -163,6 +168,20 @@ int main(int argc, char** argv) {
         } else if (arg == "--input-diag") {
             // P1-C9: 输入心跳诊断 (键盘失灵复发时定位用; 默认关)
             input_diag_requested = true;
+        } else if (arg == "--autoshot" && i + 1 < __argc) {
+            // M6-i.1: 3D 渲染第 N 帧自动截图 (视觉取证, 不依赖键盘)
+            extern int g_hd2d_autoshot;
+            g_hd2d_autoshot = atoi(__argv[++i]);
+        } else if (arg == "--hidwin") {
+            // M6-i.1: 窗口移出屏幕 (后台取证不弹窗干扰)
+            g_window_hidden = true;
+        } else if (arg == "--autocontinue") {
+            // M6-i.1: 跳过标题/选档, 直接读 slot1 继续游戏 (取证免键入)
+            g_autocontinue = true;
+        } else if (arg == "--goto-floor" && i + 1 < __argc) {
+            // M6-i.1: 覆盖读档楼层 (取证指定 F1/F6/F11)
+            g_autocontinue = true;
+            g_goto_floor = atoi(__argv[++i]);
         }
     }
 #endif
@@ -176,6 +195,10 @@ int main(int argc, char** argv) {
     GameScene::g_sim_runs  = sim_runs;    // G5.6
     if (record_mode) LOG_INFO("Replay: recording to %s", record_path.c_str());
     if (replay_mode) LOG_INFO("Replay: playing from %s", replay_path.c_str());
+    if (g_window_hidden) {
+        // M6-i.1: 后台取证静音 (不写 meta/存档以免污染)
+        AudioServer::g_muted = true;
+    }
     if (sim_mode) {
         SimulationConfig sim_cfg;
         sim_cfg.runs = sim_runs;
@@ -331,6 +354,40 @@ int main(int argc, char** argv) {
         CloseAudioDevice();
         Logger::inst().close();
         return 0;
+    }
+
+    // M6-i.1: --autocontinue 直接读档进游戏 (跳过 Title/SlotSelect; 取证链路免键盘)
+    if (g_autocontinue && has_save) {
+        int slot_id = 1;
+        for (int s = 1; s <= SAVE_SLOT_COUNT; ++s)
+            if (SaveManager::get_slot_summary(s).exists) { slot_id = s; break; }
+        auto gs = std::make_shared<GameScene>();
+        gs->name = "GameScene";
+        auto* data = SaveManager::load_game(slot_id);
+        if (data) {
+            int floor = data->current_floor, maxf = data->max_unlocked_floor;
+            if (g_goto_floor >= 1) floor = (std::min)(g_goto_floor, maxf);
+            if (!data->player) {
+                auto p = std::make_unique<Player>(TILE_SIZE * 2, TILE_SIZE * 2,
+                    PLAYER_SPEED, PLAYER_MAX_HP, PLAYER_ATTACK, PLAYER_PDEF, PLAYER_MDEF);
+                data->player = std::move(p);
+            }
+            gs->load_saved_game(floor, maxf, std::move(data->player),
+                                data->dungeon_seed, data->special_triggered,
+                                data->special_discovered, data->rule_counters,
+                                data->quest_states, data->play_time);
+            gs->set_mirror_memory(data->mirror_prior_alpha, data->mirror_prior_beta);
+            delete data;
+            tree.change_scene(gs);
+            LOG_INFO("autocontinue → slot %d 第%d层", slot_id, floor);
+            tree.run();
+            ServiceLocator::remove_all();
+            ResourceManager::inst().unload_all();
+            CloseAudioDevice();
+            Logger::inst().close();
+            return 0;
+        }
+        LOG_WARN("autocontinue: 读档失败 slot %d, 回退标题", slot_id);
     }
 
     auto title = std::make_shared<TitleScene>();

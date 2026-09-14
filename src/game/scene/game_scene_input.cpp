@@ -26,6 +26,12 @@ void GameSceneInput::handle_input(const InputMap& input) {
     auto* tree = _s.get_tree();
     if (!tree) return;
 
+    // M6-i.1: 游戏内截图 (F7 — 最顶部, 任何 UI/状态都可用; Release 生效)
+    if (IsKeyPressed(KEY_F7)) {
+        TakeScreenshot("screenshot.png");
+        LOG_INFO("[M6-i.1 截图] screenshot.png 已保存 (工作目录)");
+    }
+
     // D4 Step2: event UI intercept
     if (_s._is_event_running()) { handle_event_input(input); return; }
     // D4 Step4: dialogue UI intercept
@@ -158,6 +164,8 @@ auto* boss = boss_factory_create(btype, _s.stairs_pos.first, _s.stairs_pos.secon
         _s._show_relic_panel = !_s._show_relic_panel;
         tree->get_audio()->play_sfx("ui_click", 0.35f);  // Q4.5
     }
+
+    // M6-i.1: 游戏内截图已挪 handle_input 顶部 (任何状态可用)
 
 #ifdef _DEBUG
     handle_debug_keys();
@@ -307,6 +315,12 @@ void GameSceneInput::handle_debug_keys() {
         _s._presentation.show_growth_debug = !_s._presentation.show_growth_debug;
     if (IsKeyPressed(KEY_F9))
         _s._presentation.combat_juice_on = !_s._presentation.combat_juice_on;
+    // M6-i.1: 游戏内截图 (调试键 F7 — raylib TakeScreenshot 直接读 GL
+    // 帧缓冲, 3D/HDR 内容零失真; 截到工作目录 screenshot.png)
+    if (IsKeyPressed(KEY_F7)) {
+        TakeScreenshot("screenshot.png");
+        LOG_INFO("[截图] screenshot.png 已保存 (工作目录)");
+    }
     if (IsKeyPressed(KEY_F10))
         _s._presentation.show_flow_debug = !_s._presentation.show_flow_debug;
     if (IsKeyPressed(KEY_F11))

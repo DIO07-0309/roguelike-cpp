@@ -6,6 +6,11 @@
 #include <cstring>
 #include <cmath>
 
+// M6-i.1: --hidwin 窗口移出屏幕 (后台取证; 定义于此以便测试目标也能链接)
+bool g_window_hidden = false;
+bool g_autocontinue = false;
+int  g_goto_floor = 0;
+
 SceneTree::SceneTree(int w, int h, const char* title) {
     // G10.9-fix2: 放弃 FLAG_WINDOW_HIGHDPI
     // 探针实证 (tools/dpi_probe v4-v7): raylib5.0+GLFW+HIGHDPI 下窗口/FBO/绘图
@@ -33,6 +38,11 @@ SceneTree::SceneTree(int w, int h, const char* title) {
     InitAudioDevice();
     SetExitKey(0);
     center_active_window();
+    // M6-i.1: 取证静默 — 仅移出屏幕 (不最小化: 最小化会触发 OS 帧节流,
+    // autoshot 帧计数 3600f 在 1-5fps 下永远到不了)
+    if (g_window_hidden) {
+        SetWindowPosition(-32000, -32000);
+    }
     SetTargetFPS(60);
     _input.setup_defaults();
     _audio = std::make_unique<AudioServer>();
@@ -158,7 +168,17 @@ void SceneTree::run() {
         // Source: entire texture (flipped vertically because OpenGL)
         Rectangle src = {0, 0, (float)_target.texture.width, -(float)_target.texture.height};
         Rectangle dst = _blit_dst({}, IsWindowFullscreen());
-        DrawTexturePro(_target.texture, src, dst, {0, 0}, 0, WHITE);
+        DrawTexturePro(_target.texture, src, dst, {0, 0}, 0.0f, WHITE);
+        // M6-i.1: 自动截图取证 (--autoshot N — 第 N 帧把主 RT 导出 PNG;
+        // 绝对路径 saves/ 由 SaveManager mkdir 保证存在, 不依赖进程 CWD)
+        extern int g_hd2d_autoshot;
+        if (g_hd2d_autoshot > 0 && --g_hd2d_autoshot == 0) {
+            Image shot = LoadImageFromTexture(_target.texture);
+            ExportImage(shot, "saves/screenshot.png");
+            UnloadImage(shot);
+            LOG_INFO("[autoshot] 主 RT 已导出 -> saves/screenshot.png (%dx%d)",
+                     _target.texture.width, _target.texture.height);
+        }
         EndDrawing();
     }
 }

@@ -76,7 +76,9 @@ void main()
 
     // v2e: shadow map 阴影系数 (直射光; 失败=1 全亮)
     float shadow = (shadowEnabled > 0.5) ? sample_shadow(fragWorldPos) : 1.0;
-    color *= 0.45 + 0.55 * shadow;               // 环境光 45% 保底
+    // M6-i.1: 环境光保底 0.62→0.78 — 实测贴图 176 被压到 22 (12.5%),
+    // 材质完全不可读; 0.78 满阴影仍有层次 (137) 但群系色可辨
+    color *= 0.78 + 0.22 * shadow;
 
     // v2c: 距离雾
     float fog_factor = smoothstep(fogStart, fogEnd, length(fragWorldPos - viewPos));

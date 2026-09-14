@@ -15,6 +15,7 @@
 #include "resources/resource_manager.h"
 #include "rendering/sprite_renderer.h"
 #include "config.h"                 // TILE_SIZE
+#include "core/logger.h"            // M6-i.1 DEBUG
 #include <algorithm>
 #include <cstring>
 #include <cmath>
@@ -48,6 +49,22 @@ static int _biome_material_style(const GameMap& map) {
     return (int)SpriteRenderer::BiomeStyle::GENERIC;
 }
 
+// ── M6-i.1: 群系贴图 key — 全 id → sprites.json 短名 (与 game_map 同修) ──
+static const char* _biome_tile_key(const char* biome_id, const char* kind) {
+    static char key[48];
+    const char* short_id = "";
+    if (biome_id && biome_id[0]) {
+        if (strcmp(biome_id, "forgotten_prison") == 0) short_id = "prison";
+        else if (strcmp(biome_id, "ash_volcano") == 0) short_id = "volcano";
+        else if (strcmp(biome_id, "void_abyss") == 0) short_id = "abyss";
+    }
+    if (short_id[0]) {
+        snprintf(key, sizeof(key), "%s_%s", kind, short_id);
+        return key;
+    }
+    return kind;
+}
+
 // ── M6-v2a: 群系 tile 贴图解析 — 复用 2D 同源回退链 ──
 // (群系 wall_<biome> → 通用 wall → 程序化 procedural_tile, 与 GameMap::draw 一致)
 // M6-i: 程序化末端升级为群系风格化材质 (监狱/火山/深渊 各自画法)
@@ -60,8 +77,7 @@ static TileTexPair _resolve_tile_tex(const GameMap& map, const char* kind,
                                       const Color& fallback_color, bool wall) {
     TileTexPair out;
     auto& res = ResourceManager::inst();
-    char biome_key[48];
-    snprintf(biome_key, sizeof(biome_key), "%s_%s", kind, map.biome_id());
+    const char* biome_key = _biome_tile_key(map.biome_id(), kind);
     Texture2D biome_tex = res.sprite_by_key(biome_key, out.def);
     if (biome_tex.id > 0) { out.tex = biome_tex; return out; }
     out.def = SpriteDef{};
@@ -162,6 +178,15 @@ static void _apply_floor_decoration(const GameMap& map, int tx, int ty,
 }
 
 // ── 地形: 玩家周围可见 tile → 地板/墙 item (M6-v2a: 群系贴图接线) ──
+// M6-i.1: 未探索区不再留黑 — 画成"暗色群系岩石"(贴图保留群系色相, 亮度压到
+// ~25%), 使整屏读作地牢地面而非纯黑空洞; 已探索区亮度语义保持不变。
+// i.1-fix2: 中性灰蓝 tint 会把暖色群系贴图整体拉冷 (实测全屏 R-B≈-10),
+// 未探索 tint 改从群系 palette 推导 — 暗色但保留群系色相。
+static Color _darkened(const Color& c, float factor) {
+    return Color{(unsigned char)(c.r * factor), (unsigned char)(c.g * factor),
+                 (unsigned char)(c.b * factor), 255};
+}
+
 static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
     const GameMap* map = gs.game_map.get();
     if (!map) return;
@@ -171,8 +196,9 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
         cx = (int)(gs.player->entity.rect.x / TILE_SIZE);
         cy = (int)(gs.player->entity.rect.y / TILE_SIZE);
     }
-    int x0 = std::max(0, cx - 16), x1 = std::min(map->width - 1, cx + 16);
-    int y0 = std::max(0, cy - 12), y1 = std::min(map->height - 1, cy + 12);
+    // 扩大 build 范围: 相机 440 拉近后视野投影超出旧 ±16/±12 (实测 52% 屏幕是 ClearBackground)
+    int x0 = std::max(0, cx - 22), x1 = std::min(map->width - 1, cx + 22);
+    int y0 = std::max(0, cy - 16), y1 = std::min(map->height - 1, cy + 16);
 
     // v2a: 与 2D 同源的贴图回退链 (群系 → 通用 → 程序化)
     auto& res = ResourceManager::inst();
@@ -180,18 +206,41 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
     bool has_pal = map->has_palette();
     Color wall_c  = has_pal ? pal.wall_face : Color{60, 60, 80, 255};
     Color floor_c = has_pal ? pal.floor_base : Color{25, 25, 35, 255};
+    // i.1-fix2: 未探索 tint 群系化 (palette 暖色 × 暗化; 无 palette 回退旧中性灰)
+    Color unex_wall_tint  = has_pal ? _darkened(pal.wall_top, 0.45f)
+                                    : Color{50, 50, 54, 255};
+    Color unex_floor_tint = has_pal ? _darkened(pal.floor_dirt, 0.50f)
+                                    : Color{64, 64, 68, 255};
     TileTexPair wall_tex  = _resolve_tile_tex(*map, "wall", wall_c, true);
     TileTexPair floor_tex = _resolve_tile_tex(*map, "floor", floor_c, false);
 
     for (int ty = y0; ty <= y1; ty++) {
         for (int tx = x0; tx <= x1; tx++) {
-            if (!map->isExplored(tx, ty)) continue;
             TileType t = map->tile_at(tx, ty);
             HD2DDrawItem item;
             item.tile_x = tx; item.tile_y = ty;
             item.world_pos = {(float)tx * TILE_SIZE + TILE_SIZE * 0.5f, 0,
                               (float)ty * TILE_SIZE + TILE_SIZE * 0.5f};
             item.size = (float)TILE_SIZE;
+            // M6-i.1: 未探索区 → 暗色群系岩石 (墙面按 solid 处理, 不含门/装饰)
+            if (!map->isExplored(tx, ty)) {
+                if (t == TileType::WALL || t == TileType::DOOR) {
+                    item.kind = HD2DDrawItem::Kind::WALL_BLOCK;
+                    item.height = TILE_SIZE * 1.25f;
+                    item.texture = wall_tex.tex;
+                    item.tex_src = wall_tex.def.frame_w > 0
+                        ? SpriteRenderer::frame_rect(wall_tex.def, 0) : Rectangle{};
+                    item.tint = unex_wall_tint;
+                } else {
+                    item.kind = HD2DDrawItem::Kind::FLOOR_TILE;
+                    item.texture = floor_tex.tex;
+                    item.tex_src = floor_tex.def.frame_w > 0
+                        ? SpriteRenderer::frame_rect(floor_tex.def, 0) : Rectangle{};
+                    item.tint = unex_floor_tint;
+                }
+                out.push_back(item);
+                continue;
+            }
             item.tint = _tile_color(t, map->isVisible(tx, ty));
             if (t == TileType::WALL) {
                 item.kind = HD2DDrawItem::Kind::WALL_BLOCK;
@@ -199,6 +248,10 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                 item.texture = wall_tex.tex;
                 item.tex_src = wall_tex.def.frame_w > 0
                     ? SpriteRenderer::frame_rect(wall_tex.def, 0) : Rectangle{};
+                // i.1-fix2: 贴图墙不再叠蓝灰回退色 (地板同规则; 压暗由探索态编码)
+                if (item.texture.id > 0)
+                    item.tint = map->isVisible(tx, ty) ? WHITE
+                                                      : Color{153, 153, 153, 255};
             } else if (t == TileType::DOOR) {
                 // M6-v2h: 门 → 竖立贴图面板 (四态纹理走 door.* manifest)
                 item.kind = HD2DDrawItem::Kind::DOOR_PANEL;

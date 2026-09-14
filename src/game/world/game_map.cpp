@@ -6,6 +6,7 @@
 #include "game/rendering/door_renderer.h"     // Door sprites + anim
 #include <cmath>
 #include <cstdio>
+#include <cstring>                   // M6-i.1: strcmp (biome 短名映射)
 
 GameMap::GameMap(int w, int h, int ts)
     : width(w), height(h), tile_size(ts),
@@ -260,14 +261,25 @@ void GameMap::set_palette(const TilePalette* palette) {
     if (_has_palette) _palette = *palette;
 }
 
-// M5-A: 群系贴图 key — biomes.json id (prison/volcano/abyss) →
-// "wall_<id>"/"floor_<id>"; sprite_by_key 未命中返回空纹理 (id<=0),
-// draw() 内现有 fallback 链 (通用贴图 → 程序化) 保持兜底
+// M5-A: 群系贴图 key — biomes.json id → "wall_<短名>"/"floor_<短名>"
+// M6-i.1 修复: 全 id (forgotten_prison) 与 sprites.json 短名 (prison)
+// 不匹配 → M5 起贴图查找永远 miss (全群系走程序化 tint, 即 P3 审计
+// "群系贴图仅 tint 差异"的根因)。映射表对齐 sprites.json key。
+static const char* _biome_short_id(const char* biome_id) {
+    if (biome_id && biome_id[0]) {
+        if (strcmp(biome_id, "forgotten_prison") == 0) return "prison";
+        if (strcmp(biome_id, "ash_volcano") == 0)      return "volcano";
+        if (strcmp(biome_id, "void_abyss") == 0)       return "abyss";
+    }
+    return "";
+}
+
 static const char* _biome_tile_key(const char* biome_id,
                                    const char* kind /* "wall"|"floor" */) {
     static char key[48];
-    if (biome_id && biome_id[0]) {
-        snprintf(key, sizeof(key), "%s_%s", kind, biome_id);
+    const char* short_id = _biome_short_id(biome_id);
+    if (short_id[0]) {
+        snprintf(key, sizeof(key), "%s_%s", kind, short_id);
         return key;
     }
     return kind;

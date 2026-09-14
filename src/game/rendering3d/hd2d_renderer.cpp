@@ -16,6 +16,7 @@
 #include <cstring>                          // M6-v2g: strcmp (biome 预设)
 
 bool g_hd2d_mode = false;
+int  g_hd2d_autoshot = 0;     // M6-i.1: >0 = 第 N 帧自动截图一次 (取证)
 
 HD2DRenderer& HD2DRenderer::inst() {
     static HD2DRenderer renderer;
@@ -53,7 +54,9 @@ void HD2DRenderer::_load_terrain_shaders() {
         _fog_start_loc = GetShaderLocation(_fog_shader, "fogStart");
         _fog_end_loc = GetShaderLocation(_fog_shader, "fogEnd");
         // 默认雾参数 (距离按相机距离; 贴图 tile 不暗但远处入雾)
-        float fog_start = 520.0f, fog_end = 900.0f;
+        float fog_start = 760.0f, fog_end = 1250.0f;
+        // M6-i.1: 520/900 → 760/1250 — 原值把相机 800px 处的视野内地板
+        // 混合 60% 深夜雾色 (近黑); 推迟起点保住玩家视野内材质可读性
         SetShaderValue(_fog_shader, _fog_start_loc, &fog_start,
                        SHADER_UNIFORM_FLOAT);
         SetShaderValue(_fog_shader, _fog_end_loc, &fog_end,
@@ -84,7 +87,9 @@ void HD2DRenderer::_upload_fog_uniforms() {
     Vector3 view_pos = _camera.position;
     SetShaderValue(_fog_shader, _fog_viewpos_loc, &view_pos,
                    SHADER_UNIFORM_VEC3);
-    Vector4 fog_color = {12.0f / 255.0f, 14.0f / 255.0f, 24.0f / 255.0f, 1.0f};
+    // M6-i.1: 雾色 12,14,24 → 28,30,48 (深夜蓝黑提到暗蓝, 避免雾区纯黑)
+    // i.1-fix2: 雾色从蓝 (28,30,48) 改暖暗 (30,26,22) — 远景入雾不再拉冷群系
+    Vector4 fog_color = {30.0f / 255.0f, 26.0f / 255.0f, 22.0f / 255.0f, 1.0f};
     SetShaderValue(_fog_shader, _fog_color_loc, &fog_color,
                    SHADER_UNIFORM_VEC4);
     _upload_shadow_uniforms();                     // v2e: 阴影
@@ -198,7 +203,8 @@ void HD2DRenderer::render_frame(GameScene& gs) {
     _shake_offset = {0, 0, 0};
     // 3. 相机定位 (v2f: 提前到深度 pass 前 — billboard 深度几何朝向
     // 需当帧相机, 不吃上一帧残值; _draw_scene 内复用不再重算)
-    float cam_dist = 640.0f;
+    // M6-i.1: 640→440 拉近相机 (可见 ~12x19 tile), 房间/材质占屏更大
+    float cam_dist = 440.0f;
     _camera.position = {
         _camera_focus.x,
         _camera_focus.y + cam_dist * 0.7071f,
@@ -222,8 +228,9 @@ void HD2DRenderer::render_frame(GameScene& gs) {
 
 // ── 场景绘制: 分 kind 绘制 (地形 → 实体 → 特效; 相机已在 render_frame 定位) ──
 void HD2DRenderer::_draw_scene() {
+    // i.1-fix2: 背景从蓝黑 (12,14,24) 改暖黑 — 空洞/接缝不再露出冷色
     BeginMode3D(_camera);
-    ClearBackground({12, 14, 24, 255});
+    ClearBackground({16, 13, 11, 255});
 
     _draw_terrain_pass();                    // M6-v2c: 雾 shader 包裹地形批
     for (const auto& item : _draw_items)
@@ -731,16 +738,18 @@ Vector2 HD2DRenderer::world_to_screen(Vector3 world_pos, float y_offset) const {
     return s;
 }
 
-// ── M6-v2g: bloom 按 biome 自适应 — 夜暗层低阈值提亮 / 火山压强度 ──
+// ── M6-v2g/M6-i.1: bloom 按 biome 自适应 ──
+// i.1: 环境光 0.78 抬亮地板后, 监狱原阈值 0.60 会提取中亮地板 → bloom
+// 叠加炸成全白 (实测 238); 阈值随环境光上调, 只让高光 (岩浆/火把) bloom
 static void _apply_bloom_biome_preset(const GameMap* map) {
     auto& fx = HD2DPostFX::inst();
     const char* biome = map ? map->biome_id() : "";
     if (strcmp(biome, "ash_volcano") == 0)
-        fx.set_params(0.80f, 0.15f, 0.42f);   // 火山: 高阈值 + 压强度防全屏泛红
+        fx.set_params(0.82f, 0.14f, 0.42f);   // 火山: 只吃岩浆/裂纹高光
     else if (strcmp(biome, "void_abyss") == 0)
-        fx.set_params(0.68f, 0.22f, 0.50f);   // 深渊: 幽紫光晕提感
+        fx.set_params(0.74f, 0.20f, 0.50f);   // 深渊: 只吃符文/晶光
     else
-        fx.set_params(0.60f, 0.25f, 0.58f);   // 监狱(默认): 冷暗层低阈值补亮
+        fx.set_params(0.72f, 0.22f, 0.45f);   // 监狱(默认): 只吃火把/高光
 }
 
 // ── M6-v2c: 后处理 — bloom 链 + 夜色分级 + 地平雾带 (shader 版) ──
@@ -755,12 +764,14 @@ void HD2DRenderer::_apply_post_processing(GameScene& gs) {
         _apply_bloom_biome_preset(gs.game_map.get());     // M6-v2g
         fx.process(tree->main_target());
         // 夜色分级 + 地平雾带 (bloom 之下)
-        DrawRectangle(0, 0, _target_w, _target_h, {20, 18, 46, 28});
+        // i.1-fix2: 夜色从蓝 (20,18,46) 改暖暗 (30,24,18) — 蓝罩把全屏
+        // 群系材质拉冷 (实测暖 32%→29%, 冷 0.6%→51%); 保留分级不染色相
+        DrawRectangle(0, 0, _target_w, _target_h, {30, 24, 18, 14});
         for (int i = 0; i < 6; i++) {
             int alpha = 50 - i * 8;
             if (alpha <= 0) break;
             DrawRectangle(0, _target_h - (6 - i) * 24, _target_w, 24,
-                          {16, 20, 40, (unsigned char)alpha});
+                          {22, 18, 16, (unsigned char)alpha});
         }
         fx.draw_overlay();          // additive bloom 叠加 (最上层)
     }
