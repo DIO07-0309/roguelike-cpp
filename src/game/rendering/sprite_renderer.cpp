@@ -414,3 +414,49 @@ Texture2D SpriteRenderer::gen_pixel_blast(Color c) {
     UnloadImage(img);
     return tex;
 }
+
+Texture2D SpriteRenderer::gen_arena_prop(int type, Color base) {
+    Image img = GenImageColor(32, 32, {0, 0, 0, 0});
+    switch (type) {
+    case 0: {
+        Color wood = {160, 100, 40, 255}, band = {40, 30, 20, 255};
+        ImageDrawRectangle(&img, 8, 6, 16, 20, wood);
+        ImageDrawRectangle(&img, 6, 8, 20, 3, band);
+        ImageDrawRectangle(&img, 6, 20, 20, 3, band);
+        ImageDrawRectangle(&img, 12, 4, 8, 4, {60, 40, 20, 255});
+        break;
+    }
+    case 1: {
+        Color pole = {30, 120, 50, 255}, glow = {100, 255, 120, 200};
+        ImageDrawRectangle(&img, 12, 8, 8, 18, pole);
+        ImageDrawCircle(&img, 16, 10, 6, glow);
+        ImageDrawCircle(&img, 16, 10, 4, {200, 255, 200, 255});
+        break;
+    }
+    case 2: {
+        Color pool = {40, 150, 55, 180};
+        ImageDrawRectangle(&img, 4, 10, 24, 12, pool);
+        ImageDrawRectangle(&img, 8, 12, 16, 8, {60, 180, 70, 200});
+        break;
+    }
+    case 3: {
+        Color rock = {100, 95, 100, 255};
+        ImageDrawRectangle(&img, 6, 12, 20, 12, rock);
+        ImageDrawRectangle(&img, 8, 10, 6, 4, {120, 115, 120, 255});
+        ImageDrawRectangle(&img, 18, 8, 8, 6, {110, 105, 110, 255});
+        break;
+    }
+    case 4: {
+        Color spike = {180, 50, 50, 255};
+        for (int y = 4; y < 28; y++) {
+            int w = (y - 4) * 2 / 3;
+            ImageDrawLine(&img, 16 - w, y, 16 + w, y, spike);
+        }
+        break;
+    }
+    }
+    _add_noise(&img, base);
+    Texture2D tex = LoadTextureFromImage(img);
+    UnloadImage(img);
+    return tex;
+}

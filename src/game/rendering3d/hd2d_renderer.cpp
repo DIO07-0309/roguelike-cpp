@@ -491,16 +491,23 @@ void HD2DRenderer::_draw_portal_ring(const HD2DDrawItem& item) {
 void HD2DRenderer::_draw_floor_decal(const HD2DDrawItem& item) {
     Vector3 pos = item.world_pos;
     float e = item.size * 0.5f;
-    rlSetTexture(item.texture.id);
-    rlBegin(RL_QUADS);
-    rlColor4ub(255, 255, 255, 190);                 // 融入度 (透 25%)
-    rlNormal3f(0, 1, 0);
-    rlTexCoord2f(0, 0); rlVertex3f(pos.x - e, 0.09f, pos.z - e);
-    rlTexCoord2f(1, 0); rlVertex3f(pos.x + e, 0.09f, pos.z - e);
-    rlTexCoord2f(1, 1); rlVertex3f(pos.x + e, 0.09f, pos.z + e);
-    rlTexCoord2f(0, 1); rlVertex3f(pos.x - e, 0.09f, pos.z + e);
-    rlEnd();
-    rlSetTexture(0);
+    // M6-l: 支持无纹理纯色 quad (Boss FOV 红雾) + 使用 item.tint
+    if (item.texture.id > 0) {
+        rlSetTexture(item.texture.id);
+        rlBegin(RL_QUADS);
+        rlColor4ub(item.tint.r, item.tint.g, item.tint.b, item.tint.a);
+        rlNormal3f(0, 1, 0);
+        rlTexCoord2f(0, 0); rlVertex3f(pos.x - e, pos.y, pos.z - e);
+        rlTexCoord2f(1, 0); rlVertex3f(pos.x + e, pos.y, pos.z - e);
+        rlTexCoord2f(1, 1); rlVertex3f(pos.x + e, pos.y, pos.z + e);
+        rlTexCoord2f(0, 1); rlVertex3f(pos.x - e, pos.y, pos.z + e);
+        rlEnd();
+        rlSetTexture(0);
+    } else {
+        // 纯色 quad (Boss FOV 红雾等)
+        DrawPlane({pos.x, pos.y, pos.z}, {item.size, item.size},
+                  {item.tint.r, item.tint.g, item.tint.b, item.tint.a});
+    }
 }
 
 // ── M6-v2h: 门 — 竖立贴图面板 (四态纹理; 锁=红罩 / 封=紫脉冲十字) ──

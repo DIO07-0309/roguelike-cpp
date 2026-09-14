@@ -52,6 +52,10 @@ public:
     // M4f.2: 程序化 VFX 爆点占位 32×32 (中心闪光 + 8 向放射)
     static Texture2D gen_pixel_blast(Color c);
 
+    // M6-k: 程序化 Arena 物件 32×32 (爆炸桶/图腾/毒池/岩石/尖刺)
+    // type: 0=EXPLOSIVE_BARREL 1=HEALING_TOTEM 2=POISON_POOL 3=ROCK 4=SPIKE
+    static Texture2D gen_arena_prop(int type, Color base);
+
 private:
     static void _fill_body(Image* img, Color body, int variant);
     static void _draw_eyes(Image* img, Color accent, int variant, int eye_dir);

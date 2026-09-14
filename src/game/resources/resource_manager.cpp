@@ -270,6 +270,14 @@ Texture2D ResourceManager::procedural_fx(const char* key, Color c) {
     return tex;
 }
 
+Texture2D ResourceManager::procedural_arena_prop(const char* key, int type, Color base) {
+    auto it = _texture_cache.find(key);
+    if (it != _texture_cache.end()) return it->second;
+    Texture2D tex = SpriteRenderer::gen_arena_prop(type, base);
+    _texture_cache[key] = tex;
+    return tex;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // M4f.4: 数据驱动精灵 (resources/sprites.json)
 // ═══════════════════════════════════════════════════════════════

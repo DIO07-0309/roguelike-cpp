@@ -58,6 +58,8 @@ public:
                                 int variant, int eye_dir = 0);
     // M4f.2: 程序化 VFX 爆点缓存
     Texture2D procedural_fx(const char* key, Color c);
+    // M6-k: 程序化 Arena 物件缓存 (type 0-4; 零 RNG)
+    Texture2D procedural_arena_prop(const char* key, int type, Color base);
 
     // ── M4f.4: 数据驱动精灵 (resources/sprites.json → 文件纹理) ──
     bool load_sprite_config();

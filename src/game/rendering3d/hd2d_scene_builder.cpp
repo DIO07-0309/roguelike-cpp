@@ -308,8 +308,49 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                                             floor_tex.tex, item, out);
             }
             out.push_back(item);
+            // M6-l: Boss FOV 红雾 — Boss 可见但玩家不可见的区域叠红色半透明
+            // 2D: DrawRectangle({180,40,40,50}); 3D: FLOOR_DECAL 贴地红色 quad
+            if (map->isBossVisible(tx, ty) && map->isExplored(tx, ty)
+                && !map->isVisible(tx, ty)) {
+                HD2DDrawItem fog;
+                fog.kind = HD2DDrawItem::Kind::FLOOR_DECAL;
+                fog.world_pos = item.world_pos;
+                fog.world_pos.y = 0.06f;
+                fog.size = TILE_SIZE;
+                fog.tile_x = tx; fog.tile_y = ty;
+                fog.tint = {180, 40, 40, 50};
+                fog.texture = {};
+                out.push_back(fog);
+            }
         }
     }
+}
+
+// ── M6-m: 怪物 sprite key 映射 (与 monster.cpp _monster_sprite_key 同源) ──
+static const char* _monster_sprite_key_for_3d(const Monster& m) {
+    if (m.is_boss) return nullptr;
+    switch (m.monster_type) {
+        case MonsterType::BOMBER:    return "mon_bomber";
+        case MonsterType::TANK:      return "mon_tank";
+        case MonsterType::CHARGER:   return "mon_charger";
+        case MonsterType::SUMMONER:  return "mon_summoner";
+        case MonsterType::SHAMAN:    return "mon_shaman";
+        default: break;
+    }
+    const auto& name = m.name;
+    if (name.find("史莱姆") != std::string::npos) return "mon_slime";
+    if (name.find("骨") != std::string::npos || name.find("骷髅") != std::string::npos)
+        return "mon_skeleton";
+    if (name.find("萨满") != std::string::npos || name.find("法师") != std::string::npos)
+        return "mon_shaman";
+    if (name.find("潜伏") != std::string::npos || name.find("潜行者") != std::string::npos)
+        return "mon_shadow_stalker";
+    if (name.find("刺客") != std::string::npos) return "mon_shadow_assassin";
+    if (name.find("火魔") != std::string::npos) return "mon_fire_imp";
+    if (name.find("守卫") != std::string::npos) return "mon_tank";
+    if (name.find("兽人") != std::string::npos)
+        return (name.find("精英") != std::string::npos) ? "mon_elite_orc" : "mon_orc";
+    return "mon_orc";
 }
 
 // ── 实体: 玩家 + 存活怪 → billboard (贴图 2D 同源 + v2a 呼吸帧动画) ──
@@ -342,10 +383,10 @@ static void _build_entities(GameScene& gs, std::vector<HD2DDrawItem>& out) {
         item.size = 34.0f;
         item.sort_y = r.y;
         SpriteDef def;
-        if (!m->sprite_override.empty())
-            item.texture = res.sprite_by_key(m->sprite_override.c_str(), def);
-        if (item.texture.id == 0)
-            item.texture = res.sprite_by_key("mon_orc", def);
+        // M6-m: 使用 sprite_override 或按类型/名称映射
+        const char* skey = !m->sprite_override.empty() ? m->sprite_override.c_str()
+                                                       : _monster_sprite_key_for_3d(*m);
+        if (skey) item.texture = res.sprite_by_key(skey, def);
         if (item.texture.id > 0)
             item.tex_src = SpriteRenderer::frame_rect(def, anim_frame);
         else item.tint = {220, 80, 80, 255};
@@ -384,6 +425,48 @@ static void _build_ground_items(GameScene& gs, std::vector<HD2DDrawItem>& out) {
         if (item.texture.id <= 0) continue;     // 图标缺素材不画 (2D 有几何回退, 3D 跳过)
         item.tex_src = SpriteRenderer::frame_rect(def, 0);
         item.tint = WHITE;
+        out.push_back(item);
+    }
+}
+
+// ── M6-k: Arena 物件 → billboard/贴地 (爆炸桶/图腾/毒池/岩石/尖刺) ──
+static void _build_arena_objects(GameScene& gs, std::vector<HD2DDrawItem>& out) {
+    const GameMap* map = gs.game_map.get();
+    if (!map) return;
+    auto& res = ResourceManager::inst();
+    static bool logged = false;
+    if (!logged) { logged = true; LOG_INFO("[M6k] arena_objects count=%d", (int)map->arena_objects.size()); }
+    for (const auto& ao : map->arena_objects) {
+        if (!ao.active) continue;
+        if (!map->isVisible(ao.tile_x, ao.tile_y)) continue;
+        int type_idx = static_cast<int>(ao.type);
+        char key[32];
+        snprintf(key, sizeof(key), "arena_prop_%d", type_idx);
+        Color base = {100, 100, 100, 255};
+        Texture2D tex = res.procedural_arena_prop(key, type_idx, base);
+        if (tex.id <= 0) continue;
+        HD2DDrawItem item;
+        item.world_pos = {(float)ao.tile_x * TILE_SIZE + TILE_SIZE * 0.5f, 0,
+                          (float)ao.tile_y * TILE_SIZE + TILE_SIZE * 0.5f};
+        item.tile_x = ao.tile_x;
+        item.tile_y = ao.tile_y;
+        item.size = 28.0f;
+        item.sort_y = (float)ao.tile_y * TILE_SIZE;
+        item.texture = tex;
+        item.tex_src = {0, 0, 32, 32};
+        if (ao.type == ArenaObjectType::POISON_POOL ||
+            ao.type == ArenaObjectType::SPIKE) {
+            item.kind = HD2DDrawItem::Kind::FLOOR_DECAL;
+            item.world_pos.y = 0.08f;
+            item.size = TILE_SIZE;
+        } else {
+            item.kind = HD2DDrawItem::Kind::ENTITY_BILLBOARD;
+        }
+        item.tint = WHITE;
+        if (ao.type == ArenaObjectType::EXPLOSIVE_BARREL && ao.timer > 0.0f) {
+            float pulse = 0.6f + 0.4f * sinf((float)GetTime() * 14.0f);
+            item.tint = {255, (unsigned char)(150 * pulse), (unsigned char)(100 * pulse), 255};
+        }
         out.push_back(item);
     }
 }
@@ -705,6 +788,7 @@ void build_scene(GameScene& gs, std::vector<HD2DDrawItem>& out_items) {
     _build_entities(gs, out_items);
     _build_effects(gs, out_items);
     _build_ground_items(gs, out_items);   // M6-v2a
+    _build_arena_objects(gs, out_items);  // M6-k
     _build_special_rooms(gs, out_items);   // M6-v2h
     _build_npcs(gs, out_items);           // M6-v2a
     _build_portals(gs, out_items);        // M6-v2a

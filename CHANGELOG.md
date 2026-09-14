@@ -1,3 +1,57 @@
+# v1.4.31 — M6-m 完成: 角色资产升级 (2026-09-14)
+
+> 玩家与怪物使用真实 sprite 纹理替代程序化占位,
+> 4 个 Hero Asset 验证通过后可批量扩展。
+>
+> ## 资产 (resources/sprites.json)
+> - **player_default**: 新增,映射到 player_fire.png (默认玩家外观)
+> - sprites.json 精灵定义 81→82
+>
+> ## 渲染 (rendering3d)
+> - **_monster_sprite_key_for_3d**: 新增怪物 sprite 映射函数
+>   (按 MonsterType + 名称匹配,与 2D monster.cpp 同源)
+> - **_build_entities**: 怪物渲染改用 sprite 映射而非硬编码 "mon_orc"
+>
+> ## 验证
+> - 60/60 ctest + 0 警告 + world_validator 0 err
+> - F1 截图确认 sprite 加载 (82 定义)
+
+# v1.4.30 — M6-l 完成: Boss FOV 红雾 3D 呈现 (2026-09-14)
+
+> Boss 可见但玩家不可见的区域叠红色半透明覆盖,提示危险区域。
+> 修复 _draw_floor_decal 支持无纹理纯色 quad + 使用 item.tint。
+>
+> ## 渲染 (rendering3d)
+> - **_build_terrain**: 遍历 tile 时检查 `boss_visible && explored && !visible`
+>   → 添加 FLOOR_DECAL 红色 quad `{180,40,40,50}`
+> - **_draw_floor_decal**: 支持无纹理纯色 quad (DrawPlane)
+>   + 使用 item.tint 而非硬编码白色
+>
+> ## 验证
+> - 60/60 ctest + 0 警告 + world_validator 0 err
+> - F5 Boss 层截图验证 (Boss 未遭遇时无 fog, 符合预期)
+
+# v1.4.29 — M6-k 完成: Arena 物件 3D 呈现 (2026-09-14)
+
+> 战场环境元素(爆炸桶/图腾/毒池/岩石/尖刺)从 2D 翻译到 3D,
+> 程序化纹理零外部素材,确定性生成保 Sim 兼容。
+>
+> ## 渲染 (rendering3d / sprite_renderer)
+> - **gen_arena_prop**: 5 类物件程序纹理 32×32
+>   - EXPLOSIVE_BARREL: 木桶+黑箍,点燃时红脉冲 tint
+>   - HEALING_TOTEM: 绿符文柱+光晕
+>   - POISON_POOL: 绿色毒池贴地 quad
+>   - ROCK: 灰岩石矮 billboard
+>   - SPIKE: 红尖刺三角贴地
+> - **_build_arena_objects**: 遍历 map->arena_objects,
+>   POISON_POOL/SPIKE 走 FLOOR_DECAL(贴地), 其他走 ENTITY_BILLBOARD
+> - ResourceManager.procedural_arena_prop 缓存 per-type 纹理
+>
+> ## 验证
+> - F6 火山层生成 7 个 arena 物件,截图检测到
+>   绿 4434px(totem) / 橙 1648px(barrel) / 红 23786px(spike)
+> - 60/60 ctest + 0 警告 + world_validator 0 err
+
 # v1.4.28 — M6-i.1 完成: 3D 群系色相可见 + 静默取证监视链 (2026-09-14)
 
 > 本切片解决 HD2D 3D 渲染"全屏蓝灰、群系不可辨"问题,并建立后台静默
