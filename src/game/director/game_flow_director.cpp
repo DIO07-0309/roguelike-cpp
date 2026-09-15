@@ -67,10 +67,44 @@ void GameFlowDirector::on_player_dead() {
     ds->final_line   = _scene->_gameplay.ending_dir.final_line();
     ds->meta_soul    = _scene->_gameplay.ending_dir.meta_reward_soul() / 2;
     ds->meta_knowledge = _scene->_gameplay.ending_dir.meta_reward_knowledge() / 2;
+    _fill_mirror_verdict(*ds);
 
     _scene->get_tree()->change_scene(ds);
     current_state = GameFlowState::ENDING;
     LOG_INFO("死亡→DeathScene (第%d层 Lv%d)", ds->final_floor, ds->final_level);
+}
+
+// v1.6-B1: F15 死亡时的镜像复盘 — "它靠什么赢了你" (非 F15 留空不显示)
+void GameFlowDirector::_fill_mirror_verdict(DeathScene& ds) {
+    if (!_scene->_boss._mirror_agent) return;
+    const auto& agent = *_scene->_boss._mirror_agent;
+    const MirrorDebugStats* st = agent.debug_stats();
+    float acc = agent.prediction_accuracy();
+    int phase = agent.current_phase();
+    // 结论文案: 按 phase + 准确率分档
+    char vbuf[160];
+    if (phase >= 3)
+        snprintf(vbuf, sizeof(vbuf), "回响进入了进化期 — 它完整复刻了你的战斗人格");
+    else if (acc > 0.5f)
+        snprintf(vbuf, sizeof(vbuf), "它预判了你 %.0f%% 的动作 — 你的习惯成了破绽", acc * 100);
+    else
+        snprintf(vbuf, sizeof(vbuf), "它仍在学习你 (命中 %.0f%%) — 这一次, 是它比你强", acc * 100);
+    ds.mirror_verdict = vbuf;
+    // 被针对习惯 Top3 (与战斗内面板同源逻辑)
+    const PlayerHabitProfile& pf = agent.profile();
+    ds.mirror_habits.clear();
+    auto add = [&](const char* s) { ds.mirror_habits += s; ds.mirror_habits += '\n'; };
+    if (pf.predict_attack_heavy) add("· 攻击成瘾 — 被『引诱后惩罚』反复针对");
+    if (pf.predict_low_dodge)    add("· 几乎不闪避 — 被近身压制");
+    if (pf.predict_panic_heal)   add("· 治疗时机可预测 — 被读秒打断");
+    if (pf.fight_back_rate > 0.6f) add("· 受击必反击 — 被后手预判");
+    if (pf.attack_rhythm_var < 0.25f && pf.total_actions > 40)
+        add("· 固定攻击节奏 — 被节奏反制");
+    if (st && st->snapshot().interrupt_success > 0) {
+        char ib[64];
+        snprintf(ib, sizeof(ib), "· 技能被时停打断 %d 次", st->snapshot().interrupt_success);
+        add(ib);
+    }
 }
 
 void GameFlowDirector::on_game_clear() {

@@ -49,6 +49,33 @@ void DeathScene::_render() {
             DrawTextEx(g_font_small, buf, {sw/2.0f - w/2, 240}, 14, 1, {200,220,255,200});
         }
 
+        // v1.6-B1: 镜像复盘 (仅 F15 死亡有内容 — 死在"自己"手里的特别演出)
+        if (!mirror_verdict.empty()) {
+            float vy = 300.0f;
+            w = MeasureTextEx(g_font_small, "— 镜像复盘 —", 16, 1).x;
+            DrawTextEx(g_font_small, "— 镜像复盘 —", {sw/2.0f - w/2, vy}, 16, 1,
+                       {255, 120, 100, 240});
+            vy += 24;
+            w = MeasureTextEx(g_font_small, mirror_verdict.c_str(), 15, 1).x;
+            DrawTextEx(g_font_small, mirror_verdict.c_str(), {sw/2.0f - w/2, vy},
+                       15, 1, {220, 160, 150, 235});
+            vy += 26;
+            // 逐行画习惯 (手动折行: 每行一个 '\n')
+            size_t pos = 0;
+            while (pos < mirror_habits.size() && vy < sh - 110) {
+                size_t nl = mirror_habits.find('\n', pos);
+                if (nl == std::string::npos) nl = mirror_habits.size();
+                std::string line = mirror_habits.substr(pos, nl - pos);
+                if (!line.empty()) {
+                    w = MeasureTextEx(g_font_small, line.c_str(), 13, 1).x;
+                    DrawTextEx(g_font_small, line.c_str(), {sw/2.0f - w/2, vy},
+                               13, 1, {170, 140, 135, 225});
+                    vy += 19;
+                }
+                pos = nl + 1;
+            }
+        }
+
         w = MeasureTextEx(g_font_small, "存档已保留，可从选关界面继续挑战", 16, 1).x;
         DrawTextEx(g_font_small, "存档已保留，可从选关界面继续挑战",
                    {sw/2.0f - w/2, 275}, 16, 1, {220, 180, 100, 255});

@@ -297,6 +297,18 @@ void BossSystemDirector::connect_mirror_theater(
             });
 }
 
+// v1.6-B1: 阶段晋升横幅通道 — 覆盖 M1 的小字播报为醒目横幅
+// (connect_mirror_theater 之后调用; phase 2=镜像期 3=进化期)
+void BossSystemDirector::hook_phase_banner(
+    std::function<void(int, const char*)> banner) {
+    if (!banner) return;
+    if (_mirror_agent)
+        _mirror_agent->set_phase_sink(
+            [banner](int phase, const char* reason) {
+                banner(phase, reason);
+            });
+}
+
 void BossSystemDirector::tick(float dt, Monster* boss, Player* player, int floor,
     float game_time, const WorldState& ws, const RelationshipSystem& rels,
     StoryStage stage, std::vector<std::unique_ptr<Monster>>& monsters,

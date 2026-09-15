@@ -1473,6 +1473,9 @@ void GameScene::_process(double delta) {
     // B10: 房间消息计时器
     if (_presentation.room_msg_timer > 0) _presentation.room_msg_timer -= dt;
 
+    // v1.6-B1: 镜像晋升横幅计时器
+    if (_mirror_banner_timer > 0) _mirror_banner_timer -= dt;
+
     // Batch 3H: Gamble result timer decay
     if (gamble_result_timer > 0) gamble_result_timer -= dt;
 
@@ -2668,6 +2671,11 @@ void GameScene::_render_ui_tail(int sw, int sh) {
     // D4 Step2: 事件演出 UI (在所有 HUD 之上)
     _draw_event_ui(sw, sh);
 
+    // v1.6-B1: 镜像阶段晋升横幅 (最高优先级 — 招牌时刻)
+    if (_mirror_banner_timer > 0)
+        GameRenderer::draw_phase_banner(sw, sh, _mirror_banner_phase,
+                                        _mirror_banner_timer);
+
     // M4.2: 镜像冻结 overlay (优先级高于玩家时停 — 显示红霜)
     if (player_frozen_by_mirror()) {
         _renderer.draw_mirror_freeze_overlay(sw, sh, _boss.mirror_freeze_remaining());
@@ -3013,6 +3021,35 @@ void GameScene::_build_echo_panel_data(CharacterPanelData& echo) const {
     if (mb < 0) mb = 0;   // 观察期未决策 → 展示桶0
     for (int i = 0; i < 4; i++)
         echo.mirror_arm_rates[i] = _boss._mirror_agent->arm_win_rate(mb, i);
+    _fill_mirror_learn_display(echo);
+}
+
+// ── v1.6-B1: "它眼中的你" 数据 (Boss 层常驻; 全部只读自画像/在线统计) ──
+void GameScene::_fill_mirror_learn_display(CharacterPanelData& echo) const {
+    const auto& agent = *_boss._mirror_agent;
+    const PlayerHabitProfile& pf = agent.profile();
+    // 在线统计 (观察期就有意义: 已观察数与准确率展示"它在学")
+    echo.mirror_observed = agent.observed_actions();
+    float acc = agent.prediction_accuracy();
+    echo.mirror_accuracy = (echo.mirror_observed >= 5) ? acc : -1.0f;
+    echo.mirror_drift = agent.profile_drift();
+    snprintf(echo.mirror_style, sizeof(echo.mirror_style), "%s", pf.style_name());
+    // Top3 习惯短句: 按画像字段生成 (后写覆盖前写, 手感优先级 < 条件维度)
+    int n = 0;
+    auto set_habit = [&](const char* fmt, float v) {
+        if (n >= 3) return;
+        snprintf(echo.mirror_habits[n], sizeof(echo.mirror_habits[0]), fmt, v);
+        n++;
+    };
+    if (pf.predict_attack_heavy) set_habit("重攻轻守: 攻击占比%.0f%%", pf.aggression_score * 100);
+    if (pf.predict_low_dodge)   set_habit("几乎不闪避 (%.0f%%)", pf.dodge_rate * 100);
+    if (pf.predict_panic_heal)  set_habit("习惯提前治疗 (HP%.0f%%)", pf.hp_counter_threshold);
+    if (pf.fight_back_rate > 0.6f) set_habit("受击后硬刚反击 (%.0f%%)", pf.fight_back_rate * 100);
+    else if (pf.fight_back_rate < 0.3f && pf.total_actions > 40)
+        set_habit("受击后倾向后撤 (%.0f%%)", (1.0f - pf.fight_back_rate) * 100);
+    if (pf.attack_rhythm_var > 0 && pf.attack_rhythm_var < 0.25f)
+        set_habit("固定攻击节奏 (方差%.2f)", pf.attack_rhythm_var);
+    while (n < 3) { echo.mirror_habits[n][0] = '\0'; n++; }
 }
 
 // Echo 面板 buff 腐化名映射 (攻/防/毒/缓/冻/血/燃/雷 → 黑化前缀)

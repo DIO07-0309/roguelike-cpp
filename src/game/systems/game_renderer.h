@@ -41,6 +41,12 @@ struct CharacterPanelData {
     // M4e: 在线学习 HUD (当前桶 4 臂胜率, -1 = 未决策)
     int mirror_last_action = -1;
     float mirror_arm_rates[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    // v1.6-B1: 镜像记忆可视化 — "它眼中的你" (Boss 层常驻)
+    float mirror_accuracy = -1.0f;   // 预测准确率 [0,1], -1=数据不足
+    int   mirror_observed = 0;        // 已观察动作数
+    float mirror_drift = 0.0f;        // 本局风格漂移 [0,1]
+    char  mirror_style[24] = "";      // 画像风格名 (激进/防御/狙击/法师/均衡)
+    char  mirror_habits[3][48] = {"", "", ""};  // Top3 习惯中文短句
 };
 
 // ============================================================
@@ -74,6 +80,9 @@ public:
 
     // ---- F15.5.1: 角色面板 (可复用的玩家/Echo面板) ----
     static void draw_character_panel(const CharacterPanelData& d, float x, float y);
+
+    // ---- v1.6-B1: 镜像阶段晋升横幅 (观察→镜像→进化) ----
+    static void draw_phase_banner(int sw, int sh, int phase, float timer);
 
     // ---- HUD 渲染 ----
     void draw_hud(const Player* player, int current_floor, float game_time,

@@ -373,6 +373,11 @@ private:
     // F15.5.1/M6-v2a: Echo 面板数据构建 (2D/3D 分支共用, 防 60 行复制)
     void _build_echo_panel_data(CharacterPanelData& out) const;
     void _fill_echo_buffs(CharacterPanelData& out) const;
+    // v1.6-B1: 镜像记忆可视化 — "它眼中的你" (只读画像/在线统计)
+    void _fill_mirror_learn_display(CharacterPanelData& out) const;
+    // v1.6-B1: 镜像阶段晋升横幅状态 (观察→镜像→进化 醒目播报)
+    int   _mirror_banner_phase = 0;
+    float _mirror_banner_timer = 0.0f;
 
     // M6-v2a: _render UI 尾段共用 (红屏/HUD/小地图/对话/冻结/演出; 2D/3D 同 UI)
     void _render_ui_tail(int sw, int sh);

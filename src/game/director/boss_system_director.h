@@ -75,6 +75,8 @@ public:
                               const std::vector<float>& beta);
     // M1: 镜像学习剧场接线 — GameScene 注入播报通道 (战术/阶段晋升 → 屏幕消息)
     void connect_mirror_theater(std::function<void(const char*, float)> sink);
+    // v1.6-B1: 阶段晋升横幅通道 — "它开始模仿你/看穿你" 醒目播报
+    void hook_phase_banner(std::function<void(int, const char*)> banner);
 
     std::string intro_text;
     std::string modifier_text;

@@ -139,12 +139,17 @@ auto* boss = boss_factory_create(btype, _s.stairs_pos.first, _s.stairs_pos.secon
             // M4e: 跨对局镜像记忆注入 (空 vector 安全)
             _s._boss.inject_mirror_memory(_s._mirror_mem_alpha,
                                           _s._mirror_mem_beta);
-            // M1: 镜像播报接线 — 战术切换 / 阶段晋升 → 屏幕消息
-            // (仅 F15 镜像 Boss: agent 由 init_on_spawn 内部创建后才有意义,
-            //  每帧 tick 走 boss_system_director, 这里只挂 sink)
+            // M1 + v1.6-B1: 镜像播报接线 — 战术切换走消息; 阶段晋升走
+            // 醒目横幅 (它开始模仿你/看穿你 — 招牌时刻不该是小字)
             _s._boss.connect_mirror_theater(
                 [&s = _s](const char* msg, float dur) {
                     if (msg) s._presentation.show_message(msg, dur);
+                });
+            _s._boss.hook_phase_banner(
+                [&s = _s](int phase, const char* reason) {
+                    s._mirror_banner_phase = phase;
+                    s._mirror_banner_timer = 3.0f;
+                    if (reason) s._presentation.show_message(reason, 2.5f);
                 });
             _s._presentation.boss_modifier_text = _s._boss.modifier_text;
 

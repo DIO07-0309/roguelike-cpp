@@ -324,6 +324,27 @@ void GameRenderer::draw_room_message(int sw, int sh, const std::string& msg, flo
     DrawTextEx(g_font_small, display.c_str(), {px, py}, 18, 1, fg);
 }
 
+// ── v1.6-B1: 镜像阶段晋升横幅 — "它学会了" 高优先级播报 ──
+// phase: 2=镜像期(开始模仿你) 3=进化期(完整克制你); timer 3s 渐隐
+void GameRenderer::draw_phase_banner(int sw, int sh, int phase, float timer) {
+    if (timer <= 0 || !g_font_loaded) return;
+    float alpha = std::min(1.0f, timer / 0.8f);        // 尾部 0.8s 淡出
+    float slide = (1.0f - alpha) * 30.0f;             // 淡出时上滑
+    const char* big = (phase >= 3) ? "它看穿了你的套路" : "它开始模仿你";
+    const char* sub = (phase >= 3) ? "ECHO · 进化完成 — 完整克制策略上线"
+                                   : "MIRROR · 镜像期 — 你的习惯正在被复刻";
+    Color bigc = (phase >= 3) ? Color{255, 80, 60, 255} : Color{230, 120, 90, 255};
+    // 全宽暗带 (Boss 战画面之上, 横幅可读性)
+    DrawRectangle(0, (int)(sh * 0.30f), sw, 96,
+        {10, 4, 4, (unsigned char)(150 * alpha)});
+    float big_w = MeasureTextEx(g_font, big, 34, 1).x;
+    DrawTextEx(g_font, big, {sw / 2.0f - big_w / 2, sh * 0.30f + 14 - slide},
+        34, 1, {bigc.r, bigc.g, bigc.b, (unsigned char)(255 * alpha)});
+    float sub_w = MeasureTextEx(g_font_small, sub, 15, 1).x;
+    DrawTextEx(g_font_small, sub, {sw / 2.0f - sub_w / 2, sh * 0.30f + 60 - slide},
+        15, 1, {220, 170, 150, (unsigned char)(220 * alpha)});
+}
+
 // ============================================================
 // HUD 渲染
 // ============================================================
@@ -820,37 +841,66 @@ void GameRenderer::draw_character_panel(const CharacterPanelData& d, float px, f
     if (!d.buffs.empty())
         _draw_panel_buffs(d.buffs, px + 10, ly, d.mirror_mode);
 
-    // M4e: 在线学习 HUD (决策后才显示)
-    if (d.mirror_mode && d.mirror_last_action >= 0)
+    // M4e + v1.6-B1: 镜像学习区 — "它眼中的你" 常驻 (观察期起);
+    // 4 臂胜率条仅决策后叠加
+    if (d.mirror_mode)
         _draw_mirror_learning(d, px, py, ph);
 }
 
-// M4e: 镜像在线学习 HUD — 当前桶 4 臂胜率 + 上次决策
+// v1.6-B1: "它眼中的你" — 风格/Top3习惯/准确率 (Boss 层常驻, 观察期起)
+// 布局: 紧贴 Echo 面板下方; 高度按习惯条数自适应 (54~116px)
 void GameRenderer::_draw_mirror_learning(const CharacterPanelData& d,
                                          float px, float py, float panel_h) {
-    static const char* ARM_NAMES[4] = {"近战压制", "后撤拉扯", "技能反制", "连招输出"};
     float ly2 = py + panel_h + 8.0f;
-    float lh = 74.0f;
-    DrawRectangleRounded({px, ly2, 240.0f, lh}, 0.12f, 4, {20, 8, 8, 220});
-    DrawRectangleRoundedLines({px, ly2, 240.0f, lh}, 0.12f, 4, 1.0f,
+    // ── 上段: 它眼中的你 (常驻) ──
+    int habit_rows = 0;
+    for (int i = 0; i < 3; i++)
+        if (d.mirror_habits[i][0]) habit_rows++;
+    float top_h = 46.0f + habit_rows * 15.0f;
+    DrawRectangleRounded({px, ly2, 240.0f, top_h}, 0.12f, 4, {24, 10, 10, 225});
+    DrawRectangleRoundedLines({px, ly2, 240.0f, top_h}, 0.12f, 4, 1.0f,
+        {130, 40, 40, 190});
+    char lbuf[64];
+    snprintf(lbuf, sizeof(lbuf), "它眼中的你 · %s", d.mirror_style);
+    DrawTextEx(g_font_small, lbuf, {px + 8, ly2 + 3}, 12, 1, {230, 120, 110, 255});
+    float ry = ly2 + 20.0f;
+    for (int i = 0; i < 3; i++) {
+        if (!d.mirror_habits[i][0]) continue;
+        DrawTextEx(g_font_small, d.mirror_habits[i], {px + 8, ry}, 11, 1,
+            {195, 140, 135, 240});
+        ry += 15.0f;
+    }
+    // 准确率行 (数据不足显示观察进度)
+    if (d.mirror_accuracy >= 0.0f)
+        snprintf(lbuf, sizeof(lbuf), "预测命中 %d%% (%d 招)",
+            (int)(d.mirror_accuracy * 100), d.mirror_observed);
+    else
+        snprintf(lbuf, sizeof(lbuf), "观察中… 已收录 %d 招", d.mirror_observed);
+    DrawTextEx(g_font_small, lbuf, {px + 8, ry}, 11, 1, {220, 170, 120, 255});
+    // ── 下段: 4 臂胜率 (决策后) ──
+    if (d.mirror_last_action < 0) return;
+    static const char* ARM_NAMES[4] = {"近战压制", "后撤拉扯", "技能反制", "连招输出"};
+    float ay = ly2 + top_h + 4.0f;
+    float ah = 74.0f;
+    DrawRectangleRounded({px, ay, 240.0f, ah}, 0.12f, 4, {20, 8, 8, 220});
+    DrawRectangleRoundedLines({px, ay, 240.0f, ah}, 0.12f, 4, 1.0f,
         {90, 30, 30, 180});
-    char lbuf[48];
-    snprintf(lbuf, sizeof(lbuf), "在线学习 · 决策: %s",
+    snprintf(lbuf, sizeof(lbuf), "应对策略 · 决策: %s",
         ARM_NAMES[d.mirror_last_action]);
-    DrawTextEx(g_font_small, lbuf, {px + 8, ly2 + 3}, 12, 1,
+    DrawTextEx(g_font_small, lbuf, {px + 8, ay + 3}, 12, 1,
         {220, 150, 140, 255});
-    float ry = ly2 + 22.0f;
+    float ary = ay + 22.0f;
     for (int i = 0; i < 4; i++) {
         bool cur = (i == d.mirror_last_action);
         Color ac = cur ? Color{220, 90, 80, 255} : Color{170, 130, 130, 255};
-        DrawTextEx(g_font_small, ARM_NAMES[i], {px + 8, ry}, 11, 1, ac);
+        DrawTextEx(g_font_small, ARM_NAMES[i], {px + 8, ary}, 11, 1, ac);
         snprintf(lbuf, sizeof(lbuf), "%d%%",
             (int)(d.mirror_arm_rates[i] * 100.0f));
-        DrawTextEx(g_font_small, lbuf, {px + 66, ry}, 11, 1, ac);
-        draw_progress_bar({px + 104, ry + 3, 112, 8}, d.mirror_arm_rates[i],
+        DrawTextEx(g_font_small, lbuf, {px + 66, ary}, 11, 1, ac);
+        draw_progress_bar({px + 104, ary + 3, 112, 8}, d.mirror_arm_rates[i],
             cur ? Color{220, 90, 80, 255} : Color{120, 60, 60, 255},
             {50, 20, 20, 255});
-        ry += 13.0f;
+        ary += 13.0f;
     }
 }
 
