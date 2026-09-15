@@ -40,3 +40,4 @@ ersHPanaconda3shellcondabinconda-hook.ps1*
 
 # symlink 安装的 skill (指向 ~/.opencode/skills, 不入库)
 .claude/skills/anysearch/
+saves/screenshot.png
