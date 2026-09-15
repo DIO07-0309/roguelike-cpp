@@ -8,8 +8,9 @@
 </p>
 
 <p align="center">
-  <!-- TODO(GIF): 首图位 — F15 镜像 Boss 战斗 GIF (10s, 960x640), 录制清单见 docs/RELEASE_CHECKLIST.md 附录A --><br>
-  <sub>📷 截图位：标题 / 战斗 / F15 镜像（录制清单备好，实机截图待补）</sub>
+  <!-- TODO(GIF): 首图位 — F15 镜像 Boss 战斗 GIF (10s, 960x640), 录制清单见 docs/RELEASE_CHECKLIST.md 附录A -->
+  <img src="docs/screenshots/v1.5.0_F6_volcano.png" width="480" alt="F6 火山群系 — 暖棕地牢与点燃的桶"><br>
+  <sub>F6 火山群系（HD-2D 3D 表现层）· 更多: <a href="docs/screenshots/v1.5.0_F1_prison.png">F1 石灰监狱</a> / <a href="docs/screenshots/v1.5.0_F11_abyss.png">F11 深渊</a></sub>
 </p>
 
 ---
@@ -108,7 +109,7 @@ F15 镜像 Boss 读你的行为画像（攻防倾向/走位偏好/技能习惯�
 - **平台** — Windows 实机验证；macOS/Linux 构建规范见 `docs/G4_PLATFORM_BIBLE.md`，未实机验证
 - **输入** — 键盘 only
 - **确定性已知项** — sim 批量间歇分岔已于 v1.4.15 修复（P1-C8/RNG-002：VFX 视觉掷骰误吃 gameplay rng 流，32 批并行验证零分岔）；`combat_coordinator.cpp` 时停 pre_hp 裸指针快照列清理候选
-- **截图/GIF** — README 截图位为占位，录制清单已备（`docs/RELEASE_CHECKLIST.md` 附录 A）
+- **截图/GIF** — README 已有 HD-2D 实机截图（F1/F6/F11 三群系）；GIF/Trailer 仍为占位，录制清单见 `docs/RELEASE_CHECKLIST.md` 附录 A（v1.5.x 补）
 
 ## License
 

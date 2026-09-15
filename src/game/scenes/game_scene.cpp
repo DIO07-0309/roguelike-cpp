@@ -50,6 +50,7 @@
 extern Font g_font;
 extern Font g_font_small;
 extern bool g_font_loaded;
+extern int  g_goto_floor;                    // v1.5.0-P0: scene_tree.cpp 定义
 
 // ═══ G4.5: Replay static config ═══
 std::string GameScene::g_record_path;
@@ -153,6 +154,25 @@ void GameScene::_ready() {
     ServiceLocator::provide(&_interact);
 }
 
+// v1.5.0-P0: sim goto-floor 玩家强度对标 — bot 裸装 (120HP/12ATK) 进 F15
+// 对 demon_lord (620HP/26ATK/15PDEF) 约 6 击即死, 取证不了镜像机制。
+// 对标手算: 15 层自然成长的合理面板 (等级/装备/药水同步补), 只影响 sim 取证局。
+void GameScene::_sim_goto_scale_player(int start_floor) {
+    int target_level = 1 + (start_floor - 1) * 2 / 3;         // F15→Lv11
+    player->level = target_level;
+    player->xp = 0;
+    player->xp_to_next = Player::calc_xp_for_level(target_level);
+    int scale_hp = 120 + (start_floor - 1) * 60;                // F15→960
+    player->combat.max_hp = scale_hp;
+    player->combat.current_hp = scale_hp;
+    player->combat.attack += (start_floor - 1) * 2;            // F15→40
+    player->combat.physical_defense += (start_floor - 1);      // F15→+14
+    player->combat.magical_defense += (start_floor - 1) / 2;   // F15→+7
+    for (int potion_i = 0; potion_i < start_floor / 3; potion_i++)
+        player->inventory.items.push_back(
+            std::make_shared<ConsumableItem>("治疗药水", Rarity::COMMON, "heal", 30));
+}
+
 void GameScene::new_game() {
     // M1: 新对局清空行为录制 — 修复跨局流污染
     // (旧代码 g_behavior 从不清: 上一局的死亡记录混入本局镜像分析)
@@ -213,9 +233,16 @@ void GameScene::new_game() {
     g_meta.load();
     _gameplay.run_stats = RunSummary{};
     player->skills.apply_all_passives(player.get());
-    current_floor = 1;
-    max_unlocked_floor = 1;
-    enter_floor(1);
+    // v1.5.0-P0: sim goto-floor 直达 (取证/冒烟深层的测试通道; 默认 0 时
+    // 与原路径完全一致, RNG 基线不受影响; 仅 sim 模式生效)
+    int start_floor = 1;
+    if (g_sim_mode && g_goto_floor >= 1) {
+        start_floor = (std::min)(g_goto_floor, 15);
+        _sim_goto_scale_player(start_floor);
+    }
+    current_floor = start_floor;
+    max_unlocked_floor = start_floor;
+    enter_floor(start_floor);
     _presentation.set_build_theme(BuildType::BERSERKER);  // G5.8.2: default theme
 
     // ── G4.5: Replay/Record auto-start ──

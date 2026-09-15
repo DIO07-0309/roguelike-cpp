@@ -9,28 +9,28 @@
 
 - [ ] 新档从标题 → 教程(11步) → F1 首战 → 死亡/重开，全程无卡死（实机 30 分钟路径）
 - [ ] 三存档槽：新建×3 / 切换 / 满档删除流（二次确认）/ 删档不丢结局收集（Meta 独立性）
-- [ ] 旧档迁移：save.json → slot_1.json 自动迁移 + .bak 保留（v1.4.0 前存档场景）
+- [x] 旧档迁移：save.json → slot_1.json 自动迁移 + .bak 保留（v1.4.0 前存档场景）— v1.5.0-P0 实测：构造 save.json 启动即迁移+备份，日志确认
 - [ ] 选关解锁：best_floor 推进，F5 击杀后 F6+ 可选
-- [ ] Boss 全链：F5（三选一随机）/ F10（领域机制）/ F15（镜像）可正常触发、战斗、掉结算
+- [x] Boss 全链：F5（三选一随机）/ F10（领域机制）/ F15（镜像）可正常触发、战斗、掉结算 — F5/F10 由 sim20 验证（65%/40% 击杀）；F15 经 `--sim 1 --goto-floor 15` 直达验证（触发/镜像 Echo/Phase2/击杀/win 全链）；新增 sim goto-floor 测试通道（v1.5.0-P0, RNG 基线零漂移已证）
 
 ### 2. 稳定性
 
 - [ ] 30 分钟实机无崩溃（crash.log 不新增）
-- [ ] 60/60 ctest 全绿
-- [ ] world_validator.py 0 errors 0 warnings
-- [ ] 冒烟 20 局：无 NaN/超长局/异常胜率跳变
+- [x] 60/60 ctest 全绿
+- [x] world_validator.py 0 errors 0 warnings
+- [x] 冒烟 20 局：无 NaN/超长局/异常胜率跳变 — exit 0 / NaN=0 / avg_floor 7.75 / F5+F10 Boss 正常击杀
 
 ### 3. 发布物完整
 
 - [x] 发布包自包含：exe + `raylib.dll`（UCRT 为 Win10+ 系统自带）— 干净机器双击即玩；验证法 `objdump -p build\roguelike_cpp.exe | grep "DLL Name"` 应只有 raylib.dll + 系统库
 - [ ] GitHub Release zip：exe + raylib.dll + assets/ + resources/ + README.md，命名 `roguelike-cpp-v1.5.0.zip`（v1.0.0 包结构参照 `dist/roguelike-cpp-v1.0.0/`）
 - [x] README 陌生化：新玩家 30 秒内明白"这是什么游戏、怎么开始玩"（v1.4.14 重写，130 行玩家优先版）
-- [ ] 至少 1 张游戏截图（标题/战斗/Boss 三选一）— 占位已设
+- [x] 至少 1 张游戏截图（标题/战斗/Boss 三选一）— v1.5.0-P0 实拍 HD-2D 三群系 F1/F6/F11（`docs/screenshots/`），README 首图已挂 F6
 - [x] 桌面打包版同步（exe 在根目录）+ raylib.dll 补齐（本次门禁发现并修复：桌面包此前缺 raylib.dll，靠系统 PATH 兜底才没炸）
 
 ### 4. 已知问题披露
 
-- [ ] Current Limitations 节与实际一致（不夸大不隐瞒）
+- [x] Current Limitations 节与实际一致（不夸大不隐瞒）— v1.5.0-P0 核对：美术/手感/平台/输入/RNG 各行与实际相符；截图行更新为实拍状态
 - [x] P1-C8 间歇非确定性 → v1.4.15 已修复（RNG-002 根因+方案 A+32 批零分岔验证），LIMITATIONS 行已更新
 
 ## P1 · 应过关（允许 [~] 注明）

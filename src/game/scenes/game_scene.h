@@ -411,6 +411,8 @@ private:
     bool _sim_mode = false;
     bool _use_bt_agent = false;        // G8.1: true = BT, false = DecisionAgent
     void _collect_sim_stats();
+    // v1.5.0-P0: sim goto-floor 玩家强度对标 (bot 裸装进深层被秒, 取证无意义)
+    void _sim_goto_scale_player(int start_floor);
     int  _sim_wall_frames = 0;         // M2-E: 帧数兜底超时 (36000f=600s, 替代 GetTime 墙钟)
     bool _sim_wall_timeout = false;    // M2-A: 本局是否因帧数兜底结算
     bool _sim_game_timeout = false;    // M2-A: 本局是否因 900s 游戏时上限结算
