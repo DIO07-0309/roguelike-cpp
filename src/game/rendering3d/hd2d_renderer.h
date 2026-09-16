@@ -131,14 +131,9 @@ private:
     int _out_shadow_on_loc = -1;
     int _out_shadow_texel_loc = -1;
     int _out_shadow_bias_loc = -1;
-    float _px_per_world = 1.56f;     // 每帧: 相机距离/FOV → 世界单位屏幕像素数
-    // ── A4: bloom 逐帧亮度反馈 (EMA; 渲染器内部信号, 零回读) ──
-    int _pl_lava_count = 0;          // 本帧岩浆代表光数 (0..7, 发光密度代理)
-    float _bloom_lum_ema = -1.0f;    // 亮度估计 EMA (<0 = 未初始化)
-    float _bloom_last_center = -1.0f; // 上一帧 preset center (biome 切换检测)
-    struct BloomPreset { float threshold, softness, intensity, center; };
-    static BloomPreset _bloom_preset_for(const GameMap* map);
-    void _apply_bloom_adaptive(const GameMap* map);  // A4: preset + EMA 亮度 → set_params
+    float _px_per_world = 1.56f;     // 每帧：相机距离/FOV → 世界单位屏幕像素数
+    // ── M6-v2g: bloom 三档手调 preset (监狱/深渊/火山) ──
+    static void _apply_bloom_biome_preset(const GameMap* map);
 
     void _setup_camera();
     void _load_terrain_shaders();   // v2c: 雾/岩浆 shader 懒加载+缓存 loc

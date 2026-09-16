@@ -1,3 +1,17 @@
+﻿# v1.6-A3.2-fix — 墙顶镂空修复 (背面剔除) + A4 回退到手调 (2026-09-17)
+
+> **A3.2-fix**: 实机反馈"墙顶直接没了，能看进镂空内部" → 在 _draw_wall_block
+> 的 rlBegin 前后调用 rlDisableBackfaceCulling/rlEnableBackfaceCulling，
+> 保证顶面 quad 从上方任意视角可见 (raylib 推荐做法，双侧面渲染)。
+>
+> **A4 退避预案执行**: 实机验收"看不出任何变化" → 移除 EMA 亮度反馈机制，
+> 回退到 v2g 手调三档 preset (监狱/深渊/火山)。原因：岩浆桶代表光数
+> (0..7) granularity 不足，典型火山层可见岩浆桶数饱和 → lum≡center，
+> 反馈通道实际无信号。保留代码整洁，移除 _pl_lava_count/_bloom_lum_ema 等
+> 内部状态。详见 docs/M6_HD2D_RENDERING.md 已知限制。
+>
+> - 验证：Release 0 error; ctest 61/61; 墙顶实机目检通过
+
 # v1.6-A4 — bloom 逐帧亮度反馈 (B 案: EMA, 零回读) (2026-09-16)
 
 > 清偿 v2g 遗留: bloom 三档手调常量在岩浆密度逐层不同的火山会偏。
@@ -2049,3 +2063,4 @@ SaveManager core format · Player/Monster lifecycle
 - Balance pass
 - Automated tests
 - Package & deploy
+

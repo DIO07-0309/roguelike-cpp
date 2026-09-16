@@ -202,8 +202,6 @@ void HD2DRenderer::_upload_point_lights() {
         ranges[count] = TILE_SIZE * 3.5f;                  // v2g: 4→3.5 tile
         count++;
     }
-    // A4: 缓存岩浆代表光数 → bloom 亮度反馈的发光密度代理
-    _pl_lava_count = count;
     // 玩家随身暖光 (火把感; _camera_focus 即玩家世界 x/z)
     positions[count] = {_camera_focus.x, 14.0f, _camera_focus.z};
     colors[count] = {0.16f, 0.12f, 0.07f};
@@ -467,11 +465,13 @@ void HD2DRenderer::_draw_wall_block(const HD2DDrawItem& item) {
         float v0 = uv.y / (float)item.texture.height;
         float v1 = (uv.y + uv.height) / (float)item.texture.height;
         rlSetTexture(item.texture.id);
+        rlDisableBackfaceCulling();  // A3.2-fix: 顶面从上方可见 (用户实机反馈镂空)
         rlBegin(RL_QUADS);
         rlColor4ub(item.tint.r, item.tint.g, item.tint.b, item.tint.a);
         _wall_quad(u0, u1, v0, v1, pos, e, h);   // 侧面 ×4 (共享 UV)
         _wall_top_quad(u0, u1, v0, v1, pos, e, h, item.tint);  // A3.2 顶面
         rlEnd();
+        rlEnableBackfaceCulling();
         rlSetTexture(0);
         return;
     }
@@ -969,35 +969,17 @@ Vector2 HD2DRenderer::world_to_screen(Vector3 world_pos, float y_offset) const {
     return s;
 }
 
-// ── M6-v2g/i.1 档位 + A4: bloom 亮度反馈 preset ──
-// i.1: 环境光 0.78 抬亮地板后, 低阈值会提取中亮地板 → bloom 炸全白
-// (实测 238); 各档阈值只吃高光。center = 调参当时亮度代理典型值
-HD2DRenderer::BloomPreset HD2DRenderer::_bloom_preset_for(const GameMap* map) {
+// ── M6-v2g: bloom 三档手调 preset (监狱/深渊/火山) ──
+// v2g: 环境光 0.78 抬亮地板后，低阈值会提取中亮地板 → bloom 炸全白
+// (实测 238); 各档阈值只吃高光
+void HD2DRenderer::_apply_bloom_biome_preset(const GameMap* map) {
     const char* biome = map ? map->biome_id() : "";
+    float threshold = 0.72f, softness = 0.22f, intensity = 0.12f;
     if (strcmp(biome, "ash_volcano") == 0)
-        return {0.82f, 0.14f, 0.15f, 0.655f};  // 火山: 岩浆满布时实测
-    if (strcmp(biome, "void_abyss") == 0)
-        return {0.74f, 0.20f, 0.18f, 0.34f};   // 深渊: 无岩浆 → 代理基线
-    return {0.72f, 0.22f, 0.12f, 0.34f};       // 监狱(默认)
-}
-
-// ── A4: 逐帧亮度反馈 — lum = 0.34 + 0.045×岩浆数 (代理), EMA τ≈0.17s ──
-// d>0 场景偏亮 → 提阈值压强度 (防炸白); d<0 偏暗 → 放阈值提强度。
-// 监狱/深渊恒 d=0 → 与 v2g 手调值逐位一致 (反馈只在火山生效)
-void HD2DRenderer::_apply_bloom_adaptive(const GameMap* map) {
-    BloomPreset p = _bloom_preset_for(map);
-    float lum = 0.34f + 0.045f * (float)_pl_lava_count;
-    if (_bloom_lum_ema < 0.0f || p.center != _bloom_last_center)
-        _bloom_lum_ema = lum;                    // 首帧/biome 切换: 重同步
-    else
-        _bloom_lum_ema += 0.10f * (lum - _bloom_lum_ema);
-    _bloom_last_center = p.center;
-    float d = _bloom_lum_ema - p.center;
-    float th = std::min(std::max(p.threshold + 0.5f * d, p.threshold - 0.06f),
-                        p.threshold + 0.10f);
-    float inten = std::min(std::max(p.intensity * (1.0f - 0.6f * d),
-                                    p.intensity * 0.6f), p.intensity * 1.5f);
-    HD2DPostFX::inst().set_params(th, p.softness, inten);
+        threshold = 0.82f, softness = 0.14f, intensity = 0.15f;  // 火山
+    else if (strcmp(biome, "void_abyss") == 0)
+        threshold = 0.74f, softness = 0.20f, intensity = 0.18f;  // 深渊
+    HD2DPostFX::inst().set_params(threshold, softness, intensity);
 }
 
 // ── M6-v2c: 后处理 — bloom 链 + 夜色分级 + 地平雾带 (shader 版) ──
@@ -1009,7 +991,7 @@ void HD2DRenderer::_apply_post_processing(GameScene& gs) {
     auto& fx = HD2DPostFX::inst();
     auto* tree = gs.get_tree();
     if (tree && fx.ensure_init(_target_w, _target_h)) {
-        _apply_bloom_adaptive(gs.game_map.get());   // A4 (原 v2g biome 三档)
+        _apply_bloom_biome_preset(gs.game_map.get());   // M6-v2g 手调三档
         fx.process(tree->main_target());
         // 夜色分级 + 地平雾带 (bloom 之下)
         // i.1-fix2: 夜色从蓝 (20,18,46) 改暖暗 (30,24,18) — 蓝罩把全屏
