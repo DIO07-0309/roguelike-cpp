@@ -375,6 +375,8 @@ private:
     void _fill_echo_buffs(CharacterPanelData& out) const;
     // v1.6-B1: 镜像记忆可视化 — "它眼中的你" (只读画像/在线统计)
     void _fill_mirror_learn_display(CharacterPanelData& out) const;
+    // v1.6-B1.1: Mirror HUD overlay (顶部分析卡 reveal + 顶部观察卡常驻)
+    void _render_mirror_hud_overlay(int sw, float game_time);
     // v1.6-B1: 镜像阶段晋升横幅状态 (观察→镜像→进化 醒目播报)
     int   _mirror_banner_phase = 0;
     float _mirror_banner_timer = 0.0f;

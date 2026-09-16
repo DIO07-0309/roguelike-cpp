@@ -4,6 +4,7 @@
 #include <memory>
 
 class GameScene;
+class GameMap;
 struct HD2DDrawItem;
 
 // ============================================================
@@ -15,6 +16,9 @@ struct HD2DDrawItem;
 //   4. 切换开关 g_hd2d_mode: true 走本渲染器, false 走原 2D 路径
 // ============================================================
 
+// A2.1: 氛围粒子群系性格 (纯渲染语义, 不进 gameplay)
+enum class MoteStyle : int { DUST = 0, EMBER = 1, FIREFLY = 2 };
+
 // 一帧的 3D 绘制项 (由 HD2DSceneBuilder 从 GameScene 状态提取)
 struct HD2DDrawItem {
     enum class Kind { FLOOR_TILE, WALL_BLOCK, ENTITY_BILLBOARD, FX_QUAD,
@@ -23,7 +27,8 @@ struct HD2DDrawItem {
                      CONE_FAN, ENTITY_LINK,          // M6-v2b: 扇形/实体连线
                      AMBIENT_MOTE,                   // M6-v2e: 氛围粒子微光点
                      DOOR_PANEL, ROOM_ICON,         // M6-v2h: 门/特殊房间图标
-                     FLOOR_DECAL };                  // M6-j: 地板装饰贴片
+                     FLOOR_DECAL,                   // M6-j: 地板装饰贴片
+                     STAIR_STEP };                  // N5: 楼梯 3D 立方
     Kind kind = Kind::FLOOR_TILE;
     int tile_x = 0;                 // 世界 tile 坐标 (32px/格)
     int tile_y = 0;
@@ -48,6 +53,7 @@ struct HD2DDrawItem {
     int door_state = 0;           // M6-v2h: DOOR_PANEL 四态 (DoorState 枚举值)
     int door_axis = 0;            // M6-n: 门朝向 0=贴东西墙(面板朝±Z) 1=贴南北墙(朝±X)
     bool outline = false;         // M6-n: 实体描边 (玩家/怪; 4向偏移深色底)
+    MoteStyle mote_style = MoteStyle::DUST;  // A2.1: AMBIENT_MOTE 群系性格
 };
 
 // 单房间切片: 960x640 目标 → 3D 透视相机 + 地形 + billboard
@@ -97,6 +103,7 @@ private:
     bool _fog_ok = false;
     bool _lava_ok = false;
     Texture2D _blob_shadow_tex = {};// 径向渐变阴影贴图 (billboard 脚下)
+    Texture2D _mote_glow_tex = {};  // A2.1: 氛围粒子软光 billboard 贴图
     int _lava_time_loc = -1;        // 岩浆 uTime uniform 位置缓存
     int _fog_viewpos_loc = -1;      // 雾 uniforms 位置缓存
     int _fog_color_loc = -1;
@@ -112,13 +119,38 @@ private:
     int _pl_pos_loc = -1;            // 点光源 pos[8]
     int _pl_color_loc = -1;           // 点光源 color[8]
     int _pl_range_loc = -1;          // 点光源 range[8]
+    // ── A1.1: 3D-aware billboard 真轮廓 (alpha-mask 描边 shader) ──
+    Shader _outline_shader = {};     // hd2d_billboard_outline (失败→回退 4 向偏移)
+    bool _outline_ok = false;
+    int _outline_off_loc = -1;       // uTexelOffset (世界宽→屏幕 clamp→UV)
+    int _outline_color_loc = -1;     // uOutlineColor
+    int _outline_thresh_loc = -1;    // uAlphaThreshold
+    // A3: 实体接收阴影 (与地形同字段名 sampler/mat/参数, loc 独立)
+    int _out_shadow_map_loc = -1;
+    int _out_shadow_mvp_loc = -1;
+    int _out_shadow_on_loc = -1;
+    int _out_shadow_texel_loc = -1;
+    int _out_shadow_bias_loc = -1;
+    float _px_per_world = 1.56f;     // 每帧: 相机距离/FOV → 世界单位屏幕像素数
+    // ── A4: bloom 逐帧亮度反馈 (EMA; 渲染器内部信号, 零回读) ──
+    int _pl_lava_count = 0;          // 本帧岩浆代表光数 (0..7, 发光密度代理)
+    float _bloom_lum_ema = -1.0f;    // 亮度估计 EMA (<0 = 未初始化)
+    float _bloom_last_center = -1.0f; // 上一帧 preset center (biome 切换检测)
+    struct BloomPreset { float threshold, softness, intensity, center; };
+    static BloomPreset _bloom_preset_for(const GameMap* map);
+    void _apply_bloom_adaptive(const GameMap* map);  // A4: preset + EMA 亮度 → set_params
 
     void _setup_camera();
     void _load_terrain_shaders();   // v2c: 雾/岩浆 shader 懒加载+缓存 loc
+    void _load_outline_shader();    // A1.1: billboard 真轮廓 shader
+    void _update_px_per_world();    // A1.1: 每帧世界单位→屏幕像素比例换算
     void _cache_v2e_uniform_locs(); // v2e: 阴影/点光 uniform 位置
     void _make_blob_shadow_tex();   // v2c: 径向渐变程序纹理
+    void _make_mote_glow_tex();     // A2.1: 软光程序纹理 (additive 粒子)
     void _upload_fog_uniforms();    // v2c: 视点+雾色 → 地形 shader
     void _upload_shadow_uniforms(); // v2e: 光矩阵/深度纹理/参数 → 地形 shader
+    void _upload_shadow_to(Shader sh, int map_loc, int mvp_loc, int on_loc,
+                           int texel_loc, int bias_loc);  // A3: 共用体
     void _upload_point_lights();    // v2e: LAVA tile+玩家暖光 → uniform
     void _draw_scene();              // (相机已由 render_frame 定位)
     void _draw_terrain_pass();      // v2c: 地形批 (雾 shader 包裹/岩浆分流)
@@ -126,7 +158,11 @@ private:
     void _draw_wall_block(const HD2DDrawItem& item);
     void _wall_quad(float u0, float u1, float v0, float v1,
                     Vector3 pos, float e, float h);   // M6-v2a: 墙体贴图侧面
+    void _wall_top_quad(float u0, float u1, float v0, float v1,
+                        Vector3 pos, float e, float h, Color tint);  // A3.2: 同贴图顶面
     void _draw_billboard(const HD2DDrawItem& item);
+    void _draw_billboard_outline(const HD2DDrawItem& item, const Rectangle& src,
+                                 Vector3 pos, float w, float h);  // A1.1
     void _draw_blob_shadow(Vector3 pos, float w);   // M6-v2c: 接地阴影
     void _draw_fx_quad(const HD2DDrawItem& item);
     void _draw_portal_ring(const HD2DDrawItem& item);   // M6-v2a: 挑战传送门
@@ -134,13 +170,15 @@ private:
     void _draw_lock_badge(Vector3 pos, float door_h);  // M6-v2h: 锁徽记
     void _draw_room_icon(const HD2DDrawItem& item);     // M6-v2h: 房间图标
     void _draw_floor_decal(const HD2DDrawItem& item);   // M6-j: 地板装饰
+    void _draw_stair_step(const HD2DDrawItem& item);    // N5: 楼梯立方
     void _draw_projectile_body(const HD2DDrawItem& item);  // M6-v2b
     void _draw_projectile_trail(const HD2DDrawItem& item, Color c);  // M6-v2d
     void _draw_warning_ring(const HD2DDrawItem& item);     // M6-v2b: 贴地预警/射程环
     void _draw_trajectory_line(const HD2DDrawItem& item);  // M6-v2b
     void _draw_cone_fan(const HD2DDrawItem& item);          // M6-v2b: Boss 扇形预警
     void _draw_entity_link(const HD2DDrawItem& item);       // M6-v2b: 实体连线
-    void _draw_ambient_mote(const HD2DDrawItem& item);     // M6-v2e: 氛围粒子
+    void _draw_ambient_batch();     // A2.1: 氛围粒子单批软光 (替 M6-v2e 逐颗球)
+    bool _ambient_billboard_basis(Vector3& right, Vector3& up) const;  // A2.1
     void _apply_post_processing(GameScene& gs);
 
     HD2DRenderer(const HD2DRenderer&) = delete;

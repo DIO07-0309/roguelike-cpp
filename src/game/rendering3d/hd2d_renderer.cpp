@@ -13,10 +13,21 @@
 #include "entities/player.h"
 #include "entities/monster.h"
 #include <algorithm>
+#include <cmath>                            // A1.1: tanf/sqrtf/fabsf (outline 换算)
 #include <cstring>                          // M6-v2g: strcmp (biome 预设)
 
 bool g_hd2d_mode = false;
 int  g_hd2d_autoshot = 0;     // M6-i.1: >0 = 第 N 帧自动截图一次 (取证)
+
+// ── A1.1: 3D-aware billboard outline 参数 ──
+// 描边宽度在世界空间定义 (基准 kOutlineBaseWorldW px), 按相机距离换算屏幕
+// 像素后 clamp [1,4] 再转 UV 偏移 → 远近视觉厚度稳定 (HD-2D), 不做固定 texel
+namespace {
+constexpr float kOutlineBaseWorldW = 2.0f;   // 基准描边宽 (世界单位)
+constexpr float kOutlineMinScreenPx = 1.0f;  // 远距最小可辨识保护
+constexpr float kOutlineMaxScreenPx = 4.0f;  // 近距 Boss 过粗保护
+constexpr float kOutlineAlphaCutoff = 0.5f;  // 剪影阈值 (与 depth pass 同源)
+}  // namespace
 
 HD2DRenderer& HD2DRenderer::inst() {
     static HD2DRenderer renderer;
@@ -29,7 +40,9 @@ bool HD2DRenderer::ensure_init(int target_w, int target_h) {
     _target_h = target_h;
     _setup_camera();
     _load_terrain_shaders();      // M6-v2c: 雾/岩浆 (失败自动回退)
+    _load_outline_shader();       // A1.1: billboard 真轮廓 (失败回退 4 向偏移)
     _make_blob_shadow_tex();     // M6-v2c: blob shadow 程序纹理
+    _make_mote_glow_tex();       // A2.1: 氛围粒子软光纹理
     _ready = true;
     LOG_INFO("HD2D: 3D 表现层已激活");  // P1-C9: 确认 3D 分支生效 (回退静默时日志可辨)
     return true;
@@ -39,7 +52,9 @@ void HD2DRenderer::shutdown() {
     _draw_items.clear();
     if (_blob_shadow_tex.id > 0) UnloadTexture(_blob_shadow_tex);
     _blob_shadow_tex = {};
-    _fog_ok = _lava_ok = false;
+    if (_mote_glow_tex.id > 0) UnloadTexture(_mote_glow_tex);   // A2.1
+    _mote_glow_tex = {};
+    _fog_ok = _lava_ok = _outline_ok = false;
     _ready = false;
 }
 
@@ -67,6 +82,38 @@ void HD2DRenderer::_load_terrain_shaders() {
     _lava_ok = _lava_shader.id > 0;
     if (_lava_ok)
         _lava_time_loc = GetShaderLocation(_lava_shader, "uTime");
+}
+
+// ── A1.1: billboard 真轮廓 shader 加载 (alpha-mask 8 邻域; 失败→回退旧描边) ──
+void HD2DRenderer::_load_outline_shader() {
+    _outline_shader = HD2DShaderBank::inst().load("hd2d_billboard_outline",
+                                                  "hd2d_world");
+    _outline_ok = _outline_shader.id > 0;
+    if (!_outline_ok) return;   // bank 已 LOG_WARN; _draw_billboard 走旧 4 向路径
+    _outline_off_loc = GetShaderLocation(_outline_shader, "uTexelOffset");
+    _outline_color_loc = GetShaderLocation(_outline_shader, "uOutlineColor");
+    _outline_thresh_loc = GetShaderLocation(_outline_shader, "uAlphaThreshold");
+    // A3: 实体接收阴影 — 同名 uniform 的 loc 独立缓存 (fs 缺失时=-1→自动禁用)
+    _out_shadow_map_loc = GetShaderLocation(_outline_shader, "shadowMap");
+    _out_shadow_mvp_loc = GetShaderLocation(_outline_shader, "lightViewProj");
+    _out_shadow_on_loc = GetShaderLocation(_outline_shader, "shadowEnabled");
+    _out_shadow_texel_loc = GetShaderLocation(_outline_shader, "shadowTexel");
+    _out_shadow_bias_loc = GetShaderLocation(_outline_shader, "shadowBias");
+    SetShaderValue(_outline_shader, _outline_thresh_loc, &kOutlineAlphaCutoff,
+                   SHADER_UNIFORM_FLOAT);
+}
+
+// ── A1.1: 每帧公共换算 — 1 世界单位在屏幕上占多少像素 ──
+// (透视: screen_px = world / (2·d·tan(fovy/2)) · RT 高; 取相机→焦点距离,
+//  与 billboard 距焦距离差异在俯视切片内可忽略, 保持单一公共值)
+void HD2DRenderer::_update_px_per_world() {
+    float dx = _camera.position.x - _camera.target.x;
+    float dy = _camera.position.y - _camera.target.y;
+    float dz = _camera.position.z - _camera.target.z;
+    float d = sqrtf(dx * dx + dy * dy + dz * dz);
+    _px_per_world = (d > 1.0f)
+        ? (float)_target_h / (2.0f * d * tanf(_camera.fovy * DEG2RAD * 0.5f))
+        : 1.56f;   // 退化保护: 440 距离/50°/640 高的标称值
 }
 
 // ── M6-v2e: 阴影/点光 uniform 位置缓存 (地形 shader 一次) ──
@@ -98,29 +145,33 @@ void HD2DRenderer::_upload_fog_uniforms() {
 
 // ── M6-v2e: 阴影 uniforms 上传 (每帧; 深度纹理包装 Texture2D 走标准 API) ──
 void HD2DRenderer::_upload_shadow_uniforms() {
+    _upload_shadow_to(_fog_shader, _shadow_map_loc, _shadow_mvp_loc,
+                      _shadow_on_loc, _shadow_texel_loc, _shadow_bias_loc);
+}
+
+// A3: 阴影参数上传共用 (地形 fog / billboard outline 两套 loc 同一数据源)
+void HD2DRenderer::_upload_shadow_to(Shader sh, int map_loc, int mvp_loc,
+                                     int on_loc, int texel_loc, int bias_loc) {
     auto& shadow = HD2DShadowCaster::inst();
-    bool active = shadow.is_ready() && _shadow_map_loc >= 0;
+    bool active = shadow.is_ready() && map_loc >= 0;
     float enabled = active ? 1.0f : 0.0f;
-    SetShaderValue(_fog_shader, _shadow_on_loc, &enabled,
-                   SHADER_UNIFORM_FLOAT);
+    SetShaderValue(sh, on_loc, &enabled, SHADER_UNIFORM_FLOAT);
     if (!active) return;
     // raylib 5.0: proj*view = lightViewProj (raymath row-major, shader 内
     // mat4 列主序 — SetShaderValueMatrix 内部已做转置适配)
     Matrix light_vp = MatrixMultiply(shadow.light_proj(), shadow.light_view());
-    SetShaderValueMatrix(_fog_shader, _shadow_mvp_loc, light_vp);
+    SetShaderValueMatrix(sh, mvp_loc, light_vp);
     float texel = shadow.depth_texel();             // 1/depth 尺寸 (PCF 步长)
-    SetShaderValue(_fog_shader, _shadow_texel_loc, &texel,
-                   SHADER_UNIFORM_FLOAT);
+    SetShaderValue(sh, texel_loc, &texel, SHADER_UNIFORM_FLOAT);
     float bias = shadow.texel_world_size() * 1.5f;  // 世界 texel → 深度补偿
-    SetShaderValue(_fog_shader, _shadow_bias_loc, &bias,
-                   SHADER_UNIFORM_FLOAT);
+    SetShaderValue(sh, bias_loc, &bias, SHADER_UNIFORM_FLOAT);
     // 深度纹理 (rlgl 裸 id) 包装 Texture2D POD → SetShaderValueTexture
     Texture2D depth_tex_pod = {};
     depth_tex_pod.id = shadow.depth_tex_id();
     depth_tex_pod.width = shadow.map_width();
     depth_tex_pod.height = shadow.map_height();
     depth_tex_pod.mipmaps = 1;
-    SetShaderValueTexture(_fog_shader, _shadow_map_loc, depth_tex_pod);
+    SetShaderValueTexture(sh, map_loc, depth_tex_pod);
 }
 
 // ── M6-v2e/v2g: 点光源收集上传 (LAVA tile 聚类 + 玩家暖光; 只读) ──
@@ -143,8 +194,7 @@ void HD2DRenderer::_upload_point_lights() {
         long bz = (long)(item.world_pos.z / bucket_span);
         long key = bx * 100003L + bz;
         bool dup = false;
-        for (int i = 0; i < count; i++)
-            if (seen_buckets[i] == key) { dup = true; break; }
+        for (int i = 0; i < count && !dup; i++) dup = (seen_buckets[i] == key);
         if (dup) continue;                                 // 桶已亮, 跳过
         seen_buckets[count] = key;
         positions[count] = {item.world_pos.x, 6.0f, item.world_pos.z};
@@ -152,6 +202,8 @@ void HD2DRenderer::_upload_point_lights() {
         ranges[count] = TILE_SIZE * 3.5f;                  // v2g: 4→3.5 tile
         count++;
     }
+    // A4: 缓存岩浆代表光数 → bloom 亮度反馈的发光密度代理
+    _pl_lava_count = count;
     // 玩家随身暖光 (火把感; _camera_focus 即玩家世界 x/z)
     positions[count] = {_camera_focus.x, 14.0f, _camera_focus.z};
     colors[count] = {0.16f, 0.12f, 0.07f};
@@ -172,6 +224,16 @@ void HD2DRenderer::_make_blob_shadow_tex() {
     Image img = GenImageGradientRadial(64, 64, 0.0f,
                                        Color{0, 0, 0, 200}, Color{0, 0, 0, 0});
     _blob_shadow_tex = LoadTextureFromImage(img);
+    UnloadImage(img);
+}
+
+// ── A2.1: 软光纹理 — 白色径向渐变 (中心亮→边缘透明), additive 粒子用 ──
+void HD2DRenderer::_make_mote_glow_tex() {
+    if (_mote_glow_tex.id > 0) return;
+    Image img = GenImageGradientRadial(32, 32, 0.0f,
+                                       Color{255, 255, 255, 255},
+                                       Color{255, 255, 255, 0});
+    _mote_glow_tex = LoadTextureFromImage(img);
     UnloadImage(img);
 }
 
@@ -211,6 +273,7 @@ void HD2DRenderer::render_frame(GameScene& gs) {
         _camera_focus.z + cam_dist * 0.7071f
     };
     _camera.target = _camera_focus;
+    _update_px_per_world();    // A1.1: outline 世界→屏幕换算 (每帧一次)
     // M6-v2e/v2f: 光空间深度 pass (墙 + billboard 剪影; 失败时主 pass 走 blob 回退)
     // outer_fbo = scene_tree 主 RT (EndTextureMode 盲绑 FBO 0 的同源坑:
     // 深度 pass 后必须恢复主 RT 绑定, 否则主场景画到屏幕 FBO 上丢失)
@@ -228,13 +291,16 @@ void HD2DRenderer::render_frame(GameScene& gs) {
 
 // ── 场景绘制: 分 kind 绘制 (地形 → 实体 → 特效; 相机已在 render_frame 定位) ──
 void HD2DRenderer::_draw_scene() {
-    // i.1-fix2: 背景从蓝黑 (12,14,24) 改暖黑 — 空洞/接缝不再露出冷色
+    // M6-i.2: {16,13,11}→{40,35,30} — 黑边暖灰化，与监狱地板 [122,112,88] 过渡更自然
     BeginMode3D(_camera);
-    ClearBackground({16, 13, 11, 255});
+    ClearBackground({40, 35, 30, 255});
 
     _draw_terrain_pass();                    // M6-v2c: 雾 shader 包裹地形批
     for (const auto& item : _draw_items)
         if (item.kind == HD2DDrawItem::Kind::FLOOR_DECAL) _draw_floor_decal(item);
+    // N5: 楼梯立方 — 地形/贴花之后, 实体之前 (3D 立体块, 深度测试正常)
+    for (const auto& item : _draw_items)
+        if (item.kind == HD2DDrawItem::Kind::STAIR_STEP) _draw_stair_step(item);
     // M6-v2b: 贴地层 (预警圈/射程环/扇形/危险区) — 地形之上, 实体之下
     for (const auto& item : _draw_items) {
         if (item.kind == HD2DDrawItem::Kind::WARNING_RING) _draw_warning_ring(item);
@@ -257,18 +323,66 @@ void HD2DRenderer::_draw_scene() {
         if (item.kind == HD2DDrawItem::Kind::PROJECTILE_BODY) _draw_projectile_body(item);
     for (const auto& item : _draw_items)
         if (item.kind == HD2DDrawItem::Kind::FX_QUAD) _draw_fx_quad(item);
-    for (const auto& item : _draw_items)
-        if (item.kind == HD2DDrawItem::Kind::AMBIENT_MOTE)
-            _draw_ambient_mote(item);                 // M6-v2e
+    _draw_ambient_batch();                            // A2.1 (替 v2e 逐颗球)
     EndMode3D();
 }
 
-// ── M6-v2e: 氛围粒子微光点 — additive 小球 (2D 灰尘/余烬/幽光的 3D 对应) ──
-void HD2DRenderer::_draw_ambient_mote(const HD2DDrawItem& item) {
-    Color c = item.tint;
-    c.a = (unsigned char)(c.a * item.height);      // life 渐隐
+// ── A2.1: billboard 切平面基 (软光纹理中心对称, 手性无关紧要) ──
+bool HD2DRenderer::_ambient_billboard_basis(Vector3& right, Vector3& up) const {
+    Vector3 fwd = { _camera.target.x - _camera.position.x,
+                    _camera.target.y - _camera.position.y,
+                    _camera.target.z - _camera.position.z };
+    float fl = sqrtf(fwd.x * fwd.x + fwd.y * fwd.y + fwd.z * fwd.z);
+    if (fl < 1e-6f) return false;
+    fwd = { fwd.x / fl, fwd.y / fl, fwd.z / fl };
+    right = { -fwd.z, 0.0f, fwd.x };                 // cross(fwd, worldUp)
+    float rl = sqrtf(right.x * right.x + right.z * right.z);
+    if (rl < 1e-6f) return false;                     // 正俯视退化
+    right = { right.x / rl, 0.0f, right.z / rl };
+    up = { right.y * fwd.z - right.z * fwd.y,
+           right.z * fwd.x - right.x * fwd.z,
+           right.x * fwd.y - right.y * fwd.x };       // cross(right, fwd)
+    return true;
+}
+
+// ── A2.1: 氛围粒子单批软光 — 相机朝向 quad + 程序软光纹理, 一次 rlgl 批 ──
+// (替 M6-v2e 逐颗 DrawSphere: 24 次 blend 切换/约 1.2 万三角面 → 1 批 24 quad;
+//  风格几何/闪烁/透明度包络全在 scene_builder 计算, 本函数只忠实画 quad)
+void HD2DRenderer::_draw_ambient_batch() {
+    if (_mote_glow_tex.id <= 0) return;
+    Vector3 right, up;
+    if (!_ambient_billboard_basis(right, up)) return;
     BeginBlendMode(BLEND_ADDITIVE);
-    DrawSphere(item.world_pos, item.size * 0.5f, c);
+    rlSetTexture(_mote_glow_tex.id);
+    unsigned int cur_tex = _mote_glow_tex.id;
+    rlBegin(RL_QUADS);
+    for (const auto& item : _draw_items) {
+        if (item.kind != HD2DDrawItem::Kind::AMBIENT_MOTE) continue;
+        // A2.2: 群系 PNG 优先 (同帧同群系, 实际只切 1 次); 缺失→程序化软光
+        if (item.texture.id > 0 && item.texture.id != cur_tex) {
+            cur_tex = item.texture.id;
+            rlSetTexture(cur_tex);
+        }
+        // 软光晕 quad 大于可视核; 像素贴图核即图案, 放大系数收紧
+        float r = item.size * (item.texture.id > 0 ? 1.3f : 1.6f);
+        Vector3 c = item.world_pos;
+        Color t = item.tint;                          // builder 已含包络/闪烁
+        rlColor4ub(t.r, t.g, t.b, t.a);
+        rlTexCoord2f(0, 0); rlVertex3f(c.x - right.x * r - up.x * r,
+                                       c.y - right.y * r - up.y * r,
+                                       c.z - right.z * r - up.z * r);
+        rlTexCoord2f(1, 0); rlVertex3f(c.x + right.x * r - up.x * r,
+                                       c.y + right.y * r - up.y * r,
+                                       c.z + right.z * r - up.z * r);
+        rlTexCoord2f(1, 1); rlVertex3f(c.x + right.x * r + up.x * r,
+                                       c.y + right.y * r + up.y * r,
+                                       c.z + right.z * r + up.z * r);
+        rlTexCoord2f(0, 1); rlVertex3f(c.x - right.x * r + up.x * r,
+                                       c.y - right.y * r + up.y * r,
+                                       c.z - right.z * r + up.z * r);
+    }
+    rlEnd();
+    rlSetTexture(0);
     EndBlendMode();
 }
 
@@ -356,15 +470,9 @@ void HD2DRenderer::_draw_wall_block(const HD2DDrawItem& item) {
         rlBegin(RL_QUADS);
         rlColor4ub(item.tint.r, item.tint.g, item.tint.b, item.tint.a);
         _wall_quad(u0, u1, v0, v1, pos, e, h);   // 侧面 ×4 (共享 UV)
+        _wall_top_quad(u0, u1, v0, v1, pos, e, h, item.tint);  // A3.2 顶面
         rlEnd();
         rlSetTexture(0);
-        // 顶面: 亮 10% (无贴图顶层, 伪受光)
-        Color top = {
-            (unsigned char)std::min(item.tint.r * 1.1f, 255.0f),
-            (unsigned char)std::min(item.tint.g * 1.1f, 255.0f),
-            (unsigned char)std::min(item.tint.b * 1.1f, 255.0f), item.tint.a
-        };
-        DrawCube({pos.x, h + 0.5f, pos.z}, item.size, 1.0f, item.size, top);
         return;
     }
 
@@ -411,6 +519,22 @@ void HD2DRenderer::_wall_quad(float u0, float u1, float v0, float v1,
     rlTexCoord2f(u1, v0); rlVertex3f(pos.x - e, h, pos.z - e);
 }
 
+// ── A3.2: 墙顶面 — 同贴图水平 quad (与 caster 深度顶面 y=h 共面; 顶点序同地板) ──
+void HD2DRenderer::_wall_top_quad(float u0, float u1, float v0, float v1,
+                                  Vector3 pos, float e, float h, Color tint) {
+    Color top = {   // 亮 10% 伪受光 (v2a 语义, 但带贴图不再白块)
+        (unsigned char)std::min(tint.r * 1.1f, 255.0f),
+        (unsigned char)std::min(tint.g * 1.1f, 255.0f),
+        (unsigned char)std::min(tint.b * 1.1f, 255.0f), tint.a
+    };
+    rlColor4ub(top.r, top.g, top.b, top.a);
+    rlNormal3f(0, 1, 0);
+    rlTexCoord2f(u0, v0); rlVertex3f(pos.x - e, h, pos.z - e);
+    rlTexCoord2f(u1, v0); rlVertex3f(pos.x + e, h, pos.z - e);
+    rlTexCoord2f(u1, v1); rlVertex3f(pos.x + e, h, pos.z + e);
+    rlTexCoord2f(u0, v1); rlVertex3f(pos.x - e, h, pos.z + e);
+}
+
 // ── Billboard: 面向相机的精灵, 脚点落地, 帧矩形裁剪 (v2a: flip_x 接线) ──
 void HD2DRenderer::_draw_billboard(const HD2DDrawItem& item) {
     Vector3 pos = item.world_pos;
@@ -421,7 +545,13 @@ void HD2DRenderer::_draw_billboard(const HD2DDrawItem& item) {
             : Rectangle{0, 0, (float)item.texture.width, (float)item.texture.height};
         // flip_x: 负宽源矩形 (raylib DrawTexturePro 惯例; billboard 同理取负 w)
         if (item.flip_x) src.width = -src.width;
-        // M6-n: 实体描边 — 4 向偏移深色底稿 (2D 描边法移植; 分离主体与背景)
+        // A1.1: 3D-aware alpha-mask 真轮廓 (单 draw; 描边不进 shadow map)
+        if (item.outline && _outline_ok) {
+            _draw_billboard_outline(item, src, pos, w, h);
+            _draw_blob_shadow(pos, w);
+            return;
+        }
+        // M6-n 回退: 4 向偏移深色底稿 (仅 outline shader 加载失败时)
         // 中性深色: 不给群系加色偏 (暖棕会稀释深渊紫, 实测 F11 中心 -4.5→+1.3)
         if (item.outline) {
             Color edge{24, 24, 27, 220};
@@ -442,6 +572,37 @@ void HD2DRenderer::_draw_billboard(const HD2DDrawItem& item) {
         DrawCube({pos.x, h * 0.5f, pos.z}, w * 0.5f, h, w * 0.25f, item.tint);
     }
     _draw_blob_shadow(pos, w);     // M6-v2c: 径向渐变接地阴影
+}
+
+// ── A1.1: 3D-aware 描边路径 — 世界基准宽 → 屏幕 px clamp[1,4] → UV 偏移,
+// 轮廓贴合精灵剪影 (8 邻域 alpha-mask 在 shader 内), 单 DrawBillboardRec ──
+void HD2DRenderer::_draw_billboard_outline(const HD2DDrawItem& item,
+                                           const Rectangle& src,
+                                           Vector3 pos, float w, float h) {
+    float px = _px_per_world;
+    // 世界基准宽 → 屏幕像素 (clamp 保证远距仍可辨 / 近距 Boss 不过粗)
+    float screen_w = fminf(kOutlineMaxScreenPx,
+                           fmaxf(kOutlineMinScreenPx, kOutlineBaseWorldW * px));
+    float eff_world_w = screen_w / px;      // 反推有效世界宽
+    float frame_w = fabsf(src.width);       // 帧矩形宽 (图集 px; flip_x 为负取绝对)
+    float tex_w = item.texture.width > 0 ? (float)item.texture.width : 1.0f;
+    // world → UV: 帧矩形占图集 UV 宽 / billboard 世界宽
+    float uv_off = (frame_w > 0.0f && w > 0.0f)
+        ? eff_world_w * frame_w / (tex_w * w)
+        : eff_world_w / tex_w;
+    Vector4 outline_color = {24.0f / 255.0f, 24.0f / 255.0f, 27.0f / 255.0f,
+                             220.0f / 255.0f};   // 与旧回退同色 (中性深色)
+    BeginShaderMode(_outline_shader);
+    _upload_shadow_to(_outline_shader, _out_shadow_map_loc, _out_shadow_mvp_loc,
+                      _out_shadow_on_loc, _out_shadow_texel_loc,
+                      _out_shadow_bias_loc);             // A3: 与地形同源阴影
+    SetShaderValue(_outline_shader, _outline_off_loc, &uv_off,
+                   SHADER_UNIFORM_FLOAT);
+    SetShaderValue(_outline_shader, _outline_color_loc, &outline_color,
+                   SHADER_UNIFORM_VEC4);
+    DrawBillboardRec(_camera, item.texture, src,
+                     {pos.x, h * 0.5f, pos.z}, {w, h}, item.tint);
+    EndShaderMode();
 }
 
 // ── M6-v2c: blob shadow — 径向渐变纹理贴地 quad (失败回退黑扁片) ──
@@ -502,10 +663,12 @@ void HD2DRenderer::_draw_portal_ring(const HD2DDrawItem& item) {
 }
 
 // ── M6-j: 地板装饰 — 贴地 decal quad (裂缝/苔藓/符文; 32px 平铺) ──
-// 与地板同平面 (y=0.09 略高避免 z-fight), 半透融入
+// N1-fix: 关闭深度测试 — decal 从45°角看比地板"更远"会被深度缓冲丢弃
 void HD2DRenderer::_draw_floor_decal(const HD2DDrawItem& item) {
     Vector3 pos = item.world_pos;
     float e = item.size * 0.5f;
+    rlDisableDepthTest();
+    rlDrawRenderBatchActive();                 // 强制刷新确保深度状态生效
     // M6-l: 支持无纹理纯色 quad (Boss FOV 红雾) + 使用 item.tint
     if (item.texture.id > 0) {
         rlSetTexture(item.texture.id);
@@ -519,10 +682,20 @@ void HD2DRenderer::_draw_floor_decal(const HD2DDrawItem& item) {
         rlEnd();
         rlSetTexture(0);
     } else {
-        // 纯色 quad (Boss FOV 红雾等)
         DrawPlane({pos.x, pos.y, pos.z}, {item.size, item.size},
                   {item.tint.r, item.tint.g, item.tint.b, item.tint.a});
     }
+    rlEnableDepthTest();
+    rlDrawRenderBatchActive();                 // 恢复深度状态
+}
+
+// ── N5: 楼梯台阶 — 真实 3D 立方块 (DrawCube 自带面光照) ──
+// 4 个立方由 builder 逐级下沉/缩小, 视觉上形成阶梯
+void HD2DRenderer::_draw_stair_step(const HD2DDrawItem& item) {
+    Vector3 pos = item.world_pos;
+    float depth = item.height;                  // z 深度复用 height 字段
+    Color face = item.tint;
+    DrawCube(pos, item.size, 2.5f, depth, face);
 }
 
 // ── M6-v2h: 门 — 竖立贴图面板 (四态纹理; 锁=红罩 / 封=紫脉冲十字) ──
@@ -796,18 +969,35 @@ Vector2 HD2DRenderer::world_to_screen(Vector3 world_pos, float y_offset) const {
     return s;
 }
 
-// ── M6-v2g/M6-i.1: bloom 按 biome 自适应 ──
-// i.1: 环境光 0.78 抬亮地板后, 监狱原阈值 0.60 会提取中亮地板 → bloom
-// 叠加炸成全白 (实测 238); 阈值随环境光上调, 只让高光 (岩浆/火把) bloom
-static void _apply_bloom_biome_preset(const GameMap* map) {
-    auto& fx = HD2DPostFX::inst();
+// ── M6-v2g/i.1 档位 + A4: bloom 亮度反馈 preset ──
+// i.1: 环境光 0.78 抬亮地板后, 低阈值会提取中亮地板 → bloom 炸全白
+// (实测 238); 各档阈值只吃高光。center = 调参当时亮度代理典型值
+HD2DRenderer::BloomPreset HD2DRenderer::_bloom_preset_for(const GameMap* map) {
     const char* biome = map ? map->biome_id() : "";
     if (strcmp(biome, "ash_volcano") == 0)
-        fx.set_params(0.82f, 0.14f, 0.42f);   // 火山: 只吃岩浆/裂纹高光
-    else if (strcmp(biome, "void_abyss") == 0)
-        fx.set_params(0.74f, 0.20f, 0.50f);   // 深渊: 只吃符文/晶光
+        return {0.82f, 0.14f, 0.15f, 0.655f};  // 火山: 岩浆满布时实测
+    if (strcmp(biome, "void_abyss") == 0)
+        return {0.74f, 0.20f, 0.18f, 0.34f};   // 深渊: 无岩浆 → 代理基线
+    return {0.72f, 0.22f, 0.12f, 0.34f};       // 监狱(默认)
+}
+
+// ── A4: 逐帧亮度反馈 — lum = 0.34 + 0.045×岩浆数 (代理), EMA τ≈0.17s ──
+// d>0 场景偏亮 → 提阈值压强度 (防炸白); d<0 偏暗 → 放阈值提强度。
+// 监狱/深渊恒 d=0 → 与 v2g 手调值逐位一致 (反馈只在火山生效)
+void HD2DRenderer::_apply_bloom_adaptive(const GameMap* map) {
+    BloomPreset p = _bloom_preset_for(map);
+    float lum = 0.34f + 0.045f * (float)_pl_lava_count;
+    if (_bloom_lum_ema < 0.0f || p.center != _bloom_last_center)
+        _bloom_lum_ema = lum;                    // 首帧/biome 切换: 重同步
     else
-        fx.set_params(0.72f, 0.22f, 0.45f);   // 监狱(默认): 只吃火把/高光
+        _bloom_lum_ema += 0.10f * (lum - _bloom_lum_ema);
+    _bloom_last_center = p.center;
+    float d = _bloom_lum_ema - p.center;
+    float th = std::min(std::max(p.threshold + 0.5f * d, p.threshold - 0.06f),
+                        p.threshold + 0.10f);
+    float inten = std::min(std::max(p.intensity * (1.0f - 0.6f * d),
+                                    p.intensity * 0.6f), p.intensity * 1.5f);
+    HD2DPostFX::inst().set_params(th, p.softness, inten);
 }
 
 // ── M6-v2c: 后处理 — bloom 链 + 夜色分级 + 地平雾带 (shader 版) ──
@@ -819,7 +1009,7 @@ void HD2DRenderer::_apply_post_processing(GameScene& gs) {
     auto& fx = HD2DPostFX::inst();
     auto* tree = gs.get_tree();
     if (tree && fx.ensure_init(_target_w, _target_h)) {
-        _apply_bloom_biome_preset(gs.game_map.get());     // M6-v2g
+        _apply_bloom_adaptive(gs.game_map.get());   // A4 (原 v2g biome 三档)
         fx.process(tree->main_target());
         // 夜色分级 + 地平雾带 (bloom 之下)
         // i.1-fix2: 夜色从蓝 (20,18,46) 改暖暗 (30,24,18) — 蓝罩把全屏

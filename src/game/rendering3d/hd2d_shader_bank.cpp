@@ -3,6 +3,7 @@
 // raylib 5.0 LoadShader(nullptr, fs) 会自动挂默认顶点布局 (后处理 fs 适用);
 // 地形系 shader 必须传 hd2d_world.vs (需要 fragWorldPos 输出)
 #include "hd2d_shader_bank.h"
+#include "rlgl.h"
 #include "core/logger.h"
 #include <map>
 #include <string>
@@ -28,11 +29,15 @@ Shader HD2DShaderBank::load(const char* name, const char* vs_name) {
         return it->second.valid ? it->second.shader : Shader{};
 
     Entry entry;
-    const char* vs_path = vs_name ? _shader_path(vs_name, "vs").c_str() : nullptr;
-    const char* fs_path = _shader_path(name, "fs").c_str();
+    // 必须持有 string 生命周期: 临时串 .c_str() 悬垂 (UB, 路径随机损坏)
+    std::string vs_full = vs_name ? _shader_path(vs_name, "vs") : std::string();
+    std::string fs_full = _shader_path(name, "fs");
+    const char* vs_path = vs_name ? vs_full.c_str() : nullptr;
+    const char* fs_path = fs_full.c_str();
     // vs 缺文件时 raylib 自动回退默认顶点 (LoadShader nullptr 分支)
     entry.shader = LoadShader(vs_path, fs_path);
-    entry.valid = entry.shader.id > 0;
+    // raylib 编译失败时返回默认 shader (id>0 假阳性) — 必须比对默认 id
+    entry.valid = entry.shader.id > 0 && entry.shader.id != rlGetShaderIdDefault();
     if (!entry.valid) {
         LOG_WARN("HD2D shader [%s] 加载失败, 该项回退默认管线", name);
         entry.shader = {};

@@ -39,6 +39,8 @@ static AmbientDef _parse_ambient(const json& obj) {
     a.rise = amb.value("rise", true);
     a.life_min = amb.value("life_min", 2.5f);
     a.life_max = amb.value("life_max", 6.0f);
+    a.style = amb.value("style", std::string());      // A2.2
+    a.texture = amb.value("texture", std::string());  // A2.2
     return a;
 }
 

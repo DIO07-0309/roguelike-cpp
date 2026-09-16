@@ -126,4 +126,6 @@ F15 镜像 Boss 读你的行为画像（攻防倾向/走位偏好/技能习惯�
 | v1.4.0 | 三存档槽 · 结局收集迁 Meta · 4 个历史 Bug 修复 |
 | v1.4.13 | 三群系贴图 + RNG-001 修复 |
 | v1.4.14 | 30 怪一怪一图 · Boss 专属立绘 · visual_id 数据驱动 |
-| **v1.5.0** | **Demo Release（本次门禁目标，checklist 见 docs/RELEASE_CHECKLIST.md）** |
+| v1.4.32 | M6-n 视觉收口：HD-2D 深度/脚印/装饰/3D 楼梯 + bloom 减弱 |
+| v1.5.0 | Demo Release 门禁达成（sim 直达 · 死因基线 · 平衡审计） |
+| **v1.6** | **平台深化** — B2 死因仪表盘 · B1 Mirror 记忆可视化 HUD · B3M Mirror 学习闭环 · A1.1 Billboard 真轮廓 · A2 群系性格粒子 (含 PNG 贴图数据驱动) · A3 实体接收阴影 · A3.1 P0 shader 热修 (雾/阴影/bloom 首次真实生效) · A3.2 墙顶同贴图化 · A4 bloom 逐帧亮度反馈 |

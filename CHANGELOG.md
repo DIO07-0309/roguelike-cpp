@@ -1,3 +1,273 @@
+# v1.6-A4 — bloom 逐帧亮度反馈 (B 案: EMA, 零回读) (2026-09-16)
+
+> 清偿 v2g 遗留: bloom 三档手调常量在岩浆密度逐层不同的火山会偏。
+> A 案 (真 HDR pass) 需每帧 readPixels stall, 不采纳; B 案用渲染器
+> 已有信号做亮度代理: `lum = 0.34 + 0.045 × 岩浆代表光数(0..7)`,
+> EMA τ≈0.17s, 偏差 d 联动 threshold(±0.06/+0.10 内) 与
+> intensity(×0.6~×1.5 内); biome 切换 ema 直接重同步无穿帮。
+> 设计详见 docs/M6_HD2D_RENDERING.md A4 节。
+
+> ## 性质与验证
+> - 监狱/深渊无岩浆恒 d=0 → 与 v2g 手调值逐位一致 (反馈只在火山生效)
+> - F6 满布岩浆火山实测: 与 A3.2 画面 diff 26/614400 (0.004%, 仅粒子
+>   相位) = 落在标定中心, 零回归; 目检 bloom 光晕正常
+> - 纯渲染器私有状态 (_pl_lava_count/_bloom_lum_ema), 不触 PostFX
+>   接口/Shader/逻辑层
+> - Release 0 error; ctest 61/61; sim 12×2 双跑逐行一致;
+>   _upload_point_lights 压回 40 行合规
+
+> ## 取证伪影结案 (A4 期间顺带查明)
+> - 历史截图"HUD 中文乱码"= autoshot 裸导 RT 的字形纵向镜像伪影
+>   (2D 模式截图同样中招; 实机屏幕正常, 用户从未反馈此问题)。
+>   曾试 LoadImageFromScreen 抓 backbuffer → hidwin 下全黑, 已回滚。
+>   读文本以 game.log 为准。详见 docs/M6_HD2D_RENDERING.md 已知限制
+
+# v1.6-A3.2 — 墙顶白块替换: 同贴图顶面 quad (2026-09-16)
+
+> A3.1 让 shader 真实生效后, v2a 遗留的"顶面亮 10% 无贴图 DrawCube 盖"
+> 成为画面最刺眼缺陷: 纯白 1 单位浮块盖住走廊、不收雾/阴影、与 caster
+> 深度顶面 (y=h) 不共面。
+
+> ## 修复 (纯渲染)
+> - `_draw_wall_block` 贴图分支: DrawCube 白盖 → `_wall_top_quad`
+>   同贴图水平 quad @ y=h (与 shadow caster 顶面共面, 影带自动对齐);
+>   "亮 10% 伪受光"语义保留在 tint 上, 但颜色来自贴图不再爆白
+> - 无贴图回退分支不动 (纯色块 + 盖本来就自洽)
+> - 附带收益: 墙体视觉高度 -1 单位 = 真实高度, 走廊/上层房间可见性提升
+
+> ## 验证
+> - F6/F3 取证: 白块全消, 墙面六面纹理一致, 零 shader 编译失败
+> - 函数长度合规 (`_draw_wall_block` 34 行, tint 计算挪入 helper)
+> - 重构前后像素 diff 26/614400 (0.004%, 仅粒子相位) = 零视觉变化
+> - Release 0 error; ctest 61/61; 桌面同步 (src + exe + docs)
+
+# v1.6-A3.1 — P0 热修: HD2D shader 从未编译过 (`#` 注释 + bank 假阳性 + 悬垂路径) (2026-09-16)
+
+> 目检取证截图时发现画面与"shader 生效前"完全同构。深挖后确认三个叠加
+> 缺陷, 导致 v2c 起 (v1.4.x→v1.5.0→v1.6-A1/A2/A3) 的雾/阴影/岩浆动画/
+> bloom/描边 shader **从未在 GPU 上编译成功**, 游戏一直静默跑默认回退管线。
+
+> ## 三个根因
+> - `assets/shaders/*.fs|*.vs` 全部 8 个文件: 头部注释行 `// ` 被写成
+>   `# ` (非法 GLSL 预处理指令) → 编译必败; git 考古确认自创建提交
+>   (ab93b44 v2c) 起即如此, 非近期回归
+> - `hd2d_shader_bank.cpp` 有效性判定 `shader.id > 0` 假阳性: raylib
+>   编译失败返回**默认 shader (id>0)**, 日志永远记"加载成功" → 此前
+>   取证"7 shader 全绿零 WARN"结论作废 (WARN 在 stderr, game.log 不含)
+> - 同文件 `_shader_path(...).c_str()` 对临时 std::string 取指针 =
+>   悬垂 UB → 路径随机损坏 (偶发 "Failed to open" / depth 单帧失败)
+
+> ## 修复
+> - 8 个 shader 文件 `(?m)^# ` → `// ` (合法 `#version` 不受影响)
+> - bank: `entry.valid = id>0 && id != rlGetShaderIdDefault()` (+rlgl.h)
+> - bank: vs/fs 路径改持有 std::string 生命周期
+
+> ## 验证 (真实 shader 首次上 GPU)
+> - F3/F6/F11 三楼层取证: stderr 零编译失败, game.log 全 INFO 加载成功
+> - 像素 diff: 修复前后 46.2% 像素变化 (全小 delta 无爆图) = fog/shadow/
+>   point-light/lava/bloom 真实生效, 画面稳定无异常
+> - F11 深渊萤火虫 PNG 贴图正常渲染 (A2.2 首次肉眼可见)
+> - Release 0 error; ctest 61/61; sim 双跑逐行一致 (sim 路径零渲染引用);
+>   对旧基线差异归因 = 取证游玩使镜像学习表进化 (设计内), 非本批代码
+> - 桌面同步: assets/shaders + src + exe
+
+# v1.6-A3 — 实体接收阴影 (billboard shadow map 逐像素采样) (2026-09-16)
+
+> v1.5 技术债清单第 3 项 ("实体不接收阴影") 清偿。v2f 起实体只投影不
+> 收影: 站在墙面影带里依然全亮, 与地形脱节。A3 让描边路径角色
+> (玩家/怪/Boss/NPC) 与地形共享同一张 shadow map。
+
+> ## 实现 (纯渲染, 逻辑层零改动)
+> - `hd2d_billboard_outline.fs`: 新增 shadow map 采样段 — sample_shadow
+>   与 `hd2d_fog.fs` 逐字同源 (lightViewProj + PCF 3x3 + 光域外豁免);
+>   压暗系数 `0.78 + 0.22*shadow` 与地形 M6-i.1 环境保底同一档位
+> - 逐像素投影 (非整片单采样): 身上影带与地面阴影自然对齐,
+>   高于遮挡物的部位沿光路自动复亮 — 物理正确的"半身入影"
+> - 描边色同步压暗 (影中轮廓不浮亮); tint/fade/呼吸语义不变
+> - C++: `_upload_shadow_uniforms` 抽公共体 `_upload_shadow_to`
+>   (fog/outline 两 shader 一套数据源, 转置/包装/缺失兜底共用)
+> - 降级安全: shadow map 未就绪→shadowEnabled=0 原样渲染;
+>   outline shader 加载失败→旧 4 向描边路径 (不收影, 不崩溃)
+
+> ## 影响面与边界
+> - 生效面 = item.outline 实体 (builder: 玩家/怪/Boss/NPC);
+>   装饰/道具 blob 接地阴影不变 (全 shader 化留 A5 一并评估)
+> - 性能: 每实体 +5 SetShaderValue + PCF 9 采样/像素, ≤60 实体无感
+> - sim 零分岔: 双跑一致 + 对 A2.2 基线仅构建戳差异 (实测)
+
+> ## 验证
+> - Release 0 error; ctest 61/61; sim 红线电池绿
+> - **无头取证链** (`--hd2d --goto-floor F --autoshot N --hidwin` + 桌面
+>   slot_1 借档): F3/F6 截图帧全 shader (含新 outline fs) 加载成功,
+>   渲染 300 帧零 WARN; 像素审计描边/半影带正常 (非全黑/无破图),
+>   取证后 slot/meta/game.log 现场已完整还原
+> - 待实机目检: 影带对齐观感 (唯一不可自动化项)
+
+# v1.6-A2.2 — 粒子资产升级: 群系 PNG 贴图 + 数据驱动风格 (2026-09-16)
+
+> A2.1 的三性格是代码里按 biome id 硬映射 + 程序化软光圆。A2.2 补上
+> ART_ASSET_PLAN P2 "Ambient particles PNG" 欠账: 风格与贴图进 biomes.json
+> 数据驱动, 三个手绘 16×16 像素粒子图, 为 MOD/新群系留好扩展口。
+
+> ## 新增
+> - `tools/make_particle_textures.py` (PIL, 确定性零随机) →
+>   `assets/textures/particles/particle_{dust,ember,firefly}.png`
+>   - dust: 灰紫柔球+碎屑斑 / ember: 白热核+橙环+上飘尾迹 / firefly: 亮核+十字星芒
+> - `biomes.json` ambient 段新增 `style` + `texture` 字段 (全可选)
+> - 解析链: `AmbientDef.style/texture` → `AmbientCfg.style/texture` (2D 侧不消费)
+> - 3D: builder 优先 `cfg.style` 派生 `MoteStyle` (空→A2.1 id 回退);
+>   `item.texture` 经 ResourceManager 现成缓存加载, 像素贴图放大系数收紧 1.6→1.3
+> - renderer 批量内按 item.texture 切换 (同帧同群系实际仅 1 次), 缺图→程序化软光
+
+> ## 影响面
+> - 2D AmbientLayer 行为零改动 (新字段 2D 不读取); JSON 为"只新增字段"不破坏旧读者
+> - sim 零逻辑分岔 (实测双跑一致 + 对 B3M 基线仅构建戳差异)
+> - validator 扩展: ambient.style 白名单 {dust,ember,firefly} + texture 文件存在性
+
+> ## 验证
+> - Release 0 error; ctest 61/61; world_validator 0/0 (新检查生效)
+> - `--sim 12 --sim-seed 3` 双跑一致, 对 B3M 基线零逻辑 diff
+> - 桌面包已同步: src/ resources/ tools/ assets/ + exe
+
+# v1.6-B3M — Mirror 学习闭环: 克隆表跨局记忆 (2026-09-16)
+
+> "会学习你的 Roguelike" 的最后一块拼图: 此前跨局唯一持久的学习只有 slot 档
+> 内的 Thompson 后验 (mra/mrb)；M1 克隆表每局从清零的 action stream 现算,
+> 换个进程就忘光 — AI_LEARNING_GUIDE §8.4 点名的技术债 ("load 空 stub") 清偿。
+
+> ## 新增
+> - `MirrorMemoryStore` (src/ai/mirror/): saves/mirror_memory.json 读写,
+>   克隆表快照序列化 (nlohmann), .tmp+rename 伪原子写, 128 条熔丝
+> - **跨局遗忘曲线**: 每次读入整体 ×0.99 截断, 单次证据一局即过期,
+>   40+ 证据可撑 ~20 局 — 旧习惯自然让位新打法
+> - `BehaviorCloneTable::table()/merge_entry()` 持久化注入口
+> - 注入点: `_init_mirror_boss` 本局 build 后 merge (每局新建表, 天然不叠加)
+> - 回写点: `export_mirror_memory` (楼梯存档/回标题/死亡三处现有调用全覆盖);
+>   本局未遇 F15 (agent 空/表空) 跳过落盘, 不清空历史记忆
+
+> ## 影响面与红线
+> - **sim 确定性零接触**: `MetaSystem::g_readonly` 双端 guard, 实测
+>   `--sim 12 --sim-seed 3` 不落盘不注入, 双跑一致, 对 A2.1 基线零逻辑 diff
+> - 2D/3D 逻辑层/战斗数值/JSON 资源零改动; Profile/ChainTable 留后续批
+> - 记忆跟人走 (saves/ 根), 不挤占 slot 档与 meta 伪 JSON 格式
+
+> ## 验证
+> - Release 构建新增文件 0 warning; ctest **61/61** (新增 5 例:
+>   存取自愈/衰减精确值/merge 累加/微量记忆过期/损坏文件防脆)
+> - 桌面同步: src+tests+exe
+
+# v1.6-A2.1 — 3D 环境粒子: 群系性格软光 (2026-09-16)
+
+> M6-v2e 的氛围粒子在 3D 层是"逐颗 DrawSphere + 每颗切一次 blend":
+> 24 颗 ≈ 1.2 万三角面 + 24 次状态切换, 且挤在同一高度带像悬浮小球地毯。
+> A2.1 把它做成真正的 3D 氛围层: 程序软光纹理 billboard 单批 + 群系性格运动。
+
+> ## 新增
+> - **软光渲染重构**: 32×32 白色径向渐变程序纹理 + 相机朝向 quad,
+>   全部 AMBIENT_MOTE 一次 `rlBegin/rlEnd` additive 批 (24 次 flush → 1)
+> - **群系性格** (`MoteStyle`, 按 `get_biome_for_floor` 派生, 纯渲染语义):
+>   - `DUST` 监牢尘埃: 贴地 4~20, 慢摆 + 弱微闪
+>   - `EMBER` 火山余烬: 急升 8~72, 大幅蜿蜒, 亮度随熄灭衰减
+>   - `FIREFLY` 深渊幽光: 中层悬浮 bob, 强周期明灭
+>   相位由 spawn 稳定字段 (vx/size) 位哈希 + `GetTime()` 推导 —
+>   无新增状态、无随机 (同 v2a 呼吸帧惯例)
+> - 首尾渐隐包络与 2D `AmbientLayer::draw` 同式, 2D/3D 观感同源
+
+> ## 影响面
+> - AmbientLayer (2D 共享逻辑) 零改动; sim 不跑渲染层, 逻辑零分岔
+> - ShadowCaster / PostFX / JSON / Save / RNG 零接触
+> - draw call: 粒子 24→1 批 (球体 ~500 tris/颗 → quad 2 tris/颗)
+> - shutdown 对称释放 `_mote_glow_tex`
+
+> ## 验证
+> - Release 构建 0 warning; ctest 60/60; world_validator 0/0
+> - `--sim 12 --sim-seed 3` 双跑一致 + 对 A1.1 基线仅构建戳差异
+> - 函数长度审查: 全部新增/改动函数 ≤30 行
+> - 桌面包已同步 src/ + exe
+> - 实机待验收: F1 尘埃贴地感 / F6 余烬上升蜿蜒 / F11 幽光明灭 + 性能不降
+
+# v1.6-A1.1 — 3D-aware Billboard 真轮廓描边 (2026-09-16)
+
+> M6-n 的 4 向偏移是"2D 描边搬进 3D": 世界 x/z 偏移在 45° 俯角下退化成左右
+> 两向、矩形剪影不贴精灵轮廓、每个描边实体 5 次 draw。A1.1 把它升级为真正的
+> 3D 渲染管线 Billboard Outline — 单 draw call, 轮廓精确贴合 Sprite Alpha Mask。
+
+> ## 新增
+> - **hd2d_billboard_outline.fs**: 8 邻域 alpha-mask 采样 (4 正向 + 4 对角),
+>   本体像素走原色, 透明且邻域为剪影 → 描边色, 其余 discard; 阈值 0.5 与
+>   shadow depth pass 同源; 复用 hd2d_world.vs
+> - **世界空间 → 屏幕空间自适应** (核心, 拒绝固定 texel):
+>   基准宽 2.0 世界单位 → 每帧 `_update_px_per_world()` 按相机距离/FOV 换算
+>   屏幕像素 (透视投影) → clamp [1, 4] px (远距可辨识 / 近距 Boss 不过粗)
+>   → 再转图集 UV offset 传入 shader
+> - **outline 色经 uniform 传入** (默认 RGB 24,24,27 / a=220, 与旧系统同色),
+>   为后续群系色相微调留钩子
+> - **NPC 开启描边** (与玩家/怪/Boss 同权); 拾取物/Arena 物件/Projectile/VFX
+>   保持不描边 (kind 天然隔离, 未动)
+
+> ## 影响面
+> - 描边实体 draw call 5→1 (outline 生效时); 非描边实体路径零改动
+> - **描边不参与 shadow map**: ShadowCaster 仍用本体几何 (hd2d_depth.fs),
+>   视觉轮廓 ≠ 实体几何, 两 pass 语义保持干净
+> - HD2DPostFX / fog / lava / bloom / Gameplay / RNG / Save 零接触
+> - shader 加载失败 → `_outline_ok=false` → 完整回退 M6-n 旧 4 向偏移路径
+
+> ## 验证
+> - Release 构建 0 warning; ctest 60/60 全绿
+> - world_validator 0 错误 (JSON 未动, 零漂移)
+> - `--sim 12 --sim-seed 3`: 新 exe 双跑逐行一致; 与 A1.1 前旧 exe 对比仅
+>   构建时间戳/META 存档环境差异, 逻辑零分岔
+> - 桌面包已同步 src/ + assets/shaders/ + exe (根目录一键跑)
+> - 实机待验收: F1 轮廓清晰不糊黑块 / F6 深色背景不融边 / F11 紫环境不染色 /
+>   F15 Boss 近拉远屏幕厚度稳定 1–4 px
+
+# v1.6-B1.1 — Mirror 记忆实时可视化 HUD (2026-09-16)
+
+> B1 前作只把"它眼中的你"堆在右上 Echo 面板下方; 玩家看不到 Mirror 到底在
+> 猜什么、习惯什么。B1.1 让"它在学"从抽象数字变成战斗中一眼读懂的画面。
+
+> ## 新增
+> - **MirrorHudPanel 组件**: 顶部 reveal + 顶部观察卡 (零逻辑侵入)
+>   - `MIRROR ANALYSIS` 500×88 分析卡: Echo 登场 reveal 6.5s 淡入淡出, 不常驻
+>   - 左半 = 技能偏好 4 柱 (SL/FB/SH/TW, 本命金框)
+>   - 右半 = **战斗习惯** 4 方块 (ATK/SKL/RET/APP, 明确"非角色属性")
+> - **观察卡 340×54**: reveal 结束后接手同位置, 战斗全程常驻
+>   - 首行 = "它猜你下一步 → ATTACK 68%" (缓存 action+confidence, 决策同频)
+>   - 尾行 = "本局节奏 A3.2 S1.4 D0.8 H0.3 · 42s" (实时/秒)
+> - **MirrorAgent 决策缓存**: `predict_next_action` 内部各分支返回前写入
+>   `_last_pred_action/_last_pred_conf` (mutable, const 语义保持);
+>   `cache_pred_time(gt)` 由 MirrorCombatDirector 打时间戳; HUD 严禁重跑 predict
+> - **stale 语义**: 观察卡 >2s 未刷新降级"上次预测 Ns前"; >200s 兜底"观察中…"
+
+> ## 影响面
+> - 单测 `predict_next_action` 返回值语义不变 (3 处测试原样通过)
+> - Thompson 早退分支不刷新 predict 缓存, age 自然增大 → HUD 显示陈旧标记
+> - `begin_battle` 追加清缓存; 二周目/调试重开不残留
+
+> ## 验证
+> - ctest 60/60 全绿
+> - 字体码位: 新增 24 中文字符 + `…` `·` `%` 全部命中现有 1831 码位表
+> - 桌面包已同步 exe + src/ (根目录 roguelike_cpp.exe 一键跑)
+
+# v1.6-B2 — 死因仪表盘游戏内化 (2026-09-15)
+
+> 死因数据止于 sim CSV — 玩家死后只看到"你死了"。B2 把死因谱搬进游戏内:
+> DeathScene 显示本局死因 + 跨局死因谱 Top3。
+
+> ## 新增
+> - **本局死因行**: DeathScene "死于: XXX" (红字醒目, 位于层数行上方);
+>   `dot:`/`env:` 前缀翻译为 "持续伤害·"/"环境·" 友好文案 (sim CSV 仍用原始码)
+> - **跨局死因谱**: 账号级 death_history (最近 8 条环形), 账号级删档不丢;
+>   ≥2 类死因才显示 Top3 ("尖刺史莱姆 ×3"); 首死只看本局不显示谱
+> - **MetaSystem::record_death / top_death_causes**: 环形入账 + 聚合查询
+> - **存档兼容**: 老档无 `deaths` 键 → 空史加载不炸 (实测); buf 2048→4096
+>   手写异常文件 (>8 条) 也截到最近 8 条 (丢最旧, 与 record 语义一致)
+
+> ## 验证
+> - ctest 60/60 (含新增 DeathHistoryRingAndTopCauses: 环形/Top聚合/删档不丢)
+> - sim12 seed3 基线零漂移 (排除时间戳); meta 哈希前后一致 (readonly 生效)
+> - 磁盘往返: 9 条手写 → load 截 8; 中文死因 UTF-8 回读正确
+
 # v1.4.33 — v1.5.0 P0 门禁推进 (2026-09-15)
 
 > M6 后直接进入 v1.5.0 发布门禁自动化验证。

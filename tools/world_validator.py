@@ -99,6 +99,14 @@ for b in biomes:
         check_ref(e, enemy_ids, f"{ctx} enemy_pool", ctx)
     check_ref(b.get("boss_id",""), boss_ids, f"{ctx} boss_id", ctx)
     check_ref(b.get("bgm",""), valid_bgm, f"{ctx} bgm", ctx)
+    # A2.2: ambient.style 白名单 + ambient.texture 文件存在 (从仓库根运行)
+    amb = b.get("ambient", {})
+    style = amb.get("style", "")
+    if style and style not in ("dust", "ember", "firefly"):
+        err(f"BROKEN REF: {ctx} ambient.style '{style}' 非法 (dust/ember/firefly)")
+    tex = amb.get("texture", "")
+    if tex and not os.path.exists(tex):
+        err(f"MISSING: {ctx} ambient.texture {tex}")
 
 for lm in landmarks:
     ctx = f"landmarks.json [{lm['id']}]"

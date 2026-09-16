@@ -1,8 +1,8 @@
-# M6-v2e: 地形 shader (雾 + shadow map 采样 + 点光源) — 克自 v2c hd2d_fog.fs
-# vertexColor: tile tint (FOV 探索压暗语义保留)
-# 阴影: 光空间投影 → depth tex 比较 (PCF 3x3); shadow map 缺失时
-#   uniform shadowEnabled=0 → 跳过采样 (blob 回退, renderer 控制)
-# 点光源: uniform 数组 pos/range/color (岩浆/火把; 上限 8, count 控制)
+// M6-v2e: 地形 shader (雾 + shadow map 采样 + 点光源) — 克自 v2c hd2d_fog.fs
+// vertexColor: tile tint (FOV 探索压暗语义保留)
+// 阴影: 光空间投影 → depth tex 比较 (PCF 3x3); shadow map 缺失时
+//   uniform shadowEnabled=0 → 跳过采样 (blob 回退, renderer 控制)
+// 点光源: uniform 数组 pos/range/color (岩浆/火把; 上限 8, count 控制)
 #version 330
 in vec2 fragTexCoord;
 in vec4 fragColor;

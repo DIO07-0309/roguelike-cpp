@@ -1,5 +1,5 @@
-# M6-v2c: 高斯模糊 (可分离 blur) — 9 tap 高斯核, 方向由 uDir 控制
-# 乒乓 pass: 水平 → 垂直, 各一次, 作用于 1/4 分辨率亮部图
+// M6-v2c: 高斯模糊 (可分离 blur) — 9 tap 高斯核, 方向由 uDir 控制
+// 乒乓 pass: 水平 → 垂直, 各一次, 作用于 1/4 分辨率亮部图
 #version 330
 in vec2 fragTexCoord;
 out vec4 finalColor;

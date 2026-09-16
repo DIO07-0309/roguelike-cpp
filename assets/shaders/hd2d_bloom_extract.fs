@@ -1,5 +1,5 @@
-# M6-v2c: Bloom 亮部提取 (bright-pass) — 阈值以上部分平方衰减输出
-# 输入: scene RT 纹理; 输出: 1/4 分辨率亮部图
+// M6-v2c: Bloom 亮部提取 (bright-pass) — 阈值以上部分平方衰减输出
+// 输入: scene RT 纹理; 输出: 1/4 分辨率亮部图
 #version 330
 in vec2 fragTexCoord;
 out vec4 finalColor;

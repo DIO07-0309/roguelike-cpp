@@ -192,6 +192,41 @@ TEST(SlotApi, MetaSurvivesSlotDelete) {
     g_meta.save();
 }
 
+// ── v1.6-B2: 死因史 — 环形上限 + Top 聚合 + 删档不丢 ──
+TEST(SlotApi, DeathHistoryRingAndTopCauses) {
+    SlotGuard guard;
+    MetaSystem::g_readonly = false;
+    g_meta.load();  // 从磁盘基线开始 (老档 deaths=[] → 空)
+    ASSERT_TRUE(g_meta.data().death_history.empty());
+
+    // 环形: 写 10 条, 只留最近 8
+    for (int i = 1; i <= 10; i++)
+        g_meta.record_death(i, (i % 2 == 0) ? "火焰陷阱" : "尖刺史莱姆");
+    auto& hist = g_meta.data().death_history;
+    ASSERT_EQ(hist.size(), (size_t)8);
+    EXPECT_EQ(hist.front().floor, 3);          // 最旧 (第1,2条被挤掉)
+    EXPECT_EQ(hist.back().floor, 10);          // 最新
+
+    // Top 聚合: 6x尖刺史莱姆 + (8-6)x火焰陷阱 — 写 10 条后
+    // 奇数=尖刺史莱姆(5条), 偶数=火焰陷阱(5条) → 环形截断后 奇数4 偶数4
+    auto top = g_meta.top_death_causes(3);
+    ASSERT_EQ(top.size(), (size_t)2);
+    EXPECT_EQ(top[0].second, 4);
+    EXPECT_EQ(top[1].second, 4);
+
+    // 删档不丢: 存盘→删 slot→重读 meta
+    Player p(64.0f, 64.0f, 220.0f, 100, 11, 5, 3);
+    SaveManager::save_game(1, &p, 1, 1);
+    SaveManager::delete_save(1);
+    g_meta.load();
+    EXPECT_EQ(g_meta.data().death_history.size(), (size_t)8);  // 仍在
+
+    // 清理: 恢复干净的 meta (清 deaths + endings)
+    MetaSystem::debug_reset_collection();
+    g_meta._clear_death_history_for_test();   // 测试钩子
+    g_meta.save();
+}
+
 // ── B4.7: Mirror 记忆隔离 — 各档独立 ──
 TEST(SlotApi, MirrorMemoryPerSlot) {
     SlotGuard guard;

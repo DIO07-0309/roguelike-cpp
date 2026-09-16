@@ -36,6 +36,7 @@
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.2
 #include "ai/player_behavior/player_behavior_analyzer.h"  // F15.5 mirror UI
 #include "ai/mirror/mirror_agent.h"                       // F15.5
+#include "game/rendering/mirror_hud_panel.h"              // v1.6-B1.1
 #include <cmath>
 #include <algorithm>
 #include <unordered_map>
@@ -2384,6 +2385,7 @@ void GameScene::_render_ui_tail(int sw, int sh) {
                         _presentation.room_msg, _presentation.room_msg_timer, sw, sh,
                         echo_panel_data.mirror_mode ? &echo_panel_data : nullptr,
                         ch_wave, _challenge.total_waves());
+    _render_mirror_hud_overlay(sw, game_time);   // v1.6-B1.1: 顶部分析/观察卡
 
     // Phase 3: Minimap — 右下角常驻面板 (M 键开关)
     if (_show_minimap && game_map && player) {
@@ -2921,6 +2923,7 @@ void GameScene::_render_hd2d_ui_bridge(int sw, int sh) {
                        sw, sh,
                        echo_panel_data.mirror_mode ? &echo_panel_data : nullptr,
                        ch_wave, _challenge.total_waves());
+    _render_mirror_hud_overlay(sw, game_time);   // v1.6-B1.1: 顶部分析/观察卡
     _render_ui_tail(sw, sh);   // 红屏/黑屏/面板/小地图/对话/事件/冻结/演出 全套
 }
 
@@ -3050,6 +3053,21 @@ void GameScene::_fill_mirror_learn_display(CharacterPanelData& echo) const {
     if (pf.attack_rhythm_var > 0 && pf.attack_rhythm_var < 0.25f)
         set_habit("固定攻击节奏 (方差%.2f)", pf.attack_rhythm_var);
     while (n < 3) { echo.mirror_habits[n][0] = '\0'; n++; }
+}
+
+// v1.6-B1.1: Mirror HUD overlay — 顶部 reveal 分析卡 + reveal 后接手观察卡
+// 只读 MirrorAgent 缓存; 不参与战斗决策; 无 RNG
+void GameScene::_render_mirror_hud_overlay(int sw, float game_time) {
+    if (!_boss._mirror_agent) return;
+    if (_boss._behavior_type != "mirror") return;
+    const MirrorAgent& agent = *_boss._mirror_agent;
+    MirrorHudPanel::render_analysis_card(agent, sw, game_time);
+    // reveal 完成后 (>=5.5s) 由观察卡接手同一位置; 避免同帧两卡重叠
+    if (agent.battle_seconds() >= 5.5f) {
+        const float obs_w = 340.0f;
+        float obs_x = (float)(sw - (int)obs_w) / 2.0f;
+        MirrorHudPanel::render_observation_card(agent, obs_x, 4.0f, game_time);
+    }
 }
 
 // Echo 面板 buff 腐化名映射 (攻/防/毒/缓/冻/血/燃/雷 → 黑化前缀)

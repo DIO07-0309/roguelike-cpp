@@ -92,6 +92,12 @@ void BehaviorCloneTable::record_decision(const CloneContext& ctx,
     _bump(_table[ctx.key()], intent);
 }
 
+// B3-M 闭环: 持久化 merge 注入 (计数直接相加, 同 key 累加证据)
+void BehaviorCloneTable::merge_entry(const std::string& key, const Counts& c) {
+    Counts& dst = _table[key];
+    for (size_t i = 0; i < c.size(); i++) dst[i] += c[i];
+}
+
 bool BehaviorCloneTable::_pick_best(const Counts& c, ClonePrediction& out) {
     int total = 0, best_n = 0;
     for (int i = 0; i < (int)PlayerIntention::COUNT; i++) {

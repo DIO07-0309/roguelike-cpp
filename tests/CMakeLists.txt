@@ -197,6 +197,8 @@ add_roguelike_test(analyzer_test      mirror/player_behavior_analyzer_test.cpp)
 add_roguelike_test(mirror_tactic_test mirror/mirror_tactic_test.cpp)
 add_roguelike_test(tactical_chain_test mirror/tactical_chain_test.cpp)
 add_roguelike_test(sequence_e2e_test mirror/sequence_e2e_test.cpp)
+# B3-M: CloneTable 跨局持久化闭环
+add_roguelike_test(mirror_memory_store_test mirror/mirror_memory_store_test.cpp)
 
 # Batch 3A: Economy & Persistence tests
 add_roguelike_test(gold_test           economy/gold_test.cpp)

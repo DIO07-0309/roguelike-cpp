@@ -57,6 +57,9 @@ struct MetaSave {
     // G10.9-B2: 账号级数据 (按审计归属矩阵从 save.json 迁入)
     std::vector<int> unlocked_endings;   // EndingType 列表 (账号收集, 删档不丢)
     int best_floor = 1;                  // 账号历史最高层 (展示用; 选关仍读 Slot maxf)
+    // v1.6-B2: 死因史 (最近 8 条, 环形覆盖; 账号级, 删档不丢)
+    struct DeathRecord { int floor; std::string cause; };
+    std::vector<DeathRecord> death_history;
 };
 
 // ---- 全局单例 ----
@@ -102,8 +105,15 @@ public:
     static bool ending_unlocked(int ending_type);
     static void record_floor_reached(int floor);     // best_floor 更新 (只升不降)
 
+    // v1.6-B2: 死因史 — 最近 8 条环形记录 (sim readonly 模式不落盘)
+    void record_death(int floor, const std::string& cause);
+    // 死因谱 Top-N: 按次数降序 ("尖刺史莱姆" → 3)
+    std::vector<std::pair<std::string, int>> top_death_causes(int top_n) const;
+
     // G10.9-B4: 测试钩子 — 清空账号收集 (仅测试清理用, 业务勿调)
     static void debug_reset_collection();
+    // v1.6-B2: 测试钩子 — 清空死因史 (仅测试清理用, 业务勿调)
+    void _clear_death_history_for_test() { _save.death_history.clear(); }
 
 private:
     MetaSave _save;

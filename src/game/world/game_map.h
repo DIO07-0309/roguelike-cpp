@@ -128,6 +128,18 @@ public:
     int  explored_tile_count() const;      // 情绪 vignette 数据源
     void tick_footsteps(float dt);        // 足迹生命周期 (每帧调用)
 
+    // G11.2: 足迹数据结构 (环形缓冲, 固定 32 个不逐 tile 存储)
+    struct Footstep {
+        int tx, ty;            // tile 坐标
+        float life;            // 剩余秒数 (2.5s 渐隐)
+    };
+    static constexpr int FOOTSTEP_MAX = 32;
+
+    // M6-n N1: HD2D 脚印渲染只读访问
+    const Footstep* get_footsteps() const { return _footsteps; }
+    int get_footstep_head() const { return _footstep_head; }
+    static int get_footstep_max() { return FOOTSTEP_MAX; }
+
 private:
     std::vector<std::vector<Tile>> _tiles;
     bool _in_bounds(int tx, int ty) const;
@@ -136,12 +148,6 @@ private:
     bool _has_palette = false;
     std::string _biome_id;     // M5-A: 群系 id (空=通用贴图)
 
-    // G11.2: 足迹槽 (环形缓冲, 固定 32 个不逐 tile 存储)
-    struct Footstep {
-        int tx, ty;            // tile 坐标
-        float life;            // 剩余秒数 (2.5s 渐隐)
-    };
-    static constexpr int FOOTSTEP_MAX = 32;
     Footstep _footsteps[FOOTSTEP_MAX] = {};
     int _footstep_head = 0;
     int _explored_count = 0;    // is_explored=true 的 tile 数 (set 时累加)

@@ -11,6 +11,7 @@
 #include "entities/item.h"                    // M6-v2a: item_icon_key
 #include "systems/weapon_component.h"         // M6-v2b: WeaponType/range_indicator
 #include "world/npc_system.h"                 // M6-v2a: npc_sprite_key
+#include "world/biome.h"                      // A2.1: get_biome_for_floor (mote 风格)
 #include "entities/boss.h"                    // M6-v2b: BossAI 技能预警只读
 #include "resources/resource_manager.h"
 #include "rendering/sprite_renderer.h"
@@ -144,7 +145,7 @@ static const char* _special_room_icon_key(SpecialRoomType type) {
 }
 
 // ── M6-j: 地板装饰 — 坐标确定性哈希 (2D game_map.draw 同款, 零 RNG) ──
-// tint 变体 (污渍 6% / 石块 4%) + decal 贴片 (7%: 裂缝/苔藓/符文 按群系配色)
+// tint 变体 (污渍 6% / 石块 4%) + decal 贴片 (10%: 裂缝 4% / 苔藓 3% / 符文 3%)
 static void _apply_floor_decoration(const GameMap& map, int tx, int ty,
                                     bool has_pal, const TilePalette& pal,
                                     Texture2D floor_tex, HD2DDrawItem& item,
@@ -156,9 +157,9 @@ static void _apply_floor_decoration(const GameMap& map, int tx, int ty,
     if (variant < 6u)        item.tint = pal.floor_dirt;   // 污渍
     else if (variant < 10u)  item.tint = pal.floor_b;      // 石块变体
     unsigned int decal_roll = (h ^ (h >> 7)) % 100u;
-    if (decal_roll >= 7u) return;                          // 93% 无装饰
-    // decal 类型 + 群系配色 (2D dh 段同源: 裂缝/苔藓/符文)
-    int kind = (decal_roll < 3u) ? 2 : (decal_roll < 5u) ? 0 : 1;
+    if (decal_roll >= 10u) return;                          // 90% 无装饰
+    // decal 类型 + 群系配色 (2D dh 段同源: 裂缝 4% / 苔藓 3% / 符文 3%)
+    int kind = (decal_roll < 4u) ? 0 : (decal_roll < 7u) ? 1 : 2;
     Color primary = pal.floor_joint, secondary = pal.wall_highlight;
     const char* biome = map.biome_id();
     if (strcmp(biome, "ash_volcano") == 0)       primary = pal.wall_highlight;
@@ -197,8 +198,8 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
         cy = (int)(gs.player->entity.rect.y / TILE_SIZE);
     }
     // 扩大 build 范围: 相机 440 拉近后视野投影超出旧 ±16/±12 (实测 52% 屏幕是 ClearBackground)
-    int x0 = std::max(0, cx - 22), x1 = std::min(map->width - 1, cx + 22);
-    int y0 = std::max(0, cy - 16), y1 = std::min(map->height - 1, cy + 16);
+    int x0 = std::max(0, cx - 40), x1 = std::min(map->width - 1, cx + 40);
+    int y0 = std::max(0, cy - 30), y1 = std::min(map->height - 1, cy + 30);
 
     // v2a: 与 2D 同源的贴图回退链 (群系 → 通用 → 程序化)
     auto& res = ResourceManager::inst();
@@ -299,6 +300,20 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                                 (unsigned char)(item.tint.r * 6 / 10),
                                 (unsigned char)(item.tint.g * 6 / 10),
                                 (unsigned char)(item.tint.b * 6 / 10), 255};
+                        // N2: 特殊房间纯色覆盖 — 叠 FLOOR_DECAL 盖住底层贴图
+                        // (2D 版 DrawRectangle 同效果: 直接替换地板外观)
+                        HD2DDrawItem room_floor;
+                        room_floor.kind = HD2DDrawItem::Kind::FLOOR_DECAL;
+                        room_floor.world_pos = {
+                            (float)tx * TILE_SIZE + TILE_SIZE * 0.5f,
+                            0.02f,                      // 略高于 base floor (0.01f)
+                            (float)ty * TILE_SIZE + TILE_SIZE * 0.5f
+                        };
+                        room_floor.size = (float)TILE_SIZE;
+                        room_floor.tint = item.tint;
+                        room_floor.texture = {};
+                        room_floor.tex_src = {};
+                        out.push_back(room_floor);
                     }
                 }
                 // M6-v2h: 楼梯 tint 换棕金阶调 (2D 60/48/26 系)
@@ -306,6 +321,36 @@ static void _build_terrain(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                     && !map->get_special_room_at(tx, ty))
                     item.tint = map->isVisible(tx, ty)
                         ? Color{150, 120, 70, 255} : Color{90, 72, 42, 255};
+                // N5: 楼梯 4 级 3D 立方 (视觉 descending 沿 +Z 方向)
+                if (t == TileType::STAIRS_DOWN && map->isVisible(tx, ty)) {
+                    float cx = (float)tx * TILE_SIZE + TILE_SIZE * 0.5f;
+                    float cz = (float)ty * TILE_SIZE + TILE_SIZE * 0.5f;
+                    for (int s = 0; s < 4; s++) {
+                        unsigned char cr = (unsigned char)(60 + s * 14);
+                        unsigned char cg = (unsigned char)(48 + s * 12);
+                        unsigned char cb = (unsigned char)(26 + s * 8);
+                        HD2DDrawItem step;
+                        step.kind = HD2DDrawItem::Kind::STAIR_STEP;
+                        step.world_pos = {cx, 4.5f - (float)s * 1.8f,
+                                          cz - 12.0f + (float)s * 8.0f};
+                        step.size = TILE_SIZE - 4.0f - (float)s * 4.0f;
+                        step.height = 8.0f;                        // Z 深度
+                        step.tint = {cr, cg, cb, 255};
+                        out.push_back(step);
+                    }
+                    // 金色箭头 — 3 个大号 FLOOR_DECAL (2D 570-575 chevron 语义)
+                    for (int c = 0; c < 3; c++) {
+                        HD2DDrawItem arrow;
+                        arrow.kind = HD2DDrawItem::Kind::FLOOR_DECAL;
+                        arrow.world_pos = {cx, 0.20f + (float)c * 0.02f,
+                                           cz - 8.0f + (float)c * 8.0f};
+                        arrow.size = 14.0f;
+                        arrow.tint = {255, 200, 50, 240};
+                        arrow.texture = {};
+                        arrow.tex_src = {};
+                        out.push_back(arrow);
+                    }
+                }
                 // M6-j: 地板装饰 (2D 同款坐标哈希; 只在普通可见地板)
                 if (t == TileType::FLOOR && map->isVisible(tx, ty)
                     && !map->get_special_room_at(tx, ty))
@@ -490,6 +535,7 @@ static void _build_npcs(GameScene& gs, std::vector<HD2DDrawItem>& out) {
                           (float)npc.tile_y * TILE_SIZE + TILE_SIZE * 0.5f};
         item.size = 34.0f;
         item.sort_y = (float)npc.tile_y * TILE_SIZE;
+        item.outline = true;                   // A1.1: NPC 与玩家/怪同等待遇描边
         SpriteDef def;
         item.texture = res.sprite_by_key(skey, def);
         if (item.texture.id <= 0) continue;     // 缺素材回退: 2D 有绿点, 3D 跳过
@@ -508,6 +554,34 @@ static void _build_special_rooms(GameScene& gs, std::vector<HD2DDrawItem>& out) 
     for (const auto& sr : map->special_rooms) {
         if (sr.type == SpecialRoomType::CHALLENGE) continue;   // 传送门另有绘制
         if (sr.triggered) continue;
+
+        // N2: 菱形嵌纹 — 房间内每个地板 tile 中心添加亮色 diamond decal
+        Color inlay_base = _special_room_tint(&sr);
+        Color inlay = { (unsigned char)(inlay_base.r * 2 > 255 ? 255 : inlay_base.r * 2),
+                        (unsigned char)(inlay_base.g * 2 > 255 ? 255 : inlay_base.g * 2),
+                        (unsigned char)(inlay_base.b * 2 > 255 ? 255 : inlay_base.b * 2),
+                        150 };
+        int sx0 = std::max(0, sr.rx), sx1 = std::min(map->width, sr.rx + sr.rw);
+        int sy0 = std::max(0, sr.ry), sy1 = std::min(map->height, sr.ry + sr.rh);
+        for (int ty = sy0; ty < sy1; ty++) {
+            for (int tx = sx0; tx < sx1; tx++) {
+                if (map->tile_at(tx, ty) != TileType::FLOOR) continue;
+                HD2DDrawItem decal;
+                decal.kind = HD2DDrawItem::Kind::FLOOR_DECAL;
+                decal.world_pos = {
+                    (float)tx * TILE_SIZE + TILE_SIZE * 0.5f,
+                    0.12f,                          // 高于地板+tint，避免 z-fight
+                    (float)ty * TILE_SIZE + TILE_SIZE * 0.5f
+                };
+                decal.size = TILE_SIZE * 0.35f;     // 菱形尺寸 (tile 中心小 diamond)
+                decal.tint = inlay;
+                decal.texture = {};
+                decal.tex_src = {};
+                out.push_back(decal);
+            }
+        }
+
+        // 中心图标 (2D room_* 素材同源)
         const char* ikey = _special_room_icon_key(sr.type);
         if (!ikey) continue;
         HD2DDrawItem item;
@@ -770,28 +844,128 @@ static void _build_monster_overlays(GameScene& gs, std::vector<HD2DDrawItem>& ou
     }
 }
 
-// ── M6-v2e: 氛围粒子 → 微光点 (2D _ambient.draw 同源; 只读翻译) ──
-// 粒子 y 语义: 世界像素 y 直接映射 3D z; 高度 = 粒子 y 的 3D 浮动
-// (rise 粒子上飘 = 视觉高度渐变; 用 life 比例近似)
+// ── A2.1: 氛围粒子 → 群系性格微光 (dust 尘埃 / ember 余烬 / firefly 幽光) ──
+// 数据仍与 2D 共享 AmbientLayer (零逻辑改动); 本层只做"观感"翻译:
+// 高度分层 + 风格摆动脉络全部用 GetTime 与 spawn 稳定字段推相位
+// (与 v2a 呼吸帧同源, 非随机; sim 无头不跑本层, 不触 RNG 红线)
+// A2.2: 风格优先读 biomes.json ambient.style (数据驱动), 缺省按 id 回退
+static MoteStyle _mote_style_for_floor(int floor) {
+    const BiomeDef* b = get_biome_for_floor(floor);
+    if (!b) return MoteStyle::DUST;
+    if (b->id == "ash_volcano") return MoteStyle::EMBER;
+    if (b->id == "void_abyss")  return MoteStyle::FIREFLY;
+    return MoteStyle::DUST;
+}
+
+static MoteStyle _mote_style_from_cfg(const AmbientCfg& cfg, int floor) {
+    if (cfg.style == "ember")   return MoteStyle::EMBER;
+    if (cfg.style == "firefly") return MoteStyle::FIREFLY;
+    if (cfg.style == "dust")    return MoteStyle::DUST;
+    return _mote_style_for_floor(floor);
+}
+
+// 稳定相位源: vx/size 在同一次 spawn 生命周期内不变 → 哈希成 [0,2π)
+static float _mote_phase(const AmbientParticle& p) {
+    unsigned int hx = (unsigned int)(int)(p.vx * 4096.0f);
+    unsigned int hs = (unsigned int)(int)(p.size * 1000.0f);
+    return (float)((hx ^ (hs * 2654435761u)) & 0xFFFFu) / 65535.0f * 6.28318f;
+}
+
+// 风格运动参数 (偏移/高度/尺寸倍率/脉搏) — 纯三角函数, 无状态无随机
+struct MoteMotion { float dx, y, dz, size_mul, pulse; };
+
+static MoteMotion _mote_motion(const MoteStyle style, float t, float ph,
+                               float fade) {
+    MoteMotion m{0.0f, 0.0f, 0.0f, 1.0f, 1.0f};
+    switch (style) {
+    case MoteStyle::DUST:                              // 尘埃: 贴地慢摆, 弱闪
+        m.y = 4.0f + 16.0f * (1.0f - fade);
+        m.dx = sinf(t * 0.7f + ph) * 2.0f;
+        m.dz = cosf(t * 0.5f + ph) * 1.5f;
+        m.size_mul = 0.9f;
+        m.pulse = 0.55f + 0.2f * sinf(t * 1.3f + ph * 2.0f);
+        break;
+    case MoteStyle::EMBER:                             // 余烬: 急升蜿蜒, 熄灭渐暗
+        m.y = 8.0f + 64.0f * (1.0f - fade);
+        m.dx = sinf(t * 2.2f + ph) * 3.5f;
+        m.dz = cosf(t * 1.8f + ph * 1.3f) * 2.5f;
+        m.size_mul = 0.8f;
+        m.pulse = fade * (0.6f + 0.4f * sinf(t * 6.0f + ph));
+        break;
+    case MoteStyle::FIREFLY: {                         // 幽光: 悬浮 bob, 强明灭
+        m.y = 30.0f + 15.0f * sinf(t * 0.8f + ph);
+        m.dz = sinf(t * 0.45f + ph * 1.7f) * 6.0f;
+        m.size_mul = 1.15f;
+        float blink = 0.5f + 0.5f * sinf(t * 2.4f + ph);
+        m.pulse = 0.3f + 0.7f * blink * blink;
+        break;
+    }
+    }
+    return m;
+}
+
 static void _build_ambient(GameScene& gs, std::vector<HD2DDrawItem>& out) {
     const auto& ambient = gs.ambient_layer();
     const auto& cfg = ambient.config();
+    const MoteStyle style = _mote_style_from_cfg(cfg, gs.current_floor);
+    // A2.2: 群系粒子贴图 (缺失→id=0→renderer 程序化软光回退)
+    Texture2D mote_tex = cfg.texture.empty()
+        ? Texture2D{} : ResourceManager::inst().load_texture(cfg.texture.c_str());
+    const float t = (float)GetTime();
     for (const auto& p : ambient.particles()) {
         if (p.life <= 0.0f) continue;
+        const float fade = p.life / p.max_life;            // 1→0 生命比
+        const MoteMotion m = _mote_motion(style, t, _mote_phase(p), fade);
         HD2DDrawItem item;
         item.kind = HD2DDrawItem::Kind::AMBIENT_MOTE;
-        item.world_pos = {p.x, 8.0f + 40.0f * (1.0f - p.life / p.max_life),
-                          p.y};
-        item.size = p.size * 2.0f;               // 半径→直径感
+        item.mote_style = style;
+        item.texture = mote_tex;
+        item.size = p.size * 2.0f * m.size_mul;            // 半径→直径感
+        item.world_pos = {p.x + m.dx, m.y, p.y + m.dz};
         item.tint = cfg.color;
-        item.tint.a = p.alpha;
-        item.height = p.life / p.max_life;       // 渐隐比例
+        item.height = fade;                                // 信息保留 (渲染端已含)
+        // 首尾渐隐包络 (与 2D draw 同式) × 风格脉搏
+        float env = std::min(1.0f, fade * 2.0f)
+                  * std::min(1.0f, (p.max_life - p.life) * 2.0f + 0.3f);
+        int a = (int)((float)p.alpha * env * m.pulse);
+        item.tint.a = (unsigned char)(a > 255 ? 255 : (a < 0 ? 0 : a));
+        out.push_back(item);
+    }
+}
+
+// M6-n N1: 脚印 — 复用 2D 版 GameMap::_footsteps 数据，HD2D 表现层贴地 decal
+static void _build_footsteps(GameScene& gs, std::vector<HD2DDrawItem>& out) {
+    const GameMap* map = gs.game_map.get();
+    if (!map) return;
+    const auto* fs_arr = map->get_footsteps();
+    int head = map->get_footstep_head();
+    int max_steps = map->get_footstep_max();
+
+    for (int i = 0; i < max_steps; i++) {
+        const auto& fs = fs_arr[i];
+        if (fs.life <= 0.0f) continue;           // 生命周期结束
+        if (!map->isExplored(fs.tx, fs.ty)) continue;  // 未探索不显示
+
+        HD2DDrawItem item;
+        item.kind = HD2DDrawItem::Kind::FLOOR_DECAL;
+        item.world_pos = {
+            (float)fs.tx * TILE_SIZE + TILE_SIZE * 0.5f,
+            0.10f,                                  // 高于地板+decal，避免 z-fight
+            (float)fs.ty * TILE_SIZE + TILE_SIZE * 0.5f
+        };
+        item.size = TILE_SIZE * 0.55f;              // 脚印尺寸 (椭圆短轴)
+        // alpha = life / 2.5s × 140 (提高可见度，暗色地板上清晰)
+        float fade = fs.life / 2.5f;
+        item.tint = {220, 200, 130, (unsigned char)(140.0f * fade)};
+        item.texture = {};                          // 纯色椭圆 (2D 版回退方案)
+        item.tex_src = {};
         out.push_back(item);
     }
 }
 
 void build_scene(GameScene& gs, std::vector<HD2DDrawItem>& out_items) {
     _build_terrain(gs, out_items);
+    _build_footsteps(gs, out_items);
     _build_entities(gs, out_items);
     _build_effects(gs, out_items);
     _build_ground_items(gs, out_items);   // M6-v2a

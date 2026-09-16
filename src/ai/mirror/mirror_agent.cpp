@@ -156,27 +156,25 @@ static PlayerActionType chain_symbol_to_action(int s) {
     }
 }
 
-// M4.5-A: 战术链预测 — 缓冲 ≥2 符号 + 高置信 → 玩家下一步动作类型 (链优先于克隆/规则)
-static PlayerActionType chain_predict_action(const TacticalChainTable* chain,
-                                             int seq_a, int seq_b,
-                                             float confidence_threshold) {
-    if (!chain || seq_a < 0 || seq_b < 0) return PlayerActionType::NONE;
-    ChainPrediction cp = chain->predict(seq_a, seq_b);
-    if (cp.level < 0) cp = chain->predict_fuzzy2(seq_b);
-    if (cp.level < 0 || cp.confidence <= confidence_threshold)
-        return PlayerActionType::NONE;
-    return chain_symbol_to_action(cp.best);
-}
+// M4.5-A + v1.6-B1.1: 战术链预测内联在 predict_next_action — 缓存 action+confidence
+// 供 HUD 只读消费; 避免独立静态 helper 与 mutable 缓存分离
 
 PlayerActionType MirrorAgent::predict_next_action(
     const MirrorBattleState& st) const {
     // M4.5-A: 战术链层先行 — 预测玩家下一步战术动作 (网型序列优于单步克隆)
-    PlayerActionType chain_act =
-        chain_predict_action(_chain.get(), _seq_a, _seq_b,
-                             clone_confidence_threshold());
-    if (chain_act != PlayerActionType::NONE) {
-        _debug_stats->on_predict(0);   // 验收: 战术链命中 (与克隆层级共统计)
-        return chain_act;
+    ChainPrediction cp;
+    if (_chain && _seq_a >= 0 && _seq_b >= 0) {
+        cp = _chain->predict(_seq_a, _seq_b);
+        if (cp.level < 0) cp = _chain->predict_fuzzy2(_seq_b);
+    }
+    if (cp.level >= 0 && cp.confidence > clone_confidence_threshold()) {
+        PlayerActionType chain_act = chain_symbol_to_action(cp.best);
+        if (chain_act != PlayerActionType::NONE) {
+            _last_pred_action = chain_act;
+            _last_pred_conf   = cp.confidence;
+            _debug_stats->on_predict(0);   // 验收: 战术链命中 (与克隆层级共统计)
+            return chain_act;
+        }
     }
     // M1: behavior-clone layer (exact/fuzzy/profile), rules as fallback
     if (_phase >= 2 && _clone) {
@@ -185,19 +183,26 @@ PlayerActionType MirrorAgent::predict_next_action(
         _debug_stats->on_predict(p.level);   // 验收: 记录降级链等级
         if (p.level <= 2 && p.confidence >= clone_confidence_threshold()) {
             PlayerActionType t = intent_to_action(p.best);
-            if (t != PlayerActionType::NONE) return t;
+            if (t != PlayerActionType::NONE) {
+                _last_pred_action = t;
+                _last_pred_conf   = p.confidence;
+                return t;
+            }
         }
     }
     // Rule-based fallback (existing profile logic)
     _debug_stats->on_predict(-1);            // 验收: 记录规则兜底
+    PlayerActionType fallback = PlayerActionType::ATTACK;
     if (st.dist_tiles < 3.0f && _profile.attack_frequency > 0.6f)
-        return PlayerActionType::ATTACK;
-    if (st.player_hp_pct < _profile.hp_counter_threshold / 100.0f
+        fallback = PlayerActionType::ATTACK;
+    else if (st.player_hp_pct < _profile.hp_counter_threshold / 100.0f
         && _profile.heal_frequency > 0.01f)
-        return PlayerActionType::HEAL;
-    if (_profile.predict_skill_spam && _phase >= 2)
-        return PlayerActionType::SKILL;
-    return PlayerActionType::ATTACK;
+        fallback = PlayerActionType::HEAL;
+    else if (_profile.predict_skill_spam && _phase >= 2)
+        fallback = PlayerActionType::SKILL;
+    _last_pred_action = fallback;
+    _last_pred_conf   = 0.35f;               // 规则兜底固定低置信
+    return fallback;
 }
 
 // ── M4e: 在线自适应 — Thompson 采样决策 ──

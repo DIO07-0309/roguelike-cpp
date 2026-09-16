@@ -73,6 +73,10 @@ public:
     size_t entries() const { return _table.size(); }
     const PlayerHabitProfile* profile() const { return _has_profile ? &profile_ : nullptr; }
 
+    // B3-M 闭环: 跨局持久化读写口 (MirrorMemoryStore 唯一消费者)
+    const std::unordered_map<std::string, Counts>& table() const { return _table; }
+    void merge_entry(const std::string& key, const Counts& c);
+
     // M4: attack/retreat classification hook is pure data — kept for intent enum completeness
     static PlayerIntention fallback_intent(const PlayerHabitProfile& p,
         float dist_tiles, float hp_pct);   // profile-level default policy

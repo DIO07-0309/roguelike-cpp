@@ -2,6 +2,7 @@
 #include "title_scene.h"
 #include "scene_tree.h"
 #include "core/logger.h"
+#include "meta_progression.h"     // v1.6-B2: 死因谱 (g_meta.top_death_causes)
 
 extern Font g_font, g_font_small;
 extern bool g_font_loaded;
@@ -38,9 +39,16 @@ void DeathScene::_render() {
                        16, 1, {220, 200, 180, 240});
         }
         char buf[128];
+        // v1.6-B2: 本局死因 — 死亡界面第一要务 (红字醒目)
+        if (!death_cause.empty()) {
+            std::string cause_line = "死于: " + death_cause;
+            w = MeasureTextEx(g_font_small, cause_line.c_str(), 17, 1).x;
+            DrawTextEx(g_font_small, cause_line.c_str(), {sw/2.0f - w/2, 196}, 17, 1,
+                       {255, 90, 70, 245});
+        }
         snprintf(buf, sizeof(buf), "第%d层  Lv%d", final_floor, final_level);
         w = MeasureTextEx(g_font_small, buf, 16, 1).x;
-        DrawTextEx(g_font_small, buf, {sw/2.0f - w/2, 210}, 16, 1, {180, 180, 180, 255});
+        DrawTextEx(g_font_small, buf, {sw/2.0f - w/2, 222}, 16, 1, {180, 180, 180, 255});
 
         if (meta_soul > 0) {
             snprintf(buf, sizeof(buf), "Meta奖励: Soul +%d  Knowledge +%d",
@@ -60,9 +68,9 @@ void DeathScene::_render() {
             DrawTextEx(g_font_small, mirror_verdict.c_str(), {sw/2.0f - w/2, vy},
                        15, 1, {220, 160, 150, 235});
             vy += 26;
-            // 逐行画习惯 (手动折行: 每行一个 '\n')
+            // 逐行画习惯 (手动折行: 每行一个 '\n'; 上限避开死因谱区)
             size_t pos = 0;
-            while (pos < mirror_habits.size() && vy < sh - 110) {
+            while (pos < mirror_habits.size() && vy < sh - 155) {
                 size_t nl = mirror_habits.find('\n', pos);
                 if (nl == std::string::npos) nl = mirror_habits.size();
                 std::string line = mirror_habits.substr(pos, nl - pos);
@@ -79,6 +87,24 @@ void DeathScene::_render() {
         w = MeasureTextEx(g_font_small, "存档已保留，可从选关界面继续挑战", 16, 1).x;
         DrawTextEx(g_font_small, "存档已保留，可从选关界面继续挑战",
                    {sw/2.0f - w/2, 275}, 16, 1, {220, 180, 100, 255});
+
+        // v1.6-B2: 死因谱 — 跨局 Top3 (死得多了才显示, 首死只看本局)
+        auto top_causes = g_meta.top_death_causes(3);
+        if (top_causes.size() >= 2) {
+            float py = (float)(sh - 160);
+            w = MeasureTextEx(g_font_small, "— 死因谱 —", 14, 1).x;
+            DrawTextEx(g_font_small, "— 死因谱 —", {sw/2.0f - w/2, py}, 14, 1,
+                       {200, 140, 120, 220});
+            py += 18;
+            for (auto& [cause, cnt] : top_causes) {
+                char tb[96];
+                snprintf(tb, sizeof(tb), "%s ×%d", cause.c_str(), cnt);
+                w = MeasureTextEx(g_font_small, tb, 13, 1).x;
+                DrawTextEx(g_font_small, tb, {sw/2.0f - w/2, py}, 13, 1,
+                           {170, 130, 120, 215});
+                py += 17;
+            }
+        }
 
         w = MeasureTextEx(g_font, "按 Enter 返回标题", 22, 1).x;
         DrawTextEx(g_font, "按 Enter 返回标题",

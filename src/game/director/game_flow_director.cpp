@@ -67,7 +67,17 @@ void GameFlowDirector::on_player_dead() {
     ds->final_line   = _scene->_gameplay.ending_dir.final_line();
     ds->meta_soul    = _scene->_gameplay.ending_dir.meta_reward_soul() / 2;
     ds->meta_knowledge = _scene->_gameplay.ending_dir.meta_reward_knowledge() / 2;
+    // v1.6-B2: 本局死因 (last_damage_source 全程追踪: 怪名/环境/DOT/Boss技能)
+    // 前缀翻译成玩家友好文案 (sim CSV 用原始码, 实机 UI 用译文)
+    ds->death_cause = _scene->player->combat.last_damage_source;
+    if (ds->death_cause.rfind("dot:", 0) == 0)
+        ds->death_cause = "持续伤害·" + ds->death_cause.substr(4);
+    else if (ds->death_cause.rfind("env:", 0) == 0)
+        ds->death_cause = "环境·" + ds->death_cause.substr(4);
+    if (ds->death_cause.empty()) ds->death_cause = "未知原因";
     _fill_mirror_verdict(*ds);
+    // v1.6-B2: 死因史入账 (sim readonly 模式 record 内不落盘)
+    g_meta.record_death(ds->final_floor, ds->death_cause);
 
     _scene->get_tree()->change_scene(ds);
     current_state = GameFlowState::ENDING;

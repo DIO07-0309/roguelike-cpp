@@ -18,6 +18,9 @@ struct AmbientDef {
     float speed = 12.0f;               // 像素/秒
     bool  rise = true;                 // true=上飘(余烬/幽光) false=下落(尘埃/雪)
     float life_min = 2.5f, life_max = 6.0f;
+    // A2.2: 3D 表现风格 (dust/ember/firefly, 空=按 biome id 回退) + 粒子贴图
+    std::string style;
+    std::string texture;
 };
 
 struct BiomeDef {

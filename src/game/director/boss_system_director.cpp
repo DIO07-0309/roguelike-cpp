@@ -13,6 +13,8 @@
 #include "config.h"            // F10.2: TILE_SIZE
 #include "components/element_component.h" // F10.3: ElementType
 #include "ai/player_behavior/player_behavior_recorder.h" // F15.3
+#include "ai/mirror/mirror_memory_store.h"  // B3-M: 克隆表跨局闭环
+#include "meta_progression.h"               // B3-M: g_readonly (sim 零接触)
 #include "ai/player_behavior/player_behavior_analyzer.h"  // F15.3
 #include "ai/mirror/mirror_agent.h"                       // F15.3
 #include "ai/rl/q_agent.h"                                // v0.9.30: RL 镜像决策层
@@ -180,6 +182,12 @@ void BossSystemDirector::_init_mirror_boss(Monster* boss, const Player* player) 
     auto clone = std::make_unique<BehaviorCloneTable>();
     clone->build(history);
     clone->set_profile(profile);
+    // B3-M: Mirror 闭环 — 读本局之前的跨局克隆记忆 (表每次都是新建,
+    // 同局重复注入天然不叠加; sim/只读模式下零接触, 保确定性红线)
+    if (!MetaSystem::g_readonly &&
+        mirror::MirrorMemoryStore::load_into(*clone)) {
+        LOG_INFO("[MIRROR] cross-run clone memory merged");
+    }
     _mirror_agent->set_clone_table(std::move(clone));
     LOG_INFO("[MIRROR] CloneTable built: %zu entries from %zu actions",
              _mirror_agent->clone_table()->entries(), history.size());
@@ -276,6 +284,12 @@ void BossSystemDirector::export_mirror_memory(
     alpha.clear();
     beta.clear();
     if (_mirror_agent) _mirror_agent->export_memory(alpha, beta);
+    // B3-M: 克隆表快照回写跨局记忆 (agent 不在=本局未遇 F15, 跳过保旧记忆;
+    // 仅当本局克隆表非空才落盘, 空快照=未遭遇, 不清空历史记忆)
+    if (!MetaSystem::g_readonly && _mirror_agent &&
+        _mirror_agent->clone_table() && _mirror_agent->clone_table()->entries()) {
+        mirror::MirrorMemoryStore::save_from(*_mirror_agent->clone_table());
+    }
 }
 
 // M4e: 注入镜像跨对局记忆 (新对局/读档时, 叠加进先验)

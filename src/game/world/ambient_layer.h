@@ -3,6 +3,7 @@
 // 职责: biomes.json ambient 段实装 (环境粒子) + AI 情绪光照 vignette
 // 数据流: biomes.json → BiomeDef.ambient → GameScene::enter_floor → set_biome()
 #include "raylib.h"
+#include <string>
 #include <vector>
 
 struct BiomeDef;
@@ -23,6 +24,9 @@ struct AmbientCfg {
     float speed = 12.0f;        // 像素/秒
     bool  rise = true;          // 上飘 (火山余烬/深渊幽光) 或下落 (监狱尘埃)
     float life_min = 2.5f, life_max = 6.0f;
+    // A2.2: 3D 表现数据 (2D 侧不消费; 空值时 3D 走 biome id 回退)
+    std::string style;          // dust / ember / firefly
+    std::string texture;        // 粒子 PNG 路径 (空=程序化软光)
 };
 
 class AmbientLayer {

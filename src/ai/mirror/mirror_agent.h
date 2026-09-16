@@ -73,7 +73,12 @@ public:
     void  tick_phase(float dt, const MirrorBattleState& st);
 
     // ── 验收: 战斗内 AI 调用链统计 (F9 HUD / 战斗结束日志) ──
-    void begin_battle() { _debug_stats->reset(); }
+    void begin_battle() {
+        _debug_stats->reset();
+        _last_pred_time = -1.0f;         // v1.6-B1.1: 新战斗 → HUD 显示"观察中…"
+        _last_pred_action = PlayerActionType::NONE;
+        _last_pred_conf = 0.0f;
+    }
     void report_interrupt(bool success) { _debug_stats->on_interrupt(success); }
     void debug_behavior_state(int state) { _debug_stats->on_behavior_state(state); }
     const MirrorDebugStats* debug_stats() const { return _debug_stats.get(); }
@@ -116,6 +121,25 @@ public:
     int  last_action() const { return _last_action; }
     int  last_bucket() const { return _last_bucket; }
     float arm_win_rate(int bucket, int action) const;
+
+    // ── v1.6-B1.1: Mirror 决策缓存 (供 HUD 只读消费; 决策链单向写入) ──
+    // 写入者: predict_next_action (mutable 字段; 保持 const 语义, 单测透明)
+    //         + 时间戳由 MirrorCombatDirector::_ai_decide 调 cache_pred_time 补上
+    // HUD 严禁重跑 predict — 保证"玩家看到的百分比" = "Echo 下一步动作" 同一次决策
+    void cache_pred_time(float now) { _last_pred_time = now; }
+    PlayerActionType last_pred_action() const { return _last_pred_action; }
+    float last_pred_conf() const { return _last_pred_conf; }
+    // 距上次预测经过多少秒; 未决策时返回 9999 (供 HUD 判定"观察中…")
+    float last_pred_age(float now) const {
+        return _last_pred_time < 0.0f ? 9999.0f : now - _last_pred_time;
+    }
+
+    // ── v1.6-B1.1: 本局实时频率计数 (供 HUD 数字面板; 只读) ──
+    int   obs_attack_count() const { return _obs_attack; }
+    int   obs_skill_count()  const { return _obs_skill; }
+    int   obs_dodge_count()  const { return _obs_dodge; }
+    int   obs_heal_count()   const { return _obs_heal; }
+    float battle_seconds()   const { return _battle_time; }
 
     // ── F15.4: Mirror reward for RL self-play ──
     // Returns a bonus reward when the Boss successfully counters the player's
@@ -170,4 +194,9 @@ private:
     int _record_arm(int act, const MirrorBattleState& st);
     MlPredictor _ml_predictor;                       // M3: G5 插槽, 默认关闭
     std::unique_ptr<MirrorDebugStats> _debug_stats;  // 验收: AI 调用链统计
+
+    // v1.6-B1.1: Mirror 决策缓存 (mutable 允许 predict_next_action const 语义下写)
+    mutable PlayerActionType _last_pred_action = PlayerActionType::NONE;
+    mutable float _last_pred_conf = 0.0f;
+    float _last_pred_time = -1.0f;                   // 由 cache_pred_time 更新
 };

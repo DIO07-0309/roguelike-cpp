@@ -22,6 +22,8 @@ void AmbientLayer::set_biome(const BiomeDef* biome) {
     _cfg.rise = biome->ambient.rise;
     _cfg.life_min = biome->ambient.life_min;
     _cfg.life_max = biome->ambient.life_max;
+    _cfg.style = biome->ambient.style;        // A2.2 (2D 侧不消费)
+    _cfg.texture = biome->ambient.texture;    // A2.2
     _particles.clear();
 }
 

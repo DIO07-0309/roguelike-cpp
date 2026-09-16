@@ -530,6 +530,7 @@ void MirrorCombatDirector::_ai_decide(Monster* boss, Player* player,
     PlayerActionType pred = agent->predict_next_action(st);
     agent->on_prediction(pred, st.dist_tiles, st.player_hp_pct,
                          st.player_skills_ready);   // M2: 上报预测上下文
+    agent->cache_pred_time((float)gt);              // v1.6-B1.1: HUD 只读时间戳
 
     // M4.1: 战术驱动首选距离 — 远程消耗保持距, 压进近战贴近, 拉扯中距
     float tactic_dist = _preferred_dist;

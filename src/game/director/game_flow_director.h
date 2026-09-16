@@ -10,6 +10,7 @@ class GameMap;
 class Monster;
 struct DroppedItem;
 class GameScene;
+class DeathScene;   // v1.6-B1: _fill_mirror_verdict 参数 (仅引用, 前置声明即可)
 
 // ============================================================
 // D6 Step6: GameFlowDirector — 游戏生命周期状态机

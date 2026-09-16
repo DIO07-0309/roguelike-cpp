@@ -1,7 +1,7 @@
-# M6-v2c: 岩浆动画材质片元 — 世界坐标噪声 + 双向流动 + emissive 脉动
-# 程序化熔岩: 无贴图依赖, value-noise 生成暗壳/亮流/热核三层,
-# 与 2D game_map LAVA tile (深底+裂纹亮脉+热核, game_map.cpp:548) 同风格分段
-# 搭配 hd2d_world.vs (共享世界空间顶点)
+// M6-v2c: 岩浆动画材质片元 — 世界坐标噪声 + 双向流动 + emissive 脉动
+// 程序化熔岩: 无贴图依赖, value-noise 生成暗壳/亮流/热核三层,
+// 与 2D game_map LAVA tile (深底+裂纹亮脉+热核, game_map.cpp:548) 同风格分段
+// 搭配 hd2d_world.vs (共享世界空间顶点)
 #version 330
 in vec2 fragTexCoord;
 in vec4 fragColor;

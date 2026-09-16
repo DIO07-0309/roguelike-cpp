@@ -209,9 +209,45 @@ LAVA 聚类/Boss 层零退化, 渲染耗时 ~0.55ms/帧。
 ## 已知限制 (M6-n 后)
 
 - 雾对 LAVA tile 不生效 (岩浆自发光, 不入雾; 视觉可接受)
-- 实体本身不接收阴影 (billboard 走默认管线; v2e 起即如此, 非回归)
-- 实体描边为 4 向偏移法, 非真轮廓 (复杂轮廓/后处理描边留 v1.6+)
-- bloom 三档为手调常量, 未做逐帧亮度反馈 (人眼验收已过, 微调留 v1.6+)
+- ~~实体本身不接收阴影~~ ✅ v1.6-A3 已清偿: outline 路径逐像素采样
+  shadow map (PCF/0.78 与地形同源); 装饰/道具仍 blob 接地影
+- ~~实体描边为 4 向偏移法~~ ✅ v1.6-A1.1 已换 alpha-mask 真轮廓
+  (4 向偏移仅存为 shader 加载失败回退)
+- ~~bloom 三档为手调常量, 未做逐帧亮度反馈~~ ✅ v1.6-A4 已清偿 (见下节)
+- **autoshot "HUD 乱码" = 取证伪影, 非游戏缺陷** (v1.6-A4 结案):
+  `LoadImageFromTexture` 裸导 RT 使 2D 字形纵向镜像 (位置正确, 仅字形
+  翻转); 2D/3D 模式截图同样中招, 而用户实机 30+ milestone 无此反馈
+  = 真实屏幕 HUD 正常。曾试 `LoadImageFromScreen` 抓 backbuffer →
+  hidwin 下全黑 (驱动限制), 已回滚。**取证读文本一律以 game.log 为准,
+  截图只判布局/世界/特效**
+
+## v1.6-A4 — bloom 逐帧亮度反馈 (B 案: EMA, 2026-09-16)
+
+> 清偿 v2g 遗留: bloom 三档手调常量在"岩浆密度逐层不同"的火山里
+> 会偏 (岩浆少的层 bloom 过弱 / 满布层过强)。A 案 (真 HDR pass)
+> 需亮度 RT + readPixels 每帧同步 stall; B 案用渲染器已有信号做
+> 亮度代理估计, 零回读零逻辑耦合, 先落地。
+
+**亮度代理估计 (CPU, 每帧)**
+- `lum = 0.34 + 0.045 × lava_light_count`; count = `_upload_point_lights`
+  网格聚类后的岩浆代表光数 (0..7, 即屏幕发光密度)
+- 中心校准: 满布火山 7 桶 → 0.655 ≈ v2g 火山档调参现场;
+  监狱/深渊无岩浆 → 0.34 = 各自档位调参基线
+
+**EMA 平滑 + 参数联动**
+- `ema += 0.10 × (lum − ema)` (60fps 下 τ≈0.17s; biome 切换瞬间
+  ema 直接重同步到 center, 无渐变穿帮)
+- d = ema − preset.center:
+  `threshold = clamp(preset.th + 0.5·d, preset.th−0.06, preset.th+0.10)`
+  `intensity = clamp(preset.in × (1 − 0.6·d), ×0.6, ×1.5)`
+- softness 不联动 (防双变量漂移, 保持单信号单调)
+- 语义: 场景偏亮 → 提阈值压强度 (防炸白); 偏暗 → 放阈值提强度
+  (保住火把/符文高光感)
+
+**边界与红线**
+- 状态全在 HD2DRenderer 私有成员 (`_pl_lava_count`/`_bloom_lum_ema`),
+  不触 PostFX 接口/Shader/逻辑层; sim 无头不进渲染 → 确定性零风险
+- A 案保持不采纳: 若 B 案上机验收不达标再议 (勿默认升级)
 
 ## 一致性验证协议 (每次改 rendering3d 必跑)
 

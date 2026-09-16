@@ -144,6 +144,14 @@ bool MetaSystem::save() const {
         fprintf(f, "%s\"%s\"", first ? "" : ",", id.c_str());
         first = false;
     }
+    fprintf(f, "],\n");
+    // v1.6-B2: 死因史 (最近 8 条: "层|死因" — 死因源无引号, 免转义)
+    fprintf(f, "  \"deaths\":[");
+    for (size_t i = 0; i < _save.death_history.size(); i++) {
+        fprintf(f, "%s\"%d|%s\"", i ? "," : "",
+                _save.death_history[i].floor,
+                _save.death_history[i].cause.c_str());
+    }
     fprintf(f, "]\n}\n");
     fclose(f);
     return true;
@@ -152,8 +160,8 @@ bool MetaSystem::save() const {
 bool MetaSystem::load() {
     FILE* f = fopen("saves/meta_save.json", "r");
     if (!f) return false;
-    // 简易解析 (G10.8-B3: 512→2048 容纳 hints 数组)
-    char buf[2048];
+    // 简易解析 (v1.6-B2: 2048→4096 容纳 hints + deaths 数组)
+    char buf[4096];
     fread(buf, 1, sizeof(buf)-1, f); fclose(f); buf[sizeof(buf)-1]=0;
     auto parse_int = [&](const char* key, int def) {
         const char* p = strstr(buf, key);
@@ -207,9 +215,37 @@ bool MetaSystem::load() {
             }
         }
     }
-    LOG_INFO("[META] Loaded: runs=%d soul=%d hints=%zu",
+    // v1.6-B2: 解析 deaths 数组 ("deaths":["3|火焰陷阱","5|兽人"]) — 老档无此键
+    // → 死因史为空, 天然兼容
+    _save.death_history.clear();
+    if (const char* dp = strstr(buf, "\"deaths\"")) {
+        if ((dp = strstr(dp, "[")) != nullptr) {
+            dp++;
+            while (*dp && *dp != ']') {
+                if (*dp == '"') {
+                    char rec[96]; int k = 0;
+                    dp++;
+                    while (*dp && *dp != '"' && k < 95) rec[k++] = *dp++;
+                    rec[k] = 0;
+                    if (k > 0) {
+                        int fl = atoi(rec);
+                        const char* bar = strchr(rec, '|');
+                        if (bar && *(bar + 1))
+                            _save.death_history.push_back({fl, std::string(bar + 1)});
+                    }
+                }
+                dp++;
+            }
+        }
+    }
+    // 与 record_death 的环形上限保持一致 (手写/异常文件: 丢最旧, 留最近 8 条)
+    if (_save.death_history.size() > 8)
+        _save.death_history.erase(
+            _save.death_history.begin(),
+            _save.death_history.end() - 8);
+    LOG_INFO("[META] Loaded: runs=%d soul=%d hints=%zu deaths=%zu",
              _save.total_runs, _save.currency.soul_fragments,
-             _save.first_hints_shown.size());
+             _save.first_hints_shown.size(), _save.death_history.size());
     return true;
 }
 
@@ -256,6 +292,29 @@ void MetaSystem::record_floor_reached(int floor) {
         g_meta._save.best_floor = floor;
         g_meta.save();
     }
+}
+
+// ── v1.6-B2: 死因史 (最近 8 条环形; 账号级) ──
+void MetaSystem::record_death(int floor, const std::string& cause) {
+    auto& hist = _save.death_history;
+    MetaSave::DeathRecord rec{floor, cause};
+    if (hist.size() >= 8) {
+        // 环形: 移除最旧 (front), 追加最新 — vector 小, O(n) 可忽略
+        hist.erase(hist.begin());
+    }
+    hist.push_back(rec);
+    save();
+}
+
+std::vector<std::pair<std::string, int>> MetaSystem::top_death_causes(
+    int top_n) const {
+    std::unordered_map<std::string, int> counts;
+    for (auto& d : _save.death_history) counts[d.cause]++;
+    std::vector<std::pair<std::string, int>> list(counts.begin(), counts.end());
+    std::sort(list.begin(), list.end(),
+        [](const auto& a, const auto& b) { return a.second > b.second; });
+    if ((int)list.size() > top_n) list.resize(top_n);
+    return list;
 }
 
 // G10.9-B4: 测试清理钩子
