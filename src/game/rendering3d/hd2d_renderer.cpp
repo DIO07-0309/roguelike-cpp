@@ -456,6 +456,13 @@ void HD2DRenderer::_draw_wall_block(const HD2DDrawItem& item) {
     Vector3 pos = item.world_pos;
     float h = item.height;
     float e = item.size * 0.5f;
+    // A3.2-fix2: 顶面色 = builder 的 wall_top 色调映射 (a=0 → 旧规 tint×1.1)
+    Color top_col = item.top_tint.a > 0
+        ? item.top_tint
+        : Color{(unsigned char)std::min(item.tint.r * 1.1f, 255.0f),
+                (unsigned char)std::min(item.tint.g * 1.1f, 255.0f),
+                (unsigned char)std::min(item.tint.b * 1.1f, 255.0f),
+                item.tint.a};
 
     if (item.texture.id > 0) {
         Rectangle uv = item.tex_src.width > 0 ? item.tex_src
@@ -465,13 +472,12 @@ void HD2DRenderer::_draw_wall_block(const HD2DDrawItem& item) {
         float v0 = uv.y / (float)item.texture.height;
         float v1 = (uv.y + uv.height) / (float)item.texture.height;
         rlSetTexture(item.texture.id);
-        rlDisableBackfaceCulling();  // A3.2-fix: 顶面从上方可见 (用户实机反馈镂空)
+        rlDisableBackfaceCulling();  // A3.2-fix: 顶点在顶面的 quad 不被剔除
         rlBegin(RL_QUADS);
         rlColor4ub(item.tint.r, item.tint.g, item.tint.b, item.tint.a);
         _wall_quad(u0, u1, v0, v1, pos, e, h);   // 侧面 ×4 (共享 UV)
-        _wall_top_quad(u0, u1, v0, v1, pos, e, h, item.tint);  // A3.2 顶面
+        _wall_top_quad(u0, u1, v0, v1, pos, e, h, top_col);  // 顶面
         rlEnd();
-        rlEnableBackfaceCulling();
         rlSetTexture(0);
         return;
     }
@@ -482,12 +488,7 @@ void HD2DRenderer::_draw_wall_block(const HD2DDrawItem& item) {
         (unsigned char)(item.tint.b * 0.7f), item.tint.a
     };
     DrawCube({pos.x, h * 0.5f, pos.z}, item.size, h, item.size, side);
-    Color top = {
-        (unsigned char)std::min(item.tint.r * 1.1f, 255.0f),
-        (unsigned char)std::min(item.tint.g * 1.1f, 255.0f),
-        (unsigned char)std::min(item.tint.b * 1.1f, 255.0f), item.tint.a
-    };
-    DrawCube({pos.x, h, pos.z}, item.size, 1.0f, item.size, top);
+    DrawCube({pos.x, h, pos.z}, item.size, 1.0f, item.size, top_col);
 }
 
 // ── 墙体侧面 quad ×4 (rlBegin 内调用; 顶点序 = 从外侧看逆时针) ──
@@ -520,13 +521,9 @@ void HD2DRenderer::_wall_quad(float u0, float u1, float v0, float v1,
 }
 
 // ── A3.2: 墙顶面 — 同贴图水平 quad (与 caster 深度顶面 y=h 共面; 顶点序同地板) ──
+// A3.2-fix2: 色由调用方决定 (builder 传 wall_top 色调映射), 此处纯发射
 void HD2DRenderer::_wall_top_quad(float u0, float u1, float v0, float v1,
-                                  Vector3 pos, float e, float h, Color tint) {
-    Color top = {   // 亮 10% 伪受光 (v2a 语义, 但带贴图不再白块)
-        (unsigned char)std::min(tint.r * 1.1f, 255.0f),
-        (unsigned char)std::min(tint.g * 1.1f, 255.0f),
-        (unsigned char)std::min(tint.b * 1.1f, 255.0f), tint.a
-    };
+                                  Vector3 pos, float e, float h, Color top) {
     rlColor4ub(top.r, top.g, top.b, top.a);
     rlNormal3f(0, 1, 0);
     rlTexCoord2f(u0, v0); rlVertex3f(pos.x - e, h, pos.z - e);

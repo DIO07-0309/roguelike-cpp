@@ -36,6 +36,7 @@ struct HD2DDrawItem {
     float size = 32.0f;            // billboard 宽 / tile 边长 / ring 半径
     float height = 32.0f;          // 墙高 / 门环半径 / line 终点偏移
     Color tint = WHITE;
+    Color top_tint = {};           // A3.2-fix2: 顶面色调映射 (a=0 → 渲染器回退 tint×1.1)
     Texture2D texture = {};        // billboard/地板贴图 (0 = 纯色)
     Rectangle tex_src = {};        // 贴图源矩形 (帧动画)
     bool flip_x = false;
