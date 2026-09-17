@@ -406,3 +406,17 @@ void PlayerController::_roll_dust(GameScene& gs, float cx, float cy) { _roll_dus
 ## 验收移交（完成后向用户汇报）
 
 实机点检验收：Shift 翻滚手感（起/落地/撞墙贴停）、残影拖尾观感、尘土、Mirror HUD 的 DODGE 计数开始增长；若不满意倾斜角度/压扁幅度/时长冷却，参数全在 dodge_component.h 顶部 constexpr，一行可调。
+
+
+---
+
+## 实施勘误 (T1-T5 实测后, 以代码为准)
+
+1. **T2 delta**: 最终实现 delta_this_frame() 返回 {_dir * kSpeed * _move_t};
+   _move_t = 本帧有效位移秒时长, 末帧余量补足 → 总位移精确 64px。
+2. **T2 tick**: _try_move_axis lambda 上提, 翻滚全程(含落地帧)走单一
+   if (was_dodging) 分支; 落地尘在该分支末触发。
+3. **ctest 粒度**: 按可执行注册 → 61→62/62 (spec SS9-5), 非 67。
+4. **T5 title 面板**: 循环由硬编码 i<6 改 sizeof 自适应; 布局 y70/行距19/高155
+   避让右侧怪物队列遮挡线 (~y218)。
+5. **冒烟取图**: 字体 atlas 生成 ~1s, --autoshot 120 快进下早拍 → 用 3600 帧。
