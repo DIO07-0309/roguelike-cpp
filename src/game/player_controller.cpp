@@ -867,7 +867,10 @@ void PlayerController::_try_start_dodge(GameScene& gs, const InputMap& input) {
     _roll_dust(gs, cx, cy);   // T2 空壳 / T3 实装
 }
 
-// B3: 翻滚尘土 — T2 空壳占位, T3 填充 VFXServer 直发原语
+// B3: 翻滚尘土 — VFXServer 直发原语 → active_effects (2D/3D 双消费, spec §9-1)
 void PlayerController::_roll_dust(GameScene& gs, float cx, float cy) {
-    (void)gs; (void)cx; (void)cy;
+    VFXServer vfx;
+    vfx.ring(cx, cy, 22.0f, {190, 180, 165, 170}, 2, 0.28f);
+    vfx.spark_burst(cx, cy, 4, {210, 200, 185, 200}, 0.25f);
+    for (auto& e : vfx.effects) gs.active_effects.push_back(e);
 }
