@@ -103,3 +103,10 @@ public:
 ## 8. 明确不做 (YAGNI)
 
 改键 UI · 攻击取消翻滚窗口 · 耐力条 · 翻滚无敌帧 · sim 对称 · 输入缓冲 · 专用翻滚贴图帧 · 翻滚穿怪 (v1 视地图规则同墙)
+
+## 9. 实施勘误 (writing-plans 阶段定稿, 2026-09-17)
+
+1. **尘土不新增 vfx_recipes.json 配方** — 改用既有直发模式 `VFXServer` ring+spark_burst → `gs.active_effects` (player_controller.cpp:470-473 同构)。3D 侧经 `_build_effects` 自动消费, **删** §4 的 A2 mote burst 专属改动; validator 门保留为 T5 全量形式合规 (JSON 实际零改动)。
+2. **3D 不做倾斜旋转** — `DrawBillboardRec` 无 rotation 参数; 3D 翻滚表现 = squash 缩放 (`HD2DDrawItem.scale_w/scale_h`) + 残影 quad。倾斜仅 2D (脚底 origin 现成路径)。
+3. **撞墙早停单测并入实机验收** — `_try_move_axis` 二分贴墙是既有已验证逻辑, 组件层恒定 delta 已由 `RollMovesFullDistanceThenEnds` 覆盖; 计划 ctest 新增用例仍为 6 (61→67 不变)。
+4. **换层/重开重置链** — `dodge.reset()` 挂 `Player::reset_attack_timers()` (player.cpp:58, 进层已被 game_scene.cpp 调用), 不新开钩子点。
