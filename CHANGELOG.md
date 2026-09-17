@@ -1,3 +1,25 @@
+# v1.7-B3 — 翻滚/闪避: 纯手感位移 + 表现全套 (2026-09-17)
+
+> 用户三拍: 纯手感定位 (无无敌帧/不改战斗数学) · Shift+方向键 (任一 Shift,
+> 按住方向=翻滚方向, 无方向=面朝) · 表现件 B 案 (倾斜+压扁+尘土+残影)。
+> 设计 spec: docs/superpowers/specs/2026-09-17-b3-dodge-roll-design.md
+
+- **机制**: 2 格 (64px) / 0.16s / 独立冷却 0.7s, 末帧余量补足位移精确;
+  撞墙复用 G10.6-B 二分贴墙早停; 零 RNG/dt 定步长 (DodgeComponent)
+- **Mirror 采集**: 起翻帧显式 `g_behavior.on_dodge` → DODGE 意图开始积累
+  (每帧位移 ~6.7px « 200px 自动阈值, 无双记; DecisionAgent 不加 dodge →
+  **sim 12×seed3 报告与改前 sha256 逐字节一致**, 平衡零扰动实锤)
+- **2D** (player.cpp): 脚底 origin 倾斜 ±12° + 压扁 110/85 正弦回弹 +
+  3 段残影 alpha 衰减; 重击路径零影响 (tilt 静止恒 0)
+- **3D** (HD2D): 新 `HD2DDrawItem.scale_w/scale_h` (默认 1 全存量不变) +
+  残影 billboard; 倾斜按 spec §9-2 勘误不做 (DrawBillboardRec 无旋转)
+- **尘土**: VFXServer ring+spark 直发 → active_effects 2D/3D 双消费
+  (§9-1 勘误: 不新增 vfx_recipes.json 配方)
+- **码点**: 1936→1939 (翻滚), 字体 atlas 运行时全命中
+- 门禁: Release 0 error · **ctest 62/62** (新增 dodge_test 7 用例,
+  ctest 按可执行计 §9-5) · validator 0/0 · sim 逐字节 · 2D/3D autoshot 出图
+- 待实机验收: 翻滚手感 (参数集中在 dodge_component.h 顶部 constexpr 一行可调)
+
 # v1.6-A3.2-fix2 — 顶面色调映射 + 未探索虚空化 (2026-09-17)
 
 > 实机复测反馈: 墙顶"镂空"依旧 + 未探索区轮廓从俯视泄露。debug 实证

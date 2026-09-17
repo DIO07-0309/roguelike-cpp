@@ -213,8 +213,8 @@ void TutorialScene::_render() {
 
     // 底部按键提示
     if (g_font_loaded && guide.stage != TutorialStage::WELCOME) {
-        DrawTextEx(g_font_small, "WASD移动 | 空格攻击 | E交互 | B背包 | P跳过本步 | T退出",
-            {(float)sw/2 - 220, (float)(sh - 24)}, 14, 1, {140, 140, 140, 255});
+        DrawTextEx(g_font_small, "WASD移动 | 空格攻击 | E交互 | B背包 | Shift翻滚 | P跳过本步 | T退出",
+            {(float)sw/2 - 260, (float)(sh - 24)}, 14, 1, {140, 140, 140, 255});
     }
 }
 

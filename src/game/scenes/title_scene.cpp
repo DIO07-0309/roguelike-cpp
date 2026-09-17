@@ -452,18 +452,19 @@ void TitleScene::_render() {
             "WASD/方向键 - 移动",
             "J - 攻击   K - 技能",
             "E - 交互   B - 背包   F1 - 日志",
+            "Shift - 翻滚",
             "R - 圣物   M - 小地图   G - 全屏",
             "ESC - 保存并返回",
         };
         float guide_x = sw - 260.0f;
-        float guide_y = 88.0f;    // 老师反馈修: 上移避让右侧怪物队列 (原 y215 挡骷髅/史莱姆)
+        float guide_y = 70.0f;    // B3: 7 行面板上移+19px 行距, 末行底 213 < 怪物队列遮挡线 ~218
         float guide_w = 240.0f;
-        float guide_h = 165.0f;
+        float guide_h = 155.0f;   // B3: 7 行 (原 6 行 165)
         DrawRectangleRounded({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, Color{15, 15, 30, 200});
         DrawRectangleRoundedLines({guide_x, guide_y, guide_w, guide_h}, 0.06f, 6, 1, Color{70, 70, 100, 180});
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < (int)(sizeof(lines) / sizeof(lines[0])); i++) {
             Color lc = (i == 0) ? Color{255, 210, 80, 255} : Color{190, 190, 210, 255};
-            DrawTextEx(g_font_small, lines[i], {guide_x + 14, guide_y + 10 + i * 25.0f}, 16, 1, lc);
+            DrawTextEx(g_font_small, lines[i], {guide_x + 14, guide_y + 8 + i * 19.0f}, 15, 1, lc);
         }
     }
 
