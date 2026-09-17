@@ -48,4 +48,8 @@ private:
     void _kill_target(GameScene& gs, Monster* target);
     void _process_weapon_result(GameScene& gs, Player& p,
                                 const WeaponAttackResult& r);
+
+    // B3: 翻滚 helper — 起翻(方向解析+采集) / 尘土 (T2 空壳, T3 实装)
+    void _try_start_dodge(GameScene& gs, const InputMap& input);
+    void _roll_dust(GameScene& gs, float cx, float cy);
 };

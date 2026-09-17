@@ -8,11 +8,13 @@ bool DodgeComponent::try_start(const Vector2& dir_norm) {
 }
 
 void DodgeComponent::tick(float dt) {
-    _dt = dt;
+    _move_t = 0.0f;
     if (_cd > 0.0f) _cd -= dt;
     for (auto& g : _ghosts) g.age += dt;
     while (!_ghosts.empty() && _ghosts.front().age >= kGhostLife) _ghosts.erase(_ghosts.begin());
     if (!_running) return;
+    float remain = kDuration - _elapsed;                    // 本帧最多消化 remain 秒位移
+    _move_t = dt < remain ? dt : remain;                    // 结束帧余量补足 → 总位移精确
     _elapsed += dt; _frame++;
     if (_elapsed >= kDuration) { _running = false; _elapsed = 0.0f; _frame = 0; }
 }

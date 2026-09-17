@@ -15,11 +15,8 @@ public:
     bool try_start(const Vector2& dir_norm);
     void tick(float dt);                       // 推进计时/冷却/残影老化
     bool active() const { return _running; }
-    Vector2 delta_this_frame() const {
-        if (!_running) return {0.0f, 0.0f};
-        float s = kSpeed * _dt;
-        return {_dir.x * s, _dir.y * s};
-    }
+    // 本帧应走的位移 (tick() 后取值; 结束帧 = 余量补足, 保证总位移精确 kDistance)
+    Vector2 delta_this_frame() const { return {_dir.x * kSpeed * _move_t, _dir.y * kSpeed * _move_t}; }
     float remaining_cd() const { return _cd > 0 ? _cd : 0; }
     float tilt_deg() const;
     Vector2 squash_scale() const;
@@ -31,7 +28,8 @@ public:
 private:
     Vector2 _dir = {0.0f, 1.0f};
     bool  _running = false;
-    float _elapsed = 0.0f, _cd = 0.0f, _dt = 0.0f;
+    float _elapsed = 0.0f, _cd = 0.0f;
+    float _move_t = 0.0f;                      // 本帧有效位移时长 (秒)
     int   _frame = 0;
     std::vector<RollGhost> _ghosts;
 };

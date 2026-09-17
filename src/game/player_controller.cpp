@@ -144,8 +144,6 @@ void PlayerController::tick(float dt) {
         }
         auto& e = gs.player->entity;
         _record_move(move.x, move.y);
-        float speed_mul = (gs._tw_speed_boost > 0) ? 1.25f : 1.0f;
-        float s = get_effective_speed(gs.player.get()) * speed_mul * dt;
         // G10.6-B C2: 停靠贴合 — 整步失败改为二分逼近最大合法位移
         // 边界: 判定函数 is_rect_walkable 不变, 仅提升移动 resolution 精度
         // (原实现停靠间隙 [0,s) 帧间抖动 -> 二分 6 次后 <s/64 稳定贴边)
@@ -165,8 +163,23 @@ void PlayerController::tick(float dt) {
             if (is_x) e.position.x = start + lo; else e.position.y = start + lo;
             e.sync_rect();
         };
-        _try_move_axis(true,  move.x * s);
-        _try_move_axis(false, move.y * s);
+        // B3: 翻滚位移接管 — was_dodging 覆盖全程含结束帧(余量补足+落地尘), 否则常规移动
+        bool was_dodging = gs.player->dodge.active();
+        gs.player->dodge.tick(dt);
+        if (was_dodging) {
+            Vector2 d = gs.player->dodge.delta_this_frame();
+            _try_move_axis(true,  d.x);
+            _try_move_axis(false, d.y);                      // 撞墙=既有二分贴墙, 计时照跑
+            if (gs.player->dodge.active() && gs.player->dodge.ghost_due())
+                gs.player->dodge.push_ghost({e.position.x, e.position.y});
+            if (!gs.player->dodge.active())
+                _roll_dust(gs, e.rect.x + e.rect.width / 2, e.rect.y + e.rect.height / 2);
+        } else {
+            float speed_mul = (gs._tw_speed_boost > 0) ? 1.25f : 1.0f;
+            float s = get_effective_speed(gs.player.get()) * speed_mul * dt;
+            _try_move_axis(true,  move.x * s);
+            _try_move_axis(false, move.y * s);
+        }
 
         // ── 房间发现 ──
         std::string disc = gs._interact.check_special_discovery(gs.player.get(), gs.game_map.get());
@@ -346,6 +359,10 @@ void PlayerController::handle_input(const InputMap& input) {
 
     // M4.2: 镜像冻结期间禁攻击/技能/拾取/交互
     if (gs.player_frozen_by_mirror()) return;
+
+    // B3: 翻滚 — UI 早退链与镜像冻结门已被上方 return 覆盖
+    if (gs._is_action_just_pressed(input, "dodge"))
+        _try_start_dodge(gs, input);
 
     if (gs._is_action_just_pressed(input,"attack")) {
         if (gs._sim_mode) {
@@ -837,4 +854,20 @@ void PlayerController::use_skill(int index) {
             it = gs.monsters.erase(it);
         } else ++it;
     }
+}
+
+// B3: 起翻 — 方向键优先(斜向归一)/无键取面朝; 成功后显式喂 Mirror DODGE 采集
+void PlayerController::_try_start_dodge(GameScene& gs, const InputMap& input) {
+    auto& dg = gs.player->dodge;
+    Vector2 dir = roll_direction(input.get_movement_axis(), gs.player->direction);
+    if (!dg.try_start(dir)) return;
+    const auto& r = gs.player->entity.rect;
+    float cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    g_behavior.on_dodge((float)gs.game_time, gs.current_floor, cx, cy);
+    _roll_dust(gs, cx, cy);   // T2 空壳 / T3 实装
+}
+
+// B3: 翻滚尘土 — T2 空壳占位, T3 填充 VFXServer 直发原语
+void PlayerController::_roll_dust(GameScene& gs, float cx, float cy) {
+    (void)gs; (void)cx; (void)cy;
 }

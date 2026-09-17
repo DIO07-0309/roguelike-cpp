@@ -5,8 +5,8 @@
 TEST(DodgeComponent, RollMovesFullDistanceThenEnds) {
     DodgeComponent d; ASSERT_TRUE(d.try_start({1, 0}));
     float total = 0;
-    for (int i = 0; i < 20 && d.active(); i++) { d.tick(1 / 60.f); total += d.delta_this_frame().x; }
-    EXPECT_NEAR(total, DodgeComponent::kDistance, 8.0f);   // ±1 帧 (末帧 tick 终止不再计 delta)
+    for (int i = 0; i < 20; i++) { d.tick(1 / 60.f); total += d.delta_this_frame().x; if (!d.active()) break; }
+    EXPECT_NEAR(total, DodgeComponent::kDistance, 0.5f);
     EXPECT_FALSE(d.active());
     EXPECT_NEAR(d.remaining_cd(), DodgeComponent::kCooldown - DodgeComponent::kDuration, 0.03f);
 }

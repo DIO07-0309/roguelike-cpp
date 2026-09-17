@@ -59,6 +59,8 @@ void InputMap::setup_defaults() {
     add_action("confirm",    KEY_ENTER); add_action("confirm", KEY_KP_ENTER);
     add_action("cancel",     KEY_ESCAPE);
     add_action("fullscreen", KEY_G);
+    add_action("dodge",      KEY_LEFT_SHIFT);   // B3: 翻滚 — 任一 Shift
+    add_action("dodge",      KEY_RIGHT_SHIFT);
 }
 
 std::string InputMap::_key_name(KeyboardKey k) {

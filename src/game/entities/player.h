@@ -12,6 +12,7 @@
 #include "attack_evolution_state.h"   // G1: 普攻进化
 #include "systems/weapon_component.h"  // G9: weapon system
 #include "components/element_component.h" // G10: element core
+#include "systems/dodge_component.h"      // B3: 翻滚组件 (纯手感输入驱动)
 
 // ============================================================
 // D2: ComboState — 四段连击状态 (挂在 Player 上)
@@ -99,6 +100,9 @@ public:
 
     // G9: 武器组件 (equip时同步, 驱动普攻)
     WeaponComponent weapon;
+
+    // B3: 翻滚组件 (独立冷却 0.7s, Shift 起翻, 不占武器 recovery)
+    DodgeComponent dodge;
 
     // G1: 普攻进化状态
     AttackEvolutionState attack_evo;

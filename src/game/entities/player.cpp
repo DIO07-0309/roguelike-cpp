@@ -65,6 +65,7 @@ void Player::reset_attack_timers() {
     for (auto& s : skills.passives) {
         s->last_use_time = -999.0f;
     }
+    dodge.reset();  // B3: 换层/重开清翻滚态与冷却
 }
 
 // P1-C7-A: Player::can_attack 已删 — 空手/持械统一走 WeaponComponent::can_attack
