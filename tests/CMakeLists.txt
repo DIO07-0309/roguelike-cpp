@@ -86,6 +86,7 @@ add_roguelike_test(damage_test      combat/damage_test.cpp)
 add_roguelike_test(damage_type_test combat/damage_type_test.cpp)
 add_roguelike_test(projectile_test  combat/projectile_test.cpp)
 add_roguelike_test(buff_test        combat/buff_test.cpp)
+add_roguelike_test(dodge_test       combat/dodge_test.cpp)   # B3: 翻滚纯逻辑组件
 add_roguelike_test(biome_test       world/biome_test.cpp)
 add_roguelike_test(encounter_test   world/encounter_test.cpp)
 add_roguelike_test(condition_test   world/condition_test.cpp)

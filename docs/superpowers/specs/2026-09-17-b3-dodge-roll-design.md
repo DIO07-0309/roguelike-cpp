@@ -79,7 +79,7 @@ public:
 - Mirror 跨局记忆 (mirror_memory.json) 沿用 `MetaSystem::g_readonly` 屏蔽语义, 无新字段。
 - 存档: 无新持久字段, 冷却/翻滚态为局内态, save/load 零迁移; `DodgeComponent::reset()` 挂进既有的换层/重开清理链。
 
-## 6. 测试计划 (ctest 61 → 67)
+## 6. 测试计划 (ctest 61 → 62)
 
 | # | 用例 | 断言 |
 |:---|:---|:---|
@@ -94,7 +94,7 @@ public:
 
 ## 7. 验收门禁清单
 
-1. Release 0 error · ctest 67/67 · world_validator 0/0 (vfx_recipes 新增)
+1. Release 0 error · ctest 62/62 · world_validator 0/0 (vfx_recipes 新增)
 2. sim 双跑字节一致 + 对 m4 基线快照 diff = 空
 3. 2D/3D 双模式实机: Shift 翻滚手感/尘土/残影/落地回弹 (用户)
 4. Mirror HUD (B1.1) 可见 DODGE 意图计数起算
@@ -108,5 +108,5 @@ public:
 
 1. **尘土不新增 vfx_recipes.json 配方** — 改用既有直发模式 `VFXServer` ring+spark_burst → `gs.active_effects` (player_controller.cpp:470-473 同构)。3D 侧经 `_build_effects` 自动消费, **删** §4 的 A2 mote burst 专属改动; validator 门保留为 T5 全量形式合规 (JSON 实际零改动)。
 2. **3D 不做倾斜旋转** — `DrawBillboardRec` 无 rotation 参数; 3D 翻滚表现 = squash 缩放 (`HD2DDrawItem.scale_w/scale_h`) + 残影 quad。倾斜仅 2D (脚底 origin 现成路径)。
-3. **撞墙早停单测并入实机验收** — `_try_move_axis` 二分贴墙是既有已验证逻辑, 组件层恒定 delta 已由 `RollMovesFullDistanceThenEnds` 覆盖; 计划 ctest 新增用例仍为 6 (61→67 不变)。
+3. **撞墙早停单测并入实机验收** — `_try_move_axis` 二分贴墙是既有已验证逻辑, 组件层恒定 delta 已由 `RollMovesFullDistanceThenEnds` 覆盖; 计划 ctest 新增用例仍为 6 用例 (可执行粒度: 61→62, 见 9-5)。
 4. **换层/重开重置链** — `dodge.reset()` 挂 `Player::reset_attack_timers()` (player.cpp:58, 进层已被 game_scene.cpp 调用), 不新开钩子点。

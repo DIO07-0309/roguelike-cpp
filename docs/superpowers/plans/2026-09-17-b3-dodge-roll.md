@@ -112,7 +112,11 @@ public:
     bool try_start(const Vector2& dir_norm);
     void tick(float dt);                       // 推进计时/冷却/残影老化
     bool active() const { return _running; }
-    Vector2 delta_this_frame() const { return _running ? _dir * (kSpeed * _dt) : Vector2{}; }
+    Vector2 delta_this_frame() const {   // raylib.h 无 Vector2*float → 分量展开 (T1 实测)
+        if (!_running) return {0.0f, 0.0f};
+        float s = kSpeed * _dt;
+        return {_dir.x * s, _dir.y * s};
+    }
     float remaining_cd() const { return _cd > 0 ? _cd : 0; }
     float tilt_deg() const;
     Vector2 squash_scale() const;
@@ -181,7 +185,7 @@ Vector2 roll_direction(const Vector2& axis, Direction facing) {
 }
 ```
 
-- [ ] **Step 4: 注册 + 跑绿**：tests/CMakeLists.txt 加 `add_roguelike_test(dodge_test combat/dodge_test.cpp)`；`cmake -B build -DENABLE_TESTS=ON` 重配 → `cmake --build build` → `ctest` → 预期 **67/67**
+- [ ] **Step 4: 注册 + 跑绿**：tests/CMakeLists.txt 加 `add_roguelike_test(dodge_test combat/dodge_test.cpp)`；`cmake -B build -DENABLE_TESTS=ON` 重配 → `cmake --build build` → `ctest` → 预期 **62/62**
 
 - [ ] **Step 5: Commit** `feat: B3-T1 DodgeComponent 纯逻辑组件 + 6 单测 (零RNG/dt定步长)`
 
@@ -270,7 +274,7 @@ cmake --build build
 Compare-Object (Get-Content "$env:TEMP\opencode\pre_b3_report.json") (Get-Content reports\balance_report.json)
 ```
 
-预期：diff 空（Agent 无 dodge 动作 → 组件永不 active）。`cd build; ctest` → 67/67
+预期：diff 空（Agent 无 dodge 动作 → 组件永不 active）。`cd build; ctest` → 62/62
 
 - [ ] **Step 6: Commit** `feat: B3-T2 翻滚接线 — Shift 起翻/tick 位移接管/on_dodge 采集/sim 零变化`
 
@@ -327,7 +331,7 @@ void PlayerController::_roll_dust(GameScene& gs, float cx, float cy) { _roll_dus
         }
 ```
 
-- [ ] **Step 4: 验证**：`cmake --build build` 0 error；ctest 67/67；`--hd2d` 关闭的 2D hidwin autoshot 冒烟（不按键 → 画面应与基线一致，PIL 均值亮度 diff <1）。实机 Shift 手感归 T5 用户验收。Commit `feat: B3-T3 2D 翻滚表现 — 脚底倾斜/压扁回弹/3 段残影/尘土`
+- [ ] **Step 4: 验证**：`cmake --build build` 0 error；ctest 62/62；`--hd2d` 关闭的 2D hidwin autoshot 冒烟（不按键 → 画面应与基线一致，PIL 均值亮度 diff <1）。实机 Shift 手感归 T5 用户验收。Commit `feat: B3-T3 2D 翻滚表现 — 脚底倾斜/压扁回弹/3 段残影/尘土`
 
 ---
 
@@ -373,7 +377,7 @@ void PlayerController::_roll_dust(GameScene& gs, float cx, float cy) { _roll_dus
 
 （builder include `systems/dodge_component.h` 若经 player.h 已可见则免）
 
-- [ ] **Step 4: 验证**：build 0 error；ctest 67/67；hidwin `--hd2d --goto-floor 6 --autoshot` 冒烟（不按键，回归比对）；sim 双跑字节一致复测（3D 不进 sim，形式合规）。Commit `feat: B3-T4 3D 翻滚表现 — billboard squash + 残影 quad (HD2DDrawItem.scale_*)`
+- [ ] **Step 4: 验证**：build 0 error；ctest 62/62；hidwin `--hd2d --goto-floor 6 --autoshot` 冒烟（不按键，回归比对）；sim 双跑字节一致复测（3D 不进 sim，形式合规）。Commit `feat: B3-T4 3D 翻滚表现 — billboard squash + 残影 quad (HD2DDrawItem.scale_*)`
 
 ---
 
@@ -387,7 +391,7 @@ void PlayerController::_roll_dust(GameScene& gs, float cx, float cy) { _roll_dus
 
 - [ ] **Step 2: 码点**：`conda run python tools/extract_chars.py` → 若 1936 增长则重建字体 atlas（沿 B 线流程），确认"翻/滚/闪/避"在内。
 
-- [ ] **Step 3: 全量门禁**：Release 0 error · `cmake --build build`+`ctest` 67/67 · `conda run python tools/world_validator.py` 0/0 · sim 双跑字节一致 + 对 `pre_b3_report.json` diff 空 · hidwin 2D/3D 冒烟回归。
+- [ ] **Step 3: 全量门禁**：Release 0 error · `cmake --build build`+`ctest` 62/62 · `conda run python tools/world_validator.py` 0/0 · sim 双跑字节一致 + 对 `pre_b3_report.json` diff 空 · hidwin 2D/3D 冒烟回归。
 
 - [ ] **Step 4: CHANGELOG**（`# v1.7-B3 — 翻滚/闪避: 纯手感位移 + 表现全套 (2026-09-17)` 条目：机制参数、Mirror 采集接入、sim 零变化声明、勘误 3 条、门禁结果）；roadmap B3 行改 `| B3 ✅ v1.7-B3 | 翻滚/闪避 ... | 完成 |`。
 
