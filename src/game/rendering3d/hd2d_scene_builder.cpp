@@ -417,6 +417,19 @@ static void _build_entities(GameScene& gs, std::vector<HD2DDrawItem>& out) {
             item.tex_src = SpriteRenderer::frame_rect(def, anim_frame);
         else item.tint = {90, 160, 255, 255};
         item.flip_x = (gs.player->direction == Direction::LEFT);
+        // B3: 翻滚形变 + 残影 (倾斜见 spec §9-2: DrawBillboardRec 无旋转, 3D 不做)
+        Vector2 sq = gs.player->dodge.squash_scale();
+        item.scale_w = sq.x; item.scale_h = sq.y;
+        for (const auto& g : gs.player->dodge.ghosts()) {   // 残影先入 → painter 稳定序垫底
+            float ga = 120.0f * (1.0f - g.age / DodgeComponent::kGhostLife);
+            if (ga <= 0.0f) continue;
+            HD2DDrawItem gh = item;
+            gh.world_pos = {g.pos.x + r.width * 0.5f, 0, g.pos.y + r.height * 0.5f};
+            gh.sort_y = g.pos.y;
+            gh.tint = {255, 255, 255, (unsigned char)ga};
+            gh.outline = false;
+            out.push_back(gh);
+        }
         out.push_back(item);
     }
     for (auto& m : gs.monsters) {

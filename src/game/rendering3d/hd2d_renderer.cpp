@@ -535,8 +535,8 @@ void HD2DRenderer::_wall_top_quad(float u0, float u1, float v0, float v1,
 // ── Billboard: 面向相机的精灵, 脚点落地, 帧矩形裁剪 (v2a: flip_x 接线) ──
 void HD2DRenderer::_draw_billboard(const HD2DDrawItem& item) {
     Vector3 pos = item.world_pos;
-    float w = item.size;
-    float h = item.size * 1.5f;
+    float w = item.size * item.scale_w;      // B3: 翻滚压扁 (默认 1 = 原行为)
+    float h = item.size * 1.5f * item.scale_h;
     if (item.texture.id > 0) {
         Rectangle src = item.tex_src.width > 0 ? item.tex_src
             : Rectangle{0, 0, (float)item.texture.width, (float)item.texture.height};
